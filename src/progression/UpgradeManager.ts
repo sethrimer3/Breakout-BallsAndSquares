@@ -26,6 +26,15 @@ export class UpgradeManager {
     if (def.branch === "shotgun" && def.id !== "shotgun_unlock") {
       if (this.levelOf("shotgun_unlock") === 0) return false;
     }
+    if (def.branch === "assault_rifle" && def.id !== "ar_unlock") {
+      if (this.levelOf("ar_unlock") === 0) return false;
+    }
+    if (def.branch === "rocket_launcher" && def.id !== "rocket_unlock") {
+      if (this.levelOf("rocket_unlock") === 0) return false;
+    }
+    if (def.branch === "sniper_rifle" && def.id !== "sniper_unlock") {
+      if (this.levelOf("sniper_unlock") === 0) return false;
+    }
     return true;
   }
 

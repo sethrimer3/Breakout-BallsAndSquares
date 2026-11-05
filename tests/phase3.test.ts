@@ -163,4 +163,82 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const s3 = new SaveManager(store);
     expect(s3.data.loadouts[0].weapon).toBe("shotgun");
   });
+
+  it("supports Assault Rifle (pierce up to 5), Rocket Launcher (AoE), and Sniper Rifle (pierce/crit) trees & combat", async () => {
+    const { PixelWorld } = await import("../src/world/PixelWorld");
+    const { CombatSystem } = await import("../src/systems/CombatSystem");
+    const { Soldier } = await import("../src/entities/Soldier");
+
+    const store = new MemStorage();
+    const save = new SaveManager(store);
+    const upg = new UpgradeManager(save);
+    save.data.bank = 100_000;
+    save.data.lifetimePixels = 500;
+
+    // Unlock Assault Rifle and max out AP Pierce (5 levels => pierce = 5).
+    expect(upg.isUnlocked("ar_pierce")).toBe(false);
+    expect(upg.buy("ar_unlock")).toBe(true);
+    expect(upg.isUnlocked("ar_pierce")).toBe(true);
+    for (let i = 0; i < 5; i++) {
+      expect(upg.buy("ar_pierce")).toBe(true);
+    }
+    expect(upg.buy("ar_pierce")).toBe(false); // capped at 5
+    const arStats = upg.getSoldierStats();
+    expect(arStats.arUnlocked).toBe(true);
+    expect(arStats.arPierce).toBe(5);
+
+    // Unlock Rocket Launcher & Sniper Rifle.
+    expect(upg.buy("rocket_unlock")).toBe(true);
+    expect(upg.buy("rocket_radius")).toBe(true);
+    expect(upg.buy("rocket_cluster")).toBe(true);
+    expect(upg.buy("sniper_unlock")).toBe(true);
+    expect(upg.buy("sniper_pierce")).toBe(true);
+    const fullStats = upg.getSoldierStats();
+    expect(fullStats.rocketUnlocked).toBe(true);
+    expect(fullStats.sniperUnlocked).toBe(true);
+    expect(fullStats.sniperPierce).toBe(3);
+
+    // Verify Assault Rifle bullet with pierce=5 pierces through 6 blocks in a single line (5 pierces + final hit).
+    const w1 = new PixelWorld({ width: 30, height: 20, cellSize: 10, roomSize: 6 });
+    for (let c = 5; c <= 14; c++) {
+      w1.setCell(c, 5, 1, "set", true);
+    }
+    let destroyedCount = 0;
+    const combat1 = new CombatSystem(w1, new Rng(123), fullStats, {
+      onImpact: (_x, _y, _nx, _ny, _cx, _cy, result) => {
+        if (result === 2) destroyedCount++;
+      },
+    });
+    const arSoldier = new Soldier(15, 55, 100, 0, 3, "assault_rifle");
+    arSoldier.fireCooldown = 0;
+    // Set arSpreadDeg = 0 so shot flies strictly horizontally along row 5.
+    combat1.stats.arSpreadDeg = 0;
+    combat1.fire(arSoldier);
+    combat1.updateBullets(0.3);
+    expect(destroyedCount).toBe(6); // pierced 5 blocks and stopped on the 6th!
+
+    // Verify Rocket Launcher AoE detonation destroys multiple blocks around impact and spawns cluster bomb.
+    const w2 = new PixelWorld({ width: 30, height: 20, cellSize: 10, roomSize: 6 });
+    for (let r = 8; r <= 12; r++) {
+      for (let c = 8; c <= 12; c++) {
+        w2.setCell(c, r, 1, "set", true);
+      }
+    }
+    let rocketDestroyed = 0;
+    let explosions = 0;
+    const combat2 = new CombatSystem(w2, new Rng(456), fullStats, {
+      onImpact: (_x, _y, _nx, _ny, _cx, _cy, result) => {
+        if (result === 2) rocketDestroyed++;
+      },
+      onExplosion: () => {
+        explosions++;
+      },
+    });
+    const rocketSoldier = new Soldier(20, 105, 100, 0, 3, "rocket_launcher");
+    combat2.fire(rocketSoldier);
+    combat2.updateBullets(0.3);
+    combat2.updateBullets(0.4); // let cluster mini-bomb detonate
+    expect(explosions).toBeGreaterThanOrEqual(2);
+    expect(rocketDestroyed).toBeGreaterThan(5);
+  });
 });

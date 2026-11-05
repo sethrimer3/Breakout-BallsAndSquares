@@ -110,6 +110,51 @@ export const SHOTGUN = {
   lifetime: 0.48,
 };
 
+export const ASSAULT_RIFLE = {
+  /** Fast automatic fire rate (shots/s). */
+  fireRate: 6.5,
+  /** Base damage per round. */
+  damage: 1,
+  /** Base bullet speed (units/s). */
+  bulletSpeed: 580,
+  /** Base half-angle spread jitter (degrees). */
+  spreadDeg: 3.5,
+  /** Base pierce count (extra blocks penetrated after first impact; upgrades up to 5). */
+  pierce: 0,
+  /** Bullet lifetime (seconds). */
+  lifetime: 1.3,
+};
+
+export const ROCKET_LAUNCHER = {
+  /** Base shots per second. */
+  fireRate: 0.45,
+  /** Direct impact / epicenter damage. */
+  damage: 4,
+  /** Rocket travel velocity (units/s). */
+  bulletSpeed: 310,
+  /** Explosion radius in cells. */
+  blastRadiusCells: 2.5,
+  /** Cluster mini-bombs spawned on detonation. */
+  clusterCount: 0,
+  /** Rocket lifetime (seconds). */
+  lifetime: 2.2,
+};
+
+export const SNIPER_RIFLE = {
+  /** Base shots per second (high-caliber bolt action). */
+  fireRate: 0.65,
+  /** High single-target & line-penetration damage. */
+  damage: 6,
+  /** Hyper-velocity round speed (units/s). */
+  bulletSpeed: 980,
+  /** Base pierce count (penetrates multiple blocks in a line). */
+  pierce: 2,
+  /** Critical strike chance (0..1) for 2x damage. */
+  critChance: 0,
+  /** Bullet lifetime (seconds). */
+  lifetime: 1.8,
+};
+
 export const CAMERA = {
   defaultZoom: 2.5,
   minZoom: 0.5,

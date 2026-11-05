@@ -283,21 +283,33 @@ export class Renderer {
       const sx = cam.worldToScreenX(b.x);
       const sy = cam.worldToScreenY(b.y);
       if (sx < -40 || sy < -40 || sx > cam.viewW + 40 || sy > cam.viewH + 40) continue;
-      const tLen = Math.min(BULLET.tracerLength, b.traveled);
+      const isRocket = b.style === 1;
+      const isSniper = b.style === 2;
+      const maxTracer = isSniper ? BULLET.tracerLength * 2.4 : isRocket ? BULLET.tracerLength * 1.4 : BULLET.tracerLength;
+      const tLen = Math.min(maxTracer, b.traveled);
       const tx = cam.worldToScreenX(b.x - b.dx * tLen);
       const ty = cam.worldToScreenY(b.y - b.dy * tLen);
       const grad = ctx.createLinearGradient(tx, ty, sx, sy);
-      grad.addColorStop(0, "rgba(255, 195, 100, 0)");
-      grad.addColorStop(1, "rgba(255, 242, 195, 0.92)");
+      if (isSniper) {
+        grad.addColorStop(0, "rgba(120, 235, 255, 0)");
+        grad.addColorStop(1, "rgba(215, 252, 255, 0.98)");
+      } else if (isRocket) {
+        grad.addColorStop(0, "rgba(255, 90, 20, 0)");
+        grad.addColorStop(1, "rgba(255, 200, 110, 0.95)");
+      } else {
+        grad.addColorStop(0, "rgba(255, 195, 100, 0)");
+        grad.addColorStop(1, "rgba(255, 242, 195, 0.92)");
+      }
       ctx.strokeStyle = grad;
-      ctx.lineWidth = Math.max(1.2, 1.3 * cam.zoom);
+      ctx.lineWidth = Math.max(1.2, (isRocket ? 2.4 : isSniper ? 1.9 : 1.3) * cam.zoom);
       ctx.beginPath();
       ctx.moveTo(tx, ty);
       ctx.lineTo(sx, sy);
       ctx.stroke();
 
-      const r = Math.max(2, BULLET.radius * 2.6 * cam.zoom);
-      ctx.drawImage(this.sprites.hotGlow, sx - r, sy - r, r * 2, r * 2);
+      const rScale = isRocket ? 4.2 : isSniper ? 3.2 : 2.6;
+      const r = Math.max(2, BULLET.radius * rScale * cam.zoom);
+      ctx.drawImage(isRocket ? this.sprites.warmGlow : this.sprites.hotGlow, sx - r, sy - r, r * 2, r * 2);
     }
   }
 

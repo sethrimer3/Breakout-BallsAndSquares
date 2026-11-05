@@ -10,7 +10,13 @@ export interface SoldierLoadout {
   equipment: (string | null)[];
 }
 
-const VALID_WEAPONS: readonly WeaponType[] = ["pistol", "shotgun"];
+const VALID_WEAPONS: readonly WeaponType[] = [
+  "pistol",
+  "shotgun",
+  "assault_rifle",
+  "rocket_launcher",
+  "sniper_rifle",
+];
 const MAX_SOLDIER_SLOTS = 8;
 
 export type MuzzleFlashLevel = "brightest" | "brighter" | "bright" | "dim" | "dimmer" | "off";
@@ -114,10 +120,16 @@ export function sanitizeSaveData(raw: unknown): SaveData {
       }
     }
   }
-  // If shotgun is not unlocked in this save, fall back any shotgun loadouts to pistol.
-  if ((def.upgrades.shotgun_unlock ?? 0) === 0) {
-    for (const ld of def.loadouts) {
-      if (ld.weapon === "shotgun") ld.weapon = "pistol";
+  // If any weapon is not unlocked in this save, fall back those loadouts to pistol.
+  for (const ld of def.loadouts) {
+    if (ld.weapon === "shotgun" && (def.upgrades.shotgun_unlock ?? 0) === 0) {
+      ld.weapon = "pistol";
+    } else if (ld.weapon === "assault_rifle" && (def.upgrades.ar_unlock ?? 0) === 0) {
+      ld.weapon = "pistol";
+    } else if (ld.weapon === "rocket_launcher" && (def.upgrades.rocket_unlock ?? 0) === 0) {
+      ld.weapon = "pistol";
+    } else if (ld.weapon === "sniper_rifle" && (def.upgrades.sniper_unlock ?? 0) === 0) {
+      ld.weapon = "pistol";
     }
   }
 

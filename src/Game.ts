@@ -102,6 +102,7 @@ export class Game {
     this.combat = new CombatSystem(this.world, this.rng, this.stats, {
       onShot: (s, dx, dy, mx, my) => this.onShot(s, dx, dy, mx, my),
       onImpact: (x, y, nx, ny, cx, cy, result) => this.onImpact(x, y, nx, ny, cx, cy, result),
+      onExplosion: (x, y, rad) => this.onExplosion(x, y, rad),
     });
     this.growth = new GrowthSystem(this.world, this.rng, {
       onSoldierKilled: (s) => this.onSoldierKilled(s),
@@ -344,7 +345,7 @@ export class Game {
     }
     const slotIdx = this.runStats.soldiersDeployed;
     const rawWeapon = this.save.data.loadouts[slotIdx]?.weapon ?? "pistol";
-    const weapon = rawWeapon === "shotgun" && !this.stats.shotgunUnlocked ? "pistol" : rawWeapon;
+    const weapon = this.isWeaponUnlocked(rawWeapon) ? rawWeapon : "pistol";
     const s = new Soldier(spawn.x, spawn.y, dx, dy, this.stats.speed, weapon);
     this.soldiers.push(s);
     this.reserves--;
@@ -354,6 +355,21 @@ export class Game {
       const a = this.rng.range(0, Math.PI * 2);
       const sp = this.rng.range(20, 70);
       this.particles.spawn(PKind.Spark, spawn.x, spawn.y, Math.cos(a) * sp, Math.sin(a) * sp, 0.35, 1, 0x9ff3ff, 5);
+    }
+  }
+
+  isWeaponUnlocked(w: Soldier["weapon"]): boolean {
+    switch (w) {
+      case "pistol":
+        return true;
+      case "shotgun":
+        return this.stats.shotgunUnlocked;
+      case "assault_rifle":
+        return this.stats.arUnlocked;
+      case "rocket_launcher":
+        return this.stats.rocketUnlocked;
+      case "sniper_rifle":
+        return this.stats.sniperUnlocked;
     }
   }
 
@@ -456,6 +472,43 @@ export class Game {
         this.stats.pickupLifetime,
         this.rng,
         lootKind,
+      );
+    }
+  }
+
+  private onExplosion(x: number, y: number, radiusWorld: number): void {
+    this.audio.playDestroy();
+    const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
+    const lit = this.flashLitPool.pop() ?? makeLitCells();
+    this.flashes.push({
+      x,
+      y,
+      dx: 1,
+      dy: 0,
+      life: LIGHT.flashDuration * 1.9,
+      maxLife: LIGHT.flashDuration * 1.9,
+      radius: Math.max(LIGHT.radius * 1.2, radiusWorld * 3.2),
+      ownerId: -1,
+      poly,
+      polyCount: 0,
+      hasPolygon: false,
+      lit,
+    });
+    this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.28, radiusWorld * 0.75, 0xffaa44, 1);
+    for (let i = 0; i < 24; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(45, 220);
+      const col = i % 2 === 0 ? 0xff7722 : 0xffdd77;
+      this.particles.spawn(
+        PKind.Spark,
+        x,
+        y,
+        Math.cos(a) * sp,
+        Math.sin(a) * sp,
+        this.rng.range(0.15, 0.35),
+        this.rng.range(1.2, 2.2),
+        col,
+        6,
       );
     }
   }

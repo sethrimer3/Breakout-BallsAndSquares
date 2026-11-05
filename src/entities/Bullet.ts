@@ -8,6 +8,14 @@ export class Bullet {
   speed = 0;
   damage = 1;
   life = 0;
+  /** Number of additional solid blocks this projectile can penetrate before expiring. */
+  pierceLeft = 0;
+  /** Explosion radius in cells (> 0 for rockets / cluster bombs). */
+  explosionRadius = 0;
+  /** Number of secondary cluster mini-bombs spawned upon detonation. */
+  clusterCount = 0;
+  /** Visual style: 0 = standard round, 1 = rocket, 2 = sniper hyper-velocity tracer. */
+  style: 0 | 1 | 2 = 0;
   /** Distance traveled (used to clamp the tracer so it never trails behind the muzzle). */
   traveled = 0;
   /**

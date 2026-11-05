@@ -46,10 +46,13 @@ export class UpgradeTree {
           <div class="tree-title">UPGRADE MATRIX</div>
           <div class="tree-sub">CORE SYSTEMS, WEAPON TREES &amp; SQUAD LOADOUT</div>
           <div class="tree-tabs">
-            <button class="tree-tab active" data-tab="core">CORE MATRIX</button>
-            <button class="tree-tab" data-tab="pistol">PISTOL TREE</button>
-            <button class="tree-tab" data-tab="shotgun">SHOTGUN TREE</button>
-            <button class="tree-tab tree-tab-loadout" data-tab="loadout">LOADOUT / INVENTORY</button>
+            <button class="tree-tab active" data-tab="core">CORE</button>
+            <button class="tree-tab" data-tab="pistol">PISTOL</button>
+            <button class="tree-tab" data-tab="shotgun">SHOTGUN</button>
+            <button class="tree-tab" data-tab="assault_rifle">ASSAULT RIFLE</button>
+            <button class="tree-tab" data-tab="rocket_launcher">ROCKET</button>
+            <button class="tree-tab" data-tab="sniper_rifle">SNIPER</button>
+            <button class="tree-tab tree-tab-loadout" data-tab="loadout">LOADOUT</button>
           </div>
           <div class="tree-legend">
             <span class="leg-item" style="--leg-c: #ffd84d">■ MONEY</span>
@@ -121,6 +124,12 @@ export class UpgradeTree {
       this.subEl.textContent = "SIDEARM WEAPON TREE — STANDARD ISSUE (UNLOCKED)";
     } else if (tab === "shotgun") {
       this.subEl.textContent = "SCATTER SHOTGUN WEAPON TREE — CLOSE-RANGE CONE EXCAVATOR";
+    } else if (tab === "assault_rifle") {
+      this.subEl.textContent = "ASSAULT RIFLE WEAPON TREE — RAPID FIRE WITH UP TO 5× PIERCE";
+    } else if (tab === "rocket_launcher") {
+      this.subEl.textContent = "ROCKET LAUNCHER WEAPON TREE — HEAVY EXPLOSIVE BLAST & CLUSTER MUNITIONS";
+    } else if (tab === "sniper_rifle") {
+      this.subEl.textContent = "SNIPER RIFLE WEAPON TREE — HIGH-VELOCITY PENETRATING ROUNDS & CRITS";
     } else {
       this.subEl.textContent = "SQUAD LOADOUT & INVENTORY — EQUIP WEAPONS & GEAR PER SOLDIER";
     }
@@ -194,14 +203,17 @@ export class UpgradeTree {
 
     let bodyHtml: string;
     if (!unlocked) {
-      const needShotgun =
-        def.branch === "shotgun" && def.id !== "shotgun_unlock" && u.levelOf("shotgun_unlock") === 0;
+      const needCenter =
+        (def.branch === "shotgun" && def.id !== "shotgun_unlock" && u.levelOf("shotgun_unlock") === 0) ||
+        (def.branch === "assault_rifle" && def.id !== "ar_unlock" && u.levelOf("ar_unlock") === 0) ||
+        (def.branch === "rocket_launcher" && def.id !== "rocket_unlock" && u.levelOf("rocket_unlock") === 0) ||
+        (def.branch === "sniper_rifle" && def.id !== "sniper_unlock" && u.levelOf("sniper_unlock") === 0);
       const rem = Math.max(0, def.unlockLifetimePixels - this.game.lifetimePixels);
       const lockMsg =
         rem > 0
           ? `LOCKED — Destroy ${def.unlockLifetimePixels} lifetime pixels (${rem} more)`
-          : needShotgun
-            ? `LOCKED — Unlock the Shotgun at the center node first`
+          : needCenter
+            ? `LOCKED — Unlock this weapon at the center node first`
             : `LOCKED`;
       bodyHtml = `
         <div class="tt-desc">${def.shortDesc}</div>
@@ -239,17 +251,40 @@ export class UpgradeTree {
   private renderLoadout(): void {
     const st = this.game.upgrades.getSoldierStats();
     const count = st.maxSoldiers;
-    const shotgunUnlocked = st.shotgunUnlocked;
     const loadouts = this.game.save.data.loadouts;
+
+    const weaponDefs: { id: WeaponType; label: string; unlocked: boolean }[] = [
+      { id: "pistol", label: "PISTOL", unlocked: true },
+      { id: "shotgun", label: "SHOTGUN", unlocked: st.shotgunUnlocked },
+      { id: "assault_rifle", label: "ASSAULT", unlocked: st.arUnlocked },
+      { id: "rocket_launcher", label: "ROCKET", unlocked: st.rocketUnlocked },
+      { id: "sniper_rifle", label: "SNIPER", unlocked: st.sniperUnlocked },
+    ];
 
     let cardsHtml = "";
     for (let i = 0; i < count; i++) {
       const ld = loadouts[i] ?? { weapon: "pistol", equipment: [null, null] };
-      const curW: WeaponType = ld.weapon === "shotgun" && !shotgunUnlocked ? "pistol" : ld.weapon;
-      const wSummary =
-        curW === "shotgun"
-          ? `${st.shotgunPellets} pellets · ${st.shotgunDamage} DMG · ${st.shotgunFireRate.toFixed(2)}/s`
-          : `1 round · ${st.damage} DMG · ${st.fireRate.toFixed(2)}/s`;
+      const curW: WeaponType = this.game.isWeaponUnlocked(ld.weapon) ? ld.weapon : "pistol";
+      let wSummary = `1 round · ${st.damage} DMG · ${st.fireRate.toFixed(2)}/s`;
+      if (curW === "shotgun") {
+        wSummary = `${st.shotgunPellets} pellets · ${st.shotgunDamage} DMG · ${st.shotgunFireRate.toFixed(2)}/s`;
+      } else if (curW === "assault_rifle") {
+        wSummary = `Rapid · ${st.arDamage} DMG · ${st.arPierce} Pierce · ${st.arFireRate.toFixed(1)}/s`;
+      } else if (curW === "rocket_launcher") {
+        wSummary = `AoE ${st.rocketBlastRadius.toFixed(1)}r · ${st.rocketDamage} DMG · ${st.rocketFireRate.toFixed(2)}/s`;
+      } else if (curW === "sniper_rifle") {
+        wSummary = `Sniper · ${st.sniperDamage} DMG · ${st.sniperPierce} Pierce · ${Math.round(st.sniperCritChance * 100)}% Crit`;
+      }
+
+      const wBtnsHtml = weaponDefs
+        .map(
+          (w) => `
+            <button class="btn lc-wbtn ${curW === w.id ? "btn-primary" : ""} ${!w.unlocked ? "locked" : ""}" data-slot="${i}" data-weapon="${w.id}" ${!w.unlocked ? "disabled" : ""}>
+              ${w.unlocked ? w.label : `🔒 ${w.label}`}
+            </button>
+          `,
+        )
+        .join("");
 
       cardsHtml += `
         <div class="loadout-card">
@@ -261,14 +296,7 @@ export class UpgradeTree {
             </div>
           </div>
           <div class="lc-section-lbl">PRIMARY WEAPON (1 PER SOLDIER)</div>
-          <div class="lc-weapons">
-            <button class="btn lc-wbtn ${curW === "pistol" ? "btn-primary" : ""}" data-slot="${i}" data-weapon="pistol">
-              PISTOL
-            </button>
-            <button class="btn lc-wbtn ${curW === "shotgun" ? "btn-primary" : ""} ${!shotgunUnlocked ? "locked" : ""}" data-slot="${i}" data-weapon="shotgun" ${!shotgunUnlocked ? "disabled" : ""}>
-              ${shotgunUnlocked ? "SHOTGUN" : "🔒 SHOTGUN"}
-            </button>
-          </div>
+          <div class="lc-weapons">${wBtnsHtml}</div>
           <div class="lc-section-lbl">EQUIPMENT SLOTS (COMING SOON)</div>
           <div class="lc-gear-row">
             <div class="lc-gear-slot" title="Equipment slot — coming soon">⬡ GEAR SLOT 1</div>
@@ -294,7 +322,7 @@ export class UpgradeTree {
         if (el.disabled) return;
         const slot = Number(el.dataset.slot);
         const weapon = el.dataset.weapon as WeaponType;
-        if (weapon === "shotgun" && !shotgunUnlocked) return;
+        if (!this.game.isWeaponUnlocked(weapon)) return;
         if (!loadouts[slot]) loadouts[slot] = { weapon: "pistol", equipment: [null, null] };
         loadouts[slot].weapon = weapon;
         this.game.save.save();
@@ -313,10 +341,16 @@ export class UpgradeTree {
     crysWrap.classList.toggle("hidden", this.game.crystals <= 0 && this.game.bests.depth < 16);
     this.lifeValEl.textContent = this.game.lifetimePixels.toLocaleString();
 
-    // Update Shotgun tab lock indicator & Loadout tab count.
-    const shotgunTab = this.root.querySelector('[data-tab="shotgun"]') as HTMLButtonElement;
-    if (shotgunTab) {
-      shotgunTab.textContent = st.shotgunUnlocked ? "SHOTGUN TREE" : "🔒 SHOTGUN TREE";
+    // Update weapon tab lock indicators & Loadout tab count.
+    const tabLocks: [UpgradeBranch, string, boolean][] = [
+      ["shotgun", "SHOTGUN", st.shotgunUnlocked],
+      ["assault_rifle", "ASSAULT RIFLE", st.arUnlocked],
+      ["rocket_launcher", "ROCKET", st.rocketUnlocked],
+      ["sniper_rifle", "SNIPER", st.sniperUnlocked],
+    ];
+    for (const [tabId, label, unlocked] of tabLocks) {
+      const btn = this.root.querySelector(`[data-tab="${tabId}"]`) as HTMLButtonElement | null;
+      if (btn) btn.textContent = unlocked ? label : `🔒 ${label}`;
     }
     const loadoutTab = this.root.querySelector('[data-tab="loadout"]') as HTMLButtonElement;
     if (loadoutTab) {
@@ -329,8 +363,13 @@ export class UpgradeTree {
     }
 
     // Center hub ball is shown on Core & Pistol (where 0,0 has no upgrade node),
-    // and hidden on Shotgun where `shotgun_unlock` sits at (0,0).
-    this.coreHubEl.classList.toggle("hidden", this.activeTab === "shotgun");
+    // and hidden on weapon trees where their unlock node sits at (0,0).
+    const hasCenterUnlockNode =
+      this.activeTab === "shotgun" ||
+      this.activeTab === "assault_rifle" ||
+      this.activeTab === "rocket_launcher" ||
+      this.activeTab === "sniper_rifle";
+    this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);
 
     for (const def of UPGRADE_DEFS) {
       const btn = this.nodeEls.get(def.id)!;

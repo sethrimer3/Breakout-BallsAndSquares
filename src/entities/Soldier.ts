@@ -1,6 +1,19 @@
-import { GROWTH, LOOT, SHOTGUN, SOLDIER } from "../config";
+import {
+  ASSAULT_RIFLE,
+  GROWTH,
+  LOOT,
+  ROCKET_LAUNCHER,
+  SHOTGUN,
+  SNIPER_RIFLE,
+  SOLDIER,
+} from "../config";
 
-export type WeaponType = "pistol" | "shotgun";
+export type WeaponType =
+  | "pistol"
+  | "shotgun"
+  | "assault_rifle"
+  | "rocket_launcher"
+  | "sniper_rifle";
 
 /** Derived soldier & run stats (base config combined with upgrades). */
 export interface SoldierStats {
@@ -19,6 +32,27 @@ export interface SoldierStats {
   shotgunSpreadDeg: number;
   shotgunBulletSpeed: number;
   shotgunLifetime: number;
+  // Assault Rifle stats
+  arUnlocked: boolean;
+  arFireRate: number;
+  arDamage: number;
+  arBulletSpeed: number;
+  arSpreadDeg: number;
+  arPierce: number;
+  // Rocket Launcher stats
+  rocketUnlocked: boolean;
+  rocketFireRate: number;
+  rocketDamage: number;
+  rocketBulletSpeed: number;
+  rocketBlastRadius: number;
+  rocketClusterCount: number;
+  // Sniper Rifle stats
+  sniperUnlocked: boolean;
+  sniperFireRate: number;
+  sniperDamage: number;
+  sniperBulletSpeed: number;
+  sniperPierce: number;
+  sniperCritChance: number;
   // Money / Loot stats
   dropChance: number;
   magnetRange: number;
@@ -44,6 +78,24 @@ export function baseSoldierStats(): SoldierStats {
     shotgunSpreadDeg: SHOTGUN.spreadDeg,
     shotgunBulletSpeed: SHOTGUN.bulletSpeed,
     shotgunLifetime: SHOTGUN.lifetime,
+    arUnlocked: false,
+    arFireRate: ASSAULT_RIFLE.fireRate,
+    arDamage: ASSAULT_RIFLE.damage,
+    arBulletSpeed: ASSAULT_RIFLE.bulletSpeed,
+    arSpreadDeg: ASSAULT_RIFLE.spreadDeg,
+    arPierce: ASSAULT_RIFLE.pierce,
+    rocketUnlocked: false,
+    rocketFireRate: ROCKET_LAUNCHER.fireRate,
+    rocketDamage: ROCKET_LAUNCHER.damage,
+    rocketBulletSpeed: ROCKET_LAUNCHER.bulletSpeed,
+    rocketBlastRadius: ROCKET_LAUNCHER.blastRadiusCells,
+    rocketClusterCount: ROCKET_LAUNCHER.clusterCount,
+    sniperUnlocked: false,
+    sniperFireRate: SNIPER_RIFLE.fireRate,
+    sniperDamage: SNIPER_RIFLE.damage,
+    sniperBulletSpeed: SNIPER_RIFLE.bulletSpeed,
+    sniperPierce: SNIPER_RIFLE.pierce,
+    sniperCritChance: SNIPER_RIFLE.critChance,
     dropChance: LOOT.baseDropChance,
     magnetRange: LOOT.baseMagnetRange,
     pickupLifetime: LOOT.baseLifetime,
