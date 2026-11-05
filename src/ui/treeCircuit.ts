@@ -117,19 +117,27 @@ export function pointAt(path: readonly Pt[], dist: number): Pt {
   return path[path.length - 1];
 }
 
-interface TrailPixel extends Pt {
-  color: string;
-}
-
-interface Cycle {
+/** One ridden leg. Trails are kept as legs, not pixels, so they stay on the
+ * traces however the elastic nodes move. */
+interface Leg {
   a: string;
   b: string;
   entry: number;
   exit: number;
   clockwise: boolean;
+  /** Pixels ridden so far along this leg. */
   dist: number;
+  color: string;
+}
+
+interface Cycle {
+  /** Oldest first; the last is the leg being ridden. */
+  legs: Leg[];
   carry: number;
-  trail: TrailPixel[];
+}
+
+function pathOf(leg: Leg, circuit: Circuit): Pt[] {
+  return legPath(circuit.nodes.get(leg.a)!, circuit.nodes.get(leg.b)!, leg.entry, leg.exit, leg.clockwise);
 }
 
 export class TronCycles {
@@ -151,18 +159,8 @@ export class TronCycles {
     this.cycles.length = Math.min(this.cycles.length, want);
     while (this.cycles.length < want) {
       const start = live[Math.floor(this.rng() * live.length)];
-      const cycle: Cycle = {
-        a: start.id,
-        b: start.id,
-        entry: Math.floor(this.rng() * 4),
-        exit: 0,
-        clockwise: true,
-        dist: 0,
-        carry: 0,
-        trail: [],
-      };
-      this.chooseLeg(cycle, start, null, circuit);
-      this.cycles.push(cycle);
+      const entry = Math.floor(this.rng() * 4);
+      this.cycles.push({ legs: [this.chooseLeg(start, entry, null, circuit)], carry: 0 });
     }
     for (const cycle of this.cycles) {
       cycle.carry += SPEED * dt;
@@ -173,45 +171,60 @@ export class TronCycles {
     }
   }
 
-  /** Pick where `cycle`, now at `node`, rides next: never back unless at a dead end. */
-  private chooseLeg(cycle: Cycle, node: CircuitNode, cameFrom: string | null, circuit: Circuit): void {
+  /** The next leg from `node`: never back the way it came, unless at a dead end. */
+  private chooseLeg(node: CircuitNode, entry: number, cameFrom: string | null, circuit: Circuit): Leg {
     const options = (circuit.neighbors.get(node.id) ?? []).filter((id) => circuit.nodes.get(id)?.live);
     const onward = options.filter((id) => id !== cameFrom);
     const pool = onward.length > 0 ? onward : options;
     const nextId = pool.length > 0 ? pool[Math.floor(this.rng() * pool.length)] : node.id;
     const next = circuit.nodes.get(nextId)!;
-    cycle.a = node.id;
-    cycle.b = nextId;
-    cycle.exit = nextId === node.id ? cycle.entry : sideToward(node, next);
-    cycle.clockwise = this.rng() < 0.5;
-    cycle.dist = 0;
+    return {
+      a: node.id,
+      b: nextId,
+      entry,
+      exit: nextId === node.id ? entry : sideToward(node, next),
+      clockwise: this.rng() < 0.5,
+      dist: 0,
+      color: next.color,
+    };
   }
 
   private advance(cycle: Cycle, circuit: Circuit): void {
-    let a = circuit.nodes.get(cycle.a)!;
-    let b = circuit.nodes.get(cycle.b)!;
-    let path = legPath(a, b, cycle.entry, cycle.exit, cycle.clockwise);
-    if (cycle.dist >= pathLength(path)) {
-      cycle.entry = a.id === b.id ? cycle.entry : opposite(cycle.exit);
-      this.chooseLeg(cycle, b, a.id, circuit);
-      a = circuit.nodes.get(cycle.a)!;
-      b = circuit.nodes.get(cycle.b)!;
-      path = legPath(a, b, cycle.entry, cycle.exit, cycle.clockwise);
+    let leg = cycle.legs[cycle.legs.length - 1];
+    if (leg.dist >= pathLength(pathOf(leg, circuit))) {
+      const entry = leg.a === leg.b ? leg.entry : opposite(leg.exit);
+      leg = this.chooseLeg(circuit.nodes.get(leg.b)!, entry, leg.a, circuit);
+      cycle.legs.push(leg);
+      // Forget legs the trail has run off the end of.
+      let kept = 0;
+      for (let i = cycle.legs.length - 2; i >= 0; i--) {
+        kept += cycle.legs[i].dist;
+        if (kept >= TRAIL) {
+          cycle.legs.splice(0, i);
+          break;
+        }
+      }
     }
-    cycle.dist += 1;
-    const p = pointAt(path, cycle.dist);
-    cycle.trail.push({ x: p.x, y: p.y, color: b.color });
-    if (cycle.trail.length > TRAIL) cycle.trail.shift();
+    leg.dist += 1;
   }
 
-  draw(g: CanvasRenderingContext2D): void {
-    for (const { trail } of this.cycles) {
-      trail.forEach((p, i) => {
-        const age = (trail.length - 1 - i) / TRAIL;
+  draw(g: CanvasRenderingContext2D, circuit: Circuit): void {
+    for (const { legs } of this.cycles) {
+      const pixels: (Pt & { color: string })[] = [];
+      for (let i = legs.length - 1; i >= 0 && pixels.length < TRAIL; i--) {
+        const path = pathOf(legs[i], circuit);
+        const end = Math.min(legs[i].dist, pathLength(path));
+        for (let d = end; d > 0 && pixels.length < TRAIL; d--) {
+          pixels.push({ ...pointAt(path, d), color: legs[i].color });
+        }
+      }
+      // Tail first, so the white head lands on top where the trail crosses itself.
+      for (let i = pixels.length - 1; i >= 0; i--) {
+        const age = i / TRAIL;
         const shade = age < 0.3 ? "+" : age < 0.65 ? "#" : "-";
-        g.fillStyle = i === trail.length - 1 ? "#ffffff" : (paletteColor(shade, p.color) as string);
-        g.fillRect(p.x, p.y, 1, 1);
-      });
+        g.fillStyle = i === 0 ? "#ffffff" : (paletteColor(shade, pixels[i].color) as string);
+        g.fillRect(pixels[i].x, pixels[i].y, 1, 1);
+      }
     }
   }
 }

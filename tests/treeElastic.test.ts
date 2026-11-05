@@ -88,7 +88,7 @@ describe("tron cycles", () => {
     };
     for (let i = 0; i < 1500; i++) {
       cycles.step(1 / 60, circuit);
-      cycles.draw(g as unknown as CanvasRenderingContext2D);
+      cycles.draw(g as unknown as CanvasRenderingContext2D, circuit);
       if (last) seen.push(last);
     }
     expect(cycles.count).toBe(2);
@@ -96,6 +96,31 @@ describe("tron cycles", () => {
     expect(Math.min(...seen.map((p) => p.x))).toBeGreaterThanOrEqual(100 - RING);
     expect(Math.max(...seen.map((p) => p.x))).toBe(140 + RING);
     expect(Math.min(...seen.map((p) => p.y))).toBe(20 - RING);
+  });
+
+  it("keeps trails on the traces while nodes move", () => {
+    const circuit = makeCircuit();
+    const cycles = new TronCycles(() => 0.2);
+    for (let i = 0; i < 120; i++) cycles.step(1 / 60, circuit);
+    // Shift the whole tree: an on-trace trail shifts with it, pixel for pixel.
+    const pixels = (): string[] => {
+      const out: string[] = [];
+      const g = {
+        fillStyle: "",
+        fillRect: (x: number, y: number) => out.push(`${x},${y}`),
+      };
+      cycles.draw(g as unknown as CanvasRenderingContext2D, circuit);
+      return out;
+    };
+    const before = pixels();
+    for (const n of circuit.nodes.values()) n.y += 7;
+    const after = pixels();
+    expect(after).toEqual(
+      before.map((p) => {
+        const [x, y] = p.split(",").map(Number);
+        return `${x},${y + 7}`;
+      }),
+    );
   });
 
   it("keeps a lone unlocked node lit and runs nothing on a dark tree", () => {

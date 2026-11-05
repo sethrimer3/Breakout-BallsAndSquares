@@ -957,17 +957,40 @@ button {
   color: var(--cyan);
 }
 
-.tree-links {
+/* Pan and zoom: everything in .tree-view scales together (see treeView.ts). */
+.tree-clip {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none;
+}
+.tree-stage.panning .tree-clip {
+  cursor: grabbing;
+}
+.tree-view {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  transform-origin: 0 0;
+}
+.tree-links {
+  position: absolute;
   pointer-events: none;
   image-rendering: pixelated;
 }
 .tree-nodes {
   position: absolute;
   inset: 0;
+}
+.tree-fit {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 3;
+  padding: 2px 8px;
 }
 .tree-core,
 .tree-node {

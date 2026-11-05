@@ -18,18 +18,30 @@ import {
   type CircuitNode,
 } from "./treeCircuit";
 import { stepElastic, type ElasticBody } from "./treeElastic";
+import {
+  CENTER_X,
+  CENTER_Y,
+  clampView,
+  fitView,
+  NODE_REACH,
+  nodePos,
+  STAGE_H,
+  STAGE_W,
+  treeBounds,
+  visibleArea,
+  zoomAt,
+  type Bounds,
+  type View,
+} from "./treeView";
 
 type MatrixTab = UpgradeBranch | "loadout";
 
-const CELL_STEP = 116;
-const STAGE_W = 760;
-const STAGE_H = 320;
-const CENTER_X = 380;
-const CENTER_Y = 160;
 /** Connector layer resolution: one canvas pixel per this many CSS pixels. */
 const LINK_PIXEL = 3;
 const LINK_DOT_GAP = 4;
 const LINK_LOCKED = "#26323e";
+/** How far (CSS px) past its rest shape a tree can stretch and still draw links. */
+const LINK_OVERSCAN = 240;
 /** The center hub on trees whose (0,0) cell has no upgrade node. */
 const HUB_ID = "hub";
 /** Pointer travel (CSS px) that turns a press into a drag instead of a buy. */
@@ -47,6 +59,14 @@ interface NodeDrag {
   moved: boolean;
 }
 
+interface PanDrag {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  viewX: number;
+  viewY: number;
+}
+
 const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   core: { icon: "soldier", color: UI_COLORS.soldier },
   pistol: { icon: "pistol", color: "#ff9d3b" },
@@ -58,10 +78,6 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
 
 const lockIcon = (): string => sprite("lock", { color: "#6d8197", scale: 1 });
 const goldIcon = (): string => sprite("gold", { color: UI_COLORS.gold });
-
-function nodePos(col: number, row: number): { x: number; y: number } {
-  return { x: CENTER_X + col * CELL_STEP, y: CENTER_Y + row * CELL_STEP };
-}
 
 function toArt(v: number): number {
   return Math.round(v / LINK_PIXEL);
@@ -97,6 +113,13 @@ export class UpgradeTree {
   private circuit: Circuit = { nodes: new Map(), neighbors: new Map() };
   private cycles = new TronCycles();
   private drag: NodeDrag | null = null;
+  private panDrag: PanDrag | null = null;
+  /** See treeView.ts: the tree opens fitted to the stage. */
+  private bounds: Bounds = { x0: 0, y0: 0, x1: STAGE_W, y1: STAGE_H };
+  private view: View = { x: 0, y: 0, s: 1 };
+  private linkOrigin = { x: 0, y: 0 };
+  private viewEl: HTMLDivElement;
+  private fitBtn: HTMLButtonElement;
   private suppressClick = false;
   private raf = 0;
   private lastFrame = 0;
@@ -126,8 +149,13 @@ export class UpgradeTree {
           </div>
         </div>
         <div class="tree-stage">
-          <canvas class="tree-links"></canvas>
-          <div class="tree-nodes"></div>
+          <div class="tree-clip">
+            <div class="tree-view">
+              <canvas class="tree-links"></canvas>
+              <div class="tree-nodes"></div>
+            </div>
+          </div>
+          <button class="btn tree-fit hidden" title="Fit the whole tree on screen">FIT</button>
           <div class="tree-tooltip hidden"></div>
         </div>
         <div class="loadout-stage hidden"></div>
@@ -148,8 +176,8 @@ export class UpgradeTree {
     this.stageEl = this.root.querySelector(".tree-stage") as HTMLDivElement;
     this.loadoutWrap = this.root.querySelector(".loadout-stage") as HTMLDivElement;
     this.linksEl = this.root.querySelector(".tree-links") as HTMLCanvasElement;
-    this.linksEl.width = Math.round(STAGE_W / LINK_PIXEL);
-    this.linksEl.height = Math.round(STAGE_H / LINK_PIXEL);
+    this.viewEl = this.root.querySelector(".tree-view") as HTMLDivElement;
+    this.fitBtn = this.root.querySelector(".tree-fit") as HTMLButtonElement;
     this.nodesWrap = this.root.querySelector(".tree-nodes") as HTMLDivElement;
     this.tooltipEl = this.root.querySelector(".tree-tooltip") as HTMLDivElement;
     this.bankValEl = this.root.querySelector(".bank-num") as HTMLSpanElement;
@@ -187,6 +215,7 @@ export class UpgradeTree {
     });
 
     this.buildStage();
+    this.attachPanZoom();
     this.activateBranch(false);
     parent.append(this.root);
   }
@@ -290,8 +319,10 @@ export class UpgradeTree {
         el.classList.add("dragging");
       }
       const b = this.bodies.get(id)!;
-      b.x = Math.max(0, Math.min(STAGE_W, d.bodyX + dx));
-      b.y = Math.max(0, Math.min(STAGE_H, d.bodyY + dy));
+      const seen = visibleArea(this.view);
+      const reach = LINK_OVERSCAN - NODE_REACH;
+      b.x = Math.max(Math.max(seen.x0, this.bounds.x0 - reach), Math.min(Math.min(seen.x1, this.bounds.x1 + reach), d.bodyX + dx / this.view.s));
+      b.y = Math.max(Math.max(seen.y0, this.bounds.y0 - reach), Math.min(Math.min(seen.y1, this.bounds.y1 + reach), d.bodyY + dy / this.view.s));
     });
     const release = (e: PointerEvent): void => {
       const d = this.drag;
@@ -302,6 +333,58 @@ export class UpgradeTree {
     };
     el.addEventListener("pointerup", release);
     el.addEventListener("pointercancel", release);
+  }
+
+  /** Drag the background to pan, wheel to zoom, FIT to see the whole tree. */
+  private attachPanZoom(): void {
+    const stage = this.stageEl;
+    stage.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      if ((e.target as HTMLElement).closest(".tree-node, .tree-core, .tree-fit")) return;
+      this.panDrag = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        viewX: this.view.x,
+        viewY: this.view.y,
+      };
+      stage.setPointerCapture(e.pointerId);
+      stage.classList.add("panning");
+    });
+    stage.addEventListener("pointermove", (e) => {
+      const p = this.panDrag;
+      if (!p || p.pointerId !== e.pointerId) return;
+      const x = p.viewX + e.clientX - p.startX;
+      const y = p.viewY + e.clientY - p.startY;
+      this.setView(clampView({ x, y, s: this.view.s }, this.bounds), true);
+    });
+    const release = (e: PointerEvent): void => {
+      if (this.panDrag?.pointerId !== e.pointerId) return;
+      this.panDrag = null;
+      stage.classList.remove("panning");
+    };
+    stage.addEventListener("pointerup", release);
+    stage.addEventListener("pointercancel", release);
+    stage.addEventListener(
+      "wheel",
+      (e) => {
+        e.preventDefault();
+        if (e.deltaY === 0) return;
+        const rect = stage.getBoundingClientRect();
+        const next = zoomAt(this.view, this.bounds, -Math.sign(e.deltaY), e.clientX - rect.left, e.clientY - rect.top);
+        this.hideTooltip();
+        this.setView(next, true);
+      },
+      { passive: false },
+    );
+    this.fitBtn.addEventListener("click", () => this.setView(fitView(this.bounds), false));
+  }
+
+  /** `steered`: the player moved the view away from the fit, so offer FIT. */
+  private setView(view: View, steered: boolean): void {
+    this.view = view;
+    this.viewEl.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.s})`;
+    this.fitBtn.classList.toggle("hidden", !steered);
   }
 
   /** Bodies and circuit for the active tab; `sprout` grows them out of the root. */
@@ -321,6 +404,13 @@ export class UpgradeTree {
     }
     this.circuit = { nodes: new Map(), neighbors };
 
+    // Every tree opens fitted to the stage (see the rules in treeView.ts).
+    if (this.activeBodies.length > 0) {
+      this.bounds = treeBounds(this.activeBodies.map((b) => ({ x: b.hx, y: b.hy })));
+      this.sizeLinkCanvas();
+      this.setView(fitView(this.bounds), false);
+    }
+
     const grow = sprout && !reducedMotion();
     const rootBody = this.activeBodies.find((b) => b.parent === null);
     for (const b of this.activeBodies) {
@@ -330,6 +420,22 @@ export class UpgradeTree {
       b.vy = 0;
     }
     this.placeNodes();
+  }
+
+  /** The link canvas covers the tree plus room to stretch, on the art grid. */
+  private sizeLinkCanvas(): void {
+    const b = this.bounds;
+    const x = toArt(b.x0 - LINK_OVERSCAN);
+    const y = toArt(b.y0 - LINK_OVERSCAN);
+    const w = toArt(b.x1 + LINK_OVERSCAN) - x + 1;
+    const h = toArt(b.y1 + LINK_OVERSCAN) - y + 1;
+    this.linkOrigin = { x, y };
+    this.linksEl.width = w;
+    this.linksEl.height = h;
+    this.linksEl.style.left = `${x * LINK_PIXEL}px`;
+    this.linksEl.style.top = `${y * LINK_PIXEL}px`;
+    this.linksEl.style.width = `${w * LINK_PIXEL}px`;
+    this.linksEl.style.height = `${h * LINK_PIXEL}px`;
   }
 
   /** Move node elements to their bodies, on the same art grid as the links. */
@@ -384,7 +490,9 @@ export class UpgradeTree {
   private drawCircuit(dt: number): void {
     this.syncCircuit();
     const g = this.linksEl.getContext("2d")!;
+    g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, this.linksEl.width, this.linksEl.height);
+    g.translate(-this.linkOrigin.x, -this.linkOrigin.y);
     const u = this.game.upgrades;
     for (const b of this.activeBodies) {
       if (!b.parent) continue;
@@ -402,7 +510,7 @@ export class UpgradeTree {
       }
     }
     if (dt > 0) this.cycles.step(dt, this.circuit);
-    this.cycles.draw(g);
+    this.cycles.draw(g, this.circuit);
   }
 
   private onNodeClick(def: UpgradeDef): void {
@@ -487,9 +595,11 @@ export class UpgradeTree {
     const pos = this.bodies.get(def.id)!;
     const w = this.tooltipEl.offsetWidth;
     const h = this.tooltipEl.offsetHeight;
-    const left = Math.min(STAGE_W - w, Math.max(0, pos.x - Math.round(w / 2)));
+    const screenX = this.view.x + pos.x * this.view.s;
+    const screenY = this.view.y + pos.y * this.view.s;
+    const left = Math.min(STAGE_W - w, Math.max(0, Math.round(screenX - w / 2)));
     this.tooltipEl.style.left = `${left}px`;
-    this.tooltipEl.style.top = `${Math.round(pos.y) - 40 - h}px`;
+    this.tooltipEl.style.top = `${Math.round(screenY - 40 * this.view.s) - h}px`;
   }
 
   private hideTooltip(): void {
@@ -661,6 +771,7 @@ export class UpgradeTree {
     cancelAnimationFrame(this.raf);
     this.raf = 0;
     this.drag = null;
+    this.panDrag = null;
   }
 
   closeAndDeploy(): void {

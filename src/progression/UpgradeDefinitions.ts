@@ -69,7 +69,11 @@ export interface UpgradeDef {
   shortDesc: string;
   /** Category color accent (hex). */
   color: string;
-  /** Grid coordinates on the branch tree (0,0 is center core). */
+  /**
+   * Grid coordinates on the branch tree (0,0 is center core). Keep each tree
+   * inside columns -2..2 and rows -1..1 so it fits at 100%; bigger trees
+   * shrink to fit automatically. Rules: see the top of ui/treeView.ts.
+   */
   grid: { col: number; row: number };
   /** Visual connector parent (null = connects to the central core node). */
   parent: UpgradeId | null;
