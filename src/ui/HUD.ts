@@ -13,6 +13,7 @@ export class HUD {
   private statsEl: HTMLDivElement;
   private launchBtn: HTMLButtonElement;
   private upgBtn: HTMLButtonElement;
+  private muteBtn: HTMLButtonElement;
   private hintEl: HTMLDivElement;
   private debugEl: HTMLDivElement;
   private lastUpdate = 0;
@@ -53,6 +54,14 @@ export class HUD {
       this.game.openUpgrades();
     });
 
+    this.muteBtn = document.createElement("button");
+    this.muteBtn.className = "hud-mute-btn";
+    this.muteBtn.title = "Toggle Audio (M)";
+    this.muteBtn.addEventListener("click", () => {
+      this.game.audio.toggleMute();
+      this.update(this.game, performance.now(), true);
+    });
+
     this.launchBtn = document.createElement("button");
     this.launchBtn.className = "hud-launch-btn";
     this.launchBtn.title = "Click anywhere in the arena (or here) to deploy a reserve soldier";
@@ -64,7 +73,7 @@ export class HUD {
     this.hintEl.className = "hud-hint";
     this.debugEl = document.createElement("div");
     this.debugEl.className = "hud-debug";
-    this.root.append(bar, this.upgBtn, this.launchBtn, this.statsEl, this.hintEl, this.debugEl);
+    this.root.append(bar, this.upgBtn, this.muteBtn, this.launchBtn, this.statsEl, this.hintEl, this.debugEl);
     parent.append(this.root);
   }
 
@@ -92,6 +101,7 @@ export class HUD {
     }
     upgCount.textContent = `${affordable}`;
     this.upgBtn.classList.toggle("has-affordable", affordable > 0);
+    this.muteBtn.textContent = game.audio.muted ? "🔇" : "🔊";
 
     // Reserve launch button on the right side (styled like the reference screenshots).
     if (game.reserves > 0 && game.canDeploy && !game.runOver) {
@@ -123,12 +133,14 @@ export class HUD {
     if (game.debug) {
       const d = game.debugInfo;
       const near = game.growth.nearSoldierPercent(s.time);
+      const lt = game.lighting;
       this.debugEl.style.display = "block";
       this.debugEl.textContent =
-        `FPS ${d.fps.toFixed(0)}  frame ${d.frameMs.toFixed(1)}ms  sim ${d.simMs.toFixed(2)}ms\n` +
-        `frontier ${game.growth.frontier.size}  growthEvents ${game.growth.totalEvents}  near-soldier ${near.toFixed(0)}%\n` +
-        `bullets ${game.combat.bullets.activeCount}  particles ${game.particles.count}  ` +
-        `chunks rebuilt ${game.terrain.rebuiltLastFrame}  pending ${game.terrain.chunks.pending}\n` +
+        `FPS ${d.fps.toFixed(0)}  frame ${d.frameMs.toFixed(1)}ms  sim ${d.simMs.toFixed(2)}ms  light ${d.lightMs.toFixed(2)}ms (${lt.quality})\n` +
+        `lights ${lt.lastShadowLights}/${game.flashes.length}  rays ${lt.lastRaysCast}  ` +
+        `frontier ${game.growth.frontier.size}  near-soldier ${near.toFixed(0)}%\n` +
+        `bullets ${game.combat.bullets.activeCount}  particles ${game.particles.count}  casings ${game.casings.count}\n` +
+        `chunks rebuilt ${game.terrain.rebuiltLastFrame}  pending ${game.terrain.chunks.pending}  ` +
         `relocations ${game.physics.stats.relocations}  stuck ${game.physics.stats.stuckEvents}`;
     } else {
       this.debugEl.style.display = "none";

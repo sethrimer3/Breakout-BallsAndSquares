@@ -1,5 +1,7 @@
-import { BULLET, CAMERA, COLORS, GROWTH, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
+import { BULLET, CAMERA, COLORS, GROWTH, LIGHT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
+import { AudioSystem } from "./audio/AudioSystem";
 import { Rng } from "./core/Rng";
+import { CasingSystem } from "./entities/CasingSystem";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, baseSoldierStats, type SoldierStats } from "./entities/Soldier";
 import { SaveManager } from "./progression/SaveManager";
@@ -9,6 +11,7 @@ import { TerrainRenderer } from "./rendering/TerrainRenderer";
 import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { Input } from "./systems/Input";
+import { LightingSystem, type MuzzleLight } from "./systems/LightingSystem";
 import { PhysicsSystem, findSpawnPoint } from "./systems/PhysicsSystem";
 import { RunStats } from "./systems/RunStats";
 import { HUD } from "./ui/HUD";
@@ -20,16 +23,7 @@ import { GrowthSystem } from "./world/GrowthSystem";
 import { PixelWorld } from "./world/PixelWorld";
 import { generateWorld } from "./world/WorldGenerator";
 
-/** Short-lived muzzle flash (visual; becomes a shadow-casting light in Phase 4). */
-export interface Flash {
-  x: number;
-  y: number;
-  dx: number;
-  dy: number;
-  life: number;
-  maxLife: number;
-  ownerId: number;
-}
+export type Flash = MuzzleLight;
 
 /** Brief highlight on a terrain cell (hit or destroy). */
 export interface CellFlash {
@@ -47,13 +41,16 @@ export class Game {
   readonly physics: PhysicsSystem;
   readonly combat: CombatSystem;
   readonly growth: GrowthSystem;
+  readonly lighting: LightingSystem;
   readonly camera: CameraSystem;
   readonly terrain: TerrainRenderer;
   readonly renderer: Renderer;
   readonly particles = new ParticleSystem(3000);
+  readonly casings = new CasingSystem();
   readonly runStats = new RunStats();
   readonly save: SaveManager;
   readonly upgrades: UpgradeManager;
+  readonly audio: AudioSystem;
   readonly hud: HUD;
   readonly mainMenu: MainMenu;
   readonly pauseMenu: PauseMenu;
@@ -73,7 +70,7 @@ export class Game {
   private bankedThisRun = false;
   onUpgradePurchased?: () => void;
   debug = new URLSearchParams(location.search).has("debug") || import.meta.env.DEV;
-  debugInfo = { fps: 0, frameMs: 0, simMs: 0 };
+  debugInfo = { fps: 0, frameMs: 0, simMs: 0, lightMs: 0 };
 
   private acc = 0;
   private last = 0;
@@ -88,7 +85,9 @@ export class Game {
     }
     this.save = new SaveManager();
     this.upgrades = new UpgradeManager(this.save);
+    this.audio = new AudioSystem(this.save);
     this.stats = this.upgrades.getSoldierStats();
+    this.onUpgradePurchased = () => this.audio.playPurchase();
 
     this.physics = new PhysicsSystem(this.world, this.rng);
     this.combat = new CombatSystem(this.world, this.rng, this.stats, {
@@ -98,6 +97,7 @@ export class Game {
     this.growth = new GrowthSystem(this.world, this.rng, {
       onSoldierKilled: (s) => this.onSoldierKilled(s),
     });
+    this.lighting = new LightingSystem(this.world);
     this.camera = new CameraSystem(this.world);
     generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
@@ -167,6 +167,7 @@ export class Game {
     this.cellFlashes = [];
     this.combat.bullets.clear();
     this.particles.clear();
+    this.casings.clear();
     this.runStats.reset();
     this.reserves = this.stats.maxSoldiers;
     this.canDeploy = true;
@@ -274,6 +275,9 @@ export class Game {
       case "KeyR":
         this.restartAndBank();
         break;
+      case "KeyM":
+        this.audio.toggleMute();
+        break;
       case "Backquote":
         this.debug = !this.debug;
         break;
@@ -326,12 +330,49 @@ export class Game {
 
   private onShot(s: Soldier, dx: number, dy: number, mx: number, my: number): void {
     this.runStats.shotsFired++;
-    this.flashes.push({ x: mx, y: my, dx, dy, life: 0.08, maxLife: 0.08, ownerId: s.id });
-    for (let i = 0; i < 4; i++) {
-      const a = Math.atan2(dy, dx) + this.rng.range(-0.5, 0.5);
-      const sp = this.rng.range(60, 160);
-      this.particles.spawn(PKind.Spark, mx, my, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.06, 0.14), 1, 0xffd890, 10);
+    this.audio.playShot();
+    this.flashes.push({
+      x: mx,
+      y: my,
+      dx,
+      dy,
+      life: LIGHT.flashDuration,
+      maxLife: LIGHT.flashDuration,
+      radius: LIGHT.radius,
+      ownerId: s.id,
+      poly: new Float32Array(2048),
+      polyCount: 0,
+      hasPolygon: false,
+    });
+    // Eject a spinning brass shell casing perpendicular to firing direction.
+    this.casings.spawn(s.x, s.y, dx, dy, s.ejectSide, this.rng);
+    // Muzzle spark burst + wisp of gunsmoke.
+    for (let i = 0; i < 5; i++) {
+      const a = Math.atan2(dy, dx) + this.rng.range(-0.55, 0.55);
+      const sp = this.rng.range(65, 175);
+      this.particles.spawn(
+        PKind.Spark,
+        mx,
+        my,
+        Math.cos(a) * sp,
+        Math.sin(a) * sp,
+        this.rng.range(0.06, 0.14),
+        1,
+        0xffdc96,
+        10,
+      );
     }
+    this.particles.spawn(
+      PKind.Smoke,
+      mx + dx * 2,
+      my + dy * 2,
+      dx * this.rng.range(10, 28) + this.rng.range(-12, 12),
+      dy * this.rng.range(10, 28) + this.rng.range(-12, 12),
+      this.rng.range(0.28, 0.5),
+      2.2,
+      0x8ca0ba,
+      3.5,
+    );
   }
 
   private onImpact(
@@ -344,6 +385,8 @@ export class Game {
     result: 0 | 1 | 2,
   ): void {
     const destroyed = result === 2;
+    if (destroyed) this.audio.playDestroy();
+    else if (result === 1) this.audio.playImpact();
     const n = destroyed ? 10 : 4;
     for (let i = 0; i < n; i++) {
       const a = Math.atan2(ny, nx) + this.rng.range(-1.1, 1.1);
@@ -371,6 +414,7 @@ export class Game {
   }
 
   private onSoldierKilled(s: Soldier): void {
+    this.audio.playSoldierDeath();
     for (let i = 0; i < 36; i++) {
       const a = this.rng.range(0, Math.PI * 2);
       const sp = this.rng.range(30, 220);
@@ -393,6 +437,7 @@ export class Game {
     this.growth.update(dt, this.runStats.time, this.soldiers);
     this.growthRate = this.growth.rate;
     this.particles.update(dt);
+    this.casings.update(dt);
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       if ((this.flashes[i].life -= dt) <= 0) this.flashes.splice(i, 1);
     }
@@ -408,6 +453,49 @@ export class Game {
     const canStillDeploy = this.reserves > 0 && this.canDeploy;
     if (!alive && !canStillDeploy && (this.runStats.soldiersDeployed > 0 || !this.canDeploy)) {
       this.endRun();
+    }
+  }
+
+  /** Compute visibility polygons for visible active flashes within the shadow-light budget. */
+  private updateFlashPolygons(): void {
+    const t0 = performance.now();
+    this.lighting.lastRaysCast = 0;
+    this.lighting.lastShadowLights = 0;
+    const cam = this.camera;
+    const maxLights = this.lighting.preset.maxShadowLights;
+    let shadowed = 0;
+    // Newest flashes first so fresh shots always get crisp shadows.
+    for (let i = this.flashes.length - 1; i >= 0; i--) {
+      const fl = this.flashes[i];
+      const sx = cam.worldToScreenX(fl.x);
+      const sy = cam.worldToScreenY(fl.y);
+      const rad = fl.radius * cam.zoom;
+      const onScreen = sx + rad >= 0 && sy + rad >= 0 && sx - rad <= cam.viewW && sy - rad <= cam.viewH;
+      if (onScreen && shadowed < maxLights) {
+        fl.polyCount = this.lighting.computeVisibilityPolygon(
+          fl.x,
+          fl.y,
+          fl.dx,
+          fl.dy,
+          fl.radius,
+          fl.ownerId,
+          this.soldiers,
+          fl.poly,
+        );
+        fl.hasPolygon = fl.polyCount >= 3;
+        shadowed++;
+      } else {
+        fl.hasPolygon = false;
+      }
+    }
+    this.lighting.lastShadowLights = shadowed;
+    const elapsed = performance.now() - t0;
+    this.lighting.lastComputeMs = elapsed;
+    this.debugInfo.lightMs = elapsed;
+    if (elapsed > LIGHT.budgetMs && this.lighting.quality === "high") {
+      this.lighting.quality = "medium";
+    } else if (elapsed > LIGHT.budgetMs * 1.5 && this.lighting.quality === "medium") {
+      this.lighting.quality = "low";
     }
   }
 
@@ -436,6 +524,7 @@ export class Game {
       this.camera.update(real, this.soldiers);
     }
     const t1 = performance.now();
+    this.updateFlashPolygons();
     this.terrain.update();
     this.renderer.draw();
     this.hud.update(this, now);
