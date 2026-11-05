@@ -65,6 +65,51 @@ export function goldSquareSprite(size: number): HTMLCanvasElement {
   return c;
 }
 
+/** Pre-rendered glowing orange crystal (Zone 2 currency) with baked radial glow. */
+export function orangeCrystalSprite(size: number): HTMLCanvasElement {
+  const [c, g] = makeCanvas(size);
+  const r = size / 2;
+  const grad = g.createRadialGradient(r, r, 0, r, r, r);
+  grad.addColorStop(0, "rgba(255, 190, 95, 0.95)");
+  grad.addColorStop(0.28, "rgba(255, 115, 25, 0.58)");
+  grad.addColorStop(0.62, "rgba(215, 55, 5, 0.18)");
+  grad.addColorStop(1, "rgba(160, 25, 0, 0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+
+  // Crisp faceted diamond/crystal in the center.
+  const hw = Math.round(size * 0.19);
+  const hh = Math.round(size * 0.27);
+  g.fillStyle = "#b83804";
+  g.beginPath();
+  g.moveTo(r, r - hh - 1);
+  g.lineTo(r + hw + 1, r);
+  g.lineTo(r, r + hh + 1);
+  g.lineTo(r - hw - 1, r);
+  g.closePath();
+  g.fill();
+
+  g.fillStyle = "#ff7b1c";
+  g.beginPath();
+  g.moveTo(r, r - hh);
+  g.lineTo(r + hw, r);
+  g.lineTo(r, r + hh);
+  g.lineTo(r - hw, r);
+  g.closePath();
+  g.fill();
+
+  // Upper-left bright facet highlight.
+  g.fillStyle = "#ffe6b0";
+  g.beginPath();
+  g.moveTo(r, r - hh + 1.5);
+  g.lineTo(r + hw * 0.45, r);
+  g.lineTo(r, r + hh * 0.25);
+  g.lineTo(r - hw * 0.65, r);
+  g.closePath();
+  g.fill();
+  return c;
+}
+
 export interface Sprites {
   soldier: HTMLCanvasElement;
   soldierGlow: HTMLCanvasElement;
@@ -72,6 +117,7 @@ export interface Sprites {
   hotGlow: HTMLCanvasElement;
   crimsonGlow: HTMLCanvasElement;
   goldSquare: HTMLCanvasElement;
+  orangeCrystal: HTMLCanvasElement;
   dot: HTMLCanvasElement;
 }
 
@@ -100,6 +146,7 @@ export function createSprites(): Sprites {
       [1, "rgba(120, 0, 60, 0)"],
     ]),
     goldSquare: goldSquareSprite(32),
+    orangeCrystal: orangeCrystalSprite(32),
     dot: radialSprite(16, [
       [0, "rgba(255,255,255,1)"],
       [0.5, "rgba(255,255,255,0.6)"],

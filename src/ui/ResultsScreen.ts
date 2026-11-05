@@ -46,9 +46,14 @@ export class ResultsScreen {
         <span class="res-val">${val}${isNew ? ' <span class="badge-new">NEW BEST</span>' : ""}</span>
         <span class="res-best">${best ? `BEST ${best}` : ""}</span>
       </div>`;
+    const crystalsRow =
+      r.crystals > 0 || g.crystals > 0
+        ? row("ORANGE CRYSTALS", `◆ ${r.crystals.toLocaleString()}`, `BANK ◆ ${g.crystals.toLocaleString()}`)
+        : "";
     this.body.innerHTML =
       row("PIXELS DESTROYED", r.pixelsDestroyed.toLocaleString(), b.pixels.toLocaleString(), newBests.pixels) +
-      row("CURRENCY EARNED", `◆ ${r.currency.toLocaleString()}`, `BANK ◆ ${g.bank.toLocaleString()}`) +
+      row("GOLD COLLECTED", `■ ${r.currency.toLocaleString()}`, `BANK ■ ${g.bank.toLocaleString()}`) +
+      crystalsRow +
       row("TIME SURVIVED", fmtTime(r.time), fmtTime(b.time), newBests.time) +
       row("MAX DEPTH REACHED", `${r.maxDepth} cells`, `${b.depth} cells`, newBests.depth) +
       row("SOLDIERS DEPLOYED", `${r.soldiersDeployed}`, `PEAK GROWTH ${g.growth.rate.toFixed(1)}/s`) +

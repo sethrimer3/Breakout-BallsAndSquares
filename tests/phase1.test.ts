@@ -170,14 +170,20 @@ describe("Phase 1 — soldier physics (Rev 2 & Rev 3)", () => {
   });
 });
 
-describe("Phase 1 — camera single-target follow (Rev 3)", () => {
-  it("follows the farthest soldier with hysteresis and cycles on Tab", () => {
+describe("Phase 1 — camera manual-first & single-target follow (Rev 3)", () => {
+  it("stays stationary by default, and follows the farthest soldier with hysteresis when enabled (F) or cycled (Tab)", () => {
     const w = new PixelWorld(WORLD);
     generateWorld(w, 1);
     const cam = new CameraSystem(w);
     cam.setViewport(800, 600);
+    expect(cam.following).toBe(false);
     const a = new Soldier(w.roomCenterX, w.roomCenterY, 1, 0, 100);
     const b = new Soldier(w.roomCenterX + 10 * 8, w.roomCenterY, 1, 0, 100);
+    cam.update(0.1, [a, b]);
+    expect(cam.x).toBe(w.roomCenterX);
+
+    // Enable auto-follow (F):
+    cam.resumeAuto();
     cam.update(0.1, [a, b]);
     expect(cam.targetId).toBe(b.id);
     // Moving `a` only 2 cells beyond `b` should NOT switch (hysteresis = 4).

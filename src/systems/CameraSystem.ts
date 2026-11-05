@@ -15,7 +15,8 @@ export class CameraSystem {
   /** Viewport size in CSS pixels. */
   viewW = 1;
   viewH = 1;
-  following = true;
+  defaultFollow = false;
+  following = false;
   manualTarget = false;
   targetId = 0;
 
@@ -28,7 +29,7 @@ export class CameraSystem {
     this.x = this.world.roomCenterX;
     this.y = this.world.roomCenterY;
     this.zoom = CAMERA.defaultZoom;
-    this.following = true;
+    this.following = this.defaultFollow;
     this.manualTarget = false;
     this.targetId = 0;
   }

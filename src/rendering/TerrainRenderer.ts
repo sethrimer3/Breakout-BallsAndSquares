@@ -1,9 +1,10 @@
-import { COLORS, TERRAIN, TERRAIN as T } from "../config";
+import { COLORS, TERRAIN, TERRAIN as T, zoneForDepth } from "../config";
 import type { CameraSystem } from "../systems/CameraSystem";
 import type { PixelWorld } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
 
 type RGB = readonly [number, number, number];
+type Ramp4 = readonly [RGB, RGB, RGB, RGB];
 
 function mix(a: RGB, b: RGB, t: number, out: number[]): void {
   out[0] = a[0] + (b[0] - a[0]) * t;
@@ -11,7 +12,11 @@ function mix(a: RGB, b: RGB, t: number, out: number[]): void {
   out[2] = a[2] + (b[2] - a[2]) * t;
 }
 
-const DEEP: RGB = [54, 44, 78];
+function sampleRamp(ramp: Ramp4, t: number, out: number[]): void {
+  if (t < 1 / 3) mix(ramp[0], ramp[1], t * 3, out);
+  else if (t < 2 / 3) mix(ramp[1], ramp[2], (t - 1 / 3) * 3, out);
+  else mix(ramp[2], ramp[3], (t - 2 / 3) * 3, out);
+}
 
 /**
  * Renders terrain via cached 1-pixel-per-cell chunk canvases scaled up with
@@ -75,17 +80,21 @@ export class TerrainRenderer {
           continue;
         }
         const t = tint[i] / 255;
-        if (t < 0.5) mix(COLORS.terrainA, COLORS.terrainB, t * 2, col);
-        else mix(COLORS.terrainB, COLORS.terrainC, (t - 0.5) * 2, col);
+        const depth = world.depthOf(cx, cy);
+        // Organic 2-cell transition dither at zone boundaries based on tint.
+        const dither = (t - 0.5) * 3;
+        const z = zoneForDepth(depth + dither);
+        const ramp = z === 0 ? COLORS.zone1 : z === 1 ? COLORS.zone2 : COLORS.zone3;
+        sampleRamp(ramp, t, col);
 
         const maxHp = world.maxHealthAt(cx, cy);
-        // Harder bands shift subtly toward a deeper violet.
+        // Deeper bands darken slightly for depth perception while preserving zone palette.
         const band = (maxHp - 1) / Math.max(1, maxCap - 1);
         if (band > 0) {
-          const f = band * 0.45;
-          col[0] += (DEEP[0] - col[0]) * f;
-          col[1] += (DEEP[1] - col[1]) * f;
-          col[2] += (DEEP[2] - col[2]) * f;
+          const shade = 1 - band * 0.18;
+          col[0] *= shade;
+          col[1] *= shade;
+          col[2] *= shade;
         }
 
         // Damage tint.

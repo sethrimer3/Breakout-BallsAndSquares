@@ -9,7 +9,7 @@ function fmtTime(t: number): string {
 
 /**
  * Pixel-art DOM HUD:
- * - Top stat bar (Time, Pixels, Gold Collected, Bank, Depth, Soldiers)
+ * - Top stat bar (Time, Pixels, Gold, Crystals [when unlocked], Bank, Depth, Soldiers)
  * - Bottom-left compact soldier stats
  * - Dramatic bottom-middle Growth Rate meter
  * - Bottom-right `?` button that toggles all help/controls text
@@ -17,10 +17,9 @@ function fmtTime(t: number): string {
 export class HUD {
   readonly root: HTMLDivElement;
   private fields: Record<string, HTMLSpanElement> = {};
+  private boxes: Record<string, HTMLDivElement> = {};
   private statsEl: HTMLDivElement;
   private launchBtn: HTMLButtonElement;
-  private upgBtn: HTMLButtonElement;
-  private muteBtn: HTMLButtonElement;
   private growthMeterEl: HTMLDivElement;
   private growthFillEl: HTMLDivElement;
   private growthRateEl: HTMLSpanElement;
@@ -40,6 +39,7 @@ export class HUD {
       ["time", "TIME"],
       ["pixels", "PIXELS"],
       ["currency", "■ GOLD"],
+      ["crystals", "◆ CRYS"],
       ["bank", "■ BANK"],
       ["depth", "DEPTH"],
       ["soldiers", "SOLDIERS"],
@@ -55,24 +55,8 @@ export class HUD {
       box.append(l, v);
       bar.append(box);
       this.fields[key] = v;
+      this.boxes[key] = box;
     }
-
-    this.upgBtn = document.createElement("button");
-    this.upgBtn.className = "hud-top-btn";
-    this.upgBtn.title = "Open Upgrade Tree (U)";
-    this.upgBtn.innerHTML = `✦ <span class="upg-count">0</span>`;
-    this.upgBtn.addEventListener("click", () => {
-      this.game.bankCurrentRun();
-      this.game.openUpgrades();
-    });
-
-    this.muteBtn = document.createElement("button");
-    this.muteBtn.className = "hud-mute-btn";
-    this.muteBtn.title = "Toggle Audio (M)";
-    this.muteBtn.addEventListener("click", () => {
-      this.game.audio.toggleMute();
-      this.update(this.game, performance.now(), true);
-    });
 
     this.launchBtn = document.createElement("button");
     this.launchBtn.className = "hud-launch-btn";
@@ -121,21 +105,18 @@ export class HUD {
       <div class="help-status"></div>
       <div class="help-list">
         <div><b>LEFT CLICK</b> Aim &amp; launch reserve soldier</div>
-        <div><b>GOLD SQUARES</b> Broken pixels have a chance to drop glowing gold squares — soldiers must pick them up to collect money!</div>
-        <div><b>WHEEL</b> Zoom camera in / out</div>
-        <div><b>RIGHT / MID DRAG</b> Pan camera</div>
+        <div><b>DRAG / WHEEL</b> Pan camera around &amp; zoom in/out</div>
+        <div><b>CURRENCIES</b> Zone 1 drops gold squares (■); Zone 2 unlocks glowing orange crystals (◆). Soldiers must touch them to collect!</div>
         <div><b>F / TAB</b> Follow farthest / Cycle soldiers</div>
         <div><b>U</b> Open Upgrade Matrix</div>
-        <div><b>SPACE / ESC</b> Pause / Menu</div>
-        <div><b>R / M</b> Quick restart / Mute audio</div>
+        <div><b>SPACE / ESC</b> Pause / Menu (&amp; Settings ⚙)</div>
+        <div><b>R</b> Quick restart run</div>
       </div>
     `;
     this.helpStatusEl = this.helpPopoverEl.querySelector(".help-status") as HTMLDivElement;
 
     this.root.append(
       bar,
-      this.upgBtn,
-      this.muteBtn,
       this.launchBtn,
       this.statsEl,
       this.growthMeterEl,
@@ -153,6 +134,12 @@ export class HUD {
     this.fields.time.textContent = fmtTime(s.time);
     this.fields.pixels.textContent = s.pixelsDestroyed.toLocaleString();
     this.fields.currency.textContent = s.currency.toLocaleString();
+
+    const totalCrystals = game.crystals + s.crystals;
+    const showCrystals = totalCrystals > 0 || s.maxDepth >= 16 || game.bests.depth >= 16;
+    this.boxes.crystals.classList.toggle("hidden", !showCrystals);
+    this.fields.crystals.textContent = `${s.crystals} (${game.crystals})`;
+
     this.fields.bank.textContent = game.bank.toLocaleString();
     this.fields.depth.textContent = `${s.maxDepth}`;
     this.fields.soldiers.textContent = `${alive} / +${game.reserves}`;
@@ -160,7 +147,6 @@ export class HUD {
     // Dramatic Growth Rate meter update.
     const rate = game.growthRate;
     const graceRem = Math.max(0, GROWTH.graceSeconds - s.time);
-    // Log-ish curve so early growth (0.35 -> 15/s) is already visibly climbing and 150/s hits 100%.
     const norm =
       rate <= 0
         ? 0
@@ -197,19 +183,6 @@ export class HUD {
     this.growthMeterEl.className = `growth-meter ${stageClass}`;
     this.growthStageEl.textContent = stageLabel;
 
-    // Count affordable upgrades (including current run currency if banked).
-    const upgCount = this.upgBtn.querySelector(".upg-count") as HTMLSpanElement;
-    let affordable = 0;
-    const totalBank = game.bank + s.currency;
-    for (const d of game.upgrades.defs) {
-      if (game.upgrades.isUnlocked(d.id) && !game.upgrades.isMaxed(d.id)) {
-        if (totalBank >= game.upgrades.costOf(d.id)) affordable++;
-      }
-    }
-    upgCount.textContent = `${affordable}`;
-    this.upgBtn.classList.toggle("has-affordable", affordable > 0);
-    this.muteBtn.textContent = game.audio.muted ? "🔇" : "🔊";
-
     // Reserve launch button on the right side.
     if (game.reserves > 0 && game.canDeploy && !game.runOver) {
       this.launchBtn.classList.remove("hidden");
@@ -233,7 +206,7 @@ export class HUD {
       else if (game.reserves > 0 && game.canDeploy)
         status = `Click arena to aim & launch soldier (${game.reserves} in reserve)`;
       else if (game.reserves > 0) status = "Spawn room overrun — cannot deploy";
-      else status = "Soldiers autonomous — collect golden squares!";
+      else status = "Soldiers autonomous — pan camera to explore!";
       this.helpStatusEl.textContent = status;
     }
   }

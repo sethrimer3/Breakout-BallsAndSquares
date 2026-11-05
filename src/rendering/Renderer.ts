@@ -122,12 +122,14 @@ export class Renderer {
     const camY = cam.y;
     const halfW = vw * 0.5;
     const halfH = vh * 0.5;
-    const sprite = this.sprites.goldSquare;
+    const goldSprite = this.sprites.goldSquare;
+    const crystalSprite = this.sprites.orangeCrystal;
     const sz = Math.max(6, 5.2 * zoom);
     const half = sz * 0.5;
     const xs = loot.x;
     const ys = loot.y;
     const lives = loot.life;
+    const kinds = loot.kind;
 
     ctx.globalAlpha = 1;
     let lastAlpha = 1;
@@ -142,6 +144,7 @@ export class Renderer {
         ctx.globalAlpha = a;
         lastAlpha = a;
       }
+      const sprite = kinds[i] === 1 ? crystalSprite : goldSprite;
       ctx.drawImage(sprite, sx - half, sy - half, sz, sz);
     }
     if (lastAlpha !== 1) ctx.globalAlpha = 1;
@@ -242,9 +245,11 @@ export class Renderer {
   /** Bright outward-facing muzzle core flare along the firing vector. */
   private drawMuzzleFlares(): void {
     const { ctx, game } = this;
+    const mult = game.muzzleFlashMultiplier;
+    if (mult <= 0) return;
     const cam = game.camera;
     for (const f of game.flashes) {
-      const a = Math.max(0, f.life / f.maxLife);
+      const a = Math.max(0, f.life / f.maxLife) * mult;
       const sx = cam.worldToScreenX(f.x);
       const sy = cam.worldToScreenY(f.y);
       ctx.save();

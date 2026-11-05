@@ -30,7 +30,18 @@ export const TERRAIN = {
   chunkRebuildBudget: 24,
   /** How long a damaged-cell hit flash lasts (seconds). */
   hitFlashTime: 0.09,
+  /** Depth (cells beyond the room edge) where Zone 2 starts. */
+  zone2Depth: 16,
+  /** Depth (cells beyond the room edge) where Zone 3 starts. */
+  zone3Depth: 36,
 };
+
+/** 0 = Zone 1 (slate/grey/brown), 1 = Zone 2 (burnt orange/red/maroon/cream), 2 = Zone 3 (dark green/blue/turquoise/chartreuse). */
+export function zoneForDepth(depth: number): 0 | 1 | 2 {
+  if (depth < TERRAIN.zone2Depth) return 0;
+  if (depth < TERRAIN.zone3Depth) return 1;
+  return 2;
+}
 
 /** Configurable distance -> health curve (spec §3). */
 export function maxHealthForDistance(distance: number): number {
@@ -222,10 +233,29 @@ export const LOOT = {
 export const COLORS = {
   background: "#05070d",
   backgroundGlow: "#0b1020",
-  /** Terrain base palette (RGB). */
-  terrainA: [30, 32, 40] as const, // charcoal
-  terrainB: [38, 46, 64] as const, // slate blue
-  terrainC: [46, 36, 60] as const, // dark desaturated purple
+  /** Terrain base palette (RGB) for Zone 1: muted dark greys, blues, browns. */
+  terrainA: [30, 32, 38] as const, // muted dark grey
+  terrainB: [34, 46, 62] as const, // muted slate blue
+  terrainC: [52, 41, 34] as const, // muted dark brown
+  /** Zone 1..3 four-stop color ramps (RGB). */
+  zone1: [
+    [28, 30, 36], // dark charcoal grey
+    [34, 46, 62], // muted dark blue
+    [44, 44, 50], // muted slate grey
+    [54, 41, 33], // muted dark brown
+  ] as const,
+  zone2: [
+    [76, 38, 22], // muted burnt orange
+    [64, 22, 24], // dark red
+    [48, 18, 28], // dark maroon
+    [74, 62, 46], // dark cream
+  ] as const,
+  zone3: [
+    [22, 48, 34], // dark green
+    [22, 40, 62], // dark blue
+    [22, 58, 60], // dark turquoise
+    [54, 64, 26], // muted chartreuse
+  ] as const,
   /** Tint applied to damaged cells. */
   damage: [120, 70, 52] as const,
   soldierCore: "#1b2a3a",

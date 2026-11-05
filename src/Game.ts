@@ -1,11 +1,11 @@
-import { BULLET, CAMERA, COLORS, GROWTH, LIGHT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
+import { BULLET, CAMERA, COLORS, GROWTH, LIGHT, SIM, SOLDIER, TERRAIN, WORLD, zoneForDepth } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
-import { LootSystem } from "./entities/LootSystem";
+import { LootKind, LootSystem } from "./entities/LootSystem";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, baseSoldierStats, type SoldierStats } from "./entities/Soldier";
-import { SaveManager } from "./progression/SaveManager";
+import { MUZZLE_FLASH_MULTIPLIER, SaveManager } from "./progression/SaveManager";
 import { UpgradeManager } from "./progression/UpgradeManager";
 import { Renderer } from "./rendering/Renderer";
 import { TerrainRenderer } from "./rendering/TerrainRenderer";
@@ -108,6 +108,8 @@ export class Game {
     });
     this.lighting = new LightingSystem(this.world);
     this.camera = new CameraSystem(this.world);
+    this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
+    this.camera.following = this.camera.defaultFollow;
     generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
     this.terrain.rebuildAll();
@@ -132,6 +134,14 @@ export class Game {
 
   get bank(): number {
     return this.save.data.bank;
+  }
+
+  get crystals(): number {
+    return this.save.data.crystals;
+  }
+
+  get muzzleFlashMultiplier(): number {
+    return MUZZLE_FLASH_MULTIPLIER[this.save.data.settings.muzzleFlash] ?? 1;
   }
 
   get lifetimePixels(): number {
@@ -207,6 +217,7 @@ export class Game {
     if (!this.bankedThisRun) {
       this.bankedThisRun = true;
       this.save.data.bank += r.currency;
+      this.save.data.crystals += r.crystals;
       this.save.data.lifetimePixels += r.pixelsDestroyed;
       if (r.time > b.time) b.time = r.time;
       if (r.maxDepth > b.depth) b.depth = r.maxDepth;
@@ -425,15 +436,18 @@ export class Game {
         this.particles.spawn(PKind.Debris, ccx + this.rng.range(-3, 3), ccy + this.rng.range(-3, 3), Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.4, 0.8), this.rng.range(1, 2), col, 4);
       }
       this.runStats.pixelsDestroyed++;
+      const depth = this.world.depthOf(cx, cy);
+      if (depth > this.runStats.maxDepth) this.runStats.maxDepth = depth;
+      const zone = zoneForDepth(depth);
+      const lootKind = zone >= 1 ? LootKind.Crystal : LootKind.Gold;
       this.loot.spawnDropsForBlock(
         ccx,
         ccy,
         this.stats.dropChance,
         this.stats.pickupLifetime,
         this.rng,
+        lootKind,
       );
-      const depth = this.world.depthOf(cx, cy);
-      if (depth > this.runStats.maxDepth) this.runStats.maxDepth = depth;
     }
   }
 
@@ -465,7 +479,8 @@ export class Game {
     this.casings.update(dt);
     const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange);
     if (collected > 0) {
-      this.runStats.currency += collected;
+      this.runStats.currency += this.loot.collectedGold;
+      this.runStats.crystals += this.loot.collectedCrystals;
       this.audio.playPickup();
     }
     for (let i = this.flashes.length - 1; i >= 0; i--) {

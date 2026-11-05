@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { SOLDIER } from "../src/config";
-import { SAVE_KEY, SaveManager, type StorageLike } from "../src/progression/SaveManager";
+import { SOLDIER, zoneForDepth } from "../src/config";
+import { LootKind, LootSystem } from "../src/entities/LootSystem";
+import { Rng } from "../src/core/Rng";
+import { MUZZLE_FLASH_MULTIPLIER, SAVE_KEY, SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { UPGRADE_BY_ID } from "../src/progression/UpgradeDefinitions";
 import { UpgradeManager } from "../src/progression/UpgradeManager";
 
@@ -112,5 +114,30 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(reloaded.speed).toBeCloseTo(st2.speed, 5);
     expect(reloaded.damage).toBe(st2.damage);
     expect(reloaded.dropChance).toBeCloseTo(st2.dropChance, 5);
+  });
+
+  it("persists muzzleFlash setting, crystals, and separates Zone 1 gold from Zone 2 orange crystals", () => {
+    const store = new MemStorage();
+    const s1 = new SaveManager(store);
+    expect(s1.data.settings.muzzleFlash).toBe("brightest");
+    expect(s1.data.settings.autoFollowCamera).toBe(false);
+    expect(MUZZLE_FLASH_MULTIPLIER.brightest).toBe(1);
+    expect(MUZZLE_FLASH_MULTIPLIER.off).toBe(0);
+
+    s1.data.crystals = 42;
+    s1.data.settings.muzzleFlash = "dim";
+    s1.save();
+
+    const s2 = new SaveManager(store);
+    expect(s2.data.crystals).toBe(42);
+    expect(s2.data.settings.muzzleFlash).toBe("dim");
+    expect(zoneForDepth(5)).toBe(0);
+    expect(zoneForDepth(20)).toBe(1);
+    expect(zoneForDepth(40)).toBe(2);
+
+    const loot = new LootSystem();
+    const rng = new Rng(7);
+    loot.spawnOne(100, 100, 5, rng, LootKind.Crystal);
+    expect(loot.kind[0]).toBe(LootKind.Crystal);
   });
 });

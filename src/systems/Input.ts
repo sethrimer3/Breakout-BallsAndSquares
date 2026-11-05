@@ -35,13 +35,11 @@ export class Input {
     this.mouseY = e.offsetY;
     this.downX = e.clientX;
     this.downY = e.clientY;
-    if (e.button === 1 || e.button === 2) {
+    if (e.button === 0 || e.button === 1 || e.button === 2) {
       this.panning = true;
       this.lastX = e.clientX;
       this.lastY = e.clientY;
-      e.preventDefault();
-    } else if (e.button === 0) {
-      this.handlers.onPrimaryClick?.(e.offsetX, e.offsetY);
+      if (e.button !== 0) e.preventDefault();
     }
   };
 
@@ -54,14 +52,23 @@ export class Input {
       const dy = e.clientY - this.lastY;
       this.lastX = e.clientX;
       this.lastY = e.clientY;
-      if (Math.abs(e.clientX - this.downX) + Math.abs(e.clientY - this.downY) > 2) {
+      if (Math.abs(e.clientX - this.downX) + Math.abs(e.clientY - this.downY) > 4) {
         this.handlers.onPan?.(dx, dy);
       }
     }
   };
 
   private onUp = (e: PointerEvent): void => {
-    if (e.button === 1 || e.button === 2) this.panning = false;
+    if (e.button === 0) {
+      const dist = Math.abs(e.clientX - this.downX) + Math.abs(e.clientY - this.downY);
+      if (dist <= 4) {
+        const rect = this.canvas.getBoundingClientRect();
+        this.handlers.onPrimaryClick?.(e.clientX - rect.left, e.clientY - rect.top);
+      }
+      this.panning = false;
+    } else if (e.button === 1 || e.button === 2) {
+      this.panning = false;
+    }
   };
 
   private onWheel = (e: WheelEvent): void => {

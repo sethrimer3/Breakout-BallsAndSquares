@@ -4,9 +4,30 @@ import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
 export const SAVE_KEY = "breach.save.v1";
 export const SAVE_VERSION = 1;
 
+export type MuzzleFlashLevel = "brightest" | "brighter" | "bright" | "dim" | "dimmer" | "off";
+
+export const MUZZLE_FLASH_LEVELS: readonly MuzzleFlashLevel[] = [
+  "brightest",
+  "brighter",
+  "bright",
+  "dim",
+  "dimmer",
+  "off",
+];
+
+export const MUZZLE_FLASH_MULTIPLIER: Record<MuzzleFlashLevel, number> = {
+  brightest: 1.0,
+  brighter: 0.75,
+  bright: 0.52,
+  dim: 0.3,
+  dimmer: 0.14,
+  off: 0,
+};
+
 export interface SaveData {
   version: number;
   bank: number;
+  crystals: number;
   lifetimePixels: number;
   upgrades: Record<UpgradeId, number>;
   bests: {
@@ -17,6 +38,8 @@ export interface SaveData {
   settings: {
     muted: boolean;
     volume: number;
+    muzzleFlash: MuzzleFlashLevel;
+    autoFollowCamera: boolean;
   };
 }
 
@@ -26,10 +49,16 @@ export function defaultSaveData(): SaveData {
   return {
     version: SAVE_VERSION,
     bank: 0,
+    crystals: 0,
     lifetimePixels: 0,
     upgrades,
     bests: { time: 0, depth: 0, pixels: 0 },
-    settings: { muted: false, volume: 0.6 },
+    settings: {
+      muted: false,
+      volume: 0.6,
+      muzzleFlash: "brightest",
+      autoFollowCamera: false,
+    },
   };
 }
 
@@ -48,6 +77,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
   const obj = raw as Record<string, unknown>;
 
   def.bank = Math.floor(finiteNonNeg(obj.bank, 0));
+  def.crystals = Math.floor(finiteNonNeg(obj.crystals, 0));
   def.lifetimePixels = Math.floor(finiteNonNeg(obj.lifetimePixels, 0));
 
   if (obj.upgrades && typeof obj.upgrades === "object") {
@@ -69,6 +99,14 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     const s = obj.settings as Record<string, unknown>;
     def.settings.muted = typeof s.muted === "boolean" ? s.muted : false;
     def.settings.volume = finiteNonNeg(s.volume, 0.6, 1);
+    if (
+      typeof s.muzzleFlash === "string" &&
+      (MUZZLE_FLASH_LEVELS as readonly string[]).includes(s.muzzleFlash)
+    ) {
+      def.settings.muzzleFlash = s.muzzleFlash as MuzzleFlashLevel;
+    }
+    def.settings.autoFollowCamera =
+      typeof s.autoFollowCamera === "boolean" ? s.autoFollowCamera : false;
   }
 
   return def;

@@ -144,21 +144,24 @@ export class LightRenderer {
         air.globalAlpha = 1;
       }
     }
-    for (const fl of game.flashes) {
-      const intensity = Math.pow(Math.max(0, fl.life / fl.maxLife), 0.65);
-      const sx = cam.worldToScreenX(fl.x);
-      const sy = cam.worldToScreenY(fl.y);
-      const rad = fl.radius * cam.zoom;
-      if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
-      if (fl.hasPolygon) {
-        this.tracePolygonPath(air, game, fl.poly, fl.polyCount);
-        air.fillStyle = gradientFor(air, sx, sy, rad, FLASH_STOPS, intensity);
-        air.fill();
-      } else {
-        // Fallback cheap glow when over the shadow-light budget.
-        air.globalAlpha = intensity * 0.65;
-        air.drawImage(this.sprites.warmGlow, sx - rad * 0.7, sy - rad * 0.7, rad * 1.4, rad * 1.4);
-        air.globalAlpha = 1;
+    const flashMult = game.muzzleFlashMultiplier;
+    if (flashMult > 0) {
+      for (const fl of game.flashes) {
+        const intensity = Math.pow(Math.max(0, fl.life / fl.maxLife), 0.65) * flashMult;
+        const sx = cam.worldToScreenX(fl.x);
+        const sy = cam.worldToScreenY(fl.y);
+        const rad = fl.radius * cam.zoom;
+        if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
+        if (fl.hasPolygon) {
+          this.tracePolygonPath(air, game, fl.poly, fl.polyCount);
+          air.fillStyle = gradientFor(air, sx, sy, rad, FLASH_STOPS, intensity);
+          air.fill();
+        } else {
+          // Fallback cheap glow when over the shadow-light budget.
+          air.globalAlpha = intensity * 0.65;
+          air.drawImage(this.sprites.warmGlow, sx - rad * 0.7, sy - rad * 0.7, rad * 1.4, rad * 1.4);
+          air.globalAlpha = 1;
+        }
       }
     }
     this.finishAirLayer(g, "lighter", devW, devH, dpr);
@@ -207,17 +210,19 @@ export class LightRenderer {
     //    so the light cone and soldier/wall shadow silhouettes are clearly visible
     //    across empty space.
     let scatter: CanvasRenderingContext2D | null = null;
-    for (const fl of game.flashes) {
-      if (!fl.hasPolygon) continue;
-      const intensity = Math.pow(Math.max(0, fl.life / fl.maxLife), 0.7);
-      const sx = cam.worldToScreenX(fl.x);
-      const sy = cam.worldToScreenY(fl.y);
-      const rad = fl.radius * cam.zoom;
-      if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
-      scatter ??= this.beginLayer(devW, devH, dpr);
-      this.tracePolygonPath(scatter, game, fl.poly, fl.polyCount);
-      scatter.fillStyle = gradientFor(scatter, sx, sy, rad, SCATTER_STOPS, intensity);
-      scatter.fill();
+    if (flashMult > 0) {
+      for (const fl of game.flashes) {
+        if (!fl.hasPolygon) continue;
+        const intensity = Math.pow(Math.max(0, fl.life / fl.maxLife), 0.7) * flashMult;
+        const sx = cam.worldToScreenX(fl.x);
+        const sy = cam.worldToScreenY(fl.y);
+        const rad = fl.radius * cam.zoom;
+        if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
+        scatter ??= this.beginLayer(devW, devH, dpr);
+        this.tracePolygonPath(scatter, game, fl.poly, fl.polyCount);
+        scatter.fillStyle = gradientFor(scatter, sx, sy, rad, SCATTER_STOPS, intensity);
+        scatter.fill();
+      }
     }
     if (scatter) {
       ctx.save();
@@ -294,10 +299,13 @@ export class LightRenderer {
       const l = lighting.softLights[i];
       this.addWallLight(game, l.lit, l.x, l.y, l.radius, l.strength, SOFT_LUT);
     }
-    for (const fl of game.flashes) {
-      if (!fl.hasPolygon) continue;
-      const intensity = Math.pow(Math.max(0, fl.life / fl.maxLife), 0.65);
-      this.addWallLight(game, fl.lit, fl.x, fl.y, fl.radius, intensity, FLASH_LUT);
+    const flashMult = game.muzzleFlashMultiplier;
+    if (flashMult > 0) {
+      for (const fl of game.flashes) {
+        if (!fl.hasPolygon) continue;
+        const intensity = Math.pow(Math.max(0, fl.life / fl.maxLife), 0.65) * flashMult;
+        this.addWallLight(game, fl.lit, fl.x, fl.y, fl.radius, intensity, FLASH_LUT);
+      }
     }
 
     // Upload the union of last frame's and this frame's regions.
