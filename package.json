@@ -1,0 +1,23 @@
+{
+  "name": "breach",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BREACH - an incremental physics roguelite with destructible pixel terrain.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sethrimer3/Breakout-BallsAndSquares.git"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6",
+    "vitest": "^5.1.0"
+  }
+}
