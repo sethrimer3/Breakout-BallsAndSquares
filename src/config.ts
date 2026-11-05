@@ -140,6 +140,42 @@ export function growthRateAt(runTime: number): number {
   return Math.min(GROWTH.maxRate, GROWTH.baseRate * Math.pow(GROWTH.expBase, elapsed));
 }
 
+export const LIGHT = {
+  /** Maximum radius (world units) of a muzzle-flash shadow light (spec §6: 100..130). */
+  radius: 122,
+  /** Flash duration (seconds, spec §6: 60..100ms). */
+  flashDuration: 0.085,
+  /** Evenly spaced base rays around the flash. */
+  baseRays: 96,
+  /** Extra rays concentrated within +/-30° of the firing direction. */
+  coneRays: 16,
+  /** Angular offset (radians) on either side of a silhouette corner / tangent. */
+  cornerEpsilon: 0.00055,
+  /** Hard cap on corner-pair rays per light (2 rays per corner). */
+  maxCornerRays: 384,
+  /** Extend terrain ray hits into the solid cell (world units) so the wall face catches light. */
+  wallPenetration: 4.8,
+  /** Max simultaneous shadow-casting flashes; older/excess flashes fall back to cheap glow. */
+  maxShadowLights: 20,
+  /** Ambient darkness RGB multiplied over the scene (low = dark atmosphere). */
+  ambientRgb: [46, 52, 74] as const,
+  /** Faint ambient self-glow radius around each soldier (world units). */
+  soldierLightRadius: 34,
+  /** Auto-downgrade quality if lighting takes longer than this (ms). */
+  budgetMs: 4.2,
+};
+
+export const CASING = {
+  poolSize: 400,
+  minSpeed: 58,
+  maxSpeed: 92,
+  /** Seconds before a casing finishes fading. */
+  minLife: 1.1,
+  maxLife: 1.85,
+  drag: 4.5,
+  gravity: 38,
+};
+
 export const COLORS = {
   background: "#05070d",
   backgroundGlow: "#0b1020",
