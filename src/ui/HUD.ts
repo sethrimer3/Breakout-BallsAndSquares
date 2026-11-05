@@ -1,5 +1,6 @@
 import { GROWTH } from "../config";
 import type { Game } from "../Game";
+import { sprite, UI_COLORS, type SpriteName } from "./pixelArt";
 
 function fmtTime(t: number): string {
   const m = Math.floor(t / 60);
@@ -20,6 +21,7 @@ export class HUD {
   private boxes: Record<string, HTMLDivElement> = {};
   private statsEl: HTMLDivElement;
   private launchBtn: HTMLButtonElement;
+  private launchCountEl: HTMLSpanElement;
   private growthMeterEl: HTMLDivElement;
   private growthFillEl: HTMLDivElement;
   private growthRateEl: HTMLSpanElement;
@@ -35,21 +37,21 @@ export class HUD {
     this.root.className = "hud";
     const bar = document.createElement("div");
     bar.className = "hud-bar";
-    const items: [string, string][] = [
-      ["time", "TIME"],
-      ["pixels", "PIXELS"],
-      ["currency", "■ GOLD"],
-      ["crystals", "◆ CRYS"],
-      ["bank", "■ BANK"],
-      ["depth", "DEPTH"],
-      ["soldiers", "SOLDIERS"],
+    const items: [string, string, SpriteName, string][] = [
+      ["time", "TIME", "clock", UI_COLORS.neutral],
+      ["pixels", "PIXELS", "pixelBits", UI_COLORS.neutral],
+      ["currency", "GOLD", "gold", UI_COLORS.gold],
+      ["crystals", "CRYS", "crystal", UI_COLORS.crystal],
+      ["bank", "BANK", "gold", UI_COLORS.gold],
+      ["depth", "DEPTH", "depth", UI_COLORS.neutral],
+      ["soldiers", "SOLDIERS", "soldier", UI_COLORS.soldier],
     ];
-    for (const [key, label] of items) {
+    for (const [key, label, icon, color] of items) {
       const box = document.createElement("div");
       box.className = `hud-item hud-${key}`;
       const l = document.createElement("span");
       l.className = "hud-label";
-      l.textContent = label;
+      l.innerHTML = `${sprite(icon, { color })} ${label}`;
       const v = document.createElement("span");
       v.className = "hud-value";
       box.append(l, v);
@@ -61,6 +63,11 @@ export class HUD {
     this.launchBtn = document.createElement("button");
     this.launchBtn.className = "hud-launch-btn";
     this.launchBtn.title = "Deploy Reserve Soldier";
+    this.launchBtn.innerHTML =
+      `<span class="launch-count"></span>` +
+      sprite("soldier", { color: UI_COLORS.soldier, scale: 3 }) +
+      `<span class="launch-lbl">DEPLOY</span>`;
+    this.launchCountEl = this.launchBtn.querySelector(".launch-count") as HTMLSpanElement;
     this.launchBtn.addEventListener("click", () => this.game.launchInRandomDirection());
 
     this.statsEl = document.createElement("div");
@@ -71,15 +78,12 @@ export class HUD {
     this.growthMeterEl.className = "growth-meter stage-dormant";
     this.growthMeterEl.innerHTML = `
       <div class="gm-header">
-        <span class="gm-title">⚠ REPLICATION SURGE</span>
+        <span class="gm-title">${sprite("warn", { color: UI_COLORS.warn, scale: 1 })} REPLICATION SURGE</span>
         <span class="gm-stage">DORMANT</span>
         <span class="gm-rate">0.0 /s</span>
       </div>
       <div class="gm-track">
         <div class="gm-fill"></div>
-        <div class="gm-ticks">
-          <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-        </div>
       </div>
     `;
     this.growthFillEl = this.growthMeterEl.querySelector(".gm-fill") as HTMLDivElement;
@@ -90,7 +94,7 @@ export class HUD {
     this.helpBtn = document.createElement("button");
     this.helpBtn.className = "hud-help-btn";
     this.helpBtn.title = "Help & Controls";
-    this.helpBtn.textContent = "?";
+    this.helpBtn.innerHTML = sprite("help", { color: UI_COLORS.gold });
     this.helpBtn.addEventListener("click", () => {
       this.helpOpen = !this.helpOpen;
       this.helpPopoverEl.classList.toggle("hidden", !this.helpOpen);
@@ -106,10 +110,10 @@ export class HUD {
       <div class="help-list">
         <div><b>LEFT CLICK</b> Aim &amp; launch reserve soldier</div>
         <div><b>DRAG / WHEEL</b> Pan camera around &amp; zoom in/out</div>
-        <div><b>CURRENCIES</b> Zone 1 drops gold squares (■); Zone 2 unlocks glowing orange crystals (◆). Soldiers must touch them to collect!</div>
+        <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}; Zone 2 unlocks glowing orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}. Soldiers must touch them to collect!</div>
         <div><b>F / TAB</b> Follow farthest / Cycle soldiers</div>
         <div><b>U</b> Open Upgrade Matrix</div>
-        <div><b>SPACE / ESC</b> Pause / Menu (&amp; Settings ⚙)</div>
+        <div><b>SPACE / ESC</b> Pause / Menu (&amp; Settings ${sprite("gear", { color: UI_COLORS.soldier, scale: 1 })})</div>
         <div><b>R</b> Quick restart run</div>
       </div>
     `;
@@ -186,7 +190,7 @@ export class HUD {
     // Reserve launch button on the right side.
     if (game.reserves > 0 && game.canDeploy && !game.runOver) {
       this.launchBtn.classList.remove("hidden");
-      this.launchBtn.innerHTML = `<span class="launch-count">${game.reserves}</span><span class="launch-ball"></span><span class="launch-lbl">DEPLOY</span>`;
+      this.launchCountEl.textContent = `${game.reserves}`;
     } else {
       this.launchBtn.classList.add("hidden");
     }

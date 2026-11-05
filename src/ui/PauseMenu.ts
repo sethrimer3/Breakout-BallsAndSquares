@@ -1,6 +1,7 @@
 import type { Game } from "../Game";
 import { MUZZLE_FLASH_LEVELS, type MuzzleFlashLevel } from "../progression/SaveManager";
 import type { LightQuality } from "../systems/LightingSystem";
+import { sprite, UI_COLORS } from "./pixelArt";
 
 type SettingsTab = "gameplay" | "sound" | "visuals";
 
@@ -35,7 +36,7 @@ export class PauseMenu {
         </div>
       </div>
 
-      <button class="pause-cog-btn" title="Settings">⚙</button>
+      <button class="pause-cog-btn" title="Settings">${sprite("gear", { color: UI_COLORS.soldier })}</button>
 
       <div class="panel settings-panel hidden">
         <div class="panel-title">SETTINGS</div>

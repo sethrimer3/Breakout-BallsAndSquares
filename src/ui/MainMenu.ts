@@ -1,4 +1,5 @@
 import type { Game } from "../Game";
+import { sprite, UI_COLORS } from "./pixelArt";
 
 export class MainMenu {
   readonly root: HTMLDivElement;
@@ -13,8 +14,8 @@ export class MainMenu {
         <div class="brand-title">BREACH</div>
         <div class="brand-sub">AUTONOMOUS BALLISTIC EXCAVATION // INCREMENTAL ROGUELITE</div>
         <div class="main-summary">
-          <div>BANK <span class="diamond">◆</span> <b class="m-bank">0</b></div>
-          <div>LIFETIME PIXELS <b class="m-life">0</b></div>
+          <div>BANK ${sprite("gold", { color: UI_COLORS.gold })} <b class="m-bank">0</b></div>
+          <div>LIFETIME ${sprite("pixelBits", { color: UI_COLORS.soldier })} <b class="m-life">0</b></div>
         </div>
         <div class="panel-actions vertical">
           <button class="btn btn-primary" data-act="play">DEPLOY INTO BREACH <span class="kbd">SPACE</span></button>

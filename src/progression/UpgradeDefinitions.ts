@@ -8,6 +8,7 @@ import {
   SOLDIER,
 } from "../config";
 import type { SoldierStats } from "../entities/Soldier";
+import type { SpriteName } from "../ui/pixelArt";
 
 export type UpgradeBranch =
   | "core"
@@ -85,8 +86,8 @@ export interface UpgradeDef {
   formatDelta(): string;
   /** Apply `level` to the mutable `SoldierStats`. */
   apply(stats: SoldierStats, level: number): void;
-  /** Inline SVG path/markup for the node icon (viewBox 0 0 24 24). */
-  iconSvg: string;
+  /** Pixel sprite for the node icon (add new art to `SPRITES` in ui/pixelArt.ts). */
+  icon: SpriteName;
 }
 
 /** Exponential upgrade cost (spec §9). */
@@ -116,7 +117,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.speed = SOLDIER.speed * (1 + 0.1 * lvl);
     },
-    iconSvg: `<path d="M4 12h9M7 7l-3 5 3 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/><circle cx="17" cy="12" r="4" fill="currentColor"/>`,
+    icon: "soldierDash",
   },
   {
     id: "extra_soldier",
@@ -136,7 +137,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.maxSoldiers = SOLDIER.maxSoldiers + lvl;
     },
-    iconSvg: `<circle cx="10" cy="13" r="5" fill="currentColor"/><path d="M18 5v6M15 8h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`,
+    icon: "soldierPlus",
   },
 
   // =========================================================================
@@ -160,7 +161,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.dropChance = LOOT.baseDropChance + 0.1 * lvl;
     },
-    iconSvg: `<rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor"/><rect x="9" y="9" width="6" height="6" fill="#fff8d6"/>`,
+    icon: "goldDrop",
   },
   {
     id: "multi_drop",
@@ -180,7 +181,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.dropChance += 0.25 * lvl;
     },
-    iconSvg: `<rect x="3" y="8" width="8" height="8" rx="1" fill="currentColor"/><rect x="13" y="4" width="8" height="8" rx="1" fill="currentColor"/><rect x="11" y="13" width="8" height="8" rx="1" fill="currentColor"/>`,
+    icon: "goldStack",
   },
   {
     id: "magnet_range",
@@ -200,7 +201,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.magnetRange = LOOT.baseMagnetRange * (1 + 0.25 * lvl);
     },
-    iconSvg: `<path d="M6 5v6a6 6 0 0 0 12 0V5M6 8h3M15 8h3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>`,
+    icon: "magnet",
   },
   {
     id: "pickup_lifetime",
@@ -220,7 +221,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.pickupLifetime = LOOT.baseLifetime + 2 * lvl;
     },
-    iconSvg: `<circle cx="12" cy="13" r="7" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12" y="9" d="M12 9v4l2.5 2M9 3h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`,
+    icon: "hourglass",
   },
 
   // =========================================================================
@@ -244,7 +245,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.blightGraceSeconds = GROWTH.graceSeconds + 3 * lvl;
     },
-    iconSvg: `<path d="M12 3l7 3v5c0 5-3.2 8.8-7 10-3.8-1.2-7-5-7-10V6l7-3z" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 8v5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`,
+    icon: "blightShield",
   },
   {
     id: "blight_slow",
@@ -264,7 +265,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.blightRateMultiplier = Math.pow(0.92, lvl);
     },
-    iconSvg: `<path d="M7 4h10l-4 7 4 7H7l4-7-4-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="none"/>`,
+    icon: "blightSlow",
   },
   {
     id: "blight_weaken",
@@ -284,7 +285,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.blightWeakenChance = Math.min(0.8, lvl * 0.1);
     },
-    iconSvg: `<rect x="5" y="5" width="14" height="14" rx="1.5" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M5 11l5 2 3-4 6 3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/>`,
+    icon: "blightCrack",
   },
 
   // =========================================================================
@@ -308,7 +309,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.fireRate = SOLDIER.fireRate * (1 + 0.12 * lvl);
     },
-    iconSvg: `<path d="M5 12h14M13 6l6 6-6 6M3 7h5M3 17h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "fireRate",
   },
   {
     id: "bullet_speed",
@@ -328,7 +329,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.bulletSpeed = SOLDIER.bulletSpeed * (1 + 0.08 * lvl);
     },
-    iconSvg: `<path d="M3 16l8-8M7 18l8-8M14 5l5 5-3 1-3-3 1-3z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="currentColor"/>`,
+    icon: "bulletFast",
   },
   {
     id: "bullet_damage",
@@ -348,7 +349,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.damage = SOLDIER.damage + lvl;
     },
-    iconSvg: `<path d="M14.5 4.5l5 5-9.5 9.5H5v-5l9.5-9.5zM12 7l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "impact",
   },
   {
     id: "multishot",
@@ -368,7 +369,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.multishotChance = Math.min(1, lvl * 0.05);
     },
-    iconSvg: `<path d="M4 12h14M14 8l4 4-4 4M4 12l12-6M4 12l12 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "fan",
   },
 
   // =========================================================================
@@ -392,7 +393,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.shotgunUnlocked = lvl > 0;
     },
-    iconSvg: `<path d="M3 13h11l3-3h4v3l-3 3H9l-2 4H4l2-4H3v-3z" fill="currentColor"/>`,
+    icon: "shotgun",
   },
   {
     id: "shotgun_pellets",
@@ -412,7 +413,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.shotgunPellets = SHOTGUN.pellets + lvl;
     },
-    iconSvg: `<circle cx="7" cy="8" r="2.2" fill="currentColor"/><circle cx="15" cy="7" r="2.2" fill="currentColor"/><circle cx="12" cy="13" r="2.2" fill="currentColor"/><circle cx="7" cy="17" r="2.2" fill="currentColor"/><circle cx="17" cy="16" r="2.2" fill="currentColor"/>`,
+    icon: "pellets",
   },
   {
     id: "shotgun_fire_rate",
@@ -432,7 +433,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.shotgunFireRate = SHOTGUN.fireRate * (1 + 0.15 * lvl);
     },
-    iconSvg: `<path d="M5 12h14M13 6l6 6-6 6M3 7h5M3 17h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "fireRate",
   },
   {
     id: "shotgun_damage",
@@ -452,7 +453,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.shotgunDamage = SHOTGUN.damage + lvl;
     },
-    iconSvg: `<path d="M14.5 4.5l5 5-9.5 9.5H5v-5l9.5-9.5zM12 7l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "impact",
   },
   {
     id: "shotgun_choke",
@@ -473,7 +474,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.shotgunSpreadDeg = SHOTGUN.spreadDeg * Math.pow(0.92, lvl);
       s.shotgunBulletSpeed = SHOTGUN.bulletSpeed * (1 + 0.1 * lvl);
     },
-    iconSvg: `<path d="M4 6l8 6-8 6M20 6l-8 6 8 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "choke",
   },
   {
     id: "shotgun_range",
@@ -493,7 +494,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.shotgunLifetime = SHOTGUN.lifetime * (1 + 0.18 * lvl);
     },
-    iconSvg: `<path d="M4 12h16M15 7l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "range",
   },
 
   // =========================================================================
@@ -517,7 +518,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.arUnlocked = lvl > 0;
     },
-    iconSvg: `<path d="M2 13h13l2-3h5v3l-2 2h-4l-1 4h-3l1-4H7l-2 3H2v-5z" fill="currentColor"/>`,
+    icon: "rifle",
   },
   {
     id: "ar_pierce",
@@ -537,7 +538,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.arPierce = ASSAULT_RIFLE.pierce + lvl;
     },
-    iconSvg: `<path d="M3 12h18M16 7l5 5-5 5M9 8v8M13 8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "pierce",
   },
   {
     id: "ar_fire_rate",
@@ -557,7 +558,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.arFireRate = ASSAULT_RIFLE.fireRate * (1 + 0.12 * lvl);
     },
-    iconSvg: `<path d="M5 12h14M13 6l6 6-6 6M3 7h5M3 17h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "fireRate",
   },
   {
     id: "ar_damage",
@@ -577,7 +578,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.arDamage = ASSAULT_RIFLE.damage + lvl;
     },
-    iconSvg: `<path d="M14.5 4.5l5 5-9.5 9.5H5v-5l9.5-9.5zM12 7l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "impact",
   },
   {
     id: "ar_stabilizer",
@@ -598,7 +599,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.arSpreadDeg = ASSAULT_RIFLE.spreadDeg * Math.pow(0.88, lvl);
       s.arBulletSpeed = ASSAULT_RIFLE.bulletSpeed * (1 + 0.1 * lvl);
     },
-    iconSvg: `<circle cx="12" cy="12" r="7" stroke="currentColor" stroke-width="1.8" fill="none"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`,
+    icon: "stabilizer",
   },
 
   // =========================================================================
@@ -622,7 +623,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.rocketUnlocked = lvl > 0;
     },
-    iconSvg: `<path d="M4 14l9-9c3-1 6 0 7 1s2 4 1 7l-9 9-4-1-3-3-1-4z" stroke="currentColor" stroke-width="1.8" fill="currentColor"/>`,
+    icon: "launcher",
   },
   {
     id: "rocket_radius",
@@ -642,7 +643,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.rocketBlastRadius = ROCKET_LAUNCHER.blastRadiusCells + 0.4 * lvl;
     },
-    iconSvg: `<circle cx="12" cy="12" r="4" fill="currentColor"/><circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3 2" fill="none"/>`,
+    icon: "blast",
   },
   {
     id: "rocket_damage",
@@ -662,7 +663,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.rocketDamage = ROCKET_LAUNCHER.damage + 2 * lvl;
     },
-    iconSvg: `<path d="M12 2l2.6 6.4L21 9.5l-5 4.5 1.5 6.5L12 17l-5.5 3.5L8 14 3 9.5l6.4-1.1L12 2z" fill="currentColor"/>`,
+    icon: "warhead",
   },
   {
     id: "rocket_fire_rate",
@@ -683,7 +684,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.rocketFireRate = ROCKET_LAUNCHER.fireRate * (1 + 0.15 * lvl);
       s.rocketBulletSpeed = ROCKET_LAUNCHER.bulletSpeed * (1 + 0.1 * lvl);
     },
-    iconSvg: `<path d="M5 12h14M13 6l6 6-6 6M3 7h5M3 17h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "fireRate",
   },
   {
     id: "rocket_cluster",
@@ -703,7 +704,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.rocketClusterCount = lvl;
     },
-    iconSvg: `<circle cx="12" cy="12" r="3" fill="currentColor"/><circle cx="6" cy="7" r="2.2" fill="currentColor"/><circle cx="18" cy="7" r="2.2" fill="currentColor"/><circle cx="6" cy="17" r="2.2" fill="currentColor"/><circle cx="18" cy="17" r="2.2" fill="currentColor"/>`,
+    icon: "cluster",
   },
 
   // =========================================================================
@@ -727,7 +728,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.sniperUnlocked = lvl > 0;
     },
-    iconSvg: `<circle cx="12" cy="12" r="8" stroke="currentColor" stroke-width="1.8" fill="none"/><circle cx="12" cy="12" r="2" fill="currentColor"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>`,
+    icon: "sniper",
   },
   {
     id: "sniper_damage",
@@ -747,7 +748,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.sniperDamage = SNIPER_RIFLE.damage + 3 * lvl;
     },
-    iconSvg: `<path d="M14.5 4.5l5 5-9.5 9.5H5v-5l9.5-9.5zM12 7l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "impact",
   },
   {
     id: "sniper_pierce",
@@ -767,7 +768,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.sniperPierce = SNIPER_RIFLE.pierce + lvl;
     },
-    iconSvg: `<path d="M3 12h18M16 7l5 5-5 5M9 8v8M13 8v8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "pierce",
   },
   {
     id: "sniper_fire_rate",
@@ -788,7 +789,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.sniperFireRate = SNIPER_RIFLE.fireRate * (1 + 0.14 * lvl);
       s.sniperBulletSpeed = SNIPER_RIFLE.bulletSpeed * (1 + 0.08 * lvl);
     },
-    iconSvg: `<path d="M5 12h14M13 6l6 6-6 6M3 7h5M3 17h5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>`,
+    icon: "fireRate",
   },
   {
     id: "sniper_crit",
@@ -808,7 +809,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.sniperCritChance = Math.min(1, lvl * 0.1);
     },
-    iconSvg: `<path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4L12 3z" stroke="currentColor" stroke-width="1.8" fill="currentColor"/>`,
+    icon: "crit",
   },
 ];
 

@@ -7,22 +7,46 @@ import {
   type UpgradeDef,
   type UpgradeId,
 } from "../progression/UpgradeDefinitions";
+import { paletteColor, sprite, UI_COLORS, type SpriteName } from "./pixelArt";
 
 type MatrixTab = UpgradeBranch | "loadout";
 
 const CELL_STEP = 116;
+const STAGE_W = 760;
+const STAGE_H = 390;
 const CENTER_X = 380;
 const CENTER_Y = 195;
+/** Connector layer resolution: one canvas pixel per this many CSS pixels. */
+const LINK_PIXEL = 3;
+const LINK_DOT_GAP = 4;
+const LINK_LOCKED = "#26323e";
+
+const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
+  core: { icon: "soldier", color: UI_COLORS.soldier },
+  pistol: { icon: "pistol", color: "#ff9d3b" },
+  shotgun: { icon: "shotgun", color: "#ff7832" },
+  assault_rifle: { icon: "rifle", color: "#52f296" },
+  rocket_launcher: { icon: "launcher", color: "#ff5c40" },
+  sniper_rifle: { icon: "sniper", color: UI_COLORS.soldier },
+};
+
+const lockIcon = sprite("lock", { color: "#6d8197", scale: 1 });
+const goldIcon = sprite("gold", { color: UI_COLORS.gold });
 
 function nodePos(col: number, row: number): { x: number; y: number } {
   return { x: CENTER_X + col * CELL_STEP, y: CENTER_Y + row * CELL_STEP };
+}
+
+function tabHtml(tab: UpgradeBranch, label: string, locked = false): string {
+  const { icon, color } = TAB_ICONS[tab];
+  return `${sprite(icon, { color: locked ? "#6d8197" : color, scale: 1 })} ${label}${locked ? ` ${lockIcon}` : ""}`;
 }
 
 export class UpgradeTree {
   readonly root: HTMLDivElement;
   private stageEl: HTMLDivElement;
   private loadoutWrap: HTMLDivElement;
-  private svgEl: SVGSVGElement;
+  private linksEl: HTMLCanvasElement;
   private nodesWrap: HTMLDivElement;
   private coreHubEl: HTMLDivElement;
   private tooltipEl: HTMLDivElement;
@@ -32,7 +56,6 @@ export class UpgradeTree {
   private subEl: HTMLDivElement;
   private legendEl: HTMLDivElement;
   private nodeEls = new Map<UpgradeId, HTMLButtonElement>();
-  private lineEls = new Map<UpgradeId, SVGLineElement>();
   private hoveredId: UpgradeId | null = null;
   private activeTab: MatrixTab = "core";
 
@@ -41,27 +64,27 @@ export class UpgradeTree {
     this.root.className = "overlay tree-overlay hidden";
     this.root.innerHTML = `
       <div class="tree-shell">
-        <button class="tree-close" title="Close (Esc)">✕</button>
+        <button class="tree-close" title="Close (Esc)">${sprite("close", { color: UI_COLORS.magenta })}</button>
         <div class="tree-header">
           <div class="tree-title">UPGRADE MATRIX</div>
           <div class="tree-sub">CORE SYSTEMS, WEAPON TREES &amp; SQUAD LOADOUT</div>
           <div class="tree-tabs">
-            <button class="tree-tab active" data-tab="core">CORE</button>
-            <button class="tree-tab" data-tab="pistol">PISTOL</button>
-            <button class="tree-tab" data-tab="shotgun">SHOTGUN</button>
-            <button class="tree-tab" data-tab="assault_rifle">ASSAULT RIFLE</button>
-            <button class="tree-tab" data-tab="rocket_launcher">ROCKET</button>
-            <button class="tree-tab" data-tab="sniper_rifle">SNIPER</button>
+            <button class="tree-tab active" data-tab="core">${tabHtml("core", "CORE")}</button>
+            <button class="tree-tab" data-tab="pistol">${tabHtml("pistol", "PISTOL")}</button>
+            <button class="tree-tab" data-tab="shotgun"></button>
+            <button class="tree-tab" data-tab="assault_rifle"></button>
+            <button class="tree-tab" data-tab="rocket_launcher"></button>
+            <button class="tree-tab" data-tab="sniper_rifle"></button>
             <button class="tree-tab tree-tab-loadout" data-tab="loadout">LOADOUT</button>
           </div>
           <div class="tree-legend">
-            <span class="leg-item" style="--leg-c: #ffd84d">■ MONEY</span>
-            <span class="leg-item" style="--leg-c: #38d6ff">● SOLDIER</span>
-            <span class="leg-item" style="--leg-c: #ff4b8b">▲ BLIGHT</span>
+            <span class="leg-item" style="--leg-c: #ffd84d">${goldIcon} MONEY</span>
+            <span class="leg-item" style="--leg-c: #38d6ff">${sprite("soldier", { color: UI_COLORS.soldier, scale: 1 })} SOLDIER</span>
+            <span class="leg-item" style="--leg-c: #ff4b8b">${sprite("warn", { color: UI_COLORS.blight, scale: 1 })} BLIGHT</span>
           </div>
         </div>
         <div class="tree-stage">
-          <svg class="tree-svg" viewBox="0 0 760 390" preserveAspectRatio="xMidYMid meet"></svg>
+          <canvas class="tree-links"></canvas>
           <div class="tree-nodes"></div>
           <div class="tree-tooltip hidden"></div>
         </div>
@@ -69,8 +92,8 @@ export class UpgradeTree {
         <div class="tree-footer">
           <div class="tree-points-label">RESOURCES AVAILABLE</div>
           <div class="tree-points-val">
-            <span class="diamond">■</span> <span class="bank-num">0</span>
-            <span class="crys-wrap hidden"> &nbsp; <span class="crys-icon">◆</span> <span class="crys-num">0</span></span>
+            ${goldIcon} <span class="bank-num">0</span>
+            <span class="crys-wrap hidden"> &nbsp; ${sprite("crystal", { color: UI_COLORS.crystal })} <span class="crys-num">0</span></span>
           </div>
           <div class="tree-life">LIFETIME EXCAVATED: <span class="life-num">0</span> PX</div>
           <div class="tree-actions">
@@ -82,7 +105,9 @@ export class UpgradeTree {
 
     this.stageEl = this.root.querySelector(".tree-stage") as HTMLDivElement;
     this.loadoutWrap = this.root.querySelector(".loadout-stage") as HTMLDivElement;
-    this.svgEl = this.root.querySelector(".tree-svg") as SVGSVGElement;
+    this.linksEl = this.root.querySelector(".tree-links") as HTMLCanvasElement;
+    this.linksEl.width = Math.round(STAGE_W / LINK_PIXEL);
+    this.linksEl.height = Math.round(STAGE_H / LINK_PIXEL);
     this.nodesWrap = this.root.querySelector(".tree-nodes") as HTMLDivElement;
     this.tooltipEl = this.root.querySelector(".tree-tooltip") as HTMLDivElement;
     this.bankValEl = this.root.querySelector(".bank-num") as HTMLSpanElement;
@@ -95,7 +120,9 @@ export class UpgradeTree {
     this.coreHubEl.className = "tree-core";
     this.coreHubEl.style.left = `${CENTER_X}px`;
     this.coreHubEl.style.top = `${CENTER_Y}px`;
-    this.coreHubEl.innerHTML = `<div class="tree-core-ball"></div>`;
+    this.coreHubEl.innerHTML =
+      sprite("ring", { color: UI_COLORS.soldier, scale: 3, cls: "node-ring" }) +
+      sprite("soldier", { color: UI_COLORS.soldier, scale: 3 });
     this.nodesWrap.append(this.coreHubEl);
 
     this.root.querySelector(".tree-close")!.addEventListener("click", () => this.closeAndDeploy());
@@ -142,36 +169,57 @@ export class UpgradeTree {
   private buildStage(): void {
     for (const def of UPGRADE_DEFS) {
       const to = nodePos(def.grid.col, def.grid.row);
-      const from = def.parent
-        ? nodePos(UPGRADE_BY_ID[def.parent].grid.col, UPGRADE_BY_ID[def.parent].grid.row)
-        : { x: CENTER_X, y: CENTER_Y };
-
-      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-      line.setAttribute("x1", `${from.x}`);
-      line.setAttribute("y1", `${from.y}`);
-      line.setAttribute("x2", `${to.x}`);
-      line.setAttribute("y2", `${to.y}`);
-      line.setAttribute("class", "tree-line");
-      if (def.grid.col === 0 && def.grid.row === 0 && def.parent === null) {
-        line.style.display = "none";
-      }
-      this.svgEl.append(line);
-      this.lineEls.set(def.id, line);
-
       const btn = document.createElement("button");
-      btn.className = "tree-node";
+      // The weapon-unlock node at the center of a tree gets a round frame.
+      const round = def.grid.col === 0 && def.grid.row === 0;
+      btn.className = round ? "tree-node round" : "tree-node";
       btn.style.left = `${to.x}px`;
       btn.style.top = `${to.y}px`;
       btn.style.setProperty("--node-color", def.color);
+      const ring = round
+        ? sprite("ring", { color: def.color, scale: 3, cls: "node-ring ring-empty" }) +
+          sprite("ringFilled", { color: def.color, scale: 3, cls: "node-ring ring-filled" })
+        : "";
       btn.innerHTML = `
-        <svg class="node-icon" viewBox="0 0 24 24">${def.iconSvg}</svg>
+        ${ring}
+        ${sprite(def.icon, { color: def.color, scale: 3, cls: "node-icon" })}
         <span class="node-lvl"></span>
+        <span class="node-pip">${sprite("plus", { color: def.color, scale: 1 })}</span>
       `;
       btn.addEventListener("mouseenter", () => this.showTooltip(def));
       btn.addEventListener("mouseleave", () => this.hideTooltip());
       btn.addEventListener("click", () => this.onNodeClick(def));
       this.nodesWrap.append(btn);
       this.nodeEls.set(def.id, btn);
+    }
+  }
+
+  /** Dotted pixel connectors for the active tab: dim when locked, solid once owned. */
+  private drawLinks(): void {
+    const g = this.linksEl.getContext("2d")!;
+    g.clearRect(0, 0, this.linksEl.width, this.linksEl.height);
+    const u = this.game.upgrades;
+    for (const def of UPGRADE_DEFS) {
+      if (def.branch !== this.activeTab) continue;
+      if (def.grid.col === 0 && def.grid.row === 0 && def.parent === null) continue;
+      const to = nodePos(def.grid.col, def.grid.row);
+      const from = def.parent
+        ? nodePos(UPGRADE_BY_ID[def.parent].grid.col, UPGRADE_BY_ID[def.parent].grid.row)
+        : { x: CENTER_X, y: CENTER_Y };
+      const owned = u.levelOf(def.id) > 0;
+      const unlocked = u.isUnlocked(def.id);
+      g.fillStyle = unlocked ? (paletteColor(owned ? "#" : "-", def.color) as string) : LINK_LOCKED;
+      const x0 = Math.round(from.x / LINK_PIXEL);
+      const y0 = Math.round(from.y / LINK_PIXEL);
+      const x1 = Math.round(to.x / LINK_PIXEL);
+      const y1 = Math.round(to.y / LINK_PIXEL);
+      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      const gap = owned ? 1 : LINK_DOT_GAP;
+      for (let i = 0; i <= steps; i += gap) {
+        const x = Math.round(x0 + ((x1 - x0) * i) / steps);
+        const y = Math.round(y0 + ((y1 - y0) * i) / steps);
+        g.fillRect(x, y, 1, 1);
+      }
     }
   }
 
@@ -226,9 +274,9 @@ export class UpgradeTree {
       `;
     } else {
       bodyHtml = `
-        <div class="tt-compare">${curVal} <span class="tt-arrow">&gt;</span> ${nextVal}</div>
+        <div class="tt-compare">${curVal} ${sprite("chevron", { color: "#7e9bb8" })} ${nextVal}</div>
         <div class="tt-delta">${def.formatDelta()} (${def.shortDesc})</div>
-        <div class="tt-cost ${canBuy ? "affordable" : "expensive"}"><span class="diamond">■</span> ${cost.toLocaleString()}</div>
+        <div class="tt-cost ${canBuy ? "affordable" : "expensive"}">${goldIcon} ${cost.toLocaleString()}</div>
       `;
     }
 
@@ -253,13 +301,14 @@ export class UpgradeTree {
     const count = st.maxSoldiers;
     const loadouts = this.game.save.data.loadouts;
 
-    const weaponDefs: { id: WeaponType; label: string; unlocked: boolean }[] = [
+    const weaponDefs: { id: WeaponType & UpgradeBranch; label: string; unlocked: boolean }[] = [
       { id: "pistol", label: "PISTOL", unlocked: true },
       { id: "shotgun", label: "SHOTGUN", unlocked: st.shotgunUnlocked },
       { id: "assault_rifle", label: "ASSAULT", unlocked: st.arUnlocked },
       { id: "rocket_launcher", label: "ROCKET", unlocked: st.rocketUnlocked },
       { id: "sniper_rifle", label: "SNIPER", unlocked: st.sniperUnlocked },
     ];
+    const socket = sprite("socket", { color: "#3d5267" });
 
     let cardsHtml = "";
     for (let i = 0; i < count; i++) {
@@ -279,8 +328,9 @@ export class UpgradeTree {
       const wBtnsHtml = weaponDefs
         .map(
           (w) => `
-            <button class="btn lc-wbtn ${curW === w.id ? "btn-primary" : ""} ${!w.unlocked ? "locked" : ""}" data-slot="${i}" data-weapon="${w.id}" ${!w.unlocked ? "disabled" : ""}>
-              ${w.unlocked ? w.label : `🔒 ${w.label}`}
+            <button class="lc-wbtn ${curW === w.id ? "equipped" : ""} ${!w.unlocked ? "locked" : ""}" data-slot="${i}" data-weapon="${w.id}" title="${w.label}" ${!w.unlocked ? "disabled" : ""}>
+              ${sprite(TAB_ICONS[w.id].icon, { color: w.unlocked ? TAB_ICONS[w.id].color : "#6d8197", scale: 2 })}
+              ${w.unlocked ? `<span class="lc-wname">${w.label}</span>` : `<span class="lc-wname">${lockIcon}</span>`}
             </button>
           `,
         )
@@ -289,7 +339,7 @@ export class UpgradeTree {
       cardsHtml += `
         <div class="loadout-card">
           <div class="lc-header">
-            <div class="lc-avatar"><div class="tree-core-ball"></div></div>
+            <div class="lc-avatar">${sprite("soldier", { color: UI_COLORS.soldier })}</div>
             <div class="lc-meta">
               <div class="lc-name">SOLDIER #${i + 1}</div>
               <div class="lc-stats">${wSummary}</div>
@@ -299,8 +349,8 @@ export class UpgradeTree {
           <div class="lc-weapons">${wBtnsHtml}</div>
           <div class="lc-section-lbl">EQUIPMENT SLOTS (COMING SOON)</div>
           <div class="lc-gear-row">
-            <div class="lc-gear-slot" title="Equipment slot — coming soon">⬡ GEAR SLOT 1</div>
-            <div class="lc-gear-slot" title="Equipment slot — coming soon">⬡ GEAR SLOT 2</div>
+            <div class="lc-gear-slot" title="Equipment slot 1 — coming soon">${socket}</div>
+            <div class="lc-gear-slot" title="Equipment slot 2 — coming soon">${socket}</div>
           </div>
         </div>
       `;
@@ -350,11 +400,11 @@ export class UpgradeTree {
     ];
     for (const [tabId, label, unlocked] of tabLocks) {
       const btn = this.root.querySelector(`[data-tab="${tabId}"]`) as HTMLButtonElement | null;
-      if (btn) btn.textContent = unlocked ? label : `🔒 ${label}`;
+      if (btn) btn.innerHTML = tabHtml(tabId, label, !unlocked);
     }
     const loadoutTab = this.root.querySelector('[data-tab="loadout"]') as HTMLButtonElement;
     if (loadoutTab) {
-      loadoutTab.textContent = `LOADOUT (${st.maxSoldiers})`;
+      loadoutTab.innerHTML = `${sprite("socket", { color: UI_COLORS.magenta, scale: 1 })} LOADOUT (${st.maxSoldiers})`;
     }
 
     if (this.activeTab === "loadout") {
@@ -370,13 +420,12 @@ export class UpgradeTree {
       this.activeTab === "rocket_launcher" ||
       this.activeTab === "sniper_rifle";
     this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);
+    this.drawLinks();
 
     for (const def of UPGRADE_DEFS) {
       const btn = this.nodeEls.get(def.id)!;
-      const line = this.lineEls.get(def.id)!;
       const inBranch = def.branch === this.activeTab;
       btn.classList.toggle("hidden", !inBranch);
-      line.classList.toggle("hidden", !inBranch);
       if (!inBranch) continue;
 
       const lvl = u.levelOf(def.id);
@@ -390,11 +439,8 @@ export class UpgradeTree {
       btn.classList.toggle("affordable", canBuy);
 
       const lvlEl = btn.querySelector(".node-lvl") as HTMLSpanElement;
-      lvlEl.textContent = unlocked ? `${lvl}/${def.maxLevel}` : "🔒";
-
-      line.classList.toggle("owned", lvl > 0);
-      line.classList.toggle("unlocked", unlocked);
-      line.style.stroke = unlocked ? def.color : "rgba(110, 150, 185, 0.28)";
+      if (!unlocked) lvlEl.innerHTML = lockIcon;
+      else lvlEl.textContent = maxed ? "MAX" : `${lvl}/${def.maxLevel}`;
     }
   }
 

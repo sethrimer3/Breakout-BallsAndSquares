@@ -1,4 +1,5 @@
 import type { Game } from "../Game";
+import { sprite, UI_COLORS } from "./pixelArt";
 
 function fmtTime(t: number): string {
   const m = Math.floor(t / 60);
@@ -46,13 +47,15 @@ export class ResultsScreen {
         <span class="res-val">${val}${isNew ? ' <span class="badge-new">NEW BEST</span>' : ""}</span>
         <span class="res-best">${best ? `BEST ${best}` : ""}</span>
       </div>`;
+    const goldIcon = sprite("gold", { color: UI_COLORS.gold });
+    const crystalIcon = sprite("crystal", { color: UI_COLORS.crystal });
     const crystalsRow =
       r.crystals > 0 || g.crystals > 0
-        ? row("ORANGE CRYSTALS", `◆ ${r.crystals.toLocaleString()}`, `BANK ◆ ${g.crystals.toLocaleString()}`)
+        ? row("ORANGE CRYSTALS", `${crystalIcon} ${r.crystals.toLocaleString()}`, `BANK ${crystalIcon} ${g.crystals.toLocaleString()}`)
         : "";
     this.body.innerHTML =
       row("PIXELS DESTROYED", r.pixelsDestroyed.toLocaleString(), b.pixels.toLocaleString(), newBests.pixels) +
-      row("GOLD COLLECTED", `■ ${r.currency.toLocaleString()}`, `BANK ■ ${g.bank.toLocaleString()}`) +
+      row("GOLD COLLECTED", `${goldIcon} ${r.currency.toLocaleString()}`, `BANK ${goldIcon} ${g.bank.toLocaleString()}`) +
       crystalsRow +
       row("TIME SURVIVED", fmtTime(r.time), fmtTime(b.time), newBests.time) +
       row("MAX DEPTH REACHED", `${r.maxDepth} cells`, `${b.depth} cells`, newBests.depth) +

@@ -17,7 +17,7 @@ export class DebugOverlay {
       <div class="debug-controls">
         <button data-act="ts1">1×</button>
         <button data-act="ts4">4×</button>
-        <button data-act="bank">+1k ◆</button>
+        <button data-act="bank">+1k GOLD</button>
         <button data-act="qual">Light Q</button>
         <button data-act="chunks">Chunks</button>
         <button data-act="copy">Copy Log</button>
