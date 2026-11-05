@@ -2,6 +2,8 @@ import { BULLET, CAMERA, COLORS, GROWTH, SIM, SOLDIER, TERRAIN, WORLD } from "./
 import { Rng } from "./core/Rng";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, baseSoldierStats, type SoldierStats } from "./entities/Soldier";
+import { SaveManager } from "./progression/SaveManager";
+import { UpgradeManager } from "./progression/UpgradeManager";
 import { Renderer } from "./rendering/Renderer";
 import { TerrainRenderer } from "./rendering/TerrainRenderer";
 import { CameraSystem } from "./systems/CameraSystem";
@@ -10,8 +12,10 @@ import { Input } from "./systems/Input";
 import { PhysicsSystem, findSpawnPoint } from "./systems/PhysicsSystem";
 import { RunStats } from "./systems/RunStats";
 import { HUD } from "./ui/HUD";
+import { MainMenu } from "./ui/MainMenu";
 import { PauseMenu } from "./ui/PauseMenu";
 import { ResultsScreen } from "./ui/ResultsScreen";
+import { UpgradeTree } from "./ui/UpgradeTree";
 import { GrowthSystem } from "./world/GrowthSystem";
 import { PixelWorld } from "./world/PixelWorld";
 import { generateWorld } from "./world/WorldGenerator";
@@ -48,9 +52,13 @@ export class Game {
   readonly renderer: Renderer;
   readonly particles = new ParticleSystem(3000);
   readonly runStats = new RunStats();
+  readonly save: SaveManager;
+  readonly upgrades: UpgradeManager;
   readonly hud: HUD;
+  readonly mainMenu: MainMenu;
   readonly pauseMenu: PauseMenu;
   readonly resultsScreen: ResultsScreen;
+  readonly upgradeTree: UpgradeTree;
   readonly input: Input;
 
   stats: SoldierStats = baseSoldierStats();
@@ -62,11 +70,8 @@ export class Game {
   growthRate = 0;
   paused = false;
   runOver = false;
-  /** Persistent-style counters (SaveManager hooks in Phase 3). */
-  bank = 0;
-  lifetimePixels = 0;
-  bests = { time: 0, depth: 0, pixels: 0 };
   private bankedThisRun = false;
+  onUpgradePurchased?: () => void;
   debug = new URLSearchParams(location.search).has("debug") || import.meta.env.DEV;
   debugInfo = { fps: 0, frameMs: 0, simMs: 0 };
 
@@ -81,6 +86,10 @@ export class Game {
     if (2 * SOLDIER.collisionRadius >= WORLD.cellSize) {
       console.warn("Soldier collision diameter >= cell size: soldiers cannot fit 1-cell tunnels.");
     }
+    this.save = new SaveManager();
+    this.upgrades = new UpgradeManager(this.save);
+    this.stats = this.upgrades.getSoldierStats();
+
     this.physics = new PhysicsSystem(this.world, this.rng);
     this.combat = new CombatSystem(this.world, this.rng, this.stats, {
       onShot: (s, dx, dy, mx, my) => this.onShot(s, dx, dy, mx, my),
@@ -94,9 +103,11 @@ export class Game {
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
     this.terrain.rebuildAll();
     this.renderer = new Renderer(canvas, this);
-    this.hud = new HUD(uiRoot);
+    this.hud = new HUD(uiRoot, this);
+    this.mainMenu = new MainMenu(uiRoot, this);
     this.pauseMenu = new PauseMenu(uiRoot, this);
     this.resultsScreen = new ResultsScreen(uiRoot, this);
+    this.upgradeTree = new UpgradeTree(uiRoot, this);
     this.input = new Input(canvas, {
       onPrimaryClick: (sx, sy) => this.tryLaunch(sx, sy),
       onWheel: (sx, sy, dy) =>
@@ -109,6 +120,30 @@ export class Game {
     this.startRun();
   }
 
+  get bank(): number {
+    return this.save.data.bank;
+  }
+
+  get lifetimePixels(): number {
+    return this.save.data.lifetimePixels;
+  }
+
+  get bests(): { time: number; depth: number; pixels: number } {
+    return this.save.data.bests;
+  }
+
+  applyUpgrades(): void {
+    this.stats = this.upgrades.getSoldierStats();
+    this.combat.stats = this.stats;
+    for (const s of this.soldiers) {
+      if (!s.alive) continue;
+      const len = Math.hypot(s.vx, s.vy) || 1;
+      s.vx = (s.vx / len) * this.stats.speed;
+      s.vy = (s.vy / len) * this.stats.speed;
+      s.speed = this.stats.speed;
+    }
+  }
+
   resize(): void {
     this.renderer.resize();
     this.camera.setViewport(this.canvas.clientWidth, this.canvas.clientHeight);
@@ -116,13 +151,16 @@ export class Game {
 
   /** Begin a fresh run (regenerates the world in place). */
   startRun(): void {
+    this.mainMenu.hide();
     this.pauseMenu.hide();
     this.resultsScreen.hide();
+    this.upgradeTree.hide();
     if (this.runStats.time > 0) {
       generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
       this.terrain.rebuildAll();
     }
     this.growth.reset();
+    this.stats = this.upgrades.getSoldierStats();
     this.combat.stats = this.stats;
     this.soldiers = [];
     this.flashes = [];
@@ -144,18 +182,20 @@ export class Game {
   /** Bank currency & lifetime pixels earned in the current run (idempotent per run). */
   bankCurrentRun(): { time: boolean; depth: boolean; pixels: boolean } {
     const r = this.runStats;
+    const b = this.save.data.bests;
     const newBests = {
-      time: r.time > this.bests.time && r.soldiersDeployed > 0,
-      depth: r.maxDepth > this.bests.depth && r.maxDepth > 0,
-      pixels: r.pixelsDestroyed > this.bests.pixels && r.pixelsDestroyed > 0,
+      time: r.time > b.time && r.soldiersDeployed > 0,
+      depth: r.maxDepth > b.depth && r.maxDepth > 0,
+      pixels: r.pixelsDestroyed > b.pixels && r.pixelsDestroyed > 0,
     };
     if (!this.bankedThisRun) {
       this.bankedThisRun = true;
-      this.bank += r.currency;
-      this.lifetimePixels += r.pixelsDestroyed;
-      if (r.time > this.bests.time) this.bests.time = r.time;
-      if (r.maxDepth > this.bests.depth) this.bests.depth = r.maxDepth;
-      if (r.pixelsDestroyed > this.bests.pixels) this.bests.pixels = r.pixelsDestroyed;
+      this.save.data.bank += r.currency;
+      this.save.data.lifetimePixels += r.pixelsDestroyed;
+      if (r.time > b.time) b.time = r.time;
+      if (r.maxDepth > b.depth) b.depth = r.maxDepth;
+      if (r.pixelsDestroyed > b.pixels) b.pixels = r.pixelsDestroyed;
+      this.save.save();
     }
     return newBests;
   }
@@ -166,7 +206,7 @@ export class Game {
   }
 
   togglePauseMenu(show?: boolean): void {
-    if (this.runOver) return;
+    if (this.runOver || this.upgradeTree.visible || this.mainMenu.visible) return;
     const next = show ?? !this.pauseMenu.visible;
     if (next) {
       this.paused = true;
@@ -179,11 +219,40 @@ export class Game {
   }
 
   openUpgrades(): void {
-    // Phase 3 connects the UpgradeTree screen here; in Phase 2 restart cleanly.
-    this.startRun();
+    this.pauseMenu.hide();
+    this.resultsScreen.hide();
+    this.mainMenu.hide();
+    this.paused = true;
+    this.upgradeTree.show();
+    this.hud.update(this, performance.now(), true);
+  }
+
+  openMainMenu(): void {
+    this.bankCurrentRun();
+    this.pauseMenu.hide();
+    this.resultsScreen.hide();
+    this.upgradeTree.hide();
+    this.paused = true;
+    this.mainMenu.show();
+    this.hud.update(this, performance.now(), true);
   }
 
   private onKey(code: string): void {
+    if (this.upgradeTree.visible) {
+      if (code === "Escape" || code === "KeyU" || code === "Space") {
+        this.upgradeTree.closeAndDeploy();
+      }
+      return;
+    }
+    if (this.mainMenu.visible) {
+      if (code === "Space" || code === "Enter") {
+        this.mainMenu.hide();
+        this.startRun();
+      } else if (code === "KeyU") {
+        this.openUpgrades();
+      }
+      return;
+    }
     switch (code) {
       case "KeyF":
         this.camera.resumeAuto();
@@ -195,7 +264,12 @@ export class Game {
         if (!this.runOver && !this.pauseMenu.visible) this.paused = !this.paused;
         break;
       case "Escape":
-        this.togglePauseMenu();
+        if (this.resultsScreen.visible) this.startRun();
+        else this.togglePauseMenu();
+        break;
+      case "KeyU":
+        this.bankCurrentRun();
+        this.openUpgrades();
         break;
       case "KeyR":
         this.restartAndBank();
@@ -205,6 +279,15 @@ export class Game {
         break;
     }
     this.hud.update(this, performance.now(), true);
+  }
+
+  launchInRandomDirection(): void {
+    const spawn = findSpawnPoint(this.world, SOLDIER.collisionRadius);
+    if (!spawn) return;
+    const a = this.rng.range(0, Math.PI * 2);
+    const sx = this.camera.worldToScreenX(spawn.x + Math.cos(a) * 40);
+    const sy = this.camera.worldToScreenY(spawn.y + Math.sin(a) * 40);
+    this.tryLaunch(sx, sy);
   }
 
   /** Launch a reserve soldier from the spawn point toward a screen position. */

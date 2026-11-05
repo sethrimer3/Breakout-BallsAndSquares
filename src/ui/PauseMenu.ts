@@ -14,6 +14,7 @@ export class PauseMenu {
           <button class="btn btn-primary" data-act="resume">RESUME <span class="kbd">ESC</span></button>
           <button class="btn" data-act="restart">RESTART RUN <span class="kbd">R</span></button>
           <button class="btn btn-accent" data-act="upgrades">UPGRADE TREE <span class="kbd">U</span></button>
+          <button class="btn" data-act="main">MAIN MENU</button>
         </div>
       </div>
     `;
@@ -26,6 +27,9 @@ export class PauseMenu {
       game.togglePauseMenu(false);
       game.bankCurrentRun();
       game.openUpgrades();
+    });
+    this.root.querySelector('[data-act="main"]')!.addEventListener("click", () => {
+      game.openMainMenu();
     });
     parent.append(this.root);
   }
