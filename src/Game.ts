@@ -2,6 +2,7 @@ import { BULLET, CAMERA, COLORS, GROWTH, LIGHT, SIM, SOLDIER, TERRAIN, WORLD } f
 import { AudioSystem } from "./audio/AudioSystem";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
+import { LootSystem } from "./entities/LootSystem";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, baseSoldierStats, type SoldierStats } from "./entities/Soldier";
 import { SaveManager } from "./progression/SaveManager";
@@ -48,6 +49,7 @@ export class Game {
   readonly renderer: Renderer;
   readonly particles = new ParticleSystem(3000);
   readonly casings = new CasingSystem();
+  readonly loot = new LootSystem();
   readonly runStats = new RunStats();
   readonly save: SaveManager;
   readonly upgrades: UpgradeManager;
@@ -175,6 +177,7 @@ export class Game {
     this.combat.bullets.clear();
     this.particles.clear();
     this.casings.clear();
+    this.loot.clear();
     this.runStats.reset();
     this.reserves = this.stats.maxSoldiers;
     this.canDeploy = true;
@@ -415,7 +418,13 @@ export class Game {
         this.particles.spawn(PKind.Debris, ccx + this.rng.range(-3, 3), ccy + this.rng.range(-3, 3), Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.4, 0.8), this.rng.range(1, 2), col, 4);
       }
       this.runStats.pixelsDestroyed++;
-      this.runStats.currency++;
+      this.loot.spawnDropsForBlock(
+        ccx,
+        ccy,
+        this.stats.dropChance,
+        this.stats.pickupLifetime,
+        this.rng,
+      );
       const depth = this.world.depthOf(cx, cy);
       if (depth > this.runStats.maxDepth) this.runStats.maxDepth = depth;
     }
@@ -447,6 +456,11 @@ export class Game {
     this.runStats.recordSampleIfDue(this.growthRate);
     this.particles.update(dt);
     this.casings.update(dt);
+    const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange);
+    if (collected > 0) {
+      this.runStats.currency += collected;
+      this.audio.playPickup();
+    }
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       if ((this.flashes[i].life -= dt) <= 0) {
         this.flashPolyPool.push(this.flashes[i].poly);

@@ -1,8 +1,8 @@
 import type { Game } from "../Game";
 import { UPGRADE_BY_ID, UPGRADE_DEFS, type UpgradeDef, type UpgradeId } from "../progression/UpgradeDefinitions";
 
-const CELL_STEP = 112;
-const CENTER_X = 320;
+const CELL_STEP = 116;
+const CENTER_X = 380;
 const CENTER_Y = 210;
 
 function nodePos(col: number, row: number): { x: number; y: number } {
@@ -31,7 +31,7 @@ export class UpgradeTree {
           <div class="tree-sub">PERMANENT SOLDIER ENHANCEMENTS</div>
         </div>
         <div class="tree-stage">
-          <svg class="tree-svg" viewBox="0 0 640 420" preserveAspectRatio="xMidYMid meet"></svg>
+          <svg class="tree-svg" viewBox="0 0 760 420" preserveAspectRatio="xMidYMid meet"></svg>
           <div class="tree-nodes"></div>
           <div class="tree-tooltip hidden"></div>
         </div>

@@ -20,12 +20,6 @@ export class MainMenu {
           <button class="btn btn-primary" data-act="play">DEPLOY INTO BREACH <span class="kbd">SPACE</span></button>
           <button class="btn btn-accent" data-act="upgrades">UPGRADE TREE <span class="kbd">U</span></button>
         </div>
-        <div class="main-controls">
-          <div><b>LEFT CLICK</b> Aim &amp; launch reserve soldier</div>
-          <div><b>WHEEL / RIGHT DRAG</b> Zoom &amp; pan camera</div>
-          <div><b>F / TAB</b> Auto-follow farthest / cycle soldiers</div>
-          <div><b>SPACE / ESC / R</b> Pause / Menu / Quick restart</div>
-        </div>
       </div>
     `;
     this.bankEl = this.root.querySelector(".m-bank") as HTMLSpanElement;

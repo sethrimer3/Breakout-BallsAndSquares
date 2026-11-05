@@ -95,10 +95,22 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(st.speed).toBeCloseTo(SOLDIER.speed * 2, 5);
     expect(st.damage).toBe(SOLDIER.damage + 1);
     expect(st.fireRate).toBeCloseTo(SOLDIER.fireRate * 1.12, 5);
+    expect(st.dropChance).toBeCloseTo(0.2, 5);
+
+    // Upgrade gold drop chance, multi-drop, magnet range, and pickup lifetime.
+    expect(upg.buy("drop_chance")).toBe(true);
+    expect(upg.buy("multi_drop")).toBe(true);
+    expect(upg.buy("magnet_range")).toBe(true);
+    expect(upg.buy("pickup_lifetime")).toBe(true);
+    const st2 = upg.getSoldierStats();
+    expect(st2.dropChance).toBeCloseTo(0.2 + 0.1 + 0.25, 5);
+    expect(st2.magnetRange).toBeGreaterThan(st.magnetRange);
+    expect(st2.pickupLifetime).toBeGreaterThan(st.pickupLifetime);
 
     // Reload from storage: upgrades persist.
     const reloaded = new UpgradeManager(new SaveManager(store)).getSoldierStats();
-    expect(reloaded.speed).toBeCloseTo(st.speed, 5);
-    expect(reloaded.damage).toBe(st.damage);
+    expect(reloaded.speed).toBeCloseTo(st2.speed, 5);
+    expect(reloaded.damage).toBe(st2.damage);
+    expect(reloaded.dropChance).toBeCloseTo(st2.dropChance, 5);
   });
 });

@@ -1,3 +1,4 @@
+import { GROWTH } from "../config";
 import type { Game } from "../Game";
 
 function fmtTime(t: number): string {
@@ -6,7 +7,13 @@ function fmtTime(t: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-/** Minimal DOM HUD: top stat bar, bottom-left soldier stats, launch control, hint line. */
+/**
+ * Pixel-art DOM HUD:
+ * - Top stat bar (Time, Pixels, Gold Collected, Bank, Depth, Soldiers)
+ * - Bottom-left compact soldier stats
+ * - Dramatic bottom-middle Growth Rate meter
+ * - Bottom-right `?` button that toggles all help/controls text
+ */
 export class HUD {
   readonly root: HTMLDivElement;
   private fields: Record<string, HTMLSpanElement> = {};
@@ -14,7 +21,14 @@ export class HUD {
   private launchBtn: HTMLButtonElement;
   private upgBtn: HTMLButtonElement;
   private muteBtn: HTMLButtonElement;
-  private hintEl: HTMLDivElement;
+  private growthMeterEl: HTMLDivElement;
+  private growthFillEl: HTMLDivElement;
+  private growthRateEl: HTMLSpanElement;
+  private growthStageEl: HTMLSpanElement;
+  private helpBtn: HTMLButtonElement;
+  private helpPopoverEl: HTMLDivElement;
+  private helpStatusEl: HTMLDivElement;
+  private helpOpen = false;
   private lastUpdate = 0;
 
   constructor(parent: HTMLElement, private game: Game) {
@@ -25,11 +39,10 @@ export class HUD {
     const items: [string, string][] = [
       ["time", "TIME"],
       ["pixels", "PIXELS"],
-      ["currency", "◆ RUN"],
-      ["bank", "◆ BANK"],
+      ["currency", "■ GOLD"],
+      ["bank", "■ BANK"],
       ["depth", "DEPTH"],
       ["soldiers", "SOLDIERS"],
-      ["growth", "GROWTH"],
     ];
     for (const [key, label] of items) {
       const box = document.createElement("div");
@@ -63,19 +76,77 @@ export class HUD {
 
     this.launchBtn = document.createElement("button");
     this.launchBtn.className = "hud-launch-btn";
-    this.launchBtn.title = "Click anywhere in the arena (or here) to deploy a reserve soldier";
+    this.launchBtn.title = "Deploy Reserve Soldier";
     this.launchBtn.addEventListener("click", () => this.game.launchInRandomDirection());
 
     this.statsEl = document.createElement("div");
     this.statsEl.className = "hud-stats";
-    this.hintEl = document.createElement("div");
-    this.hintEl.className = "hud-hint";
-    this.root.append(bar, this.upgBtn, this.muteBtn, this.launchBtn, this.statsEl, this.hintEl);
+
+    // Dramatic bottom-middle Growth Rate Meter.
+    this.growthMeterEl = document.createElement("div");
+    this.growthMeterEl.className = "growth-meter stage-dormant";
+    this.growthMeterEl.innerHTML = `
+      <div class="gm-header">
+        <span class="gm-title">⚠ REPLICATION SURGE</span>
+        <span class="gm-stage">DORMANT</span>
+        <span class="gm-rate">0.0 /s</span>
+      </div>
+      <div class="gm-track">
+        <div class="gm-fill"></div>
+        <div class="gm-ticks">
+          <span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    `;
+    this.growthFillEl = this.growthMeterEl.querySelector(".gm-fill") as HTMLDivElement;
+    this.growthRateEl = this.growthMeterEl.querySelector(".gm-rate") as HTMLSpanElement;
+    this.growthStageEl = this.growthMeterEl.querySelector(".gm-stage") as HTMLSpanElement;
+
+    // Bottom-right '?' button + collapsible help popover containing all help text.
+    this.helpBtn = document.createElement("button");
+    this.helpBtn.className = "hud-help-btn";
+    this.helpBtn.title = "Help & Controls";
+    this.helpBtn.textContent = "?";
+    this.helpBtn.addEventListener("click", () => {
+      this.helpOpen = !this.helpOpen;
+      this.helpPopoverEl.classList.toggle("hidden", !this.helpOpen);
+      this.helpBtn.classList.toggle("active", this.helpOpen);
+      this.update(this.game, performance.now(), true);
+    });
+
+    this.helpPopoverEl = document.createElement("div");
+    this.helpPopoverEl.className = "hud-help-popover hidden";
+    this.helpPopoverEl.innerHTML = `
+      <div class="help-title">HOW TO PLAY &amp; CONTROLS</div>
+      <div class="help-status"></div>
+      <div class="help-list">
+        <div><b>LEFT CLICK</b> Aim &amp; launch reserve soldier</div>
+        <div><b>GOLD SQUARES</b> Broken pixels have a chance to drop glowing gold squares — soldiers must pick them up to collect money!</div>
+        <div><b>WHEEL</b> Zoom camera in / out</div>
+        <div><b>RIGHT / MID DRAG</b> Pan camera</div>
+        <div><b>F / TAB</b> Follow farthest / Cycle soldiers</div>
+        <div><b>U</b> Open Upgrade Matrix</div>
+        <div><b>SPACE / ESC</b> Pause / Menu</div>
+        <div><b>R / M</b> Quick restart / Mute audio</div>
+      </div>
+    `;
+    this.helpStatusEl = this.helpPopoverEl.querySelector(".help-status") as HTMLDivElement;
+
+    this.root.append(
+      bar,
+      this.upgBtn,
+      this.muteBtn,
+      this.launchBtn,
+      this.statsEl,
+      this.growthMeterEl,
+      this.helpPopoverEl,
+      this.helpBtn,
+    );
     parent.append(this.root);
   }
 
   update(game: Game, now: number, force = false): void {
-    if (!force && now - this.lastUpdate < 100) return;
+    if (!force && now - this.lastUpdate < 80) return;
     this.lastUpdate = now;
     const s = game.runStats;
     const alive = game.soldiers.filter((x) => x.alive).length;
@@ -85,7 +156,46 @@ export class HUD {
     this.fields.bank.textContent = game.bank.toLocaleString();
     this.fields.depth.textContent = `${s.maxDepth}`;
     this.fields.soldiers.textContent = `${alive} / +${game.reserves}`;
-    this.fields.growth.textContent = `${game.growthRate.toFixed(1)}/s`;
+
+    // Dramatic Growth Rate meter update.
+    const rate = game.growthRate;
+    const graceRem = Math.max(0, GROWTH.graceSeconds - s.time);
+    // Log-ish curve so early growth (0.35 -> 15/s) is already visibly climbing and 150/s hits 100%.
+    const norm =
+      rate <= 0
+        ? 0
+        : Math.min(
+            1,
+            Math.log(1 + rate * 1.8) / Math.log(1 + GROWTH.maxRate * 1.8),
+          );
+    const pct = (norm * 100).toFixed(1);
+    this.growthFillEl.style.width = `${pct}%`;
+
+    let stageClass = "stage-dormant";
+    let stageLabel = "DORMANT";
+    if (rate <= 0) {
+      stageClass = "stage-dormant";
+      stageLabel = graceRem > 0 ? `GRACE ${graceRem.toFixed(0)}S` : "DORMANT";
+      this.growthRateEl.textContent = `0.0 /S`;
+    } else if (rate < 3) {
+      stageClass = "stage-creeping";
+      stageLabel = "CREEPING";
+      this.growthRateEl.textContent = `${rate.toFixed(1)} /S`;
+    } else if (rate < 18) {
+      stageClass = "stage-surging";
+      stageLabel = "SURGING!";
+      this.growthRateEl.textContent = `${rate.toFixed(1)} /S`;
+    } else if (rate < 70) {
+      stageClass = "stage-critical";
+      stageLabel = "CRITICAL!!";
+      this.growthRateEl.textContent = `${rate.toFixed(1)} /S`;
+    } else {
+      stageClass = "stage-overdrive";
+      stageLabel = "OVERDRIVE!!!";
+      this.growthRateEl.textContent = `${rate.toFixed(0)} /S`;
+    }
+    this.growthMeterEl.className = `growth-meter ${stageClass}`;
+    this.growthStageEl.textContent = stageLabel;
 
     // Count affordable upgrades (including current run currency if banked).
     const upgCount = this.upgBtn.querySelector(".upg-count") as HTMLSpanElement;
@@ -100,7 +210,7 @@ export class HUD {
     this.upgBtn.classList.toggle("has-affordable", affordable > 0);
     this.muteBtn.textContent = game.audio.muted ? "🔇" : "🔊";
 
-    // Reserve launch button on the right side (styled like the reference screenshots).
+    // Reserve launch button on the right side.
     if (game.reserves > 0 && game.canDeploy && !game.runOver) {
       this.launchBtn.classList.remove("hidden");
       this.launchBtn.innerHTML = `<span class="launch-count">${game.reserves}</span><span class="launch-ball"></span><span class="launch-lbl">DEPLOY</span>`;
@@ -113,18 +223,18 @@ export class HUD {
       `<div><b>SPD</b> ${st.speed.toFixed(0)}</div>` +
       `<div><b>ROF</b> ${st.fireRate.toFixed(2)}/s</div>` +
       `<div><b>DMG</b> ${st.damage}</div>` +
-      `<div><b>BUL</b> ${st.bulletSpeed.toFixed(0)}</div>` +
-      `<div><b>MULTI</b> ${(st.multishotChance * 100).toFixed(0)}%</div>` +
+      `<div><b>DROP</b> ${(st.dropChance * 100).toFixed(0)}%</div>` +
+      `<div><b>MAG</b> ${st.magnetRange.toFixed(0)}</div>` +
       `<div><b>MAX</b> ${st.maxSoldiers}</div>`;
 
-    let hint = "";
-    if (game.paused && !game.runOver) hint = "PAUSED — Space to resume";
-    else if (game.reserves > 0 && game.canDeploy)
-      hint = `Click arena to aim & launch soldier (${game.reserves} in reserve)`;
-    else if (game.reserves > 0) hint = "Spawn room overrun — cannot deploy";
-    hint +=
-      (hint ? "  ·  " : "") +
-      "Wheel zoom · Right/Middle drag pan · F follow · Tab cycle · U upgrades · R restart";
-    this.hintEl.textContent = hint;
+    if (this.helpOpen) {
+      let status = "";
+      if (game.paused && !game.runOver) status = "PAUSED — Press Space to resume";
+      else if (game.reserves > 0 && game.canDeploy)
+        status = `Click arena to aim & launch soldier (${game.reserves} in reserve)`;
+      else if (game.reserves > 0) status = "Spawn room overrun — cannot deploy";
+      else status = "Soldiers autonomous — collect golden squares!";
+      this.helpStatusEl.textContent = status;
+    }
   }
 }

@@ -1,4 +1,4 @@
-import { SOLDIER } from "../config";
+import { LOOT, SOLDIER } from "../config";
 
 /** Derived soldier stats for a run (base config combined with upgrades). */
 export interface SoldierStats {
@@ -8,6 +8,12 @@ export interface SoldierStats {
   bulletSpeed: number;
   multishotChance: number;
   maxSoldiers: number;
+  /** Expected golden squares dropped per broken pixel (0.2 = 20% for 1; 1.5 = 1 guaranteed + 50% for a 2nd, etc.). */
+  dropChance: number;
+  /** Magnetic attraction radius (world units) for golden square pickups. */
+  magnetRange: number;
+  /** Seconds before an uncollected golden square despawns. */
+  pickupLifetime: number;
 }
 
 export function baseSoldierStats(): SoldierStats {
@@ -18,6 +24,9 @@ export function baseSoldierStats(): SoldierStats {
     bulletSpeed: SOLDIER.bulletSpeed,
     multishotChance: SOLDIER.multishotChance,
     maxSoldiers: SOLDIER.maxSoldiers,
+    dropChance: LOOT.baseDropChance,
+    magnetRange: LOOT.baseMagnetRange,
+    pickupLifetime: LOOT.baseLifetime,
   };
 }
 

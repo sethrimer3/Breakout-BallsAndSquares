@@ -94,6 +94,7 @@ export class Renderer {
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
+    this.drawLoot();
     this.drawGrowthPulses();
     this.drawMuzzleFlares();
     this.drawBullets();
@@ -101,6 +102,49 @@ export class Renderer {
     ctx.restore();
 
     this.lightRenderer.renderVignette(ctx, w, h);
+  }
+
+  /**
+   * Super-efficient rendering of up to thousands of glowing golden squares:
+   * single pre-rendered glow+square sprite per item, fast frustum culling,
+   * and zero per-item state changes unless fading out in the final second.
+   */
+  private drawLoot(): void {
+    const { ctx, game } = this;
+    const loot = game.loot;
+    const n = loot.count;
+    if (n === 0) return;
+    const cam = game.camera;
+    const vw = cam.viewW;
+    const vh = cam.viewH;
+    const zoom = cam.zoom;
+    const camX = cam.x;
+    const camY = cam.y;
+    const halfW = vw * 0.5;
+    const halfH = vh * 0.5;
+    const sprite = this.sprites.goldSquare;
+    const sz = Math.max(6, 5.2 * zoom);
+    const half = sz * 0.5;
+    const xs = loot.x;
+    const ys = loot.y;
+    const lives = loot.life;
+
+    ctx.globalAlpha = 1;
+    let lastAlpha = 1;
+    for (let i = 0; i < n; i++) {
+      const sx = (xs[i] - camX) * zoom + halfW;
+      if (sx < -sz || sx > vw + sz) continue;
+      const sy = (ys[i] - camY) * zoom + halfH;
+      if (sy < -sz || sy > vh + sz) continue;
+      const rem = lives[i];
+      const a = rem < 1 ? Math.max(0, rem) : 1;
+      if (a !== lastAlpha) {
+        ctx.globalAlpha = a;
+        lastAlpha = a;
+      }
+      ctx.drawImage(sprite, sx - half, sy - half, sz, sz);
+    }
+    if (lastAlpha !== 1) ctx.globalAlpha = 1;
   }
 
   private drawCasings(): void {

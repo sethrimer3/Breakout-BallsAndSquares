@@ -39,12 +39,39 @@ export function soldierSprite(size: number): HTMLCanvasElement {
   return c;
 }
 
+/** Pre-rendered golden square with a soft outer radial glow for ultra-fast single-drawImage loot rendering. */
+export function goldSquareSprite(size: number): HTMLCanvasElement {
+  const [c, g] = makeCanvas(size);
+  const r = size / 2;
+  const grad = g.createRadialGradient(r, r, 0, r, r, r);
+  grad.addColorStop(0, "rgba(255, 240, 130, 0.95)");
+  grad.addColorStop(0.28, "rgba(255, 195, 40, 0.55)");
+  grad.addColorStop(0.62, "rgba(255, 140, 10, 0.16)");
+  grad.addColorStop(1, "rgba(255, 110, 0, 0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+
+  // Crisp pixel-art golden square core in the center.
+  const sq = Math.round(size * 0.34);
+  const x0 = Math.round(r - sq / 2);
+  const y0 = Math.round(r - sq / 2);
+  g.fillStyle = "#e89a10";
+  g.fillRect(x0 - 1, y0 - 1, sq + 2, sq + 2);
+  g.fillStyle = "#ffd942";
+  g.fillRect(x0, y0, sq, sq);
+  const inner = Math.max(2, Math.round(sq * 0.5));
+  g.fillStyle = "#fffbe0";
+  g.fillRect(x0 + 1, y0 + 1, inner, inner);
+  return c;
+}
+
 export interface Sprites {
   soldier: HTMLCanvasElement;
   soldierGlow: HTMLCanvasElement;
   warmGlow: HTMLCanvasElement;
   hotGlow: HTMLCanvasElement;
   crimsonGlow: HTMLCanvasElement;
+  goldSquare: HTMLCanvasElement;
   dot: HTMLCanvasElement;
 }
 
@@ -72,6 +99,7 @@ export function createSprites(): Sprites {
       [0.4, "rgba(200, 20, 80, 0.35)"],
       [1, "rgba(120, 0, 60, 0)"],
     ]),
+    goldSquare: goldSquareSprite(32),
     dot: radialSprite(16, [
       [0, "rgba(255,255,255,1)"],
       [0.5, "rgba(255,255,255,0.6)"],

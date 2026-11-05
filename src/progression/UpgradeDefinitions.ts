@@ -1,4 +1,4 @@
-import { SOLDIER } from "../config";
+import { LOOT, SOLDIER } from "../config";
 import type { SoldierStats } from "../entities/Soldier";
 
 export type UpgradeId =
@@ -7,7 +7,11 @@ export type UpgradeId =
   | "bullet_speed"
   | "bullet_damage"
   | "multishot"
-  | "extra_soldier";
+  | "extra_soldier"
+  | "drop_chance"
+  | "multi_drop"
+  | "magnet_range"
+  | "pickup_lifetime";
 
 export interface UpgradeDef {
   id: UpgradeId;
@@ -155,6 +159,82 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.maxSoldiers = SOLDIER.maxSoldiers + lvl;
     },
     iconSvg: `<circle cx="10" cy="13" r="5" fill="currentColor"/><path d="M18 5v6M15 8h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`,
+  },
+  {
+    id: "drop_chance",
+    name: "Gold Drop Chance",
+    shortDesc: "+10% chance for broken pixels to drop a golden square",
+    color: "#ffd84d",
+    grid: { col: -1, row: -1 },
+    parent: "ball_speed",
+    maxLevel: 8,
+    baseCost: 8,
+    costMultiplier: 1.48,
+    unlockLifetimePixels: 0,
+    valueAt: (lvl) => Math.round((LOOT.baseDropChance + 0.1 * lvl) * 100),
+    formatValue: (v) => `${v}%`,
+    formatDelta: () => "+10%",
+    apply: (s, lvl) => {
+      s.dropChance = LOOT.baseDropChance + 0.1 * lvl;
+    },
+    iconSvg: `<rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor"/><rect x="9" y="9" width="6" height="6" fill="#fff8d6"/>`,
+  },
+  {
+    id: "multi_drop",
+    name: "Multi-Drop",
+    shortDesc: "+25% drop yield per level — drops 2 or more golden squares!",
+    color: "#ffae2b",
+    grid: { col: -2, row: -1 },
+    parent: "drop_chance",
+    maxLevel: 12,
+    baseCost: 28,
+    costMultiplier: 1.55,
+    unlockLifetimePixels: 30,
+    valueAt: (lvl) => +(1 + 0.25 * lvl).toFixed(2),
+    formatValue: (v) => `${v.toFixed(2)}× DROPS`,
+    formatDelta: () => "+0.25 DROPS",
+    apply: (s, lvl) => {
+      s.dropChance += 0.25 * lvl;
+    },
+    iconSvg: `<rect x="3" y="8" width="8" height="8" rx="1" fill="currentColor"/><rect x="13" y="4" width="8" height="8" rx="1" fill="currentColor"/><rect x="11" y="13" width="8" height="8" rx="1" fill="currentColor"/>`,
+  },
+  {
+    id: "magnet_range",
+    name: "Magnet Range",
+    shortDesc: "+25% golden square attraction radius per level",
+    color: "#4bf2d8",
+    grid: { col: -1, row: 1 },
+    parent: "ball_speed",
+    maxLevel: 10,
+    baseCost: 10,
+    costMultiplier: 1.48,
+    unlockLifetimePixels: 0,
+    valueAt: (lvl) => Math.round(LOOT.baseMagnetRange * (1 + 0.25 * lvl)),
+    formatValue: (v) => `${v} R`,
+    formatDelta: () => "+25%",
+    apply: (s, lvl) => {
+      s.magnetRange = LOOT.baseMagnetRange * (1 + 0.25 * lvl);
+    },
+    iconSvg: `<path d="M6 5v6a6 6 0 0 0 12 0V5M6 8h3M15 8h3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" fill="none"/>`,
+  },
+  {
+    id: "pickup_lifetime",
+    name: "Gold Duration",
+    shortDesc: "+2.0s before golden squares despawn",
+    color: "#ffe875",
+    grid: { col: -2, row: 1 },
+    parent: "magnet_range",
+    maxLevel: 8,
+    baseCost: 12,
+    costMultiplier: 1.5,
+    unlockLifetimePixels: 0,
+    valueAt: (lvl) => +(LOOT.baseLifetime + 2 * lvl).toFixed(1),
+    formatValue: (v) => `${v.toFixed(1)}s`,
+    formatDelta: () => "+2.0s",
+    apply: (s, lvl) => {
+      s.pickupLifetime = LOOT.baseLifetime + 2 * lvl;
+    },
+    iconSvg: `<circle cx="12" cy="13" r="7" stroke="currentColor" stroke-width="2" fill="none"/><path d="M12 9v4l2.5 2M9 3h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>`,
   },
 ];
 

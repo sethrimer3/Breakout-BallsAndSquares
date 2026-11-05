@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { LIGHT, SIM, SOLDIER, WORLD } from "../src/config";
+import { LIGHT, LOOT, SIM, SOLDIER, WORLD } from "../src/config";
 import { Rng } from "../src/core/Rng";
 import { CasingSystem } from "../src/entities/CasingSystem";
+import { LootSystem } from "../src/entities/LootSystem";
 import { PKind, ParticleSystem } from "../src/entities/ParticleSystem";
 import { Soldier } from "../src/entities/Soldier";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
@@ -40,11 +41,13 @@ function simulateRun(
   const phys = new PhysicsSystem(w, rng);
   const stats = upg.getSoldierStats();
   const runStats = new RunStats();
+  const loot = new LootSystem();
   const combat = new CombatSystem(w, rng, stats, {
     onImpact: (_x, _y, _nx, _ny, cx, cy, r) => {
       if (r === 2) {
         runStats.pixelsDestroyed++;
-        runStats.currency++;
+        const cs = w.cellSize;
+        loot.spawnDropsForBlock((cx + 0.5) * cs, (cy + 0.5) * cs, stats.dropChance, stats.pickupLifetime, rng);
         const d = w.depthOf(cx, cy);
         if (d > runStats.maxDepth) runStats.maxDepth = d;
       }
@@ -79,6 +82,7 @@ function simulateRun(
     }
     combat.updateBullets(SIM.dt);
     growth.update(SIM.dt, runStats.time, soldiers);
+    runStats.currency += loot.update(SIM.dt, soldiers, stats.magnetRange);
     runStats.recordSampleIfDue(growth.rate);
 
     const alive = soldiers.some((s) => s.alive);
@@ -209,5 +213,48 @@ describe("Phase 5 — 8-soldier stress benchmark & high-speed stability", () => 
     }
     const avgMs = (performance.now() - t0) / benchFrames;
     expect(avgMs).toBeLessThan(12);
+  });
+
+  it("magnetically attracts golden squares to soldiers, despawns expired squares, and supports multi-drop (2+)", () => {
+    const loot = new LootSystem(8192);
+    const rng = new Rng(123);
+
+    // 1/5 base drop chance -> ~20% over 1000 trials.
+    let dropped = 0;
+    for (let i = 0; i < 1000; i++) {
+      dropped += loot.spawnDropsForBlock(100, 100, LOOT.baseDropChance, 5, rng);
+    }
+    expect(dropped).toBeGreaterThan(150);
+    expect(dropped).toBeLessThan(250);
+    loot.clear();
+
+    // Multi-drop (e.g. dropChance = 2.5 -> 2 or 3 drops per block).
+    for (let i = 0; i < 50; i++) {
+      const n = loot.spawnDropsForBlock(100, 100, 2.5, 5, rng);
+      expect(n).toBeGreaterThanOrEqual(2);
+      expect(n).toBeLessThanOrEqual(3);
+    }
+    loot.clear();
+
+    // Magnetic attraction & collection only when soldier picks up.
+    loot.spawnOne(120, 100, 5, rng);
+    // Zero initial velocity to test pure magnetic attraction.
+    loot.vx[0] = 0;
+    loot.vy[0] = 0;
+    loot.x[0] = 120;
+    loot.y[0] = 100;
+    const soldier = new Soldier(100, 100, 1, 0, 125);
+    let totalCollected = 0;
+    for (let step = 0; step < 60 && loot.count > 0; step++) {
+      totalCollected += loot.update(SIM.dt, [soldier], 40);
+    }
+    expect(totalCollected).toBe(1);
+    expect(loot.count).toBe(0);
+
+    // Despawn after lifetime expires when no soldier is near.
+    loot.spawnOne(500, 500, 1.0, rng);
+    expect(loot.count).toBe(1);
+    expect(loot.update(1.1, [soldier], 40)).toBe(0);
+    expect(loot.count).toBe(0);
   });
 });

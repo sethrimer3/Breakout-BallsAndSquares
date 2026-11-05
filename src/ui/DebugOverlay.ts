@@ -63,7 +63,7 @@ export class DebugOverlay {
       `FPS ${d.fps.toFixed(0)}  frame ${d.frameMs.toFixed(1)}ms  sim ${d.simMs.toFixed(2)}ms  light ${d.lightMs.toFixed(2)}ms (${lt.quality})  speed ${g.timeScale}×\n` +
       `lights ${lt.lastShadowLights}/${g.flashes.length}  rays ${lt.lastRaysCast}  ` +
       `frontier ${g.growth.frontier.size}  near-soldier ${near.toFixed(0)}%\n` +
-      `bullets ${g.combat.bullets.activeCount}  particles ${g.particles.count}  casings ${g.casings.count}\n` +
+      `bullets ${g.combat.bullets.activeCount}  particles ${g.particles.count}  casings ${g.casings.count}  loot ${g.loot.count}\n` +
       `chunks rebuilt ${g.terrain.rebuiltLastFrame}  pending ${g.terrain.chunks.pending}  ` +
       `reloc ${g.physics.stats.relocations}  stuck ${g.physics.stats.stuckEvents}`;
   }

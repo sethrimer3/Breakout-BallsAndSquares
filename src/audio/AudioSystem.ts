@@ -11,6 +11,7 @@ export class AudioSystem {
   private lastShotAt = 0;
   private lastImpactAt = 0;
   private lastDestroyAt = 0;
+  private lastPickupAt = 0;
 
   constructor(private save: SaveManager) {}
 
@@ -139,6 +140,27 @@ export class AudioSystem {
     osc.connect(g).connect(ctx.destination);
     osc.start(t);
     osc.stop(t + 0.32);
+  }
+
+  /** Bright high-pitched coin ping when a soldier collects a golden square. */
+  playPickup(): void {
+    const now = performance.now();
+    if (now - this.lastPickupAt < 38) return;
+    this.lastPickupAt = now;
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    const base = 980 + Math.random() * 180;
+    osc.frequency.setValueAtTime(base, t);
+    osc.frequency.exponentialRampToValueAtTime(base * 1.35, t + 0.05);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(this.vol(0.09), t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.055);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.06);
   }
 
   /** Bright two-tone chime on upgrade purchase. */

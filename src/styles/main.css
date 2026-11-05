@@ -12,7 +12,9 @@ body {
   overflow: hidden;
   background: #05070d;
   color: #dce8f5;
-  font-family: "JetBrains Mono", "Consolas", "SFMono-Regular", ui-monospace, monospace;
+  font-family: "Silkscreen", "Press Start 2P", "Courier New", monospace;
+  -webkit-font-smoothing: none;
+  image-rendering: pixelated;
 }
 
 #game {
@@ -67,7 +69,7 @@ body {
 
 .hud-currency .hud-label,
 .hud-currency .hud-value {
-  color: #f472d0;
+  color: #ffd84d;
 }
 
 .hud-growth .hud-value {
@@ -77,33 +79,226 @@ body {
 .hud-stats {
   position: absolute;
   left: 14px;
-  bottom: 36px;
+  bottom: 14px;
   padding: 8px 12px;
-  background: rgba(8, 12, 22, 0.78);
-  border: 1px solid rgba(110, 200, 240, 0.22);
-  border-radius: 4px;
+  background: rgba(8, 12, 22, 0.85);
+  border: 2px solid rgba(110, 200, 240, 0.28);
+  border-radius: 3px;
   font-size: 11px;
-  line-height: 1.6;
+  line-height: 1.65;
   color: #b9d2ea;
 }
 .hud-stats b {
   display: inline-block;
-  width: 44px;
+  width: 50px;
   color: #6f8aa6;
-  font-weight: 600;
+  font-weight: 700;
 }
 
-.hud-hint {
+/* Dramatic Bottom-Middle Growth Rate Meter */
+.growth-meter {
   position: absolute;
-  bottom: 10px;
+  bottom: 14px;
   left: 50%;
   transform: translateX(-50%);
+  width: min(440px, 56vw);
+  padding: 8px 12px 10px;
+  background: rgba(8, 6, 16, 0.9);
+  border: 2px solid rgba(255, 70, 120, 0.45);
+  border-radius: 4px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.75), 0 0 18px rgba(255, 45, 105, 0.2);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.gm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
   font-size: 11px;
-  color: rgba(185, 210, 234, 0.75);
+}
+
+.gm-title {
+  color: #ff85a6;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.gm-stage {
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #0b0711;
+  background: #ff5b84;
+  border-radius: 2px;
+}
+
+.gm-rate {
+  font-family: "Press Start 2P", "Silkscreen", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 70, 130, 0.8);
+}
+
+.gm-track {
+  position: relative;
+  height: 16px;
+  background: rgba(18, 8, 24, 0.95);
+  border: 2px solid rgba(255, 90, 140, 0.38);
+  overflow: hidden;
+}
+
+.gm-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #ff9d3b 0%, #ff3b6b 55%, #ff00aa 100%);
+  box-shadow: 0 0 16px rgba(255, 50, 120, 0.9);
+  transition: width 0.12s linear;
+}
+
+.gm-ticks {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-evenly;
+  pointer-events: none;
+}
+
+.gm-ticks span {
+  width: 2px;
+  height: 100%;
   background: rgba(5, 7, 13, 0.65);
-  padding: 3px 10px;
-  border-radius: 3px;
-  white-space: nowrap;
+}
+
+.growth-meter.stage-dormant {
+  border-color: rgba(110, 200, 240, 0.35);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.65);
+}
+.growth-meter.stage-dormant .gm-title {
+  color: #7eb2d6;
+}
+.growth-meter.stage-dormant .gm-stage {
+  background: #48b8e8;
+}
+
+.growth-meter.stage-creeping {
+  border-color: #ff9d3b;
+  box-shadow: 0 0 18px rgba(255, 157, 59, 0.3);
+}
+.growth-meter.stage-creeping .gm-stage {
+  background: #ffae42;
+}
+
+.growth-meter.stage-surging {
+  border-color: #ff4b7d;
+  box-shadow: 0 0 24px rgba(255, 75, 125, 0.45);
+}
+
+.growth-meter.stage-critical {
+  border-color: #ff1e62;
+  box-shadow: 0 0 32px rgba(255, 30, 98, 0.7);
+  animation: meterPulse 0.65s infinite alternate;
+}
+
+.growth-meter.stage-overdrive {
+  border-color: #ff55ff;
+  box-shadow: 0 0 42px rgba(255, 30, 160, 0.95);
+  animation: meterShake 0.28s infinite alternate;
+}
+.growth-meter.stage-overdrive .gm-stage {
+  background: #ff44ff;
+  color: #ffffff;
+}
+
+@keyframes meterPulse {
+  0% {
+    transform: translateX(-50%) scale(1);
+  }
+  100% {
+    transform: translateX(-50%) scale(1.025);
+  }
+}
+
+@keyframes meterShake {
+  0% {
+    transform: translateX(calc(-50% - 1.5px)) scale(1.03);
+  }
+  100% {
+    transform: translateX(calc(-50% + 1.5px)) scale(1.04);
+  }
+}
+
+/* Bottom-Right Question Mark Help Button & Popover */
+.hud-help-btn {
+  pointer-events: auto;
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  font-family: "Press Start 2P", "Silkscreen", monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffe89e;
+  background: rgba(12, 18, 32, 0.9);
+  border: 2px solid #ffd84d;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7), 0 0 12px rgba(255, 216, 77, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 16;
+}
+.hud-help-btn:hover,
+.hud-help-btn.active {
+  background: rgba(34, 48, 78, 0.96);
+  border-color: #fff2a6;
+  box-shadow: 0 0 18px rgba(255, 216, 77, 0.6);
+}
+
+.hud-help-popover {
+  pointer-events: auto;
+  position: absolute;
+  right: 16px;
+  bottom: 64px;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  background: rgba(6, 10, 20, 0.96);
+  border: 2px solid #ffd84d;
+  border-radius: 4px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.85);
+  font-size: 11px;
+  line-height: 1.65;
+  color: #c8def2;
+  z-index: 16;
+}
+
+.help-title {
+  font-family: "Press Start 2P", "Silkscreen", monospace;
+  font-size: 11px;
+  color: #ffd84d;
+  margin-bottom: 8px;
+  letter-spacing: 0.05em;
+}
+
+.help-status {
+  margin-bottom: 8px;
+  padding: 5px 8px;
+  background: rgba(255, 216, 77, 0.12);
+  border-left: 3px solid #ffd84d;
+  color: #fff3b8;
+  font-size: 10px;
+}
+
+.help-list div {
+  margin-bottom: 4px;
+}
+.help-list b {
+  color: #7ee4ff;
 }
 
 .debug-panel {
@@ -170,9 +365,10 @@ body {
 }
 
 .panel-title {
-  font-size: 22px;
+  font-family: "Press Start 2P", "Silkscreen", monospace;
+  font-size: 18px;
   font-weight: 800;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.1em;
   color: #f0f7ff;
   text-align: center;
 }
@@ -294,7 +490,7 @@ body {
 .hud-bank .hud-label,
 .hud-bank .hud-value,
 .diamond {
-  color: #f472d0;
+  color: #ffd84d;
 }
 
 .hud-top-btn {
@@ -376,9 +572,10 @@ body {
 
 /* Main Menu */
 .brand-title {
-  font-size: 38px;
+  font-family: "Press Start 2P", "Silkscreen", monospace;
+  font-size: 32px;
   font-weight: 900;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.18em;
   text-align: center;
   color: #eef8ff;
   text-shadow: 0 0 24px rgba(100, 220, 255, 0.45);
@@ -423,12 +620,12 @@ body {
 }
 .tree-shell {
   position: relative;
-  width: 720px;
-  max-width: 95vw;
+  width: 820px;
+  max-width: 96vw;
   padding: 22px 26px 20px;
   background: rgba(5, 11, 18, 0.94);
-  border: 1px solid rgba(90, 190, 235, 0.32);
-  border-radius: 8px;
+  border: 2px solid rgba(90, 190, 235, 0.36);
+  border-radius: 6px;
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.85);
 }
 .tree-close {
@@ -453,9 +650,10 @@ body {
   text-align: center;
 }
 .tree-title {
-  font-size: 20px;
+  font-family: "Press Start 2P", "Silkscreen", monospace;
+  font-size: 16px;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.12em;
   color: #eaf6ff;
 }
 .tree-sub {
@@ -466,7 +664,8 @@ body {
 }
 .tree-stage {
   position: relative;
-  width: 640px;
+  width: 760px;
+  max-width: 100%;
   height: 420px;
   margin: 6px auto;
 }

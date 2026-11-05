@@ -176,6 +176,28 @@ export const CASING = {
   gravity: 38,
 };
 
+export const LOOT = {
+  /** Maximum active golden square pickups (SoA pool capacity). */
+  poolSize: 8192,
+  /** Base probability (0..1) of a destroyed pixel dropping a golden square (1/5 = 0.2). */
+  baseDropChance: 0.2,
+  /** Base attraction radius (world units) within which pickups are pulled toward a soldier. */
+  baseMagnetRange: 32,
+  /** Base time (seconds) before an uncollected pickup despawns. */
+  baseLifetime: 6,
+  /** Distance from soldier center (world units) at which a pickup is collected. */
+  pickupRadius: 6.5,
+  /** Initial scatter speed range when popped out of a broken block (units/s). */
+  minPopSpeed: 18,
+  maxPopSpeed: 55,
+  /** Air drag applied to scatter velocity. */
+  drag: 5.5,
+  /** Magnetic pull acceleration (units/s²). */
+  magnetAccel: 540,
+  /** Max magnetic pull speed (units/s). */
+  magnetMaxSpeed: 380,
+};
+
 export const COLORS = {
   background: "#05070d",
   backgroundGlow: "#0b1020",
