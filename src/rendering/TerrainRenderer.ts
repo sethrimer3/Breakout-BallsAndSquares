@@ -97,6 +97,17 @@ export class TerrainRenderer {
         }
         sampleRamp(ramp, t, col);
 
+        // Lab set dressing, with a touch of the cell's grain so it isn't flat.
+        const detail = world.decor[i];
+        if (detail > 0) {
+          const dc = COLORS.labDecor[detail];
+          const dm = COLORS.labDecorMix[detail];
+          const grain = 0.94 + t * 0.12;
+          col[0] += (dc[0] * grain - col[0]) * dm;
+          col[1] += (dc[1] * grain - col[1]) * dm;
+          col[2] += (dc[2] * grain - col[2]) * dm;
+        }
+
         const maxHp = world.maxHealthAt(cx, cy);
         // Deeper bands darken slightly for depth perception while preserving zone palette.
         const band = (maxHp - 1) / Math.max(1, maxCap - 1);

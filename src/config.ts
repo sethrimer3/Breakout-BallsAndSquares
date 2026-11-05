@@ -341,6 +341,29 @@ export const COLORS = {
     [88, 94, 112], // brushed steel bulkhead
     [64, 54, 88], // reinforced violet-grey plating
   ] as const,
+  /** Lab detail colors, indexed by `DECOR` in world/LabDetails.ts. */
+  labDecor: [
+    [0, 0, 0], // none
+    [58, 68, 78], // floor: sterile steel
+    [78, 90, 102], // floor tile line
+    [70, 150, 160], // corridor guide line
+    [120, 30, 70], // blight stain
+    [96, 104, 116], // blast door
+    [30, 34, 42], // door seam
+    [90, 230, 150], // door jamb light
+    [190, 150, 40], // hazard yellow
+    [24, 24, 28], // hazard black
+    [104, 114, 128], // equipment frame
+    [120, 200, 210], // tank glass
+    [50, 170, 130], // specimen fluid
+    [120, 255, 170], // status LED
+    [36, 42, 54], // dark panel
+    [128, 118, 100], // bench top
+    [170, 176, 184], // bunk linen
+    [22, 16, 16], // scorched breach
+  ] as const,
+  /** How strongly each lab detail covers the cell's own color (same order). */
+  labDecorMix: [0, 0.45, 0.55, 0.7, 0.55, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] as const,
   /** Tint applied to damaged cells. */
   damage: [120, 70, 52] as const,
   soldierCore: "#1b2a3a",

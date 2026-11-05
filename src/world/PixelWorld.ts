@@ -1,4 +1,4 @@
-import { maxHealthForDistance, wallHealthForZone, zoneForDepth } from "../config";
+import { maxHealthForDistance, wallHealthForZone } from "../config";
 import type { SolidQuery } from "../core/gridRaycast";
 import type { LabLayout } from "./WorldGenerator";
 
@@ -43,6 +43,8 @@ export class PixelWorld implements SolidQuery {
    * 3 = lab wall made of Reinforced Wall material (in Zone 3)
    */
   readonly wall: Uint8Array;
+  /** Per-cell lab set dressing (`DECOR` in LabDetails.ts). Purely cosmetic. */
+  readonly decor: Uint8Array;
   /** Procedurally generated lab rooms & corridors from the most recent `generateWorld` call. */
   labLayout: LabLayout | null = null;
 
@@ -63,6 +65,7 @@ export class PixelWorld implements SolidQuery {
     this.health = new Uint8Array(dims.width * dims.height);
     this.tint = new Uint8Array(dims.width * dims.height);
     this.wall = new Uint8Array(dims.width * dims.height);
+    this.decor = new Uint8Array(dims.width * dims.height);
   }
 
   get worldWidth(): number {
@@ -110,7 +113,7 @@ export class PixelWorld implements SolidQuery {
     if (this.inBounds(cx, cy)) {
       const w = this.wall[cy * this.width + cx];
       if (w > 0) {
-        const z = ((w - 1) as 0 | 1 | 2) ?? zoneForDepth(this.depthOf(cx, cy));
+        const z = Math.min(2, Math.max(0, w - 1)) as 0 | 1 | 2;
         return wallHealthForZone(z, dist);
       }
     }

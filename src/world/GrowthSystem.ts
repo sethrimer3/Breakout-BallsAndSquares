@@ -123,6 +123,8 @@ export class GrowthSystem {
       w.setCell(dx, dy, hp, "grown");
       // Copy tint with a slight variation from parent.
       w.tint[dest] = (w.tint[src] + this.rng.int(17) - 8) & 255;
+      // Blight overwrites whatever the facility had here.
+      w.decor[dest] = 0;
       this.recordGlow(dest, runTime);
       this.recordTelemetry(dx, dy, runTime, soldiers);
       this.totalEvents++;

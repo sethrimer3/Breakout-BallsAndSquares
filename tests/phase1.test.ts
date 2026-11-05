@@ -42,6 +42,113 @@ describe("Phase 1 — world & generation", () => {
     expect(w.maxHealthAt(w.centerX + 17, w.centerY)).toBe(2);
     expect(w.maxHealthAt(0, 0)).toBe(12);
   });
+
+  it("generates a seed-dependent research lab maze with reachable rooms, valid sizes, and tougher zone walls", () => {
+    const w1 = new PixelWorld(WORLD);
+    generateWorld(w1, 101);
+    const w2 = new PixelWorld(WORLD);
+    generateWorld(w2, 202);
+    const w1Copy = new PixelWorld(WORLD);
+    generateWorld(w1Copy, 101);
+
+    const layout1 = w1.labLayout!;
+    const layout2 = w2.labLayout!;
+    expect(layout1).toBeTruthy();
+    expect(layout1.rooms.length).toBeGreaterThanOrEqual(12);
+
+    // Deterministic for identical seed, different across seeds.
+    expect(layout1.rooms.map((r) => `${r.x},${r.y},${r.size}`)).toEqual(
+      w1Copy.labLayout!.rooms.map((r) => `${r.x},${r.y},${r.size}`),
+    );
+    expect(layout1.rooms.map((r) => `${r.x},${r.y},${r.size}`)).not.toEqual(
+      layout2.rooms.map((r) => `${r.x},${r.y},${r.size}`),
+    );
+
+    // Every zone (0, 1, 2) has rooms, and every room is 10..30 cells across, fits inside its zone,
+    // has wallThickness 1..3, and has non-wall soft interior fill.
+    const roomsByZone = [0, 0, 0];
+    for (const room of layout1.rooms) {
+      roomsByZone[room.zone]++;
+      expect(room.size).toBeGreaterThanOrEqual(10);
+      expect(room.size).toBeLessThanOrEqual(30);
+      expect(room.wallThickness).toBeGreaterThanOrEqual(1);
+      expect(room.wallThickness).toBeLessThanOrEqual(3);
+
+      for (let ry = room.y; ry < room.y + room.size; ry++) {
+        for (let rx = room.x; rx < room.x + room.size; rx++) {
+          const i = ry * w1.width + rx;
+          // Interior is filled with soft zone material (not empty space, not wall).
+          expect(w1.wall[i]).toBe(0);
+          expect(w1.health[i]).toBeGreaterThan(0);
+        }
+      }
+    }
+    expect(roomsByZone[0]).toBeGreaterThan(0);
+    expect(roomsByZone[1]).toBeGreaterThan(0);
+    expect(roomsByZone[2]).toBeGreaterThan(0);
+
+    // Every corridor segment is 3..5 cells wide, axis-aligned, with wallThickness 1..3.
+    expect(layout1.corridors.length).toBeGreaterThan(0);
+    for (const seg of layout1.corridors) {
+      expect(seg.width).toBeGreaterThanOrEqual(3);
+      expect(seg.width).toBeLessThanOrEqual(5);
+      expect(seg.wallThickness).toBeGreaterThanOrEqual(1);
+      expect(seg.wallThickness).toBeLessThanOrEqual(3);
+      if (seg.axis === "h") {
+        expect(seg.y1 - seg.y0 + 1).toBe(seg.width);
+      } else {
+        expect(seg.x1 - seg.x0 + 1).toBe(seg.width);
+      }
+    }
+
+    // Walls exist in all 3 zones (1 = Zone 2 mat in Zone 1, 2 = Zone 3 mat in Zone 2, 3 = Reinforced mat in Zone 3)
+    // and have strictly higher health than normal terrain at the same distance.
+    const wallCounts = [0, 0, 0, 0];
+    for (let cy = 0; cy < w1.height; cy++) {
+      for (let cx = 0; cx < w1.width; cx++) {
+        const i = cy * w1.width + cx;
+        const wm = w1.wall[i];
+        wallCounts[wm]++;
+        if (wm > 0) {
+          expect(w1.health[i]).toBe(w1.maxHealthAt(cx, cy));
+        }
+      }
+    }
+    expect(wallCounts[1]).toBeGreaterThan(0);
+    expect(wallCounts[2]).toBeGreaterThan(0);
+    expect(wallCounts[3]).toBeGreaterThan(0);
+
+    // Flood-fill (BFS) from the starting room through non-wall cells (wall === 0)
+    // must reach EVERY generated room across all zones without breaking any wall cell.
+    const visited = new Uint8Array(w1.width * w1.height);
+    const queue: number[] = [];
+    const startIdx = w1.centerY * w1.width + w1.centerX;
+    visited[startIdx] = 1;
+    queue.push(startIdx);
+    const dx = [1, -1, 0, 0];
+    const dy = [0, 0, 1, -1];
+    let head = 0;
+    while (head < queue.length) {
+      const cur = queue[head++];
+      const cx = cur % w1.width;
+      const cy = Math.floor(cur / w1.width);
+      for (let d = 0; d < 4; d++) {
+        const nx = cx + dx[d];
+        const ny = cy + dy[d];
+        if (!w1.inBounds(nx, ny)) continue;
+        const ni = ny * w1.width + nx;
+        if (visited[ni] || w1.wall[ni] !== 0) continue;
+        visited[ni] = 1;
+        queue.push(ni);
+      }
+    }
+
+    for (const room of layout1.rooms) {
+      const rcx = room.x + Math.floor(room.size / 2);
+      const rcy = room.y + Math.floor(room.size / 2);
+      expect(visited[rcy * w1.width + rcx]).toBe(1);
+    }
+  });
 });
 
 describe("Phase 1 — grid raycast & bullets", () => {
