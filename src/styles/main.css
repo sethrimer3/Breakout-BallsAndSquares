@@ -1,0 +1,121 @@
+* {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #05070d;
+  color: #dce8f5;
+  font-family: "JetBrains Mono", "Consolas", "SFMono-Regular", ui-monospace, monospace;
+}
+
+#game {
+  display: block;
+  position: fixed;
+  inset: 0;
+  cursor: crosshair;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.hud-bar {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
+  padding: 6px 12px;
+  background: rgba(8, 12, 22, 0.82);
+  border: 1px solid rgba(110, 200, 240, 0.28);
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+}
+
+.hud-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2px 8px;
+  border-right: 1px solid rgba(110, 200, 240, 0.14);
+}
+.hud-item:last-child {
+  border-right: none;
+}
+
+.hud-label {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: #6f8aa6;
+}
+
+.hud-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: #eaf6ff;
+}
+
+.hud-currency .hud-label,
+.hud-currency .hud-value {
+  color: #f472d0;
+}
+
+.hud-growth .hud-value {
+  color: #ff5b7f;
+}
+
+.hud-stats {
+  position: absolute;
+  left: 14px;
+  bottom: 36px;
+  padding: 8px 12px;
+  background: rgba(8, 12, 22, 0.78);
+  border: 1px solid rgba(110, 200, 240, 0.22);
+  border-radius: 4px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #b9d2ea;
+}
+.hud-stats b {
+  display: inline-block;
+  width: 44px;
+  color: #6f8aa6;
+  font-weight: 600;
+}
+
+.hud-hint {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: rgba(185, 210, 234, 0.75);
+  background: rgba(5, 7, 13, 0.65);
+  padding: 3px 10px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+
+.hud-debug {
+  position: absolute;
+  top: 60px;
+  left: 14px;
+  padding: 6px 10px;
+  background: rgba(5, 8, 16, 0.85);
+  border: 1px solid rgba(110, 200, 240, 0.2);
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #8fd4ff;
+  white-space: pre;
+}

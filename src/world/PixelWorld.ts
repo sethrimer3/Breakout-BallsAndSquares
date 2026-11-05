@@ -1,0 +1,132 @@
+import { maxHealthForDistance } from "../config";
+import type { SolidQuery } from "../core/gridRaycast";
+
+export type CellChangeKind = "damaged" | "destroyed" | "grown" | "set";
+
+export type CellListener = (cx: number, cy: number, kind: CellChangeKind) => void;
+
+export interface WorldDims {
+  width: number;
+  height: number;
+  cellSize: number;
+  roomSize: number;
+}
+
+/**
+ * Typed-array pixel terrain. health[i] == 0 means empty; > 0 means solid with
+ * that much remaining health. Cells outside the world are solid and
+ * indestructible (the world border).
+ */
+export class PixelWorld implements SolidQuery {
+  readonly width: number;
+  readonly height: number;
+  readonly cellSize: number;
+  readonly roomSize: number;
+  /** Center cell coordinates (used for distance / depth). */
+  readonly centerX: number;
+  readonly centerY: number;
+  /** Inclusive bounds of the starting room, in cells. */
+  readonly roomX0: number;
+  readonly roomY0: number;
+  readonly roomX1: number;
+  readonly roomY1: number;
+
+  readonly health: Uint8Array;
+  /** Per-cell color variation seed (0..255). */
+  readonly tint: Uint8Array;
+
+  private listeners: CellListener[] = [];
+
+  constructor(dims: WorldDims) {
+    this.width = dims.width;
+    this.height = dims.height;
+    this.cellSize = dims.cellSize;
+    this.roomSize = dims.roomSize;
+    this.centerX = Math.floor(dims.width / 2);
+    this.centerY = Math.floor(dims.height / 2);
+    const half = Math.floor(dims.roomSize / 2);
+    this.roomX0 = this.centerX - half;
+    this.roomY0 = this.centerY - half;
+    this.roomX1 = this.roomX0 + dims.roomSize - 1;
+    this.roomY1 = this.roomY0 + dims.roomSize - 1;
+    this.health = new Uint8Array(dims.width * dims.height);
+    this.tint = new Uint8Array(dims.width * dims.height);
+  }
+
+  get worldWidth(): number {
+    return this.width * this.cellSize;
+  }
+
+  get worldHeight(): number {
+    return this.height * this.cellSize;
+  }
+
+  /** World-space center of the starting room. */
+  get roomCenterX(): number {
+    return ((this.roomX0 + this.roomX1 + 1) / 2) * this.cellSize;
+  }
+
+  get roomCenterY(): number {
+    return ((this.roomY0 + this.roomY1 + 1) / 2) * this.cellSize;
+  }
+
+  addListener(fn: CellListener): void {
+    this.listeners.push(fn);
+  }
+
+  inBounds(cx: number, cy: number): boolean {
+    return cx >= 0 && cy >= 0 && cx < this.width && cy < this.height;
+  }
+
+  solidAt(cx: number, cy: number): boolean {
+    if (cx < 0 || cy < 0 || cx >= this.width || cy >= this.height) return true;
+    return this.health[cy * this.width + cx] > 0;
+  }
+
+  /** Chebyshev distance of a cell from the world center. */
+  distanceOf(cx: number, cy: number): number {
+    return Math.max(Math.abs(cx - this.centerX), Math.abs(cy - this.centerY));
+  }
+
+  /** Depth beyond the starting room (0 inside / at the room edge). */
+  depthOf(cx: number, cy: number): number {
+    return Math.max(0, this.distanceOf(cx, cy) - Math.floor(this.roomSize / 2));
+  }
+
+  maxHealthAt(cx: number, cy: number): number {
+    return maxHealthForDistance(this.distanceOf(cx, cy));
+  }
+
+  /**
+   * Directly set a cell's health (used by generation and growth).
+   * Fires listeners unless `silent`.
+   */
+  setCell(cx: number, cy: number, hp: number, kind: CellChangeKind = "set", silent = false): void {
+    if (!this.inBounds(cx, cy)) return;
+    this.health[cy * this.width + cx] = hp;
+    if (!silent) this.emit(cx, cy, kind);
+  }
+
+  /**
+   * Apply damage. Returns 0 if nothing happened (empty / out of bounds),
+   * 1 if damaged, 2 if destroyed.
+   */
+  damage(cx: number, cy: number, amount: number): 0 | 1 | 2 {
+    if (!this.inBounds(cx, cy)) return 0;
+    const i = cy * this.width + cx;
+    const hp = this.health[i];
+    if (hp === 0) return 0;
+    const next = Math.max(0, hp - amount);
+    this.health[i] = next;
+    if (next === 0) {
+      this.emit(cx, cy, "destroyed");
+      return 2;
+    }
+    this.emit(cx, cy, "damaged");
+    return 1;
+  }
+
+  private emit(cx: number, cy: number, kind: CellChangeKind): void {
+    for (let k = 0; k < this.listeners.length; k++) this.listeners[k](cx, cy, kind);
+  }
+}

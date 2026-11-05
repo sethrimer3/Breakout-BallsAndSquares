@@ -1,0 +1,55 @@
+export class Bullet {
+  active = false;
+  x = 0;
+  y = 0;
+  /** Normalized direction. */
+  dx = 0;
+  dy = 0;
+  speed = 0;
+  damage = 1;
+  life = 0;
+  /** Distance traveled (used to clamp the tracer so it never trails behind the muzzle). */
+  traveled = 0;
+  /**
+   * Distance still to "advance" from the soldier's center to the muzzle on the
+   * first cast. The first cast starts at the soldier center (always clear) so a
+   * wall between the center and muzzle is always detected.
+   */
+  pendingAdvance = 0;
+  ownerId = 0;
+}
+
+/** Fixed-size object pool for bullets. */
+export class BulletPool {
+  readonly items: Bullet[];
+  activeCount = 0;
+
+  constructor(size: number) {
+    this.items = new Array(size);
+    for (let i = 0; i < size; i++) this.items[i] = new Bullet();
+  }
+
+  acquire(): Bullet | null {
+    const items = this.items;
+    for (let i = 0; i < items.length; i++) {
+      if (!items[i].active) {
+        items[i].active = true;
+        this.activeCount++;
+        return items[i];
+      }
+    }
+    return null;
+  }
+
+  release(b: Bullet): void {
+    if (b.active) {
+      b.active = false;
+      this.activeCount--;
+    }
+  }
+
+  clear(): void {
+    for (const b of this.items) b.active = false;
+    this.activeCount = 0;
+  }
+}

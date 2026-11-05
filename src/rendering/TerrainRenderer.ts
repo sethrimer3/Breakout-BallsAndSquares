@@ -1,0 +1,152 @@
+import { COLORS, TERRAIN, TERRAIN as T } from "../config";
+import type { CameraSystem } from "../systems/CameraSystem";
+import type { PixelWorld } from "../world/PixelWorld";
+import { TerrainChunks } from "../world/TerrainChunks";
+
+type RGB = readonly [number, number, number];
+
+function mix(a: RGB, b: RGB, t: number, out: number[]): void {
+  out[0] = a[0] + (b[0] - a[0]) * t;
+  out[1] = a[1] + (b[1] - a[1]) * t;
+  out[2] = a[2] + (b[2] - a[2]) * t;
+}
+
+const DEEP: RGB = [54, 44, 78];
+
+/**
+ * Renders terrain via cached 1-pixel-per-cell chunk canvases scaled up with
+ * nearest-neighbor sampling, so terrain stays crisp at any zoom.
+ */
+export class TerrainRenderer {
+  readonly chunks: TerrainChunks;
+  private canvases: HTMLCanvasElement[] = [];
+  private image: ImageData;
+  private scratch: number[] = [];
+  private col = [0, 0, 0];
+  rebuiltLastFrame = 0;
+
+  constructor(private world: PixelWorld, chunkSize: number) {
+    this.chunks = new TerrainChunks(world, chunkSize);
+    const n = this.chunks.cols * this.chunks.rows;
+    for (let i = 0; i < n; i++) {
+      const c = document.createElement("canvas");
+      c.width = chunkSize;
+      c.height = chunkSize;
+      this.canvases.push(c);
+    }
+    this.image = new ImageData(chunkSize, chunkSize);
+    this.chunks.markAll();
+  }
+
+  /** Rebuild everything immediately (e.g. after generating a new world). */
+  rebuildAll(): void {
+    this.chunks.markAll();
+    this.chunks.take(Infinity, this.scratch);
+    for (const k of this.scratch) this.buildChunk(k);
+  }
+
+  private buildChunk(k: number): void {
+    const { world } = this;
+    const cs = this.chunks.chunkSize;
+    const kx = k % this.chunks.cols;
+    const ky = Math.floor(k / this.chunks.cols);
+    const data = this.image.data;
+    const W = world.width;
+    const health = world.health;
+    const tint = world.tint;
+    const col = this.col;
+    const maxCap = T.maxHealthCap;
+    for (let ly = 0; ly < cs; ly++) {
+      const cy = ky * cs + ly;
+      for (let lx = 0; lx < cs; lx++) {
+        const cx = kx * cs + lx;
+        const p = (ly * cs + lx) * 4;
+        if (cx >= W || cy >= world.height) {
+          data[p + 3] = 0;
+          continue;
+        }
+        const i = cy * W + cx;
+        const hp = health[i];
+        if (hp === 0) {
+          data[p] = 0;
+          data[p + 1] = 0;
+          data[p + 2] = 0;
+          data[p + 3] = 0;
+          continue;
+        }
+        const t = tint[i] / 255;
+        if (t < 0.5) mix(COLORS.terrainA, COLORS.terrainB, t * 2, col);
+        else mix(COLORS.terrainB, COLORS.terrainC, (t - 0.5) * 2, col);
+
+        const maxHp = world.maxHealthAt(cx, cy);
+        // Harder bands shift subtly toward a deeper violet.
+        const band = (maxHp - 1) / Math.max(1, maxCap - 1);
+        if (band > 0) {
+          const f = band * 0.45;
+          col[0] += (DEEP[0] - col[0]) * f;
+          col[1] += (DEEP[1] - col[1]) * f;
+          col[2] += (DEEP[2] - col[2]) * f;
+        }
+
+        // Damage tint.
+        if (hp < maxHp) {
+          const d = 1 - hp / maxHp;
+          const f = 0.25 + d * 0.4;
+          col[0] += (COLORS.damage[0] - col[0]) * f;
+          col[1] += (COLORS.damage[1] - col[1]) * f;
+          col[2] += (COLORS.damage[2] - col[2]) * f;
+        }
+
+        // Edge highlights where terrain faces open space.
+        const up = cy > 0 && health[i - W] === 0;
+        const left = cx > 0 && health[i - 1] === 0;
+        const down = cy < world.height - 1 && health[i + W] === 0;
+        const right = cx < W - 1 && health[i + 1] === 0;
+        let m = 1;
+        let add = 0;
+        if (up || left) {
+          m = 1.6;
+          add = 8;
+        } else if (down || right) {
+          m = 1.3;
+          add = 3;
+        }
+        data[p] = Math.min(255, col[0] * m + add);
+        data[p + 1] = Math.min(255, col[1] * m + add);
+        data[p + 2] = Math.min(255, col[2] * m + add * 1.3);
+        data[p + 3] = 255;
+      }
+    }
+    this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0);
+  }
+
+  update(): void {
+    this.chunks.take(TERRAIN.chunkRebuildBudget, this.scratch);
+    this.rebuiltLastFrame = this.scratch.length;
+    for (const k of this.scratch) this.buildChunk(k);
+  }
+
+  draw(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
+    const world = this.world;
+    const cs = this.chunks.chunkSize;
+    const unit = world.cellSize * cs;
+    const x0 = cam.screenToWorldX(0);
+    const y0 = cam.screenToWorldY(0);
+    const x1 = cam.screenToWorldX(cam.viewW);
+    const y1 = cam.screenToWorldY(cam.viewH);
+    const kx0 = Math.max(0, Math.floor(x0 / unit));
+    const ky0 = Math.max(0, Math.floor(y0 / unit));
+    const kx1 = Math.min(this.chunks.cols - 1, Math.floor(x1 / unit));
+    const ky1 = Math.min(this.chunks.rows - 1, Math.floor(y1 / unit));
+    ctx.imageSmoothingEnabled = false;
+    for (let ky = ky0; ky <= ky1; ky++) {
+      const sy0 = Math.round(cam.worldToScreenY(ky * unit));
+      const sy1 = Math.round(cam.worldToScreenY((ky + 1) * unit));
+      for (let kx = kx0; kx <= kx1; kx++) {
+        const sx0 = Math.round(cam.worldToScreenX(kx * unit));
+        const sx1 = Math.round(cam.worldToScreenX((kx + 1) * unit));
+        ctx.drawImage(this.canvases[ky * this.chunks.cols + kx], sx0, sy0, sx1 - sx0, sy1 - sy0);
+      }
+    }
+  }
+}
