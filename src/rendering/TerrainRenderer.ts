@@ -120,6 +120,18 @@ export class TerrainRenderer {
     this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0);
   }
 
+  /**
+   * Draw a canvas holding one pixel per world cell with the exact chunk mapping of
+   * `draw`, so each of its pixels covers the same screen pixels as that terrain cell.
+   */
+  drawCellOverlay(ctx: CanvasRenderingContext2D, cam: CameraSystem, overlay: HTMLCanvasElement): void {
+    const cs = this.chunks.chunkSize;
+    ctx.imageSmoothingEnabled = false;
+    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      ctx.drawImage(overlay, kx * cs, ky * cs, cs, cs, sx, sy, sw, sh);
+    });
+  }
+
   update(): void {
     this.chunks.take(TERRAIN.chunkRebuildBudget, this.scratch);
     this.rebuiltLastFrame = this.scratch.length;
@@ -127,6 +139,20 @@ export class TerrainRenderer {
   }
 
   draw(ctx: CanvasRenderingContext2D, cam: CameraSystem, showBorders = false): void {
+    ctx.imageSmoothingEnabled = false;
+    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      ctx.drawImage(this.canvases[ky * this.chunks.cols + kx], sx, sy, sw, sh);
+      if (showBorders) {
+        ctx.strokeStyle = "rgba(80, 210, 255, 0.25)";
+        ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1);
+      }
+    });
+  }
+
+  private forEachVisibleChunk(
+    cam: CameraSystem,
+    fn: (kx: number, ky: number, sx: number, sy: number, sw: number, sh: number) => void,
+  ): void {
     const world = this.world;
     const cs = this.chunks.chunkSize;
     const unit = world.cellSize * cs;
@@ -138,18 +164,13 @@ export class TerrainRenderer {
     const ky0 = Math.max(0, Math.floor(y0 / unit));
     const kx1 = Math.min(this.chunks.cols - 1, Math.floor(x1 / unit));
     const ky1 = Math.min(this.chunks.rows - 1, Math.floor(y1 / unit));
-    ctx.imageSmoothingEnabled = false;
     for (let ky = ky0; ky <= ky1; ky++) {
       const sy0 = Math.round(cam.worldToScreenY(ky * unit));
       const sy1 = Math.round(cam.worldToScreenY((ky + 1) * unit));
       for (let kx = kx0; kx <= kx1; kx++) {
         const sx0 = Math.round(cam.worldToScreenX(kx * unit));
         const sx1 = Math.round(cam.worldToScreenX((kx + 1) * unit));
-        ctx.drawImage(this.canvases[ky * this.chunks.cols + kx], sx0, sy0, sx1 - sx0, sy1 - sy0);
-        if (showBorders) {
-          ctx.strokeStyle = "rgba(80, 210, 255, 0.25)";
-          ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
-        }
+        fn(kx, ky, sx0, sy0, sx1 - sx0, sy1 - sy0);
       }
     }
   }

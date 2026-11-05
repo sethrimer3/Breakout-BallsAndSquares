@@ -12,7 +12,7 @@ import { TerrainRenderer } from "./rendering/TerrainRenderer";
 import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { Input } from "./systems/Input";
-import { LightingSystem, type MuzzleLight } from "./systems/LightingSystem";
+import { LightingSystem, makeLitCells, type LitCells, type MuzzleLight } from "./systems/LightingSystem";
 import { PhysicsSystem, findSpawnPoint } from "./systems/PhysicsSystem";
 import { RunStats } from "./systems/RunStats";
 import { HUD } from "./ui/HUD";
@@ -78,6 +78,8 @@ export class Game {
   debug = new URLSearchParams(location.search).has("debug") || import.meta.env.DEV;
   debugInfo = { fps: 0, frameMs: 0, simMs: 0, lightMs: 0 };
   private flashPolyPool: Float32Array[] = [];
+  private flashLitPool: LitCells[] = [];
+  private lightOverBudgetFrames = 0;
 
   private acc = 0;
   private last = 0;
@@ -171,7 +173,10 @@ export class Game {
     this.stats = this.upgrades.getSoldierStats();
     this.combat.stats = this.stats;
     this.soldiers = [];
-    for (const fl of this.flashes) this.flashPolyPool.push(fl.poly);
+    for (const fl of this.flashes) {
+      this.flashPolyPool.push(fl.poly);
+      this.flashLitPool.push(fl.lit);
+    }
     this.flashes = [];
     this.cellFlashes = [];
     this.combat.bullets.clear();
@@ -341,7 +346,8 @@ export class Game {
   private onShot(s: Soldier, dx: number, dy: number, mx: number, my: number): void {
     this.runStats.shotsFired++;
     this.audio.playShot();
-    const poly = this.flashPolyPool.pop() ?? new Float32Array(2048);
+    const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
+    const lit = this.flashLitPool.pop() ?? makeLitCells();
     this.flashes.push({
       x: mx,
       y: my,
@@ -354,6 +360,7 @@ export class Game {
       poly,
       polyCount: 0,
       hasPolygon: false,
+      lit,
     });
     // Eject a spinning brass shell casing perpendicular to firing direction.
     this.casings.spawn(s.x, s.y, dx, dy, s.ejectSide, this.rng);
@@ -464,6 +471,7 @@ export class Game {
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       if ((this.flashes[i].life -= dt) <= 0) {
         this.flashPolyPool.push(this.flashes[i].poly);
+        this.flashLitPool.push(this.flashes[i].lit);
         this.flashes.splice(i, 1);
       }
     }
@@ -507,6 +515,7 @@ export class Game {
           fl.ownerId,
           this.soldiers,
           fl.poly,
+          fl.lit,
         );
         fl.hasPolygon = fl.polyCount >= 3;
         shadowed++;
@@ -515,13 +524,17 @@ export class Game {
       }
     }
     this.lighting.lastShadowLights = shadowed;
+    this.lighting.updateSoftLights(this.soldiers, this.world.roomCenterX, this.world.roomCenterY, cam);
     const elapsed = performance.now() - t0;
     this.lighting.lastComputeMs = elapsed;
     this.debugInfo.lightMs = elapsed;
-    if (elapsed > LIGHT.budgetMs && this.lighting.quality === "high") {
-      this.lighting.quality = "medium";
-    } else if (elapsed > LIGHT.budgetMs * 1.5 && this.lighting.quality === "medium") {
-      this.lighting.quality = "low";
+    this.lightOverBudgetFrames = elapsed > LIGHT.budgetMs ? this.lightOverBudgetFrames + 1 : 0;
+    if (this.lightOverBudgetFrames >= LIGHT.budgetFrames) {
+      this.lightOverBudgetFrames = 0;
+      if (this.lighting.quality === "high") this.lighting.quality = "medium";
+      else if (elapsed > LIGHT.budgetMs * 1.5 && this.lighting.quality === "medium") {
+        this.lighting.quality = "low";
+      }
     }
   }
 

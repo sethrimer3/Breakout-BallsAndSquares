@@ -1,6 +1,7 @@
 import { LIGHT, SOLDIER } from "../config";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Soldier } from "../entities/Soldier";
+import type { CameraSystem } from "./CameraSystem";
 import type { PixelWorld } from "../world/PixelWorld";
 
 export type LightQuality = "high" | "medium" | "low";
@@ -10,7 +11,6 @@ export interface QualityPreset {
   coneRays: number;
   maxCornerRays: number;
   maxShadowLights: number;
-  halfResLightmap: boolean;
 }
 
 export const QUALITY_PRESETS: Record<LightQuality, QualityPreset> = {
@@ -19,23 +19,30 @@ export const QUALITY_PRESETS: Record<LightQuality, QualityPreset> = {
     coneRays: LIGHT.coneRays,
     maxCornerRays: LIGHT.maxCornerRays,
     maxShadowLights: LIGHT.maxShadowLights,
-    halfResLightmap: false,
   },
   medium: {
     baseRays: 80,
     coneRays: 12,
-    maxCornerRays: 220,
+    maxCornerRays: 512,
     maxShadowLights: 16,
-    halfResLightmap: false,
   },
   low: {
     baseRays: 64,
     coneRays: 8,
-    maxCornerRays: 120,
+    maxCornerRays: 256,
     maxShadowLights: 10,
-    halfResLightmap: true,
   },
 };
+
+/** Wall cells (world indices) with a face visible from a light. */
+export interface LitCells {
+  cells: Int32Array;
+  count: number;
+}
+
+export function makeLitCells(): LitCells {
+  return { cells: new Int32Array(LIGHT.maxLitCells), count: 0 };
+}
 
 export interface MuzzleLight {
   x: number;
@@ -50,6 +57,32 @@ export interface MuzzleLight {
   poly: Float32Array;
   polyCount: number;
   hasPolygon: boolean;
+  /** Wall cells this flash lights. Whole cells, so wall light stays on the grid. */
+  lit: LitCells;
+}
+
+/** Faint always-on glow (soldier self-light or the spawn room). */
+export interface SoftLight {
+  x: number;
+  y: number;
+  radius: number;
+  strength: number;
+  poly: Float32Array;
+  /** 0 when not shadow-traced this frame: the glow then lights open air only. */
+  polyCount: number;
+  lit: LitCells;
+}
+
+function makeSoftLight(): SoftLight {
+  return {
+    x: 0,
+    y: 0,
+    radius: 0,
+    strength: 0,
+    poly: new Float32Array(LIGHT.maxRays * 2),
+    polyCount: 0,
+    lit: makeLitCells(),
+  };
 }
 
 const rayHit = makeRayHit();
@@ -89,6 +122,9 @@ interface CornerCand {
  * Computes 2D visibility polygons for active muzzle flashes.
  * Combines evenly spaced base rays, forward-cone rays, silhouette-corner
  * grazing rays (Rev 2), and soldier-circle tangent rays (Rev 2).
+ *
+ * Polygons stop at wall faces and describe light in open air. Light on walls is
+ * resolved per cell (see `markLitCells`) so it can never cut across the grid.
  */
 export class LightingSystem {
   quality: LightQuality = "high";
@@ -97,11 +133,19 @@ export class LightingSystem {
   lastShadowLights = 0;
   lastComputeMs = 0;
 
-  private angles = new Float64Array(1024);
-  private order = new Int32Array(1024);
-  private corners: CornerCand[] = [];
+  /** Soldier / room glows for the current frame (index 0 is the room). */
+  softLights: SoftLight[] = [];
+  softCount = 0;
 
-  constructor(private world: PixelWorld) {}
+  private angles = new Float64Array(LIGHT.maxRays);
+  private corners: CornerCand[] = [];
+  /** Per-cell stamp so `markLitCells` lists each cell once per light. */
+  private litStamps: Uint32Array;
+  private litStamp = 0;
+
+  constructor(private world: PixelWorld) {
+    this.litStamps = new Uint32Array(world.width * world.height);
+  }
 
   get preset(): QualityPreset {
     return QUALITY_PRESETS[this.quality];
@@ -109,7 +153,8 @@ export class LightingSystem {
 
   /**
    * Build the visibility polygon for one light at `(ox, oy)` firing along `(dirX, dirY)`.
-   * Writes vertices into `outPoly` (must have length >= 2 * maxRays) and returns vertex count.
+   * Writes vertices into `outPoly` and returns the vertex count; if `outLit` is given,
+   * also fills it with the wall cells this light reaches.
    */
   computeVisibilityPolygon(
     ox: number,
@@ -120,20 +165,100 @@ export class LightingSystem {
     ownerId: number,
     soldiers: readonly Soldier[],
     outPoly: Float32Array,
+    outLit?: LitCells,
   ): number {
-    const preset = this.preset;
+    const p = this.preset;
+    return this.trace(
+      ox, oy, dirX, dirY, radius, ownerId, soldiers, outPoly, outLit,
+      p.baseRays, p.coneRays, p.maxCornerRays,
+    );
+  }
+
+  /**
+   * Rebuild the room glow and one glow per living soldier. Shadow-traced glows
+   * are capped; the camera culls off-screen ones.
+   */
+  updateSoftLights(
+    soldiers: readonly Soldier[],
+    roomX: number,
+    roomY: number,
+    cam: CameraSystem,
+  ): void {
+    this.softCount = 0;
+    this.addSoftLight(roomX, roomY, LIGHT.roomLightRadius, LIGHT.roomLightStrength, -1, soldiers, cam);
+    for (let i = 0; i < soldiers.length; i++) {
+      const s = soldiers[i];
+      if (!s.alive) continue;
+      this.addSoftLight(
+        s.x, s.y, LIGHT.soldierLightRadius, LIGHT.soldierLightStrength, s.id, soldiers, cam,
+      );
+    }
+  }
+
+  private addSoftLight(
+    x: number,
+    y: number,
+    radius: number,
+    strength: number,
+    ownerId: number,
+    soldiers: readonly Soldier[],
+    cam: CameraSystem,
+  ): void {
+    const idx = this.softCount++;
+    const l = this.softLights[idx] ?? (this.softLights[idx] = makeSoftLight());
+    l.x = x;
+    l.y = y;
+    l.radius = radius;
+    l.strength = strength;
+    l.polyCount = 0;
+    l.lit.count = 0;
+    const sx = cam.worldToScreenX(x);
+    const sy = cam.worldToScreenY(y);
+    const rad = radius * cam.zoom;
+    if (sx + rad < 0 || sy + rad < 0 || sx - rad > cam.viewW || sy - rad > cam.viewH) return;
+    if (idx > LIGHT.maxSoftShadowLights) return;
+    l.polyCount = this.trace(
+      x, y, 1, 0, radius, ownerId, soldiers, l.poly, l.lit,
+      LIGHT.softBaseRays, 0, this.preset.maxCornerRays,
+    );
+  }
+
+  private trace(
+    ox: number,
+    oy: number,
+    dirX: number,
+    dirY: number,
+    radius: number,
+    ownerId: number,
+    soldiers: readonly Soldier[],
+    outPoly: Float32Array,
+    outLit: LitCells | undefined,
+    baseN: number,
+    coneN: number,
+    maxCornerRays: number,
+  ): number {
     const angles = this.angles;
+    const cs = this.world.cellSize;
+    if (outLit) outLit.count = 0;
+
+    // A muzzle pressed against a wall sits inside it: back the light out to the
+    // wall face, or every ray would hit at t = 0 and the flash would vanish.
+    for (let i = 0; i < 16 && this.world.solidAt(Math.floor(ox / cs), Math.floor(oy / cs)); i++) {
+      ox -= dirX;
+      oy -= dirY;
+    }
+    if (this.world.solidAt(Math.floor(ox / cs), Math.floor(oy / cs))) return 0;
+
     let n = 0;
+    const maxVerts = Math.min(angles.length, outPoly.length >>> 1);
 
     // 1) Evenly spaced base rays around the full 360°.
-    const baseN = preset.baseRays;
     for (let i = 0; i < baseN; i++) {
       angles[n++] = (i / baseN) * Math.PI * 2 - Math.PI;
     }
 
     // 2) Extra rays inside +/-30° of the firing direction for a crisp forward cone.
     const fireAng = Math.atan2(dirY, dirX);
-    const coneN = preset.coneRays;
     const halfCone = Math.PI / 6;
     for (let i = 0; i < coneN; i++) {
       const f = (i / Math.max(1, coneN - 1)) * 2 - 1;
@@ -141,7 +266,6 @@ export class LightingSystem {
     }
 
     // 3) Silhouette corners of solid terrain cells within the light radius (Rev 2).
-    const cs = this.world.cellSize;
     const gx0 = Math.max(1, Math.floor((ox - radius) / cs));
     const gy0 = Math.max(1, Math.floor((oy - radius) / cs));
     const gx1 = Math.min(this.world.width - 1, Math.ceil((ox + radius) / cs));
@@ -174,14 +298,16 @@ export class LightingSystem {
       }
     }
 
-    // Nearest corners first if over budget.
-    const maxCorners = Math.floor(preset.maxCornerRays / 2);
+    // Nearest corners first if over budget, leaving room for soldier tangents so the
+    // sorted ray fan is never truncated.
+    const soldierRays = Math.min(soldiers.length * 4, maxVerts >>> 2);
+    const maxCorners = Math.floor(Math.min(maxCornerRays, maxVerts - n - soldierRays) / 2);
     if (corners.length > maxCorners) {
       corners.sort((a, b) => a.dist2 - b.dist2);
       corners.length = maxCorners;
     }
     const eps = LIGHT.cornerEpsilon;
-    for (let i = 0; i < corners.length && n + 2 <= angles.length; i++) {
+    for (let i = 0; i < corners.length; i++) {
       const a = corners[i].angle;
       angles[n++] = normalizeAngle(a - eps);
       angles[n++] = normalizeAngle(a + eps);
@@ -189,7 +315,7 @@ export class LightingSystem {
 
     // 4) Tangent rays to nearby soldier balls (excluding the shooter).
     const occR = SOLDIER.occluderRadius;
-    for (let i = 0; i < soldiers.length && n + 4 <= angles.length; i++) {
+    for (let i = 0; i < soldiers.length && n + 4 <= maxVerts; i++) {
       const s = soldiers[i];
       if (!s.alive || s.id === ownerId) continue;
       const dx = s.x - ox;
@@ -205,15 +331,11 @@ export class LightingSystem {
     }
 
     // Sort ray angles in ascending order.
-    const order = this.order;
-    for (let i = 0; i < n; i++) order[i] = i;
-    const sub = order.subarray(0, n);
-    sub.sort((a, b) => angles[a] - angles[b]);
+    angles.subarray(0, n).sort();
 
     // Trace each ray against the terrain grid and occluding soldiers.
-    const maxVerts = Math.min(n, outPoly.length >>> 1);
-    for (let k = 0; k < maxVerts; k++) {
-      const ang = angles[sub[k]];
+    for (let k = 0; k < n; k++) {
+      const ang = angles[k];
       const rdx = Math.cos(ang);
       const rdy = Math.sin(ang);
 
@@ -235,14 +357,58 @@ export class LightingSystem {
         }
       }
 
-      // Extend terrain hits slightly into the hit cell so the lit wall face receives light.
-      const finalT = hitTerrain ? Math.min(radius, bestT + LIGHT.wallPenetration) : bestT;
+      // Air light stops at the wall face; the small overdraw is cut by the terrain mask.
+      const finalT = hitTerrain ? Math.min(radius, bestT + LIGHT.faceOverdraw) : bestT;
       outPoly[k * 2] = ox + rdx * finalT;
       outPoly[k * 2 + 1] = oy + rdy * finalT;
     }
 
-    this.lastRaysCast += maxVerts;
-    return maxVerts;
+    if (outLit) this.markLitCells(ox, oy, outPoly, n, outLit);
+    this.lastRaysCast += n;
+    return n;
+  }
+
+  /**
+   * List the wall cells the light reaches by walking the polygon's perimeter: it
+   * runs just inside every visible wall face and crosses only air everywhere else.
+   * Wall light is applied to whole cells, so it follows the grid, not the polygon.
+   */
+  private markLitCells(ox: number, oy: number, poly: Float32Array, n: number, out: LitCells): void {
+    const step = this.world.cellSize * 0.5;
+    if (++this.litStamp === 0xffffffff) {
+      this.litStamps.fill(0);
+      this.litStamp = 1;
+    }
+    let ax = poly[(n - 1) * 2];
+    let ay = poly[(n - 1) * 2 + 1];
+    for (let i = 0; i < n; i++) {
+      const bx = poly[i * 2];
+      const by = poly[i * 2 + 1];
+      const steps = Math.ceil(Math.hypot(bx - ax, by - ay) / step);
+      for (let k = 1; k <= steps; k++) {
+        const f = k / steps;
+        const px = ax + (bx - ax) * f;
+        const py = ay + (by - ay) * f;
+        // At grazing angles the perimeter can sit on the face itself, so also look
+        // slightly further from the light along each axis.
+        this.markCellAt(px, py, out);
+        this.markCellAt(px + (px > ox ? 1 : -1), py, out);
+        this.markCellAt(px, py + (py > oy ? 1 : -1), out);
+      }
+      ax = bx;
+      ay = by;
+    }
+  }
+
+  private markCellAt(x: number, y: number, out: LitCells): void {
+    const w = this.world;
+    const cx = Math.floor(x / w.cellSize);
+    const cy = Math.floor(y / w.cellSize);
+    if (!w.inBounds(cx, cy)) return;
+    const i = cy * w.width + cx;
+    if (w.health[i] === 0 || this.litStamps[i] === this.litStamp) return;
+    this.litStamps[i] = this.litStamp;
+    if (out.count < out.cells.length) out.cells[out.count++] = i;
   }
 }
 

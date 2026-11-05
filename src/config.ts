@@ -152,17 +152,38 @@ export const LIGHT = {
   /** Angular offset (radians) on either side of a silhouette corner / tangent. */
   cornerEpsilon: 0.00055,
   /** Hard cap on corner-pair rays per light (2 rays per corner). */
-  maxCornerRays: 384,
-  /** Extend terrain ray hits into the solid cell (world units) so the wall face catches light. */
-  wallPenetration: 4.8,
+  maxCornerRays: 1024,
+  /** Hard cap on total rays / polygon vertices per light. */
+  maxRays: 2048,
+  /**
+   * Polygon overdraw past a wall face (world units). Hidden by the terrain mask;
+   * it only guarantees air light reaches the rendered wall pixels with no seam.
+   */
+  faceOverdraw: 1.25,
+  /** Hard cap on wall cells lit by a single light. */
+  maxLitCells: 4096,
+  /** Fraction of wall light added on top of the multiplied scene. */
+  wallScatter: 0.22,
   /** Max simultaneous shadow-casting flashes; older/excess flashes fall back to cheap glow. */
   maxShadowLights: 20,
   /** Ambient darkness RGB multiplied over the scene (low = dark atmosphere). */
   ambientRgb: [46, 52, 74] as const,
   /** Faint ambient self-glow radius around each soldier (world units). */
   soldierLightRadius: 34,
+  /** Soldier self-glow strength. */
+  soldierLightStrength: 0.55,
+  /** Faint glow radius at the center of the spawn room (world units). */
+  roomLightRadius: 54,
+  /** Spawn-room glow strength. */
+  roomLightStrength: 0.28,
+  /** Evenly spaced base rays for soldier / room glows (corners add precision). */
+  softBaseRays: 48,
+  /** Max soldier glows that cast shadows; the rest light open air only. */
+  maxSoftShadowLights: 48,
   /** Auto-downgrade quality if lighting takes longer than this (ms). */
   budgetMs: 4.2,
+  /** Consecutive over-budget frames before downgrading (ignores one-off spikes). */
+  budgetFrames: 12,
 };
 
 export const CASING = {

@@ -66,7 +66,7 @@ export class Renderer {
 
     // 2) Dynamic lighting pass: multiply shadow-clipped lightmap over the albedo
     //    scene + additive air-scatter cone so shadows behind walls & soldiers pop.
-    this.lightRenderer.renderLighting(ctx, game);
+    this.lightRenderer.renderLighting(ctx, game, this.dpr);
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
@@ -248,6 +248,11 @@ export class Renderer {
       const sx = cam.worldToScreenX(f.x);
       const sy = cam.worldToScreenY(f.y);
       ctx.save();
+      // The flare is drawn after the lighting pass, so stop it at walls here.
+      if (f.hasPolygon) {
+        this.lightRenderer.tracePolygonPath(ctx, game, f.poly, f.polyCount);
+        ctx.clip();
+      }
       ctx.translate(sx, sy);
       ctx.rotate(Math.atan2(f.dy, f.dx));
       const fl = 22 * cam.zoom * (0.45 + 0.55 * a);

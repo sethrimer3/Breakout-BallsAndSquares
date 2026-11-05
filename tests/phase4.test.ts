@@ -3,7 +3,7 @@ import { LIGHT } from "../src/config";
 import { Rng } from "../src/core/Rng";
 import { CasingSystem } from "../src/entities/CasingSystem";
 import { Soldier } from "../src/entities/Soldier";
-import { LightingSystem, rayCircleDistance } from "../src/systems/LightingSystem";
+import { LightingSystem, makeLitCells, rayCircleDistance } from "../src/systems/LightingSystem";
 import { PixelWorld } from "../src/world/PixelWorld";
 
 /** Point-in-polygon (ray casting) for world-space flat vertex array `[x0, y0, ...]`. */
@@ -72,6 +72,74 @@ describe("Phase 4 — Visibility-polygon lighting & shadows (Rev 2)", () => {
     expect(pointInPolygon(18.5 * 8, 28.0 * 8, poly, n)).toBe(false);
     // Point between the light and the soldier is lit.
     expect(pointInPolygon(18.5 * 8, 22.0 * 8, poly, n)).toBe(true);
+  });
+
+  it("stops air light at wall faces, with no radial bleed into the wall", () => {
+    const w = new PixelWorld({ width: 40, height: 40, cellSize: 8, roomSize: 28 });
+    w.health.fill(10);
+    for (let y = 10; y <= 30; y++) {
+      for (let x = 10; x <= 30; x++) w.setCell(x, y, 0);
+    }
+    const ls = new LightingSystem(w);
+    const poly = new Float32Array(LIGHT.maxRays * 2);
+    const n = ls.computeVisibilityPolygon(20.5 * 8, 20.5 * 8, 1, 0, LIGHT.radius, 1, [], poly);
+    const maxX = 31 * 8 + LIGHT.faceOverdraw;
+    for (let i = 0; i < n; i++) {
+      // Every vertex stays within the overdraw of the chamber, even at grazing angles.
+      expect(poly[i * 2]).toBeLessThanOrEqual(maxX + 1e-3);
+    }
+  });
+
+  it("lights whole exposed wall cells only where the light can see them", () => {
+    const w = new PixelWorld({ width: 40, height: 40, cellSize: 8, roomSize: 28 });
+    w.health.fill(10);
+    for (let y = 10; y <= 30; y++) {
+      for (let x = 10; x <= 30; x++) w.setCell(x, y, 0);
+    }
+    // Pillar shadowing part of the east wall (x = 31) from a light west of it.
+    for (let y = 18; y <= 22; y++) w.setCell(24, y, 10);
+
+    const ls = new LightingSystem(w);
+    const poly = new Float32Array(LIGHT.maxRays * 2);
+    const lit = makeLitCells();
+    ls.computeVisibilityPolygon(20.5 * 8, 20.5 * 8, 1, 0, LIGHT.radius, 1, [], poly, lit);
+    const isLit = (x: number, y: number) => lit.cells.subarray(0, lit.count).includes(y * 40 + x);
+
+    expect(isLit(24, 20)).toBe(true); // Pillar face toward the light.
+    expect(isLit(31, 20)).toBe(false); // East wall inside the pillar's umbra.
+    expect(isLit(31, 12)).toBe(true); // East wall beyond the shadow.
+    expect(isLit(10 - 1, 20)).toBe(true); // West wall.
+    expect(isLit(32, 12)).toBe(false); // Buried cell behind the exposed face.
+    expect(isLit(25, 20)).toBe(false); // Interior / far side of the pillar.
+  });
+
+  it("backs a muzzle embedded in a wall out to open air instead of losing the light", () => {
+    const w = new PixelWorld({ width: 40, height: 40, cellSize: 8, roomSize: 28 });
+    w.health.fill(10);
+    for (let y = 10; y <= 30; y++) {
+      for (let x = 10; x <= 30; x++) w.setCell(x, y, 0);
+    }
+    const ls = new LightingSystem(w);
+    const poly = new Float32Array(LIGHT.maxRays * 2);
+    // Muzzle 2 units inside the east wall, firing east.
+    const n = ls.computeVisibilityPolygon(31 * 8 + 2, 20.5 * 8, 1, 0, LIGHT.radius, 1, [], poly);
+    expect(n).toBeGreaterThan(96);
+    expect(pointInPolygon(25.5 * 8, 20.5 * 8, poly, n)).toBe(true);
+  });
+
+  it("keeps the full ray fan when a light has too many corners for its polygon buffer", () => {
+    const w = new PixelWorld({ width: 80, height: 80, cellSize: 8, roomSize: 28 });
+    for (let y = 0; y < 80; y++) {
+      for (let x = 0; x < 80; x++) w.setCell(x, y, (x + y) % 2 === 0 && (x + y) % 6 === 0 ? 10 : 0);
+    }
+    w.setCell(40, 40, 0);
+    const ls = new LightingSystem(w);
+    const poly = new Float32Array(512);
+    const n = ls.computeVisibilityPolygon(40.5 * 8, 40.5 * 8, 1, 0, LIGHT.radius, 1, [], poly);
+    expect(n).toBeLessThanOrEqual(256);
+    // Vertices past +PI would be cut off by truncation; the fan must close the circle.
+    const last = Math.atan2(poly[(n - 1) * 2 + 1] - 40.5 * 8, poly[(n - 1) * 2] - 40.5 * 8);
+    expect(last).toBeGreaterThan(3);
   });
 
   it("computes accurate ray-circle intersection distances", () => {
