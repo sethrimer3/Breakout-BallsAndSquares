@@ -103,6 +103,43 @@ export const SIM = {
   maxStepsPerFrame: 5,
 };
 
+export const GROWTH = {
+  /** Seconds at the start of a run with zero growth. */
+  graceSeconds: 12,
+  /** Initial successful copy events per second right after the grace period. */
+  baseRate: 0.35,
+  /** Exponential base per elapsed second after the grace period. */
+  expBase: 1.055,
+  /** Hard cap on copy events per second. */
+  maxRate: 150,
+  /** Max copy events executed in a single fixed step (bounds frame spikes). */
+  maxEventsPerStep: 12,
+  /** How long a newly grown cell pulses crimson/magenta (seconds). */
+  glowDuration: 0.65,
+  /** Ring buffer size for growth-glow visuals. */
+  glowCap: 4096,
+  /** Rev 2 telemetry: cell distance within which a growth event counts as "near a soldier". */
+  nearRadiusCells: 12,
+  /** Rolling window (seconds) for the near-soldier growth % metric. */
+  telemetryWindow: 10,
+  /**
+   * Rev 2 optional localized pressure (0 = pure uniform frontier pick).
+   * If > 0, this fraction of events rejection-samples near a random living soldier first.
+   */
+  localBias: 0,
+  /** Half-width (cells) of the local sampling box around a soldier. */
+  localRadiusCells: 16,
+  /** Rejection-sample attempts before falling back to uniform pick. */
+  localSamples: 12,
+};
+
+/** Growth rate (copy events / second) at `runTime` seconds into the run (spec §7). */
+export function growthRateAt(runTime: number): number {
+  if (runTime < GROWTH.graceSeconds) return 0;
+  const elapsed = Math.max(0, runTime - GROWTH.graceSeconds);
+  return Math.min(GROWTH.maxRate, GROWTH.baseRate * Math.pow(GROWTH.expBase, elapsed));
+}
+
 export const COLORS = {
   background: "#05070d",
   backgroundGlow: "#0b1020",

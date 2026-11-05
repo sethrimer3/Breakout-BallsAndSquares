@@ -1,4 +1,4 @@
-import { BULLET, COLORS, SOLDIER } from "../config";
+import { BULLET, COLORS, GROWTH, SOLDIER } from "../config";
 import { PKind } from "../entities/ParticleSystem";
 import type { Game } from "../Game";
 import { createSprites, type Sprites } from "./sprites";
@@ -87,13 +87,45 @@ export class Renderer {
     // Soldiers.
     this.drawSoldiers();
 
-    // Additive pass: muzzle flashes, bullets + tracers, sparks.
+    // Additive pass: muzzle flashes, bullets + tracers, sparks, growth pulses.
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
+    this.drawGrowthPulses();
     this.drawFlashes();
     this.drawBullets();
     this.drawAdditiveParticles();
     ctx.restore();
+  }
+
+  private drawGrowthPulses(): void {
+    const { ctx, game } = this;
+    const g = game.growth;
+    if (g.glowCount === 0) return;
+    const cam = game.camera;
+    const w = game.world;
+    const cs = w.cellSize;
+    const sz = cs * cam.zoom;
+    const now = game.runStats.time;
+    const dur = GROWTH.glowDuration;
+    for (let k = 0; k < g.glowCount; k++) {
+      const idx = (g.glowHead - 1 - k + GROWTH.glowCap) % GROWTH.glowCap;
+      const age = now - g.glowTime[idx];
+      if (age < 0 || age >= dur) continue;
+      const cell = g.glowIndex[idx];
+      if (w.health[cell] === 0) continue; // already destroyed again
+      const cx = cell % w.width;
+      const cy = Math.floor(cell / w.width);
+      const sx = cam.worldToScreenX(cx * cs);
+      const sy = cam.worldToScreenY(cy * cs);
+      if (sx + sz < 0 || sy + sz < 0 || sx > cam.viewW || sy > cam.viewH) continue;
+      const a = 1 - age / dur;
+      ctx.fillStyle = `rgba(255, 40, 110, ${a * a * 0.65})`;
+      ctx.fillRect(sx, sy, sz, sz);
+      const gr = sz * (1.2 + (1 - a) * 0.6);
+      ctx.globalAlpha = a * 0.35;
+      ctx.drawImage(this.sprites.crimsonGlow, sx + sz / 2 - gr, sy + sz / 2 - gr, gr * 2, gr * 2);
+      ctx.globalAlpha = 1;
+    }
   }
 
   private drawCellFlashes(): void {

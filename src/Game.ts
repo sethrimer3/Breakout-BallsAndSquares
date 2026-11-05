@@ -1,4 +1,4 @@
-import { BULLET, CAMERA, COLORS, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
+import { BULLET, CAMERA, COLORS, GROWTH, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
 import { Rng } from "./core/Rng";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, baseSoldierStats, type SoldierStats } from "./entities/Soldier";
@@ -10,6 +10,9 @@ import { Input } from "./systems/Input";
 import { PhysicsSystem, findSpawnPoint } from "./systems/PhysicsSystem";
 import { RunStats } from "./systems/RunStats";
 import { HUD } from "./ui/HUD";
+import { PauseMenu } from "./ui/PauseMenu";
+import { ResultsScreen } from "./ui/ResultsScreen";
+import { GrowthSystem } from "./world/GrowthSystem";
 import { PixelWorld } from "./world/PixelWorld";
 import { generateWorld } from "./world/WorldGenerator";
 
@@ -39,12 +42,15 @@ export class Game {
   readonly rng = new Rng();
   readonly physics: PhysicsSystem;
   readonly combat: CombatSystem;
+  readonly growth: GrowthSystem;
   readonly camera: CameraSystem;
   readonly terrain: TerrainRenderer;
   readonly renderer: Renderer;
   readonly particles = new ParticleSystem(3000);
   readonly runStats = new RunStats();
   readonly hud: HUD;
+  readonly pauseMenu: PauseMenu;
+  readonly resultsScreen: ResultsScreen;
   readonly input: Input;
 
   stats: SoldierStats = baseSoldierStats();
@@ -55,6 +61,12 @@ export class Game {
   canDeploy = true;
   growthRate = 0;
   paused = false;
+  runOver = false;
+  /** Persistent-style counters (SaveManager hooks in Phase 3). */
+  bank = 0;
+  lifetimePixels = 0;
+  bests = { time: 0, depth: 0, pixels: 0 };
+  private bankedThisRun = false;
   debug = new URLSearchParams(location.search).has("debug") || import.meta.env.DEV;
   debugInfo = { fps: 0, frameMs: 0, simMs: 0 };
 
@@ -74,12 +86,17 @@ export class Game {
       onShot: (s, dx, dy, mx, my) => this.onShot(s, dx, dy, mx, my),
       onImpact: (x, y, nx, ny, cx, cy, result) => this.onImpact(x, y, nx, ny, cx, cy, result),
     });
+    this.growth = new GrowthSystem(this.world, this.rng, {
+      onSoldierKilled: (s) => this.onSoldierKilled(s),
+    });
     this.camera = new CameraSystem(this.world);
     generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
     this.terrain.rebuildAll();
     this.renderer = new Renderer(canvas, this);
     this.hud = new HUD(uiRoot);
+    this.pauseMenu = new PauseMenu(uiRoot, this);
+    this.resultsScreen = new ResultsScreen(uiRoot, this);
     this.input = new Input(canvas, {
       onPrimaryClick: (sx, sy) => this.tryLaunch(sx, sy),
       onWheel: (sx, sy, dy) =>
@@ -99,10 +116,13 @@ export class Game {
 
   /** Begin a fresh run (regenerates the world in place). */
   startRun(): void {
+    this.pauseMenu.hide();
+    this.resultsScreen.hide();
     if (this.runStats.time > 0) {
       generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
       this.terrain.rebuildAll();
     }
+    this.growth.reset();
     this.combat.stats = this.stats;
     this.soldiers = [];
     this.flashes = [];
@@ -114,8 +134,53 @@ export class Game {
     this.canDeploy = true;
     this.growthRate = 0;
     this.paused = false;
+    this.runOver = false;
+    this.bankedThisRun = false;
     this.camera.reset();
     this.camera.setViewport(this.canvas.clientWidth, this.canvas.clientHeight);
+    this.hud.update(this, performance.now(), true);
+  }
+
+  /** Bank currency & lifetime pixels earned in the current run (idempotent per run). */
+  bankCurrentRun(): { time: boolean; depth: boolean; pixels: boolean } {
+    const r = this.runStats;
+    const newBests = {
+      time: r.time > this.bests.time && r.soldiersDeployed > 0,
+      depth: r.maxDepth > this.bests.depth && r.maxDepth > 0,
+      pixels: r.pixelsDestroyed > this.bests.pixels && r.pixelsDestroyed > 0,
+    };
+    if (!this.bankedThisRun) {
+      this.bankedThisRun = true;
+      this.bank += r.currency;
+      this.lifetimePixels += r.pixelsDestroyed;
+      if (r.time > this.bests.time) this.bests.time = r.time;
+      if (r.maxDepth > this.bests.depth) this.bests.depth = r.maxDepth;
+      if (r.pixelsDestroyed > this.bests.pixels) this.bests.pixels = r.pixelsDestroyed;
+    }
+    return newBests;
+  }
+
+  restartAndBank(): void {
+    this.bankCurrentRun();
+    this.startRun();
+  }
+
+  togglePauseMenu(show?: boolean): void {
+    if (this.runOver) return;
+    const next = show ?? !this.pauseMenu.visible;
+    if (next) {
+      this.paused = true;
+      this.pauseMenu.show();
+    } else {
+      this.pauseMenu.hide();
+      this.paused = false;
+    }
+    this.hud.update(this, performance.now(), true);
+  }
+
+  openUpgrades(): void {
+    // Phase 3 connects the UpgradeTree screen here; in Phase 2 restart cleanly.
+    this.startRun();
   }
 
   private onKey(code: string): void {
@@ -127,11 +192,13 @@ export class Game {
         this.camera.cycleTarget(this.soldiers);
         break;
       case "Space":
+        if (!this.runOver && !this.pauseMenu.visible) this.paused = !this.paused;
+        break;
       case "Escape":
-        this.paused = !this.paused;
+        this.togglePauseMenu();
         break;
       case "KeyR":
-        this.startRun();
+        this.restartAndBank();
         break;
       case "Backquote":
         this.debug = !this.debug;
@@ -142,7 +209,7 @@ export class Game {
 
   /** Launch a reserve soldier from the spawn point toward a screen position. */
   tryLaunch(sx: number, sy: number): void {
-    if (this.paused || this.reserves <= 0) return;
+    if (this.paused || this.runOver || this.reserves <= 0) return;
     const spawn = findSpawnPoint(this.world, SOLDIER.collisionRadius);
     if (!spawn) {
       this.canDeploy = false;
@@ -220,6 +287,16 @@ export class Game {
     }
   }
 
+  private onSoldierKilled(s: Soldier): void {
+    for (let i = 0; i < 36; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(30, 220);
+      const col = i % 3 === 0 ? 0xff4b7d : i % 2 === 0 ? 0x9ff3ff : 0xffffff;
+      this.particles.spawn(PKind.Spark, s.x, s.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.25, 0.55), this.rng.range(1.2, 2.2), col, 5);
+    }
+    this.particles.spawn(PKind.Burst, s.x, s.y, 0, 0, 0.35, 16, 0x9ff3ff, 1);
+  }
+
   /** One fixed simulation step. */
   step(dt: number): void {
     this.runStats.time += dt;
@@ -230,6 +307,8 @@ export class Game {
       this.combat.updateSoldier(s, dt);
     }
     this.combat.updateBullets(dt);
+    this.growth.update(dt, this.runStats.time, this.soldiers);
+    this.growthRate = this.growth.rate;
     this.particles.update(dt);
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       if ((this.flashes[i].life -= dt) <= 0) this.flashes.splice(i, 1);
@@ -239,6 +318,23 @@ export class Game {
     }
     if (this.cellFlashes.length > 512) this.cellFlashes.splice(0, this.cellFlashes.length - 512);
     this.canDeploy = findSpawnPoint(this.world, SOLDIER.collisionRadius) !== null;
+
+    // Run ends once at least one soldier has been deployed (or the room is
+    // overrun) and no living or deployable soldiers remain.
+    const alive = this.soldiers.some((s) => s.alive);
+    const canStillDeploy = this.reserves > 0 && this.canDeploy;
+    if (!alive && !canStillDeploy && (this.runStats.soldiersDeployed > 0 || !this.canDeploy)) {
+      this.endRun();
+    }
+  }
+
+  endRun(): void {
+    if (this.runOver) return;
+    this.runOver = true;
+    this.paused = true;
+    const newBests = this.bankCurrentRun();
+    this.resultsScreen.show(newBests);
+    this.hud.update(this, performance.now(), true);
   }
 
   frame = (now: number): void => {
@@ -280,4 +376,4 @@ export class Game {
 }
 
 // Re-export for convenience in renderers.
-export { BULLET, COLORS };
+export { BULLET, COLORS, GROWTH };

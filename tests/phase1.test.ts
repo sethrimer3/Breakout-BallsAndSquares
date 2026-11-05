@@ -14,18 +14,22 @@ describe("Phase 1 — world & generation", () => {
     const w = new PixelWorld(WORLD);
     generateWorld(w, 42);
     let empty = 0;
+    let badEmpty = 0;
+    let badSolid = 0;
     for (let y = 0; y < w.height; y++) {
       for (let x = 0; x < w.width; x++) {
         const inside = x >= w.roomX0 && x <= w.roomX1 && y >= w.roomY0 && y <= w.roomY1;
         if (!w.solidAt(x, y)) {
           empty++;
-          expect(inside).toBe(true);
-        } else {
-          expect(inside).toBe(false);
+          if (!inside) badEmpty++;
+        } else if (inside) {
+          badSolid++;
         }
       }
     }
     expect(empty).toBe(100);
+    expect(badEmpty).toBe(0);
+    expect(badSolid).toBe(0);
     expect(w.roomX1 - w.roomX0 + 1).toBe(10);
     expect(w.roomY1 - w.roomY0 + 1).toBe(10);
   });

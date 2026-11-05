@@ -82,9 +82,11 @@ export class HUD {
 
     if (game.debug) {
       const d = game.debugInfo;
+      const near = game.growth.nearSoldierPercent(s.time);
       this.debugEl.style.display = "block";
       this.debugEl.textContent =
         `FPS ${d.fps.toFixed(0)}  frame ${d.frameMs.toFixed(1)}ms  sim ${d.simMs.toFixed(2)}ms\n` +
+        `frontier ${game.growth.frontier.size}  growthEvents ${game.growth.totalEvents}  near-soldier ${near.toFixed(0)}%\n` +
         `bullets ${game.combat.bullets.activeCount}  particles ${game.particles.count}  ` +
         `chunks rebuilt ${game.terrain.rebuiltLastFrame}  pending ${game.terrain.chunks.pending}\n` +
         `relocations ${game.physics.stats.relocations}  stuck ${game.physics.stats.stuckEvents}`;
