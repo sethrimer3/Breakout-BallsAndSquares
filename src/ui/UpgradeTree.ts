@@ -1,3 +1,4 @@
+import { TERRAIN } from "../config";
 import type { WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
 import {
@@ -753,7 +754,7 @@ export class UpgradeTree {
     this.bankValEl.textContent = this.game.bank.toLocaleString();
     this.crysValEl.textContent = this.game.crystals.toLocaleString();
     const crysWrap = this.root.querySelector(".crys-wrap") as HTMLElement;
-    crysWrap.classList.toggle("hidden", this.game.crystals <= 0 && this.game.bests.depth < 16);
+    crysWrap.classList.toggle("hidden", this.game.crystals <= 0 && this.game.bests.depth < TERRAIN.zone2Depth);
     this.lifeValEl.textContent = this.game.lifetimePixels.toLocaleString();
 
     // Update weapon tab lock indicators.

@@ -67,6 +67,7 @@ export class Renderer {
     // 2) Dynamic lighting pass: multiply shadow-clipped lightmap over the albedo
     //    scene + additive air-scatter cone so shadows behind walls & soldiers pop.
     this.lightRenderer.renderLighting(ctx, game, this.dpr);
+    game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.

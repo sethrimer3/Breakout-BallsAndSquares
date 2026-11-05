@@ -37,6 +37,9 @@ export interface LabLayout {
   corridors: LabCorridorSegment[];
 }
 
+/** Cells kept between a lab room and the starting room. */
+const START_ROOM_CLEARANCE = 5;
+
 /** Room centers sit on this lattice (cells), so rooms line up like a real plan. */
 const ROOM_LATTICE = 16;
 
@@ -215,7 +218,7 @@ function buildLabLayout(world: PixelWorld, seed: number): LabLayout {
     const innerDist = roomRadiusHalf + band.minDepth;
 
     // Target number of rooms scales with zone perimeter.
-    const targetRooms = band.zone === 0 ? 8 : band.zone === 1 ? 12 : 18;
+    const targetRooms = band.zone === 0 ? 12 : band.zone === 1 ? 14 : 18;
     const attempts = targetRooms * 18;
 
     for (let a = 0; a < attempts && zoneRooms[band.zone].length < targetRooms; a++) {
@@ -406,6 +409,8 @@ function roomFitsInZone(world: PixelWorld, x: number, y: number, size: number, z
   for (const [cx, cy] of corners) {
     if (zoneForDepth(world.depthOf(cx, cy)) !== zone) return false;
   }
+  // Stay clear of the starting room, leaving space for this room's walls.
+  if (world.distanceOf(clampedX, clampedY) < Math.floor(world.roomSize / 2) + START_ROOM_CLEARANCE) return false;
   // Also check the point on the rectangle closest to the center:
   if (zoneForDepth(world.depthOf(clampedX, clampedY)) !== zone) return false;
   return true;

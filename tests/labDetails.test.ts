@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { WORLD } from "../src/config";
+import { COLORS, WORLD } from "../src/config";
 import { Rng } from "../src/core/Rng";
 import { GrowthSystem } from "../src/world/GrowthSystem";
 import { DECOR, ROOM_STAMPS } from "../src/world/LabDetails";
@@ -137,6 +137,37 @@ describe("lab details", () => {
       expect(rooms.filter((r) => r.zone === 0).length, `seed ${seed}`).toBeGreaterThanOrEqual(5);
       expect(rooms.filter((r) => r.zone === 1).length, `seed ${seed}`).toBeGreaterThanOrEqual(8);
     }
+  });
+
+  it("varies the first zone's layout from run to run", () => {
+    const layouts = SEEDS.map((seed) =>
+      world(seed)
+        .labLayout!.rooms.filter((r) => r.zone === 0)
+        .map((r) => `${r.x},${r.y},${r.size}`)
+        .sort()
+        .join(" "),
+    );
+    expect(new Set(layouts).size).toBe(SEEDS.length);
+    const sizes = world(101).labLayout!.rooms.filter((r) => r.zone === 0).map((r) => r.size);
+    expect(new Set(sizes).size).toBeGreaterThan(1);
+  });
+
+  it("keeps rooms clear of the starting room, walls included", () => {
+    for (const seed of SEEDS) {
+      const w = world(seed);
+      for (const r of w.labLayout!.rooms) {
+        const gapX = Math.max(w.roomX0 - (r.x + r.size - 1), r.x - w.roomX1);
+        const gapY = Math.max(w.roomY0 - (r.y + r.size - 1), r.y - w.roomY1);
+        expect(Math.max(gapX, gapY), `seed ${seed}`).toBeGreaterThan(r.wallThickness);
+      }
+    }
+  });
+
+  it("has a color, mix and glow for every detail", () => {
+    const count = Object.keys(DECOR).length;
+    expect(COLORS.labDecor.length).toBe(count);
+    expect(COLORS.labDecorMix.length).toBe(count);
+    expect(COLORS.labGlow.length).toBe(count);
   });
 
   it("wipes a detail when blight regrows over it", () => {

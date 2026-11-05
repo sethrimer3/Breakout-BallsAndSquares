@@ -25,6 +25,8 @@ function sampleRamp(ramp: Ramp4, t: number, out: number[]): void {
 export class TerrainRenderer {
   readonly chunks: TerrainChunks;
   private canvases: HTMLCanvasElement[] = [];
+  /** One pixel per world cell: what the lab's emergency power keeps lit. */
+  private glowCanvas: HTMLCanvasElement;
   private image: ImageData;
   private scratch: number[] = [];
   private col = [0, 0, 0];
@@ -41,6 +43,15 @@ export class TerrainRenderer {
     }
     this.image = new ImageData(chunkSize, chunkSize);
     this.chunks.markAll();
+    this.glowCanvas = document.createElement("canvas");
+    this.glowCanvas.width = world.width;
+    this.glowCanvas.height = world.height;
+    // Broken or overgrown machinery goes dark.
+    world.addListener((cx, cy, kind) => {
+      if (kind === "destroyed" || kind === "grown") {
+        this.glowCanvas.getContext("2d")!.clearRect(cx, cy, 1, 1);
+      }
+    });
   }
 
   /** Rebuild everything immediately (e.g. after generating a new world). */
@@ -48,6 +59,32 @@ export class TerrainRenderer {
     this.chunks.markAll();
     this.chunks.take(Infinity, this.scratch);
     for (const k of this.scratch) this.buildChunk(k);
+    this.buildGlow();
+  }
+
+  private buildGlow(): void {
+    const { world } = this;
+    const g = this.glowCanvas.getContext("2d")!;
+    const image = g.createImageData(world.width, world.height);
+    for (let i = 0; i < world.decor.length; i++) {
+      const c = COLORS.labGlow[world.decor[i]];
+      if ((c[0] === 0 && c[1] === 0 && c[2] === 0) || world.health[i] === 0) continue;
+      const p = i * 4;
+      image.data[p] = c[0];
+      image.data[p + 1] = c[1];
+      image.data[p + 2] = c[2];
+      image.data[p + 3] = 255;
+    }
+    g.putImageData(image, 0, 0);
+  }
+
+  /** Add the lab's slowly pulsing glow. Call after the lighting pass. */
+  drawLabGlow(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number): void {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = 0.8 + 0.2 * Math.sin(time * 1.6);
+    this.drawCellOverlay(ctx, cam, this.glowCanvas);
+    ctx.restore();
   }
 
   private buildChunk(k: number): void {

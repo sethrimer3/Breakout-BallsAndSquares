@@ -31,9 +31,9 @@ export const TERRAIN = {
   /** How long a damaged-cell hit flash lasts (seconds). */
   hitFlashTime: 0.09,
   /** Depth (cells beyond the room edge) where Zone 2 starts. */
-  zone2Depth: 16,
+  zone2Depth: 32,
   /** Depth (cells beyond the room edge) where Zone 3 starts. */
-  zone3Depth: 36,
+  zone3Depth: 52,
 };
 
 /** 0 = Zone 1 (slate/grey/brown), 1 = Zone 2 (burnt orange/red/maroon/cream), 2 = Zone 3 (dark green/blue/turquoise/chartreuse). */
@@ -364,6 +364,27 @@ export const COLORS = {
   ] as const,
   /** How strongly each lab detail covers the cell's own color (same order). */
   labDecorMix: [0, 0.45, 0.55, 0.7, 0.55, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] as const,
+  /** Emergency-power glow added over the dark scene (same order; black = none). */
+  labGlow: [
+    [0, 0, 0], // none
+    [0, 0, 0], // floor
+    [7, 9, 12], // floor tile line
+    [14, 42, 48], // corridor guide line
+    [44, 8, 26], // blight stain
+    [0, 0, 0], // blast door
+    [0, 0, 0], // door seam
+    [50, 170, 100], // door jamb light
+    [70, 52, 10], // hazard yellow
+    [0, 0, 0], // hazard black
+    [0, 0, 0], // equipment frame
+    [40, 90, 100], // tank glass
+    [20, 90, 70], // specimen fluid
+    [70, 190, 110], // status LED
+    [0, 0, 0], // dark panel
+    [0, 0, 0], // bench top
+    [0, 0, 0], // bunk linen
+    [0, 0, 0], // scorched breach
+  ] as const,
   /** Tint applied to damaged cells. */
   damage: [120, 70, 52] as const,
   soldierCore: "#1b2a3a",

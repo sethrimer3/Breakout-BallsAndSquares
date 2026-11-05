@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SOLDIER, zoneForDepth } from "../src/config";
+import { SOLDIER, TERRAIN, zoneForDepth } from "../src/config";
 import { LootKind, LootSystem } from "../src/entities/LootSystem";
 import { Rng } from "../src/core/Rng";
 import { MUZZLE_FLASH_MULTIPLIER, SAVE_KEY, SaveManager, type StorageLike } from "../src/progression/SaveManager";
@@ -132,8 +132,10 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(s2.data.crystals).toBe(42);
     expect(s2.data.settings.muzzleFlash).toBe("dim");
     expect(zoneForDepth(5)).toBe(0);
-    expect(zoneForDepth(20)).toBe(1);
-    expect(zoneForDepth(40)).toBe(2);
+    expect(zoneForDepth(TERRAIN.zone2Depth - 1)).toBe(0);
+    expect(zoneForDepth(TERRAIN.zone2Depth)).toBe(1);
+    expect(zoneForDepth(TERRAIN.zone3Depth - 1)).toBe(1);
+    expect(zoneForDepth(TERRAIN.zone3Depth)).toBe(2);
 
     const loot = new LootSystem();
     const rng = new Rng(7);

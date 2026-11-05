@@ -1,4 +1,4 @@
-import { GROWTH } from "../config";
+import { GROWTH, TERRAIN } from "../config";
 import type { Game } from "../Game";
 import { sprite, UI_COLORS, type SpriteName } from "./pixelArt";
 
@@ -140,7 +140,7 @@ export class HUD {
     this.fields.currency.textContent = s.currency.toLocaleString();
 
     const totalCrystals = game.crystals + s.crystals;
-    const showCrystals = totalCrystals > 0 || s.maxDepth >= 16 || game.bests.depth >= 16;
+    const showCrystals = totalCrystals > 0 || s.maxDepth >= TERRAIN.zone2Depth || game.bests.depth >= TERRAIN.zone2Depth;
     this.boxes.crystals.classList.toggle("hidden", !showCrystals);
     this.fields.crystals.textContent = `${s.crystals} (${game.crystals})`;
 
