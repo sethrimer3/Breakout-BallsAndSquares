@@ -139,5 +139,28 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const rng = new Rng(7);
     loot.spawnOne(100, 100, 5, rng, LootKind.Crystal);
     expect(loot.kind[0]).toBe(LootKind.Crystal);
+
+    // Shotgun tree starts locked until shotgun_unlock is purchased; blight upgrades modify blight stats.
+    const upg = new UpgradeManager(s2);
+    s2.data.bank = 10000;
+    s2.data.lifetimePixels = 100;
+    expect(upg.isUnlocked("shotgun_unlock")).toBe(true);
+    expect(upg.isUnlocked("shotgun_pellets")).toBe(false);
+    expect(upg.buy("shotgun_unlock")).toBe(true);
+    expect(upg.isUnlocked("shotgun_pellets")).toBe(true);
+    expect(upg.buy("shotgun_pellets")).toBe(true);
+    expect(upg.buy("blight_delay")).toBe(true);
+    expect(upg.buy("blight_slow")).toBe(true);
+    const st = upg.getSoldierStats();
+    expect(st.shotgunUnlocked).toBe(true);
+    expect(st.shotgunPellets).toBeGreaterThan(5);
+    expect(st.blightGraceSeconds).toBeGreaterThan(12);
+    expect(st.blightRateMultiplier).toBeLessThan(1);
+
+    // Loadouts persist per soldier slot.
+    s2.data.loadouts[0].weapon = "shotgun";
+    s2.save();
+    const s3 = new SaveManager(store);
+    expect(s3.data.loadouts[0].weapon).toBe("shotgun");
   });
 });

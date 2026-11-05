@@ -155,6 +155,9 @@ export class Game {
   applyUpgrades(): void {
     this.stats = this.upgrades.getSoldierStats();
     this.combat.stats = this.stats;
+    this.growth.graceSeconds = this.stats.blightGraceSeconds;
+    this.growth.rateMultiplier = this.stats.blightRateMultiplier;
+    this.growth.weakenChance = this.stats.blightWeakenChance;
     for (const s of this.soldiers) {
       if (!s.alive) continue;
       const len = Math.hypot(s.vx, s.vy) || 1;
@@ -182,6 +185,9 @@ export class Game {
     this.growth.reset();
     this.stats = this.upgrades.getSoldierStats();
     this.combat.stats = this.stats;
+    this.growth.graceSeconds = this.stats.blightGraceSeconds;
+    this.growth.rateMultiplier = this.stats.blightRateMultiplier;
+    this.growth.weakenChance = this.stats.blightWeakenChance;
     this.soldiers = [];
     for (const fl of this.flashes) {
       this.flashPolyPool.push(fl.poly);
@@ -336,7 +342,10 @@ export class Game {
       dx = 1;
       dy = 0.3;
     }
-    const s = new Soldier(spawn.x, spawn.y, dx, dy, this.stats.speed);
+    const slotIdx = this.runStats.soldiersDeployed;
+    const rawWeapon = this.save.data.loadouts[slotIdx]?.weapon ?? "pistol";
+    const weapon = rawWeapon === "shotgun" && !this.stats.shotgunUnlocked ? "pistol" : rawWeapon;
+    const s = new Soldier(spawn.x, spawn.y, dx, dy, this.stats.speed, weapon);
     this.soldiers.push(s);
     this.reserves--;
     this.runStats.soldiersDeployed++;

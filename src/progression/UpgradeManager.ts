@@ -22,7 +22,11 @@ export class UpgradeManager {
 
   isUnlocked(id: UpgradeId): boolean {
     const def = UPGRADE_BY_ID[id];
-    return this.save.data.lifetimePixels >= def.unlockLifetimePixels;
+    if (this.save.data.lifetimePixels < def.unlockLifetimePixels) return false;
+    if (def.branch === "shotgun" && def.id !== "shotgun_unlock") {
+      if (this.levelOf("shotgun_unlock") === 0) return false;
+    }
+    return true;
   }
 
   costOf(id: UpgradeId): number {

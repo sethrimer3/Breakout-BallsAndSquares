@@ -1,8 +1,17 @@
 import { clamp } from "../core/math";
+import type { WeaponType } from "../entities/Soldier";
 import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
 
 export const SAVE_KEY = "breach.save.v1";
 export const SAVE_VERSION = 1;
+
+export interface SoldierLoadout {
+  weapon: WeaponType;
+  equipment: (string | null)[];
+}
+
+const VALID_WEAPONS: readonly WeaponType[] = ["pistol", "shotgun"];
+const MAX_SOLDIER_SLOTS = 8;
 
 export type MuzzleFlashLevel = "brightest" | "brighter" | "bright" | "dim" | "dimmer" | "off";
 
@@ -30,6 +39,7 @@ export interface SaveData {
   crystals: number;
   lifetimePixels: number;
   upgrades: Record<UpgradeId, number>;
+  loadouts: SoldierLoadout[];
   bests: {
     time: number;
     depth: number;
@@ -46,12 +56,17 @@ export interface SaveData {
 export function defaultSaveData(): SaveData {
   const upgrades = {} as Record<UpgradeId, number>;
   for (const d of UPGRADE_DEFS) upgrades[d.id] = 0;
+  const loadouts: SoldierLoadout[] = [];
+  for (let i = 0; i < MAX_SOLDIER_SLOTS; i++) {
+    loadouts.push({ weapon: "pistol", equipment: [null, null] });
+  }
   return {
     version: SAVE_VERSION,
     bank: 0,
     crystals: 0,
     lifetimePixels: 0,
     upgrades,
+    loadouts,
     bests: { time: 0, depth: 0, pixels: 0 },
     settings: {
       muted: false,
@@ -85,6 +100,24 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     for (const d of UPGRADE_DEFS) {
       const lvl = Math.floor(finiteNonNeg(u[d.id], 0, d.maxLevel));
       def.upgrades[d.id] = clamp(lvl, 0, d.maxLevel);
+    }
+  }
+
+  if (Array.isArray(obj.loadouts)) {
+    for (let i = 0; i < Math.min(MAX_SOLDIER_SLOTS, obj.loadouts.length); i++) {
+      const item = obj.loadouts[i] as Record<string, unknown> | null;
+      if (item && typeof item === "object") {
+        const w = item.weapon;
+        if (typeof w === "string" && (VALID_WEAPONS as readonly string[]).includes(w)) {
+          def.loadouts[i].weapon = w as WeaponType;
+        }
+      }
+    }
+  }
+  // If shotgun is not unlocked in this save, fall back any shotgun loadouts to pistol.
+  if ((def.upgrades.shotgun_unlock ?? 0) === 0) {
+    for (const ld of def.loadouts) {
+      if (ld.weapon === "shotgun") ld.weapon = "pistol";
     }
   }
 

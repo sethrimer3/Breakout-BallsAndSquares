@@ -7,7 +7,7 @@ import type { Soldier, SoldierStats } from "../entities/Soldier";
 import type { PixelWorld } from "../world/PixelWorld";
 
 export interface CombatEvents {
-  /** A soldier fired (once per trigger pull, even with multishot). */
+  /** A soldier fired (once per trigger pull, even with multishot or shotgun). */
   onShot?(s: Soldier, dirX: number, dirY: number, muzzleX: number, muzzleY: number): void;
   /** A bullet hit terrain. result: 1 damaged, 2 destroyed, 0 border/indestructible. */
   onImpact?(
@@ -36,10 +36,11 @@ export class CombatSystem {
     this.stats = stats;
   }
 
-  /** Tick a soldier's weapon. */
+  /** Tick a soldier's weapon according to its equipped weapon type. */
   updateSoldier(s: Soldier, dt: number): void {
     s.fireCooldown -= dt;
-    const interval = 1 / this.stats.fireRate;
+    const rate = s.weapon === "shotgun" ? this.stats.shotgunFireRate : this.stats.fireRate;
+    const interval = 1 / Math.max(0.05, rate);
     let guard = 0;
     while (s.fireCooldown <= 0 && guard++ < 8) {
       this.fire(s);
@@ -53,15 +54,44 @@ export class CombatSystem {
     if (len < 1e-6) return;
     const dx = s.vx / len;
     const dy = s.vy / len;
-    this.spawnBullet(s, dx, dy);
-    if (this.stats.multishotChance > 0 && this.rng.next() < this.stats.multishotChance) {
-      const pairs = Math.max(1, Math.floor(BULLET.multishotExtra / 2));
-      for (let p = 1; p <= pairs; p++) {
-        const a = BULLET.multishotSpreadDeg * DEG * p;
-        for (const sign of [-1, 1]) {
-          const c = Math.cos(a * sign);
-          const sn = Math.sin(a * sign);
-          this.spawnBullet(s, dx * c - dy * sn, dx * sn + dy * c);
+    if (s.weapon === "shotgun") {
+      const n = Math.max(1, this.stats.shotgunPellets);
+      const halfSpreadRad = this.stats.shotgunSpreadDeg * DEG;
+      for (let i = 0; i < n; i++) {
+        // Fan pellets evenly across the cone with slight random jitter per pellet.
+        const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
+        const jitter = this.rng.range(-0.18, 0.18) * halfSpreadRad;
+        const a = t * halfSpreadRad + jitter;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        const spd = this.stats.shotgunBulletSpeed * this.rng.range(0.92, 1.08);
+        this.spawnBullet(
+          s,
+          dx * c - dy * sn,
+          dx * sn + dy * c,
+          spd,
+          this.stats.shotgunDamage,
+          this.stats.shotgunLifetime,
+        );
+      }
+    } else {
+      this.spawnBullet(s, dx, dy, this.stats.bulletSpeed, this.stats.damage, BULLET.lifetime);
+      if (this.stats.multishotChance > 0 && this.rng.next() < this.stats.multishotChance) {
+        const pairs = Math.max(1, Math.floor(BULLET.multishotExtra / 2));
+        for (let p = 1; p <= pairs; p++) {
+          const a = BULLET.multishotSpreadDeg * DEG * p;
+          for (const sign of [-1, 1]) {
+            const c = Math.cos(a * sign);
+            const sn = Math.sin(a * sign);
+            this.spawnBullet(
+              s,
+              dx * c - dy * sn,
+              dx * sn + dy * c,
+              this.stats.bulletSpeed,
+              this.stats.damage,
+              BULLET.lifetime,
+            );
+          }
         }
       }
     }
@@ -69,16 +99,23 @@ export class CombatSystem {
     this.events.onShot?.(s, dx, dy, s.x + dx * off, s.y + dy * off);
   }
 
-  private spawnBullet(s: Soldier, dx: number, dy: number): void {
+  private spawnBullet(
+    s: Soldier,
+    dx: number,
+    dy: number,
+    speed: number,
+    damage: number,
+    life: number,
+  ): void {
     const b = this.bullets.acquire();
     if (!b) return;
     b.x = s.x;
     b.y = s.y;
     b.dx = dx;
     b.dy = dy;
-    b.speed = this.stats.bulletSpeed;
-    b.damage = this.stats.damage;
-    b.life = BULLET.lifetime;
+    b.speed = speed;
+    b.damage = damage;
+    b.life = life;
     b.traveled = 0;
     b.pendingAdvance = s.radius + BULLET.muzzleGap;
     b.ownerId = s.id;

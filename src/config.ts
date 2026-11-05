@@ -95,6 +95,21 @@ export const BULLET = {
   poolSize: 1024,
 };
 
+export const SHOTGUN = {
+  /** Base shots per second. */
+  fireRate: 1.0,
+  /** Base damage per pellet. */
+  damage: 1,
+  /** Base pellets per blast. */
+  pellets: 5,
+  /** Base pellet velocity (units/s). */
+  bulletSpeed: 460,
+  /** Base half-angle spread cone (degrees). */
+  spreadDeg: 18,
+  /** Base pellet lifetime (seconds) -> short-to-mid range blast. */
+  lifetime: 0.48,
+};
+
 export const CAMERA = {
   defaultZoom: 2.5,
   minZoom: 0.5,

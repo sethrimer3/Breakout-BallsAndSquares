@@ -26,6 +26,9 @@ export class GrowthSystem {
   glowCount = 0;
 
   rate = 0;
+  graceSeconds = GROWTH.graceSeconds;
+  rateMultiplier = 1;
+  weakenChance = 0;
   totalEvents = 0;
   nearEventsTotal = 0;
   private acc = 0;
@@ -71,7 +74,8 @@ export class GrowthSystem {
   }
 
   update(dt: number, runTime: number, soldiers: readonly Soldier[]): void {
-    this.rate = growthRateAt(runTime);
+    const shiftedTime = runTime - (this.graceSeconds - GROWTH.graceSeconds);
+    this.rate = growthRateAt(shiftedTime) * this.rateMultiplier;
     if (this.rate <= 0 || this.frontier.size === 0) return;
     this.acc += this.rate * dt;
     let steps = 0;
@@ -112,7 +116,11 @@ export class GrowthSystem {
       const dest = neighbors[this.rng.int(neighbors.length)];
       const dx = dest % w.width;
       const dy = Math.floor(dest / w.width);
-      w.setCell(dx, dy, w.maxHealthAt(dx, dy), "grown");
+      const hp =
+        this.weakenChance > 0 && this.rng.next() < this.weakenChance
+          ? 1
+          : w.maxHealthAt(dx, dy);
+      w.setCell(dx, dy, hp, "grown");
       // Copy tint with a slight variation from parent.
       w.tint[dest] = (w.tint[src] + this.rng.int(17) - 8) & 255;
       this.recordGlow(dest, runTime);
