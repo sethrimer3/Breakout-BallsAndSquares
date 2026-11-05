@@ -8,18 +8,44 @@ import {
   type UpgradeId,
 } from "../progression/UpgradeDefinitions";
 import { paletteColor, sprite, UI_COLORS, type SpriteName } from "./pixelArt";
+import {
+  pathLength,
+  pointAt,
+  sideToward,
+  trace,
+  TronCycles,
+  type Circuit,
+  type CircuitNode,
+} from "./treeCircuit";
+import { stepElastic, type ElasticBody } from "./treeElastic";
 
 type MatrixTab = UpgradeBranch | "loadout";
 
 const CELL_STEP = 116;
 const STAGE_W = 760;
-const STAGE_H = 390;
+const STAGE_H = 320;
 const CENTER_X = 380;
-const CENTER_Y = 195;
+const CENTER_Y = 160;
 /** Connector layer resolution: one canvas pixel per this many CSS pixels. */
 const LINK_PIXEL = 3;
 const LINK_DOT_GAP = 4;
 const LINK_LOCKED = "#26323e";
+/** The center hub on trees whose (0,0) cell has no upgrade node. */
+const HUB_ID = "hub";
+/** Pointer travel (CSS px) that turns a press into a drag instead of a buy. */
+const DRAG_THRESHOLD = 5;
+/** Outward push (CSS px/s) on a node's children when it is bought. */
+const BUY_KICK = 420;
+
+interface NodeDrag {
+  id: string;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  bodyX: number;
+  bodyY: number;
+  moved: boolean;
+}
 
 const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   core: { icon: "soldier", color: UI_COLORS.soldier },
@@ -30,16 +56,24 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   sniper_rifle: { icon: "sniper", color: UI_COLORS.soldier },
 };
 
-const lockIcon = sprite("lock", { color: "#6d8197", scale: 1 });
-const goldIcon = sprite("gold", { color: UI_COLORS.gold });
+const lockIcon = (): string => sprite("lock", { color: "#6d8197", scale: 1 });
+const goldIcon = (): string => sprite("gold", { color: UI_COLORS.gold });
 
 function nodePos(col: number, row: number): { x: number; y: number } {
   return { x: CENTER_X + col * CELL_STEP, y: CENTER_Y + row * CELL_STEP };
 }
 
+function toArt(v: number): number {
+  return Math.round(v / LINK_PIXEL);
+}
+
+function reducedMotion(): boolean {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
 function tabHtml(tab: UpgradeBranch, label: string, locked = false): string {
   const { icon, color } = TAB_ICONS[tab];
-  return `${sprite(icon, { color: locked ? "#6d8197" : color, scale: 1 })} ${label}${locked ? ` ${lockIcon}` : ""}`;
+  return `${sprite(icon, { color: locked ? "#6d8197" : color, scale: 1 })} ${label}${locked ? ` ${lockIcon()}` : ""}`;
 }
 
 export class UpgradeTree {
@@ -58,6 +92,14 @@ export class UpgradeTree {
   private nodeEls = new Map<UpgradeId, HTMLButtonElement>();
   private hoveredId: UpgradeId | null = null;
   private activeTab: MatrixTab = "core";
+  private bodies = new Map<string, ElasticBody>();
+  private activeBodies: ElasticBody[] = [];
+  private circuit: Circuit = { nodes: new Map(), neighbors: new Map() };
+  private cycles = new TronCycles();
+  private drag: NodeDrag | null = null;
+  private suppressClick = false;
+  private raf = 0;
+  private lastFrame = 0;
 
   constructor(parent: HTMLElement, private game: Game) {
     this.root = document.createElement("div");
@@ -78,7 +120,7 @@ export class UpgradeTree {
             <button class="tree-tab tree-tab-loadout" data-tab="loadout">LOADOUT</button>
           </div>
           <div class="tree-legend">
-            <span class="leg-item" style="--leg-c: #ffd84d">${goldIcon} MONEY</span>
+            <span class="leg-item" style="--leg-c: #ffd84d">${goldIcon()} MONEY</span>
             <span class="leg-item" style="--leg-c: #38d6ff">${sprite("soldier", { color: UI_COLORS.soldier, scale: 1 })} SOLDIER</span>
             <span class="leg-item" style="--leg-c: #ff4b8b">${sprite("warn", { color: UI_COLORS.blight, scale: 1 })} BLIGHT</span>
           </div>
@@ -92,7 +134,7 @@ export class UpgradeTree {
         <div class="tree-footer">
           <div class="tree-points-label">RESOURCES AVAILABLE</div>
           <div class="tree-points-val">
-            ${goldIcon} <span class="bank-num">0</span>
+            ${goldIcon()} <span class="bank-num">0</span>
             <span class="crys-wrap hidden"> &nbsp; ${sprite("crystal", { color: UI_COLORS.crystal })} <span class="crys-num">0</span></span>
           </div>
           <div class="tree-life">LIFETIME EXCAVATED: <span class="life-num">0</span> PX</div>
@@ -118,12 +160,21 @@ export class UpgradeTree {
 
     this.coreHubEl = document.createElement("div");
     this.coreHubEl.className = "tree-core";
-    this.coreHubEl.style.left = `${CENTER_X}px`;
-    this.coreHubEl.style.top = `${CENTER_Y}px`;
     this.coreHubEl.innerHTML =
       sprite("ring", { color: UI_COLORS.soldier, scale: 3, cls: "node-ring" }) +
       sprite("soldier", { color: UI_COLORS.soldier, scale: 3 });
     this.nodesWrap.append(this.coreHubEl);
+    this.bodies.set(HUB_ID, {
+      id: HUB_ID,
+      parent: null,
+      hx: CENTER_X,
+      hy: CENTER_Y,
+      x: CENTER_X,
+      y: CENTER_Y,
+      vx: 0,
+      vy: 0,
+    });
+    this.attachDrag(this.coreHubEl, HUB_ID);
 
     this.root.querySelector(".tree-close")!.addEventListener("click", () => this.closeAndDeploy());
     this.root.querySelector('[data-act="deploy"]')!.addEventListener("click", () => this.closeAndDeploy());
@@ -136,12 +187,14 @@ export class UpgradeTree {
     });
 
     this.buildStage();
+    this.activateBranch(false);
     parent.append(this.root);
   }
 
   switchTab(tab: MatrixTab): void {
     this.activeTab = tab;
     this.hideTooltip();
+    this.activateBranch(true);
     this.root.querySelectorAll(".tree-tab").forEach((btn) => {
       btn.classList.toggle("active", (btn as HTMLElement).dataset.tab === tab);
     });
@@ -160,7 +213,8 @@ export class UpgradeTree {
     } else {
       this.subEl.textContent = "SQUAD LOADOUT & INVENTORY — EQUIP WEAPONS & GEAR PER SOLDIER";
     }
-    this.legendEl.classList.toggle("hidden", tab !== "core");
+    // Keeps its height on other tabs so the panel doesn't jump when switching.
+    this.legendEl.style.visibility = tab === "core" ? "" : "hidden";
     this.stageEl.classList.toggle("hidden", tab === "loadout");
     this.loadoutWrap.classList.toggle("hidden", tab !== "loadout");
     this.refresh();
@@ -173,8 +227,6 @@ export class UpgradeTree {
       // The weapon-unlock node at the center of a tree gets a round frame.
       const round = def.grid.col === 0 && def.grid.row === 0;
       btn.className = round ? "tree-node round" : "tree-node";
-      btn.style.left = `${to.x}px`;
-      btn.style.top = `${to.y}px`;
       btn.style.setProperty("--node-color", def.color);
       const ring = round
         ? sprite("ring", { color: def.color, scale: 3, cls: "node-ring ring-empty" }) +
@@ -188,39 +240,169 @@ export class UpgradeTree {
       `;
       btn.addEventListener("mouseenter", () => this.showTooltip(def));
       btn.addEventListener("mouseleave", () => this.hideTooltip());
-      btn.addEventListener("click", () => this.onNodeClick(def));
+      btn.addEventListener("click", () => {
+        if (this.suppressClick) this.suppressClick = false;
+        else this.onNodeClick(def);
+      });
+      this.attachDrag(btn, def.id);
       this.nodesWrap.append(btn);
       this.nodeEls.set(def.id, btn);
+      this.bodies.set(def.id, {
+        id: def.id,
+        parent: def.parent ?? (round ? null : HUB_ID),
+        hx: to.x,
+        hy: to.y,
+        x: to.x,
+        y: to.y,
+        vx: 0,
+        vy: 0,
+      });
     }
   }
 
-  /** Dotted pixel connectors for the active tab: dim when locked, solid once owned. */
-  private drawLinks(): void {
+  /** Drag a node to stretch its branch; it eases back when let go. */
+  private attachDrag(el: HTMLElement, id: string): void {
+    el.style.touchAction = "none";
+    el.addEventListener("pointerdown", (e) => {
+      if (e.button !== 0) return;
+      const b = this.bodies.get(id)!;
+      this.suppressClick = false;
+      this.drag = {
+        id,
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        bodyX: b.x,
+        bodyY: b.y,
+        moved: false,
+      };
+      el.setPointerCapture(e.pointerId);
+    });
+    el.addEventListener("pointermove", (e) => {
+      const d = this.drag;
+      if (!d || d.id !== id || d.pointerId !== e.pointerId) return;
+      const dx = e.clientX - d.startX;
+      const dy = e.clientY - d.startY;
+      if (!d.moved) {
+        if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+        d.moved = true;
+        this.hideTooltip();
+        el.classList.add("dragging");
+      }
+      const b = this.bodies.get(id)!;
+      b.x = Math.max(0, Math.min(STAGE_W, d.bodyX + dx));
+      b.y = Math.max(0, Math.min(STAGE_H, d.bodyY + dy));
+    });
+    const release = (e: PointerEvent): void => {
+      const d = this.drag;
+      if (!d || d.id !== id || d.pointerId !== e.pointerId) return;
+      this.suppressClick = d.moved;
+      this.drag = null;
+      el.classList.remove("dragging");
+    };
+    el.addEventListener("pointerup", release);
+    el.addEventListener("pointercancel", release);
+  }
+
+  /** Bodies and circuit for the active tab; `sprout` grows them out of the root. */
+  private activateBranch(sprout: boolean): void {
+    this.drag = null;
+    this.cycles.reset();
+    const defs = UPGRADE_DEFS.filter((d) => d.branch === this.activeTab);
+    const ids = defs.map((d) => d.id as string);
+    if (defs.length > 0 && !defs.some((d) => d.grid.col === 0 && d.grid.row === 0)) ids.push(HUB_ID);
+    this.activeBodies = ids.map((id) => this.bodies.get(id)!);
+
+    const neighbors = new Map<string, string[]>(ids.map((id) => [id, []]));
+    for (const b of this.activeBodies) {
+      if (!b.parent) continue;
+      neighbors.get(b.id)!.push(b.parent);
+      neighbors.get(b.parent)!.push(b.id);
+    }
+    this.circuit = { nodes: new Map(), neighbors };
+
+    const grow = sprout && !reducedMotion();
+    const rootBody = this.activeBodies.find((b) => b.parent === null);
+    for (const b of this.activeBodies) {
+      b.x = grow && rootBody ? rootBody.hx : b.hx;
+      b.y = grow && rootBody ? rootBody.hy : b.hy;
+      b.vx = 0;
+      b.vy = 0;
+    }
+    this.placeNodes();
+  }
+
+  /** Move node elements to their bodies, on the same art grid as the links. */
+  private placeNodes(): void {
+    for (const b of this.activeBodies) {
+      const el = b.id === HUB_ID ? this.coreHubEl : this.nodeEls.get(b.id as UpgradeId)!;
+      el.style.left = `${toArt(b.x) * LINK_PIXEL}px`;
+      el.style.top = `${toArt(b.y) * LINK_PIXEL}px`;
+    }
+  }
+
+  private syncCircuit(): void {
+    const u = this.game.upgrades;
+    for (const b of this.activeBodies) {
+      const def = b.id === HUB_ID ? null : UPGRADE_BY_ID[b.id as UpgradeId];
+      const node: CircuitNode = {
+        id: b.id,
+        x: toArt(b.x),
+        y: toArt(b.y),
+        hx: b.hx,
+        hy: b.hy,
+        color: def?.color ?? UI_COLORS.soldier,
+        live: def ? u.isUnlocked(def.id) : true,
+      };
+      this.circuit.nodes.set(b.id, node);
+    }
+  }
+
+  private frame = (time: number): void => {
+    this.raf = requestAnimationFrame(this.frame);
+    const dt = this.lastFrame ? Math.min(1 / 30, (time - this.lastFrame) / 1000) : 0;
+    this.lastFrame = time;
+    if (this.activeTab === "loadout") return;
+    const heldId = this.drag?.moved ? this.drag.id : null;
+    if (reducedMotion()) {
+      for (const b of this.activeBodies) {
+        if (b.id === heldId) continue;
+        b.x = b.hx;
+        b.y = b.hy;
+      }
+    } else {
+      stepElastic(this.activeBodies, dt, heldId);
+    }
+    this.placeNodes();
+    this.drawCircuit(reducedMotion() ? 0 : dt);
+  };
+
+  /**
+   * Right-angle traces for the active tab (dim when locked, dotted until
+   * owned, then solid) with the light cycles riding on top.
+   */
+  private drawCircuit(dt: number): void {
+    this.syncCircuit();
     const g = this.linksEl.getContext("2d")!;
     g.clearRect(0, 0, this.linksEl.width, this.linksEl.height);
     const u = this.game.upgrades;
-    for (const def of UPGRADE_DEFS) {
-      if (def.branch !== this.activeTab) continue;
-      if (def.grid.col === 0 && def.grid.row === 0 && def.parent === null) continue;
-      const to = nodePos(def.grid.col, def.grid.row);
-      const from = def.parent
-        ? nodePos(UPGRADE_BY_ID[def.parent].grid.col, UPGRADE_BY_ID[def.parent].grid.row)
-        : { x: CENTER_X, y: CENTER_Y };
+    for (const b of this.activeBodies) {
+      if (!b.parent) continue;
+      const def = UPGRADE_BY_ID[b.id as UpgradeId];
+      const from = this.circuit.nodes.get(b.parent)!;
+      const to = this.circuit.nodes.get(b.id)!;
       const owned = u.levelOf(def.id) > 0;
-      const unlocked = u.isUnlocked(def.id);
-      g.fillStyle = unlocked ? (paletteColor(owned ? "#" : "-", def.color) as string) : LINK_LOCKED;
-      const x0 = Math.round(from.x / LINK_PIXEL);
-      const y0 = Math.round(from.y / LINK_PIXEL);
-      const x1 = Math.round(to.x / LINK_PIXEL);
-      const y1 = Math.round(to.y / LINK_PIXEL);
-      const steps = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+      g.fillStyle = to.live ? (paletteColor(owned ? "#" : "-", def.color) as string) : LINK_LOCKED;
+      const path = trace(from, to, sideToward(from, to) % 2 === 0);
+      const len = pathLength(path);
       const gap = owned ? 1 : LINK_DOT_GAP;
-      for (let i = 0; i <= steps; i += gap) {
-        const x = Math.round(x0 + ((x1 - x0) * i) / steps);
-        const y = Math.round(y0 + ((y1 - y0) * i) / steps);
-        g.fillRect(x, y, 1, 1);
+      for (let i = 0; i <= len; i += gap) {
+        const p = pointAt(path, i);
+        g.fillRect(p.x, p.y, 1, 1);
       }
     }
+    if (dt > 0) this.cycles.step(dt, this.circuit);
+    this.cycles.draw(g);
   }
 
   private onNodeClick(def: UpgradeDef): void {
@@ -235,10 +417,25 @@ export class UpgradeTree {
       }
       this.refresh();
       if (this.hoveredId === def.id) this.showTooltip(def);
+      this.kickChildren(def.id);
+    }
+  }
+
+  /** A purchase shoves the next nodes outward, so the branch rings. */
+  private kickChildren(id: UpgradeId): void {
+    const from = this.bodies.get(id)!;
+    for (const b of this.activeBodies) {
+      if (b.parent !== id) continue;
+      const dx = b.x - from.x;
+      const dy = b.y - from.y;
+      const d = Math.hypot(dx, dy) || 1;
+      b.vx += (dx / d) * BUY_KICK;
+      b.vy += (dy / d) * BUY_KICK;
     }
   }
 
   private showTooltip(def: UpgradeDef): void {
+    if (this.drag?.moved) return;
     this.hoveredId = def.id;
     const u = this.game.upgrades;
     const lvl = u.levelOf(def.id);
@@ -276,7 +473,7 @@ export class UpgradeTree {
       bodyHtml = `
         <div class="tt-compare">${curVal} ${sprite("chevron", { color: "#7e9bb8" })} ${nextVal}</div>
         <div class="tt-delta">${def.formatDelta()} (${def.shortDesc})</div>
-        <div class="tt-cost ${canBuy ? "affordable" : "expensive"}">${goldIcon} ${cost.toLocaleString()}</div>
+        <div class="tt-cost ${canBuy ? "affordable" : "expensive"}">${goldIcon()} ${cost.toLocaleString()}</div>
       `;
     }
 
@@ -285,10 +482,14 @@ export class UpgradeTree {
       <div class="tt-title">${def.name} <span class="tt-lvl">LV ${lvl}/${def.maxLevel}</span></div>
       ${bodyHtml}
     `;
-    const pos = nodePos(def.grid.col, def.grid.row);
-    this.tooltipEl.style.left = `${pos.x}px`;
-    this.tooltipEl.style.top = `${pos.y - 48}px`;
     this.tooltipEl.classList.remove("hidden");
+    // Placed on whole pixels (no centering transform) so the text stays crisp.
+    const pos = this.bodies.get(def.id)!;
+    const w = this.tooltipEl.offsetWidth;
+    const h = this.tooltipEl.offsetHeight;
+    const left = Math.min(STAGE_W - w, Math.max(0, pos.x - Math.round(w / 2)));
+    this.tooltipEl.style.left = `${left}px`;
+    this.tooltipEl.style.top = `${Math.round(pos.y) - 40 - h}px`;
   }
 
   private hideTooltip(): void {
@@ -330,7 +531,7 @@ export class UpgradeTree {
           (w) => `
             <button class="lc-wbtn ${curW === w.id ? "equipped" : ""} ${!w.unlocked ? "locked" : ""}" data-slot="${i}" data-weapon="${w.id}" title="${w.label}" ${!w.unlocked ? "disabled" : ""}>
               ${sprite(TAB_ICONS[w.id].icon, { color: w.unlocked ? TAB_ICONS[w.id].color : "#6d8197", scale: 2 })}
-              ${w.unlocked ? `<span class="lc-wname">${w.label}</span>` : `<span class="lc-wname">${lockIcon}</span>`}
+              ${w.unlocked ? `<span class="lc-wname">${w.label}</span>` : `<span class="lc-wname">${lockIcon()}</span>`}
             </button>
           `,
         )
@@ -420,7 +621,7 @@ export class UpgradeTree {
       this.activeTab === "rocket_launcher" ||
       this.activeTab === "sniper_rifle";
     this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);
-    this.drawLinks();
+    this.drawCircuit(0);
 
     for (const def of UPGRADE_DEFS) {
       const btn = this.nodeEls.get(def.id)!;
@@ -439,19 +640,27 @@ export class UpgradeTree {
       btn.classList.toggle("affordable", canBuy);
 
       const lvlEl = btn.querySelector(".node-lvl") as HTMLSpanElement;
-      if (!unlocked) lvlEl.innerHTML = lockIcon;
+      if (!unlocked) lvlEl.innerHTML = lockIcon();
       else lvlEl.textContent = maxed ? "MAX" : `${lvl}/${def.maxLevel}`;
     }
   }
 
   show(): void {
+    this.activateBranch(true);
     this.refresh();
     this.root.classList.remove("hidden");
+    if (!this.raf) {
+      this.lastFrame = 0;
+      this.raf = requestAnimationFrame(this.frame);
+    }
   }
 
   hide(): void {
     this.hideTooltip();
     this.root.classList.add("hidden");
+    cancelAnimationFrame(this.raf);
+    this.raf = 0;
+    this.drag = null;
   }
 
   closeAndDeploy(): void {
