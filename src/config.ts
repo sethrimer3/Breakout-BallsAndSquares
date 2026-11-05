@@ -49,6 +49,24 @@ export function maxHealthForDistance(distance: number): number {
   return Math.min(TERRAIN.maxHealthCap, 1 + Math.floor(depth / TERRAIN.healthBandWidth));
 }
 
+/**
+ * Health of a lab wall cell in `zone` (0, 1, 2).
+ * Zone 0 walls use Zone 1's material; Zone 1 walls use Zone 2's material;
+ * Zone 2 (last zone) walls use reinforced wall material.
+ */
+export function wallHealthForZone(zone: 0 | 1 | 2, distance: number): number {
+  const baseHp = maxHealthForDistance(distance);
+  if (zone === 0) {
+    const nextZoneMinHp = maxHealthForDistance(TERRAIN.roomRadius + TERRAIN.zone2Depth);
+    return Math.min(TERRAIN.maxHealthCap, Math.max(nextZoneMinHp, baseHp + 2));
+  }
+  if (zone === 1) {
+    const nextZoneMinHp = maxHealthForDistance(TERRAIN.roomRadius + TERRAIN.zone3Depth);
+    return Math.min(TERRAIN.maxHealthCap, Math.max(nextZoneMinHp, baseHp + 2));
+  }
+  return Math.min(TERRAIN.maxHealthCap, Math.max(8, baseHp + 4));
+}
+
 export const SOLDIER = {
   /** Collision radius. Must be < cellSize / 2 so soldiers fit one-cell tunnels. */
   collisionRadius: 3.2,
@@ -315,6 +333,13 @@ export const COLORS = {
     [22, 40, 62], // dark blue
     [22, 58, 60], // dark turquoise
     [54, 64, 26], // muted chartreuse
+  ] as const,
+  /** Reinforced bulkhead wall material used for walls in the deepest zone (Zone 3). */
+  reinforcedWall: [
+    [72, 78, 94], // cold titanium slate
+    [52, 44, 76], // dark amethyst alloy
+    [88, 94, 112], // brushed steel bulkhead
+    [64, 54, 88], // reinforced violet-grey plating
   ] as const,
   /** Tint applied to damaged cells. */
   damage: [120, 70, 52] as const,

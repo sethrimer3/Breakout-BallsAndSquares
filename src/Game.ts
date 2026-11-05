@@ -273,7 +273,9 @@ export class Game {
 
   private onKey(code: string): void {
     if (this.upgradeTree.visible) {
-      if (code === "Escape" || code === "KeyU" || code === "Space") {
+      if (code === "Space" || code === "Enter") {
+        this.upgradeTree.onPrimaryAction();
+      } else if (code === "Escape" || code === "KeyU") {
         this.upgradeTree.closeAndDeploy();
       }
       return;

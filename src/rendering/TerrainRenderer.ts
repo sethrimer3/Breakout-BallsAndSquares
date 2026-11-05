@@ -81,10 +81,20 @@ export class TerrainRenderer {
         }
         const t = tint[i] / 255;
         const depth = world.depthOf(cx, cy);
-        // Organic 2-cell transition dither at zone boundaries based on tint.
-        const dither = (t - 0.5) * 3;
-        const z = zoneForDepth(depth + dither);
-        const ramp = z === 0 ? COLORS.zone1 : z === 1 ? COLORS.zone2 : COLORS.zone3;
+        const wMat = world.wall[i];
+        let ramp: Ramp4;
+        if (wMat === 1) {
+          ramp = COLORS.zone2;
+        } else if (wMat === 2) {
+          ramp = COLORS.zone3;
+        } else if (wMat === 3) {
+          ramp = COLORS.reinforcedWall;
+        } else {
+          // Organic 2-cell transition dither at zone boundaries based on tint.
+          const dither = (t - 0.5) * 3;
+          const z = zoneForDepth(depth + dither);
+          ramp = z === 0 ? COLORS.zone1 : z === 1 ? COLORS.zone2 : COLORS.zone3;
+        }
         sampleRamp(ramp, t, col);
 
         const maxHp = world.maxHealthAt(cx, cy);

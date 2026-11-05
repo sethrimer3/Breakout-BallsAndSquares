@@ -1,5 +1,6 @@
-import { maxHealthForDistance } from "../config";
+import { maxHealthForDistance, wallHealthForZone, zoneForDepth } from "../config";
 import type { SolidQuery } from "../core/gridRaycast";
+import type { LabLayout } from "./WorldGenerator";
 
 export type CellChangeKind = "damaged" | "destroyed" | "grown" | "set";
 
@@ -34,6 +35,16 @@ export class PixelWorld implements SolidQuery {
   readonly health: Uint8Array;
   /** Per-cell color variation seed (0..255). */
   readonly tint: Uint8Array;
+  /**
+   * Per-cell wall material flag:
+   * 0 = normal fill of the cell's own zone
+   * 1 = lab wall made of Zone 2 material (in Zone 1)
+   * 2 = lab wall made of Zone 3 material (in Zone 2)
+   * 3 = lab wall made of Reinforced Wall material (in Zone 3)
+   */
+  readonly wall: Uint8Array;
+  /** Procedurally generated lab rooms & corridors from the most recent `generateWorld` call. */
+  labLayout: LabLayout | null = null;
 
   private listeners: CellListener[] = [];
 
@@ -51,6 +62,7 @@ export class PixelWorld implements SolidQuery {
     this.roomY1 = this.roomY0 + dims.roomSize - 1;
     this.health = new Uint8Array(dims.width * dims.height);
     this.tint = new Uint8Array(dims.width * dims.height);
+    this.wall = new Uint8Array(dims.width * dims.height);
   }
 
   get worldWidth(): number {
@@ -94,7 +106,15 @@ export class PixelWorld implements SolidQuery {
   }
 
   maxHealthAt(cx: number, cy: number): number {
-    return maxHealthForDistance(this.distanceOf(cx, cy));
+    const dist = this.distanceOf(cx, cy);
+    if (this.inBounds(cx, cy)) {
+      const w = this.wall[cy * this.width + cx];
+      if (w > 0) {
+        const z = ((w - 1) as 0 | 1 | 2) ?? zoneForDepth(this.depthOf(cx, cy));
+        return wallHealthForZone(z, dist);
+      }
+    }
+    return maxHealthForDistance(dist);
   }
 
   /**

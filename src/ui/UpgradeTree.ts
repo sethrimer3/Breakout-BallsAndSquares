@@ -34,8 +34,6 @@ import {
   type View,
 } from "./treeView";
 
-type MatrixTab = UpgradeBranch | "loadout";
-
 /** Connector layer resolution: one canvas pixel per this many CSS pixels. */
 const LINK_PIXEL = 3;
 const LINK_DOT_GAP = 4;
@@ -104,10 +102,15 @@ export class UpgradeTree {
   private crysValEl: HTMLSpanElement;
   private lifeValEl: HTMLSpanElement;
   private subEl: HTMLDivElement;
+  private titleEl: HTMLDivElement;
+  private tabsEl: HTMLDivElement;
   private legendEl: HTMLDivElement;
+  private backBtnEl: HTMLButtonElement;
+  private primaryBtnEl: HTMLButtonElement;
   private nodeEls = new Map<UpgradeId, HTMLButtonElement>();
   private hoveredId: UpgradeId | null = null;
-  private activeTab: MatrixTab = "core";
+  private activeTab: UpgradeBranch = "core";
+  private inLoadoutScreen = false;
   private bodies = new Map<string, ElasticBody>();
   private activeBodies: ElasticBody[] = [];
   private circuit: Circuit = { nodes: new Map(), neighbors: new Map() };
@@ -140,7 +143,6 @@ export class UpgradeTree {
             <button class="tree-tab" data-tab="assault_rifle"></button>
             <button class="tree-tab" data-tab="rocket_launcher"></button>
             <button class="tree-tab" data-tab="sniper_rifle"></button>
-            <button class="tree-tab tree-tab-loadout" data-tab="loadout">LOADOUT</button>
           </div>
           <div class="tree-legend">
             <span class="leg-item" style="--leg-c: #ffd84d">${goldIcon()} MONEY</span>
@@ -167,7 +169,8 @@ export class UpgradeTree {
           </div>
           <div class="tree-life">LIFETIME EXCAVATED: <span class="life-num">0</span> PX</div>
           <div class="tree-actions">
-            <button class="btn btn-primary" data-act="deploy">DEPLOY NEW RUN <span class="kbd">SPACE</span></button>
+            <button class="btn hidden" data-act="back-matrix">← UPGRADES</button>
+            <button class="btn btn-primary" data-act="primary">DEPLOY NEW RUN <span class="kbd">SPACE</span></button>
           </div>
         </div>
       </div>
@@ -183,8 +186,12 @@ export class UpgradeTree {
     this.bankValEl = this.root.querySelector(".bank-num") as HTMLSpanElement;
     this.crysValEl = this.root.querySelector(".crys-num") as HTMLSpanElement;
     this.lifeValEl = this.root.querySelector(".life-num") as HTMLSpanElement;
+    this.titleEl = this.root.querySelector(".tree-title") as HTMLDivElement;
     this.subEl = this.root.querySelector(".tree-sub") as HTMLDivElement;
+    this.tabsEl = this.root.querySelector(".tree-tabs") as HTMLDivElement;
     this.legendEl = this.root.querySelector(".tree-legend") as HTMLDivElement;
+    this.backBtnEl = this.root.querySelector('[data-act="back-matrix"]') as HTMLButtonElement;
+    this.primaryBtnEl = this.root.querySelector('[data-act="primary"]') as HTMLButtonElement;
 
     this.coreHubEl = document.createElement("div");
     this.coreHubEl.className = "tree-core";
@@ -205,11 +212,12 @@ export class UpgradeTree {
     this.attachDrag(this.coreHubEl, HUB_ID);
 
     this.root.querySelector(".tree-close")!.addEventListener("click", () => this.closeAndDeploy());
-    this.root.querySelector('[data-act="deploy"]')!.addEventListener("click", () => this.closeAndDeploy());
+    this.backBtnEl.addEventListener("click", () => this.closeLoadoutScreen());
+    this.primaryBtnEl.addEventListener("click", () => this.onPrimaryAction());
 
     this.root.querySelectorAll(".tree-tab").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const tab = (btn as HTMLElement).dataset.tab as MatrixTab;
+        const tab = (btn as HTMLElement).dataset.tab as UpgradeBranch;
         this.switchTab(tab);
       });
     });
@@ -220,33 +228,79 @@ export class UpgradeTree {
     parent.append(this.root);
   }
 
-  switchTab(tab: MatrixTab): void {
+  /** True once the player has unlocked at least one second weapon beyond the starter Pistol. */
+  isLoadoutUnlocked(): boolean {
+    const st = this.game.upgrades.getSoldierStats();
+    return st.shotgunUnlocked || st.arUnlocked || st.rocketUnlocked || st.sniperUnlocked;
+  }
+
+  /** Advance from Upgrade Matrix -> Loadout (if unlocked), or deploy the run. */
+  onPrimaryAction(): void {
+    if (!this.inLoadoutScreen && this.isLoadoutUnlocked()) {
+      this.openLoadoutScreen();
+      return;
+    }
+    this.closeAndDeploy();
+  }
+
+  openLoadoutScreen(): void {
+    this.inLoadoutScreen = true;
+    this.hideTooltip();
+    this.refresh();
+  }
+
+  closeLoadoutScreen(): void {
+    this.inLoadoutScreen = false;
+    this.hideTooltip();
+    this.refresh();
+  }
+
+  switchTab(tab: UpgradeBranch): void {
+    this.inLoadoutScreen = false;
     this.activeTab = tab;
     this.hideTooltip();
     this.activateBranch(true);
     this.root.querySelectorAll(".tree-tab").forEach((btn) => {
       btn.classList.toggle("active", (btn as HTMLElement).dataset.tab === tab);
     });
-    if (tab === "core") {
-      this.subEl.textContent = "MONEY (LEFT) · SOLDIER (TOP) · BLIGHT SUPPRESSION (RIGHT)";
-    } else if (tab === "pistol") {
-      this.subEl.textContent = "SIDEARM WEAPON TREE — STANDARD ISSUE (UNLOCKED)";
-    } else if (tab === "shotgun") {
-      this.subEl.textContent = "SCATTER SHOTGUN WEAPON TREE — CLOSE-RANGE CONE EXCAVATOR";
-    } else if (tab === "assault_rifle") {
-      this.subEl.textContent = "ASSAULT RIFLE WEAPON TREE — RAPID FIRE WITH UP TO 5× PIERCE";
-    } else if (tab === "rocket_launcher") {
-      this.subEl.textContent = "ROCKET LAUNCHER WEAPON TREE — HEAVY EXPLOSIVE BLAST & CLUSTER MUNITIONS";
-    } else if (tab === "sniper_rifle") {
-      this.subEl.textContent = "SNIPER RIFLE WEAPON TREE — HIGH-VELOCITY PENETRATING ROUNDS & CRITS";
-    } else {
-      this.subEl.textContent = "SQUAD LOADOUT & INVENTORY — EQUIP WEAPONS & GEAR PER SOLDIER";
-    }
-    // Keeps its height on other tabs so the panel doesn't jump when switching.
-    this.legendEl.style.visibility = tab === "core" ? "" : "hidden";
-    this.stageEl.classList.toggle("hidden", tab === "loadout");
-    this.loadoutWrap.classList.toggle("hidden", tab !== "loadout");
     this.refresh();
+  }
+
+  private updateHeaderAndScreen(): void {
+    const tab = this.activeTab;
+    if (this.inLoadoutScreen) {
+      this.titleEl.textContent = "SQUAD LOADOUT";
+      this.subEl.textContent = "EQUIP PRIMARY WEAPONS & GEAR FOR EACH SOLDIER BEFORE DEPLOYING";
+    } else {
+      this.titleEl.textContent = "UPGRADE MATRIX";
+      if (tab === "core") {
+        this.subEl.textContent = "MONEY (LEFT) · SOLDIER (TOP) · BLIGHT SUPPRESSION (RIGHT)";
+      } else if (tab === "pistol") {
+        this.subEl.textContent = "SIDEARM WEAPON TREE — STANDARD ISSUE (UNLOCKED)";
+      } else if (tab === "shotgun") {
+        this.subEl.textContent = "SCATTER SHOTGUN WEAPON TREE — CLOSE-RANGE CONE EXCAVATOR";
+      } else if (tab === "assault_rifle") {
+        this.subEl.textContent = "ASSAULT RIFLE WEAPON TREE — RAPID FIRE WITH UP TO 5× PIERCE";
+      } else if (tab === "rocket_launcher") {
+        this.subEl.textContent = "ROCKET LAUNCHER WEAPON TREE — HEAVY EXPLOSIVE BLAST & CLUSTER MUNITIONS";
+      } else if (tab === "sniper_rifle") {
+        this.subEl.textContent = "SNIPER RIFLE WEAPON TREE — HIGH-VELOCITY PENETRATING ROUNDS & CRITS";
+      }
+    }
+    this.tabsEl.classList.toggle("hidden", this.inLoadoutScreen);
+    // Keeps its height on other tabs so the panel doesn't jump when switching.
+    this.legendEl.classList.toggle("hidden", this.inLoadoutScreen);
+    this.legendEl.style.visibility = !this.inLoadoutScreen && tab === "core" ? "" : "hidden";
+    this.stageEl.classList.toggle("hidden", this.inLoadoutScreen);
+    this.loadoutWrap.classList.toggle("hidden", !this.inLoadoutScreen);
+
+    const loadoutUnlocked = this.isLoadoutUnlocked();
+    this.backBtnEl.classList.toggle("hidden", !this.inLoadoutScreen);
+    if (!this.inLoadoutScreen && loadoutUnlocked) {
+      this.primaryBtnEl.innerHTML = `LOADOUT <span class="kbd">SPACE</span>`;
+    } else {
+      this.primaryBtnEl.innerHTML = `DEPLOY NEW RUN <span class="kbd">SPACE</span>`;
+    }
   }
 
   private buildStage(): void {
@@ -468,7 +522,7 @@ export class UpgradeTree {
     this.raf = requestAnimationFrame(this.frame);
     const dt = this.lastFrame ? Math.min(1 / 30, (time - this.lastFrame) / 1000) : 0;
     this.lastFrame = time;
-    if (this.activeTab === "loadout") return;
+    if (this.inLoadoutScreen) return;
     const heldId = this.drag?.moved ? this.drag.id : null;
     if (reducedMotion()) {
       for (const b of this.activeBodies) {
@@ -702,7 +756,7 @@ export class UpgradeTree {
     crysWrap.classList.toggle("hidden", this.game.crystals <= 0 && this.game.bests.depth < 16);
     this.lifeValEl.textContent = this.game.lifetimePixels.toLocaleString();
 
-    // Update weapon tab lock indicators & Loadout tab count.
+    // Update weapon tab lock indicators.
     const tabLocks: [UpgradeBranch, string, boolean][] = [
       ["shotgun", "SHOTGUN", st.shotgunUnlocked],
       ["assault_rifle", "ASSAULT RIFLE", st.arUnlocked],
@@ -713,12 +767,10 @@ export class UpgradeTree {
       const btn = this.root.querySelector(`[data-tab="${tabId}"]`) as HTMLButtonElement | null;
       if (btn) btn.innerHTML = tabHtml(tabId, label, !unlocked);
     }
-    const loadoutTab = this.root.querySelector('[data-tab="loadout"]') as HTMLButtonElement;
-    if (loadoutTab) {
-      loadoutTab.innerHTML = `${sprite("socket", { color: UI_COLORS.magenta, scale: 1 })} LOADOUT (${st.maxSoldiers})`;
-    }
 
-    if (this.activeTab === "loadout") {
+    this.updateHeaderAndScreen();
+
+    if (this.inLoadoutScreen) {
       this.renderLoadout();
       return;
     }
@@ -756,6 +808,7 @@ export class UpgradeTree {
   }
 
   show(): void {
+    this.inLoadoutScreen = false;
     this.activateBranch(true);
     this.refresh();
     this.root.classList.remove("hidden");
