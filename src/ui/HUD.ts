@@ -15,7 +15,6 @@ export class HUD {
   private upgBtn: HTMLButtonElement;
   private muteBtn: HTMLButtonElement;
   private hintEl: HTMLDivElement;
-  private debugEl: HTMLDivElement;
   private lastUpdate = 0;
 
   constructor(parent: HTMLElement, private game: Game) {
@@ -71,9 +70,7 @@ export class HUD {
     this.statsEl.className = "hud-stats";
     this.hintEl = document.createElement("div");
     this.hintEl.className = "hud-hint";
-    this.debugEl = document.createElement("div");
-    this.debugEl.className = "hud-debug";
-    this.root.append(bar, this.upgBtn, this.muteBtn, this.launchBtn, this.statsEl, this.hintEl, this.debugEl);
+    this.root.append(bar, this.upgBtn, this.muteBtn, this.launchBtn, this.statsEl, this.hintEl);
     parent.append(this.root);
   }
 
@@ -129,21 +126,5 @@ export class HUD {
       (hint ? "  ·  " : "") +
       "Wheel zoom · Right/Middle drag pan · F follow · Tab cycle · U upgrades · R restart";
     this.hintEl.textContent = hint;
-
-    if (game.debug) {
-      const d = game.debugInfo;
-      const near = game.growth.nearSoldierPercent(s.time);
-      const lt = game.lighting;
-      this.debugEl.style.display = "block";
-      this.debugEl.textContent =
-        `FPS ${d.fps.toFixed(0)}  frame ${d.frameMs.toFixed(1)}ms  sim ${d.simMs.toFixed(2)}ms  light ${d.lightMs.toFixed(2)}ms (${lt.quality})\n` +
-        `lights ${lt.lastShadowLights}/${game.flashes.length}  rays ${lt.lastRaysCast}  ` +
-        `frontier ${game.growth.frontier.size}  near-soldier ${near.toFixed(0)}%\n` +
-        `bullets ${game.combat.bullets.activeCount}  particles ${game.particles.count}  casings ${game.casings.count}\n` +
-        `chunks rebuilt ${game.terrain.rebuiltLastFrame}  pending ${game.terrain.chunks.pending}  ` +
-        `relocations ${game.physics.stats.relocations}  stuck ${game.physics.stats.stuckEvents}`;
-    } else {
-      this.debugEl.style.display = "none";
-    }
   }
 }

@@ -15,6 +15,7 @@ import { LightingSystem, type MuzzleLight } from "./systems/LightingSystem";
 import { PhysicsSystem, findSpawnPoint } from "./systems/PhysicsSystem";
 import { RunStats } from "./systems/RunStats";
 import { HUD } from "./ui/HUD";
+import { DebugOverlay } from "./ui/DebugOverlay";
 import { MainMenu } from "./ui/MainMenu";
 import { PauseMenu } from "./ui/PauseMenu";
 import { ResultsScreen } from "./ui/ResultsScreen";
@@ -52,6 +53,7 @@ export class Game {
   readonly upgrades: UpgradeManager;
   readonly audio: AudioSystem;
   readonly hud: HUD;
+  readonly debugOverlay: DebugOverlay;
   readonly mainMenu: MainMenu;
   readonly pauseMenu: PauseMenu;
   readonly resultsScreen: ResultsScreen;
@@ -69,8 +71,11 @@ export class Game {
   runOver = false;
   private bankedThisRun = false;
   onUpgradePurchased?: () => void;
+  timeScale = 1;
+  showChunkBorders = false;
   debug = new URLSearchParams(location.search).has("debug") || import.meta.env.DEV;
   debugInfo = { fps: 0, frameMs: 0, simMs: 0, lightMs: 0 };
+  private flashPolyPool: Float32Array[] = [];
 
   private acc = 0;
   private last = 0;
@@ -104,6 +109,7 @@ export class Game {
     this.terrain.rebuildAll();
     this.renderer = new Renderer(canvas, this);
     this.hud = new HUD(uiRoot, this);
+    this.debugOverlay = new DebugOverlay(uiRoot, this);
     this.mainMenu = new MainMenu(uiRoot, this);
     this.pauseMenu = new PauseMenu(uiRoot, this);
     this.resultsScreen = new ResultsScreen(uiRoot, this);
@@ -163,6 +169,7 @@ export class Game {
     this.stats = this.upgrades.getSoldierStats();
     this.combat.stats = this.stats;
     this.soldiers = [];
+    for (const fl of this.flashes) this.flashPolyPool.push(fl.poly);
     this.flashes = [];
     this.cellFlashes = [];
     this.combat.bullets.clear();
@@ -331,6 +338,7 @@ export class Game {
   private onShot(s: Soldier, dx: number, dy: number, mx: number, my: number): void {
     this.runStats.shotsFired++;
     this.audio.playShot();
+    const poly = this.flashPolyPool.pop() ?? new Float32Array(2048);
     this.flashes.push({
       x: mx,
       y: my,
@@ -340,7 +348,7 @@ export class Game {
       maxLife: LIGHT.flashDuration,
       radius: LIGHT.radius,
       ownerId: s.id,
-      poly: new Float32Array(2048),
+      poly,
       polyCount: 0,
       hasPolygon: false,
     });
@@ -436,10 +444,14 @@ export class Game {
     this.combat.updateBullets(dt);
     this.growth.update(dt, this.runStats.time, this.soldiers);
     this.growthRate = this.growth.rate;
+    this.runStats.recordSampleIfDue(this.growthRate);
     this.particles.update(dt);
     this.casings.update(dt);
     for (let i = this.flashes.length - 1; i >= 0; i--) {
-      if ((this.flashes[i].life -= dt) <= 0) this.flashes.splice(i, 1);
+      if ((this.flashes[i].life -= dt) <= 0) {
+        this.flashPolyPool.push(this.flashes[i].poly);
+        this.flashes.splice(i, 1);
+      }
     }
     for (let i = this.cellFlashes.length - 1; i >= 0; i--) {
       if ((this.cellFlashes[i].life -= dt) <= 0) this.cellFlashes.splice(i, 1);
@@ -508,19 +520,38 @@ export class Game {
     this.hud.update(this, performance.now(), true);
   }
 
+  exportTelemetryJson(): string {
+    const r = this.runStats;
+    return JSON.stringify(
+      {
+        time: +r.time.toFixed(2),
+        pixels: r.pixelsDestroyed,
+        currency: r.currency,
+        maxDepth: r.maxDepth,
+        soldiersDeployed: r.soldiersDeployed,
+        nearSoldierGrowthPct: +this.growth.nearSoldierPercent(r.time).toFixed(1),
+        upgrades: this.save.data.upgrades,
+        samples: r.samples,
+      },
+      null,
+      2,
+    );
+  }
+
   frame = (now: number): void => {
     const real = this.last ? Math.min(0.1, (now - this.last) / 1000) : SIM.dt;
     this.last = now;
     const t0 = performance.now();
     if (!this.paused) {
-      this.acc += real;
+      this.acc += real * this.timeScale;
+      const maxSteps = SIM.maxStepsPerFrame * Math.max(1, this.timeScale);
       let steps = 0;
-      while (this.acc >= SIM.dt && steps < SIM.maxStepsPerFrame) {
+      while (this.acc >= SIM.dt && steps < maxSteps) {
         this.step(SIM.dt);
         this.acc -= SIM.dt;
         steps++;
       }
-      if (steps >= SIM.maxStepsPerFrame) this.acc = 0;
+      if (steps >= maxSteps) this.acc = 0;
       this.camera.update(real, this.soldiers);
     }
     const t1 = performance.now();
@@ -528,6 +559,7 @@ export class Game {
     this.terrain.update();
     this.renderer.draw();
     this.hud.update(this, now);
+    this.debugOverlay.update();
     const t2 = performance.now();
 
     this.fpsAcc += real;

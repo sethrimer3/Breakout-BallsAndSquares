@@ -126,7 +126,7 @@ export class TerrainRenderer {
     for (const k of this.scratch) this.buildChunk(k);
   }
 
-  draw(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
+  draw(ctx: CanvasRenderingContext2D, cam: CameraSystem, showBorders = false): void {
     const world = this.world;
     const cs = this.chunks.chunkSize;
     const unit = world.cellSize * cs;
@@ -146,6 +146,10 @@ export class TerrainRenderer {
         const sx0 = Math.round(cam.worldToScreenX(kx * unit));
         const sx1 = Math.round(cam.worldToScreenX((kx + 1) * unit));
         ctx.drawImage(this.canvases[ky * this.chunks.cols + kx], sx0, sy0, sx1 - sx0, sy1 - sy0);
+        if (showBorders) {
+          ctx.strokeStyle = "rgba(80, 210, 255, 0.25)";
+          ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
+        }
       }
     }
   }

@@ -49,7 +49,7 @@ export class Renderer {
     const rRad = 88 * cam.zoom;
     ctx.drawImage(this.sprites.soldierGlow, rcx - rRad, rcy - rRad, rRad * 2, rRad * 2);
 
-    game.terrain.draw(ctx, cam);
+    game.terrain.draw(ctx, cam, game.showChunkBorders);
 
     // Subtle starting-room frame so the spawn zone stays recognizable.
     const cs = game.world.cellSize;

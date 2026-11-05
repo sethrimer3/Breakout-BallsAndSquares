@@ -106,18 +106,41 @@ body {
   white-space: nowrap;
 }
 
-.hud-debug {
+.debug-panel {
+  pointer-events: auto;
   position: absolute;
   top: 60px;
   left: 14px;
-  padding: 6px 10px;
-  background: rgba(5, 8, 16, 0.85);
-  border: 1px solid rgba(110, 200, 240, 0.2);
-  border-radius: 3px;
+  padding: 8px 10px;
+  background: rgba(5, 8, 16, 0.88);
+  border: 1px solid rgba(110, 200, 240, 0.25);
+  border-radius: 4px;
+  z-index: 15;
+}
+.debug-text {
+  margin: 0;
+  font-family: inherit;
   font-size: 11px;
   line-height: 1.45;
   color: #8fd4ff;
-  white-space: pre;
+}
+.debug-controls {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+.debug-controls button {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 2px 6px;
+  color: #cfe8ff;
+  background: rgba(20, 34, 54, 0.9);
+  border: 1px solid rgba(110, 200, 240, 0.35);
+  border-radius: 3px;
+}
+.debug-controls button:hover {
+  border-color: #7ee4ff;
 }
 
 .hidden {
