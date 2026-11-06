@@ -226,6 +226,27 @@ export const GRENADE = {
   poolSize: 32,
 };
 
+export const TURRET = {
+  /** Energy requirement to activate autoturret deployment. */
+  energyRequired: 150,
+  /** Base number of deployed autoturrets. */
+  baseCount: 2,
+  /** Duration autoturrets remain active (seconds). */
+  lifetime: 10,
+  /** Base bullet damage. */
+  baseDamage: 2,
+  /** Base shots per second. */
+  baseFireRate: 3.5,
+  /** Base tracking/turning speed (radians/sec). PI * 1.5 = 270 deg/s. */
+  baseTurnSpeed: Math.PI * 1.5,
+  /** Targeting range in grid cells. */
+  rangeCells: 18,
+  /** Bullet speed in world units/sec. */
+  bulletSpeed: 450,
+  /** Object pool capacity. */
+  poolSize: 32,
+};
+
 export const CAMERA = {
   defaultZoom: 2.5,
   minZoom: 0.5,

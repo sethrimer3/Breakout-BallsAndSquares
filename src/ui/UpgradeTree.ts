@@ -106,7 +106,7 @@ export const CATEGORIES: readonly CategoryInfo[] = [
     name: "SECONDARY WEAPONS",
     icon: "grenade",
     color: "#ff9d3b",
-    branches: ["grenade"],
+    branches: ["grenade", "turret"],
   },
   {
     id: "soldiers",
@@ -139,7 +139,7 @@ interface TreeSource {
 
 export function categoryForBranch(b: UpgradeBranch): UpgradeCategory {
   if (b === "core" || b === "resources" || b === "blight") return "systems";
-  if (b === "grenade") return "secondary";
+  if (b === "grenade" || b === "turret") return "secondary";
   if (b === "soldier") return "soldiers";
   return "primary";
 }
@@ -155,6 +155,7 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   sniper_rifle: { icon: "sniper", color: UI_COLORS.soldier },
   katana: { icon: "katana", color: "#38d6ff" },
   grenade: { icon: "grenade", color: "#ff9d3b" },
+  turret: { icon: "turret", color: "#38d6ff" },
   soldier: { icon: "soldier", color: UI_COLORS.soldier },
 };
 
@@ -282,6 +283,7 @@ export class UpgradeTree {
               </div>
               <div class="tree-cat-panel hidden" data-cat="secondary">
                 <button class="tree-tab" data-tab="grenade"></button>
+                <button class="tree-tab" data-tab="turret"></button>
               </div>
               <div class="tree-cat-panel hidden" data-cat="soldiers">
                 <div class="soldier-slot-tabs"></div>
@@ -477,6 +479,7 @@ export class UpgradeTree {
       st.sniperUnlocked ||
       st.katanaUnlocked ||
       st.grenadeUnlocked ||
+      st.turretUnlocked ||
       hasBehaviors
     );
   }
@@ -542,6 +545,8 @@ export class UpgradeTree {
         this.subEl.textContent = "KATANA WEAPON TREE — RAPID HIGH-PIERCE ENERGY SLASHES & ANTI-BLIGHT CRITS";
       } else if (tab === "grenade") {
         this.subEl.textContent = "STICKY GRENADE SECONDARY WEAPON TREE — HIGH-EXPLOSIVE STICKY ORDNANCE";
+      } else if (tab === "turret") {
+        this.subEl.textContent = "AUTOTURRET SECONDARY WEAPON TREE — AUTOMATED TARGET-LOCKING FIRE SUPPORT";
       }
     }
     this.tabsEl.classList.toggle("hidden", this.inLoadoutScreen);
@@ -963,7 +968,8 @@ export class UpgradeTree {
         (branch === "rocket_launcher" && def.id !== "rocket_unlock" && u.levelOf("rocket_unlock") === 0) ||
         (branch === "sniper_rifle" && def.id !== "sniper_unlock" && u.levelOf("sniper_unlock") === 0) ||
         (branch === "katana" && def.id !== "katana_unlock" && u.levelOf("katana_unlock") === 0) ||
-        (branch === "grenade" && def.id !== "grenade_unlock" && u.levelOf("grenade_unlock") === 0);
+        (branch === "grenade" && def.id !== "grenade_unlock" && u.levelOf("grenade_unlock") === 0) ||
+        (branch === "turret" && def.id !== "turret_unlock" && u.levelOf("turret_unlock") === 0);
       const rem = Math.max(0, def.unlockLifetimePixels - this.game.lifetimePixels);
       const lockMsg =
         rem > 0
@@ -1028,6 +1034,7 @@ export class UpgradeTree {
     const secondaryDefs: { id: SecondaryWeaponType | null; label: string; unlocked: boolean; icon: SpriteName }[] = [
       { id: null, label: "NONE", unlocked: true, icon: "close" },
       { id: "grenade", label: "GRENADE", unlocked: st.grenadeUnlocked, icon: "grenade" },
+      { id: "turret", label: "TURRET", unlocked: st.turretUnlocked, icon: "turret" },
     ];
 
     const behaviorDefs: { id: SoldierBehavior; label: string; desc: string; icon: SpriteName }[] = [
@@ -1063,6 +1070,8 @@ export class UpgradeTree {
       }
       if (curS === "grenade") {
         wSummary += ` · NADE: ${st.grenadeBlocksRequired} blk (${st.grenadeDamage} dmg)`;
+      } else if (curS === "turret") {
+        wSummary += ` · TURRET: ${st.turretEnergyRequired} eng (${st.turretCount}x ${st.turretDamage} dmg)`;
       }
 
       const wBtnsHtml = weaponDefs
@@ -1217,6 +1226,7 @@ export class UpgradeTree {
       ["sniper_rifle", "SNIPER", st.sniperUnlocked],
       ["katana", "KATANA", st.katanaUnlocked],
       ["grenade", "GRENADE", st.grenadeUnlocked],
+      ["turret", "TURRET", st.turretUnlocked],
     ];
     for (const [tabId, label, unlocked] of tabLocks) {
       const btn = this.root.querySelector(`[data-tab="${tabId}"]`) as HTMLButtonElement | null;

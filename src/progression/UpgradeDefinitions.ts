@@ -8,6 +8,7 @@ import {
   SHOTGUN,
   SNIPER_RIFLE,
   SOLDIER,
+  TURRET,
 } from "../config";
 import type { SoldierStats } from "../entities/Soldier";
 import type { SpriteName } from "../ui/pixelArt";
@@ -23,6 +24,7 @@ export type UpgradeBranch =
   | "sniper_rifle"
   | "katana"
   | "grenade"
+  | "turret"
   | "soldier";
 
 export type UpgradeId =
@@ -104,7 +106,13 @@ export type UpgradeId =
   | "grenade_damage"
   | "grenade_radius"
   | "grenade_shrapnel"
-  | "grenade_blight_mult";
+  | "grenade_blight_mult"
+  // Turret Tree (Secondary Weapon)
+  | "turret_unlock"
+  | "turret_damage"
+  | "turret_fire_rate"
+  | "turret_turn_speed"
+  | "turret_quantity";
 
 /** The four things upgrades are bought with. */
 export type Currency = "gold" | "crystals" | "greenCrystals" | "essence";
@@ -1579,6 +1587,115 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.grenadeBlightMult = +(GRENADE.blightMultiplier + 0.75 * lvl).toFixed(2);
     },
     icon: "blightCrack",
+  },
+
+  // =========================================================================
+  // 10) TURRET TREE: SECONDARY WEAPON (#38d6ff / #ffd84d)
+  // =========================================================================
+  {
+    id: "turret_unlock",
+    branch: "turret",
+    name: "Autoturret Deployer",
+    shortDesc: "Unlocks the Autoturret secondary ability: deploys 2 automated defensive turrets (150 energy)",
+    color: "#38d6ff",
+    grid: { col: 0, row: 0 },
+    parent: null,
+    maxLevel: 1,
+    baseCost: 150,
+    costMultiplier: 1,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "UNLOCKED" : "LOCKED"),
+    formatDelta: () => "UNLOCK",
+    apply: (s, lvl) => {
+      s.turretUnlocked = lvl > 0;
+    },
+    icon: "turret",
+  },
+  {
+    id: "turret_damage",
+    branch: "turret",
+    name: "Heavy Caliber",
+    shortDesc: "+1 turret bullet damage per level",
+    color: "#ff5c7c",
+    grid: { col: 1, row: 0 },
+    parent: "turret_unlock",
+    maxLevel: 5,
+    currency: "crystals",
+    baseCost: 20,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => TURRET.baseDamage + lvl,
+    formatValue: (v) => `+${v} DMG`,
+    formatDelta: () => "+1 DMG",
+    apply: (s, lvl) => {
+      s.turretDamage = TURRET.baseDamage + lvl;
+    },
+    icon: "impact",
+  },
+  {
+    id: "turret_fire_rate",
+    branch: "turret",
+    name: "Rapid Feeder",
+    shortDesc: "+20% turret fire rate per level",
+    color: "#38d6ff",
+    grid: { col: 0, row: -1 },
+    parent: "turret_unlock",
+    maxLevel: 5,
+    currency: "crystals",
+    baseCost: 18,
+    costMultiplier: 1.55,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => Math.round(TURRET.baseFireRate * (1 + 0.2 * lvl) * 10) / 10,
+    formatValue: (v) => `${v}/s`,
+    formatDelta: () => "+20%",
+    apply: (s, lvl) => {
+      s.turretFireRate = TURRET.baseFireRate * (1 + 0.2 * lvl);
+    },
+    icon: "fireRate",
+  },
+  {
+    id: "turret_turn_speed",
+    branch: "turret",
+    name: "High-Torque Servos",
+    shortDesc: "+45°/s turret tracking & lock-on speed per level",
+    color: "#ffd84d",
+    grid: { col: -1, row: 0 },
+    parent: "turret_unlock",
+    maxLevel: 5,
+    currency: "crystals",
+    baseCost: 15,
+    costMultiplier: 1.5,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => Math.round((TURRET.baseTurnSpeed + Math.PI * 0.25 * lvl) * (180 / Math.PI)),
+    formatValue: (v) => `${v}°/s`,
+    formatDelta: () => "+45°/s",
+    apply: (s, lvl) => {
+      s.turretTurnSpeed = TURRET.baseTurnSpeed + Math.PI * 0.25 * lvl;
+    },
+    icon: "behaviorTurns",
+  },
+  {
+    id: "turret_quantity",
+    branch: "turret",
+    name: "Turret Swarm",
+    shortDesc: "Deploys +1 additional autoturret per level (3, 4, 5, up to 6)",
+    color: "#ff9d3b",
+    grid: { col: 0, row: 1 },
+    parent: "turret_unlock",
+    maxLevel: 4,
+    currency: "crystals",
+    essenceCost: 5,
+    baseCost: 60,
+    costMultiplier: 2.2,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => 2 + lvl,
+    formatValue: (v) => `${v} TURRETS`,
+    formatDelta: () => "+1 TURRET",
+    apply: (s, lvl) => {
+      s.turretCount = 2 + lvl;
+    },
+    icon: "cluster",
   },
 ];
 

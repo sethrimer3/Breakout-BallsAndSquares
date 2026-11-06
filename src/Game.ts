@@ -275,6 +275,7 @@ export class Game {
     this.cellFlashes = [];
     this.combat.bullets.clear();
     this.combat.grenades.clear();
+    this.combat.turrets.clear();
     this.particles.clear();
     this.casings.clear();
     this.loot.clear();
@@ -641,7 +642,13 @@ export class Game {
   isSecondaryUnlocked(s: SecondaryWeaponType | null): boolean {
     if (!s) return true;
     if (s === "grenade") return this.stats.grenadeUnlocked;
+    if (s === "turret") return this.stats.turretUnlocked;
     return false;
+  }
+
+  getSecondaryEnergyRequired(sec: SecondaryWeaponType | null): number {
+    if (sec === "turret") return this.stats.turretEnergyRequired;
+    return this.stats.grenadeBlocksRequired;
   }
 
   setAutoMove(enabled: boolean): void {
@@ -748,7 +755,7 @@ export class Game {
       lit,
     });
     // Eject a spinning brass shell casing perpendicular to firing direction.
-    this.casings.spawn(s.x, s.y, dx, dy, s.ejectSide, this.rng);
+    this.casings.spawn(s.x ?? mx, s.y ?? my, dx, dy, s.ejectSide ?? 1, this.rng);
     // Muzzle spark burst + wisp of gunsmoke.
     for (let i = 0; i < 5; i++) {
       const a = Math.atan2(dy, dx) + this.rng.range(-0.55, 0.55);
@@ -929,7 +936,7 @@ export class Game {
     if (!soldier || !soldier.secondary) return;
     const rate = soldier.mods?.energyPerBlock ?? 0.1;
     soldier.secondaryEnergy += rate;
-    const req = this.stats.grenadeBlocksRequired;
+    const req = this.getSecondaryEnergyRequired(soldier.secondary);
     if (soldier.secondaryEnergy >= req) {
       if (this.stats.autoAbility) {
         this.activateSecondary(soldier);
@@ -945,7 +952,7 @@ export class Game {
    */
   activateSecondary(soldier: Soldier): boolean {
     if (!soldier || !soldier.alive || !soldier.secondary) return false;
-    const req = this.stats.grenadeBlocksRequired;
+    const req = this.getSecondaryEnergyRequired(soldier.secondary);
     if (soldier.secondaryEnergy < req) return false;
     soldier.secondaryEnergy = 0;
 
@@ -959,13 +966,30 @@ export class Game {
       );
       return true;
     }
+    if (soldier.secondary === "turret") {
+      this.combat.deployTurrets(
+        soldier,
+        this.stats.turretCount,
+        this.stats.turretDamage,
+        this.stats.turretFireRate,
+        this.stats.turretTurnSpeed,
+      );
+      this.audio.playShot();
+      for (let i = 0; i < 8; i++) {
+        const a = this.rng.range(0, Math.PI * 2);
+        const sp = this.rng.range(30, 90);
+        this.particles.spawn(PKind.Spark, soldier.x, soldier.y, Math.cos(a) * sp, Math.sin(a) * sp, 0.2, 1, 0x38d6ff, 5);
+      }
+      return true;
+    }
     return false;
   }
 
   /** Triggers the first ready secondary ability among alive soldiers (e.g. from hotkey). */
   triggerReadySecondary(): boolean {
-    const req = this.stats.grenadeBlocksRequired;
-    const ready = this.soldiers.find((s) => s.alive && s.secondary && s.secondaryEnergy >= req);
+    const ready = this.soldiers.find(
+      (s) => s.alive && s.secondary && s.secondaryEnergy >= this.getSecondaryEnergyRequired(s.secondary),
+    );
     if (ready) {
       return this.activateSecondary(ready);
     }
@@ -1158,6 +1182,7 @@ export class Game {
     }
     this.combat.updateBullets(dt);
     this.combat.updateGrenades(dt);
+    this.combat.updateTurrets(dt);
     this.growth.update(dt, this.runStats.time, this.soldiers);
     this.growthRate = this.growth.rate;
     this.runStats.recordSampleIfDue(this.growthRate);

@@ -70,6 +70,9 @@ export class UpgradeManager {
     if (def.branch === "grenade" && def.id !== "grenade_unlock") {
       if (this.levelOf("grenade_unlock") === 0) return false;
     }
+    if (def.branch === "turret" && def.id !== "turret_unlock") {
+      if (this.levelOf("turret_unlock") === 0) return false;
+    }
     return true;
   }
 

@@ -86,6 +86,7 @@ export class Renderer {
     // palette instead of being darkened by the lightmap.
     this.drawSoldiers();
     this.drawGrenades();
+    this.drawTurrets();
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
@@ -345,7 +346,7 @@ export class Renderer {
    * Brightest at the leading tip, leaving a trail of dimmer gold behind.
    */
   private drawSoldierEnergyOutline(s: Soldier, sx: number, sy: number): void {
-    const req = this.game.stats.grenadeBlocksRequired;
+    const req = this.game.getSecondaryEnergyRequired(s.secondary);
     if (req <= 0) return;
     const pct = Math.max(0, Math.min(1, s.secondaryEnergy / req));
     if (pct <= 0) return;
@@ -1064,6 +1065,92 @@ export class Renderer {
           ctx.arc(-h * 0.45, 0, (3 + p * 18) * cam.zoom, 0, Math.PI * 2);
           ctx.stroke();
         }
+      }
+
+      ctx.restore();
+    }
+  }
+
+  /** Draw temporary deployable autoturrets. */
+  private drawTurrets(): void {
+    const { ctx, game } = this;
+    const cam = game.camera;
+    const items = game.combat.turrets.items;
+
+    for (let i = 0; i < items.length; i++) {
+      const t = items[i];
+      if (!t.active) continue;
+
+      const sx = cam.worldToScreenX(t.x);
+      const sy = cam.worldToScreenY(t.y);
+      if (sx < -40 || sy < -40 || sx > cam.viewW + 40 || sy > cam.viewH + 40) continue;
+
+      ctx.save();
+      ctx.translate(sx, sy);
+
+      const baseR = Math.max(3, 5 * cam.zoom);
+
+      // Tripod / Base mount (3 legs)
+      ctx.strokeStyle = "#1b2533";
+      ctx.lineWidth = Math.max(1.5, 2 * cam.zoom);
+      for (let leg = 0; leg < 3; leg++) {
+        const la = (leg * Math.PI * 2) / 3 + Math.PI / 6;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(Math.cos(la) * (baseR + 2 * cam.zoom), Math.sin(la) * (baseR + 2 * cam.zoom));
+        ctx.stroke();
+      }
+
+      // Circular base hub
+      ctx.fillStyle = "#2c3b4d";
+      ctx.beginPath();
+      ctx.arc(0, 0, baseR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#3e526a";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // Swiveling turret head & barrel
+      ctx.save();
+      ctx.rotate(t.angle);
+
+      // Gun barrel extending forward
+      const barrelLen = Math.max(5, 8 * cam.zoom);
+      const barrelW = Math.max(1.5, 2 * cam.zoom);
+      ctx.fillStyle = "#5a7288";
+      ctx.fillRect(0, -barrelW * 0.9, barrelLen, barrelW * 1.8);
+      // Muzzle tips
+      ctx.fillStyle = "#8ec3eb";
+      ctx.fillRect(barrelLen - 1.5, -barrelW * 0.9, 1.5, barrelW * 1.8);
+
+      // Turret dome
+      ctx.fillStyle = "#34495e";
+      ctx.beginPath();
+      ctx.arc(0, 0, baseR * 0.75, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sensor optic eye (cyan glowing dot)
+      ctx.fillStyle = t.hasTarget ? "#38d6ff" : "#567994";
+      ctx.beginPath();
+      ctx.arc(baseR * 0.35, 0, Math.max(1, 1.4 * cam.zoom), 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      // Remaining lifetime ring around turret base
+      if (t.maxLife > 0) {
+        const lifePct = Math.max(0, Math.min(1, t.life / t.maxLife));
+        const ringR = baseR + 3 * cam.zoom;
+        ctx.strokeStyle = "rgba(56, 214, 255, 0.25)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = lifePct < 0.25 ? "#ff4d6d" : "#38d6ff";
+        ctx.beginPath();
+        ctx.arc(0, 0, ringR, -Math.PI / 2, -Math.PI / 2 + lifePct * Math.PI * 2);
+        ctx.stroke();
       }
 
       ctx.restore();

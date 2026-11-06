@@ -1,10 +1,11 @@
-import { ASSAULT_RIFLE, BULLET, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE } from "../config";
+import { ASSAULT_RIFLE, BULLET, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET } from "../config";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Rng } from "../core/Rng";
 import { BulletPool, type Bullet } from "../entities/Bullet";
 import type { Soldier, SoldierStats } from "../entities/Soldier";
 import { StickyGrenadePool, type StickyGrenade } from "../entities/StickyGrenade";
+import { AutoTurretPool, type AutoTurret } from "../entities/AutoTurret";
 import type { PixelWorld } from "../world/PixelWorld";
 
 export interface CombatEvents {
@@ -37,6 +38,7 @@ const hit = makeRayHit();
 export class CombatSystem {
   readonly bullets = new BulletPool(BULLET.poolSize);
   readonly grenades = new StickyGrenadePool(GRENADE.poolSize);
+  readonly turrets = new AutoTurretPool(TURRET.poolSize);
   stats: SoldierStats;
   /** The soldier firing right now, whose own tree shapes the shots they spawn. */
   private shooter: Soldier | null = null;
@@ -758,5 +760,94 @@ export class CombatSystem {
     }
 
     this.grenades.release(g);
+  }
+
+  /** Update active autoturrets: track target block, swivel toward target, fire. */
+  updateTurrets(dt: number): void {
+    this.turrets.update(dt, this.world, this);
+  }
+
+  /** Deploy temporary autoturrets around a soldier. */
+  deployTurrets(
+    s: Soldier,
+    count: number,
+    damage: number,
+    fireRate: number,
+    turnSpeed: number,
+  ): AutoTurret[] {
+    const deployed: AutoTurret[] = [];
+    const cs = this.world.cellSize;
+    const facing = s.facingAngle ?? (Math.atan2(s.vy, s.vx) || 0);
+
+    for (let i = 0; i < count; i++) {
+      let offsetAngle = 0;
+      const dist = 14;
+      if (count === 1) {
+        offsetAngle = facing + Math.PI;
+      } else if (count === 2) {
+        // Left and right flanks
+        offsetAngle = facing + (i === 0 ? Math.PI * 0.5 : -Math.PI * 0.5);
+      } else {
+        // Uniform circular distribution
+        offsetAngle = facing + (i / count) * Math.PI * 2;
+      }
+
+      let tx = s.x + Math.cos(offsetAngle) * dist;
+      let ty = s.y + Math.sin(offsetAngle) * dist;
+
+      // Avoid spawning inside solid wall
+      const cx = Math.floor(tx / cs);
+      const cy = Math.floor(ty / cs);
+      if (
+        cx >= 0 &&
+        cx < this.world.width &&
+        cy >= 0 &&
+        cy < this.world.height &&
+        this.world.health[cy * this.world.width + cx] > 0
+      ) {
+        tx = s.x + Math.cos(offsetAngle) * 4;
+        ty = s.y + Math.sin(offsetAngle) * 4;
+      }
+
+      const turret = this.turrets.spawn(
+        tx,
+        ty,
+        offsetAngle,
+        TURRET.lifetime,
+        damage,
+        fireRate,
+        turnSpeed,
+        s.id,
+      );
+      if (turret) deployed.push(turret);
+    }
+    return deployed;
+  }
+
+  /** Fires a bullet from an autoturret barrel at the tracked block. */
+  fireTurretShot(
+    ownerId: number,
+    x: number,
+    y: number,
+    dx: number,
+    dy: number,
+    damage: number,
+  ): void {
+    this.spawnBullet(
+      x,
+      y,
+      dx,
+      dy,
+      TURRET.bulletSpeed,
+      damage,
+      1.2,
+      0,
+      ownerId,
+      0,
+      0,
+      0,
+      0,
+    );
+    this.events.onShot?.({ id: ownerId, x, y, ejectSide: 1 } as unknown as Soldier, dx, dy, x, y);
   }
 }

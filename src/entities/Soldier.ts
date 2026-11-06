@@ -8,6 +8,7 @@ import {
   SHOTGUN,
   SNIPER_RIFLE,
   SOLDIER,
+  TURRET,
 } from "../config";
 import type { SoldierBehavior } from "../progression/SaveManager";
 import { baseSoldierMods, type SoldierMods } from "../progression/SoldierUpgrades";
@@ -20,7 +21,7 @@ export type WeaponType =
   | "sniper_rifle"
   | "katana";
 
-export type SecondaryWeaponType = "grenade";
+export type SecondaryWeaponType = "grenade" | "turret";
 
 /** Derived soldier & run stats (base config combined with upgrades). */
 export interface SoldierStats {
@@ -80,6 +81,13 @@ export interface SoldierStats {
   grenadeDamage: number;
   grenadeShrapnel: number;
   grenadeBlightMult: number;
+  // Secondary Ability: Turret stats
+  turretUnlocked: boolean;
+  turretEnergyRequired: number;
+  turretCount: number;
+  turretDamage: number;
+  turretFireRate: number;
+  turretTurnSpeed: number;
   /** Autonomous secondary ability activation unlocked via Core upgrade */
   autoAbility: boolean;
   // Money / Loot / Resources stats
@@ -154,6 +162,12 @@ export function baseSoldierStats(): SoldierStats {
     grenadeDamage: GRENADE.damage,
     grenadeShrapnel: GRENADE.shrapnelCount,
     grenadeBlightMult: GRENADE.blightMultiplier,
+    turretUnlocked: false,
+    turretEnergyRequired: TURRET.energyRequired,
+    turretCount: TURRET.baseCount,
+    turretDamage: TURRET.baseDamage,
+    turretFireRate: TURRET.baseFireRate,
+    turretTurnSpeed: TURRET.baseTurnSpeed,
     autoAbility: false,
     dropChance: LOOT.baseDropChance,
     magnetRange: LOOT.baseMagnetRange,

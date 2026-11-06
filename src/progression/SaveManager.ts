@@ -43,7 +43,7 @@ export interface SoldierLoadout {
   upgrades?: SoldierUpgradeLevels;
 }
 
-export const VALID_SECONDARY_WEAPONS: readonly SecondaryWeaponType[] = ["grenade"];
+export const VALID_SECONDARY_WEAPONS: readonly SecondaryWeaponType[] = ["grenade", "turret"];
 
 const VALID_WEAPONS: readonly WeaponType[] = [
   "pistol",
@@ -210,6 +210,8 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     }
 
     if (ld.secondary === "grenade" && (def.upgrades.grenade_unlock ?? 0) === 0) {
+      ld.secondary = null;
+    } else if (ld.secondary === "turret" && (def.upgrades.turret_unlock ?? 0) === 0) {
       ld.secondary = null;
     }
 
