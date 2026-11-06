@@ -110,4 +110,21 @@ describe("3 Save Slots System", () => {
 
     expect(SAVE_SLOTS_COUNT).toBe(3);
   });
+
+  it("records lastSaved timestamp and correctly resets a slot", () => {
+    const store = new MemStorage();
+    const save = new SaveManager(store);
+
+    save.selectSlot(1);
+    save.data.bank = 300;
+    save.save();
+
+    const sum = save.getSlotSummary(1);
+    expect(typeof sum.lastSaved).toBe("number");
+    expect(sum.lastSaved).toBeGreaterThan(0);
+
+    save.reset(1);
+    expect(save.data.bank).toBe(0);
+    expect(save.getSlotSummary(1).bank).toBe(0);
+  });
 });

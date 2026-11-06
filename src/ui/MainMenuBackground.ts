@@ -1,5 +1,3 @@
-import { COLORS } from "../config";
-
 interface SporeParticle {
   x: number;
   y: number;

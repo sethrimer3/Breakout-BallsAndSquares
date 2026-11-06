@@ -1,5 +1,5 @@
 import type { Game } from "../Game";
-import { SAVE_SLOTS_COUNT, type SlotSummary } from "../progression/SaveManager";
+import { SAVE_SLOTS_COUNT } from "../progression/SaveManager";
 import { MainMenuBackground } from "./MainMenuBackground";
 import { sprite, UI_COLORS } from "./pixelArt";
 import { SettingsModal } from "./SettingsModal";
@@ -283,6 +283,14 @@ export class MainMenu {
     this.background.stop();
     this.settingsModal.hide();
     this.root.classList.add("hidden");
+  }
+
+  onEscape(): void {
+    if (this.settingsModal.visible) {
+      this.settingsModal.hide();
+      this.mainPanel.classList.remove("hidden");
+      this.updateSummary();
+    }
   }
 
   get visible(): boolean {

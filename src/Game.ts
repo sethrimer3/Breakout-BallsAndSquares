@@ -334,7 +334,6 @@ export class Game {
 
   selectSaveSlot(slot: number): void {
     this.save.selectSlot(slot);
-    this.upgrades = new UpgradeManager(this.save);
     this.applyUpgrades();
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.autoMove = this.save.data.settings.autoMove;
@@ -373,6 +372,8 @@ export class Game {
         this.mainMenu.selectSlot(2);
       } else if (code === "Digit3" || code === "Numpad3") {
         this.mainMenu.selectSlot(3);
+      } else if (code === "Escape") {
+        this.mainMenu.onEscape();
       }
       return;
     }
