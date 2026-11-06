@@ -1,4 +1,4 @@
-import { BULLET, COLORS, GROWTH, SOLDIER } from "../config";
+import { ART_PIXEL, BULLET, COLORS, GROWTH, SOLDIER } from "../config";
 import { PKind } from "../entities/ParticleSystem";
 import type { Game } from "../Game";
 import { LightRenderer } from "./LightRenderer";
@@ -41,7 +41,7 @@ export class Renderer {
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
     // 1) Albedo pass: dark navy cavity background, terrain chunks, casings,
-    //    debris/smoke, and metallic soldier spheres.
+    //    and debris/smoke.
     ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, w, h);
     const rcx = cam.worldToScreenX(game.world.roomCenterX);
@@ -62,12 +62,14 @@ export class Renderer {
 
     this.drawCasings();
     this.drawOpaqueParticles();
-    this.drawSoldiers();
 
     // 2) Dynamic lighting pass: multiply shadow-clipped lightmap over the albedo
     //    scene + additive air-scatter cone so shadows behind walls & soldiers pop.
     this.lightRenderer.renderLighting(ctx, game, this.dpr);
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
+    // Soldiers are drawn after lighting so the pixel-art sprite keeps its full
+    // palette instead of being darkened by the lightmap.
+    this.drawSoldiers();
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
@@ -249,14 +251,17 @@ export class Renderer {
   private drawSoldiers(): void {
     const { ctx, game } = this;
     const cam = game.camera;
+    const sprite = this.sprites.soldier;
+    // Pixel-art sprite: nearest-neighbour scaling, snapped to whole screen pixels.
+    const size = Math.max(1, Math.round(sprite.width * ART_PIXEL * cam.zoom));
+    const half = size / 2;
+    ctx.imageSmoothingEnabled = false;
     for (const s of game.soldiers) {
       if (!s.alive) continue;
       const sx = cam.worldToScreenX(s.x);
       const sy = cam.worldToScreenY(s.y);
-      const gr = SOLDIER.glowRadius * cam.zoom;
-      ctx.drawImage(this.sprites.soldierGlow, sx - gr, sy - gr, gr * 2, gr * 2);
+      ctx.drawImage(sprite, Math.round(sx - half), Math.round(sy - half), size, size);
       const br = SOLDIER.renderRadius * cam.zoom;
-      ctx.drawImage(this.sprites.soldier, sx - br, sy - br, br * 2, br * 2);
       if (s.maxHealth > 0) {
         const barW = Math.max(12, 10 * cam.zoom);
         const barH = 2.5;
@@ -308,11 +313,16 @@ export class Renderer {
     ctx.globalAlpha = 1;
   }
 
+  /**
+   * Pixel-art bullets: a single bright head pixel with a one-pixel-wide trail that
+   * fades toward the tail. Pixels sit on a world-aligned grid of `ART_PIXEL` cells,
+   * stepped along the trail like a pixel-art line.
+   */
   private drawBullets(): void {
     const { ctx, game } = this;
     const cam = game.camera;
     const items = game.combat.bullets.items;
-    ctx.lineCap = "round";
+    const px = ART_PIXEL;
     for (let i = 0; i < items.length; i++) {
       const b = items[i];
       if (!b.active) continue;
@@ -323,30 +333,40 @@ export class Renderer {
       const isSniper = b.style === 2;
       const maxTracer = isSniper ? BULLET.tracerLength * 2.4 : isRocket ? BULLET.tracerLength * 1.4 : BULLET.tracerLength;
       const tLen = Math.min(maxTracer, b.traveled);
-      const tx = cam.worldToScreenX(b.x - b.dx * tLen);
-      const ty = cam.worldToScreenY(b.y - b.dy * tLen);
-      const grad = ctx.createLinearGradient(tx, ty, sx, sy);
-      if (isSniper) {
-        grad.addColorStop(0, "rgba(120, 235, 255, 0)");
-        grad.addColorStop(1, "rgba(215, 252, 255, 0.98)");
-      } else if (isRocket) {
-        grad.addColorStop(0, "rgba(255, 90, 20, 0)");
-        grad.addColorStop(1, "rgba(255, 200, 110, 0.95)");
-      } else {
-        grad.addColorStop(0, "rgba(255, 195, 100, 0)");
-        grad.addColorStop(1, "rgba(255, 242, 195, 0.92)");
-      }
-      ctx.strokeStyle = grad;
-      ctx.lineWidth = Math.max(1.2, (isRocket ? 2.4 : isSniper ? 1.9 : 1.3) * cam.zoom);
-      ctx.beginPath();
-      ctx.moveTo(tx, ty);
-      ctx.lineTo(sx, sy);
-      ctx.stroke();
 
-      const rScale = isRocket ? 4.2 : isSniper ? 3.2 : 2.6;
-      const r = Math.max(2, BULLET.radius * rScale * cam.zoom);
-      ctx.drawImage(isRocket ? this.sprites.warmGlow : this.sprites.hotGlow, sx - r, sy - r, r * 2, r * 2);
+      // Head and tail in art-pixel grid coordinates.
+      const hx = Math.floor(b.x / px);
+      const hy = Math.floor(b.y / px);
+      const tx = Math.floor((b.x - b.dx * tLen) / px);
+      const ty = Math.floor((b.y - b.dy * tLen) / px);
+      const steps = Math.max(Math.abs(hx - tx), Math.abs(hy - ty));
+
+      ctx.fillStyle = isSniper ? "#d7fcff" : isRocket ? "#ffc86e" : "#fff2c3";
+      // Trail: tail (k = 0) is faint, the pixel just behind the head is brightest.
+      for (let k = 0; k < steps; k++) {
+        const t = k / steps;
+        ctx.globalAlpha = 0.12 + 0.6 * t;
+        this.fillArtPixel(Math.round(tx + (hx - tx) * t), Math.round(ty + (hy - ty) * t), 1);
+      }
+      ctx.globalAlpha = 1;
+      if (isRocket) {
+        this.fillArtPixel(hx, hy, 2);
+      } else {
+        ctx.fillStyle = "#ffffff";
+        this.fillArtPixel(hx, hy, 1);
+      }
     }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Fill `n` x `n` art pixels starting at grid cell (gx, gy), snapped to screen pixels. */
+  private fillArtPixel(gx: number, gy: number, n: number): void {
+    const cam = this.game.camera;
+    const x0 = Math.round(cam.worldToScreenX(gx * ART_PIXEL));
+    const y0 = Math.round(cam.worldToScreenY(gy * ART_PIXEL));
+    const x1 = Math.round(cam.worldToScreenX((gx + n) * ART_PIXEL));
+    const y1 = Math.round(cam.worldToScreenY((gy + n) * ART_PIXEL));
+    this.ctx.fillRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
   }
 
   private drawOpaqueParticles(): void {
