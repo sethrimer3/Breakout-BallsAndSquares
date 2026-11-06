@@ -188,6 +188,7 @@ export class PauseMenu {
         .join("");
 
       const fiery = set.fieryMuzzleFlash;
+      const softSh = set.softShadows;
       body.innerHTML = `
         <div class="set-row">
           <div class="set-info">
@@ -197,6 +198,16 @@ export class PauseMenu {
           <button class="btn set-toggle set-check ${fiery ? "btn-primary is-checked" : ""}" data-set="fiery"
             role="checkbox" aria-checked="${fiery}">
             <span class="px-check" aria-hidden="true"></span>${fiery ? "ON" : "OFF"}
+          </button>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-label">SOFT SHADOWS</div>
+            <div class="set-desc">Blur shadow edges in the light instead of crisp lines</div>
+          </div>
+          <button class="btn set-toggle set-check ${softSh ? "btn-primary is-checked" : ""}" data-set="softshadows"
+            role="checkbox" aria-checked="${softSh}">
+            <span class="px-check" aria-hidden="true"></span>${softSh ? "ON" : "OFF"}
           </button>
         </div>
         <div class="set-group">
@@ -213,6 +224,12 @@ export class PauseMenu {
 
       body.querySelector('[data-set="fiery"]')!.addEventListener("click", () => {
         set.fieryMuzzleFlash = !set.fieryMuzzleFlash;
+        this.game.save.save();
+        this.renderSettingsTab();
+      });
+
+      body.querySelector('[data-set="softshadows"]')!.addEventListener("click", () => {
+        set.softShadows = !set.softShadows;
         this.game.save.save();
         this.renderSettingsTab();
       });
