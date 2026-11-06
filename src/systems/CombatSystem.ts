@@ -41,6 +41,14 @@ export class CombatSystem {
 
   /** Tick a soldier's weapon according to its equipped weapon type. */
   updateSoldier(s: Soldier, dt: number): void {
+    if (s.isManual) return; // Driven by player control in Game.step
+
+    if (s.behavior === "sentry_slow") {
+      s.facingAngle += (Math.PI / 3) * dt;
+    } else if (s.behavior === "sentry_fast") {
+      s.facingAngle += (4 * Math.PI / 3) * dt;
+    }
+
     s.fireCooldown -= dt;
     let rate = this.stats.fireRate;
     switch (s.weapon) {
@@ -66,12 +74,29 @@ export class CombatSystem {
     }
   }
 
-  /** Fire along the soldier's current velocity. */
-  fire(s: Soldier): void {
-    const len = Math.hypot(s.vx, s.vy);
-    if (len < 1e-6) return;
-    const dx = s.vx / len;
-    const dy = s.vy / len;
+  /** Fire along the soldier's current velocity, aim direction, or explicit vector. */
+  fire(s: Soldier, overrideDx?: number, overrideDy?: number): void {
+    let dx = 0;
+    let dy = 0;
+    if (overrideDx !== undefined && overrideDy !== undefined) {
+      const len = Math.hypot(overrideDx, overrideDy);
+      if (len > 1e-6) {
+        dx = overrideDx / len;
+        dy = overrideDy / len;
+      }
+    }
+    if (dx === 0 && dy === 0) {
+      const vlen = Math.hypot(s.vx, s.vy);
+      if (vlen > 1e-6) {
+        dx = s.vx / vlen;
+        dy = s.vy / vlen;
+      } else if (Number.isFinite(s.facingAngle)) {
+        dx = Math.cos(s.facingAngle);
+        dy = Math.sin(s.facingAngle);
+      }
+    }
+    if (dx === 0 && dy === 0) return;
+    s.facingAngle = Math.atan2(dy, dx);
 
     if (s.weapon === "shotgun") {
       const n = Math.max(1, this.stats.shotgunPellets);

@@ -1,6 +1,7 @@
 import {
   ASSAULT_RIFLE,
   GROWTH,
+  KATANA,
   LOOT,
   ROCKET_LAUNCHER,
   SHOTGUN,
@@ -18,7 +19,8 @@ export type UpgradeBranch =
   | "shotgun"
   | "assault_rifle"
   | "rocket_launcher"
-  | "sniper_rifle";
+  | "sniper_rifle"
+  | "katana";
 
 export type UpgradeId =
   // Core Matrix: Upgrades All Soldiers (#38d6ff)
@@ -84,7 +86,14 @@ export type UpgradeId =
   | "sniper_damage"
   | "sniper_pierce"
   | "sniper_fire_rate"
-  | "sniper_crit";
+  | "sniper_crit"
+  // Katana Tree
+  | "katana_unlock"
+  | "katana_damage"
+  | "katana_blight_mult"
+  | "katana_pierce"
+  | "katana_fire_rate"
+  | "katana_arc";
 
 export interface UpgradeDef {
   id: UpgradeId;
@@ -1246,6 +1255,131 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.sniperCritChance = Math.min(1, lvl * 0.1);
     },
     icon: "crit",
+  },
+
+  // =========================================================================
+  // 9) KATANA TREE (Starts locked — razor-sharp anti-blight energy slashes)
+  // =========================================================================
+  {
+    id: "katana_unlock",
+    branch: "katana",
+    name: "Unlock Katana",
+    shortDesc: "Unlocks the Katana — rapid energy slashes with high pierce and devastating anti-blight damage",
+    color: "#38d6ff",
+    grid: { col: 0, row: 0 },
+    parent: null,
+    maxLevel: 1,
+    baseCost: 100,
+    costMultiplier: 1,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "UNLOCKED" : "LOCKED"),
+    formatDelta: () => "UNLOCK WEAPON",
+    apply: (s, lvl) => {
+      s.katanaUnlocked = lvl > 0;
+    },
+    icon: "katana",
+  },
+  {
+    id: "katana_damage",
+    branch: "katana",
+    name: "Razor Edge",
+    shortDesc: "+2 base slash damage per level",
+    color: "#ff5c7c",
+    grid: { col: 1, row: 0 },
+    parent: "katana_unlock",
+    maxLevel: 8,
+    baseCost: 45,
+    costMultiplier: 1.68,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => KATANA.damage + 2 * lvl,
+    formatValue: (v) => `${v} DMG`,
+    formatDelta: () => "+2 DMG",
+    apply: (s, lvl) => {
+      s.katanaDamage = KATANA.damage + 2 * lvl;
+    },
+    icon: "impact",
+  },
+  {
+    id: "katana_blight_mult",
+    branch: "katana",
+    name: "Blight Cleaver",
+    shortDesc: "+0.5× damage multiplier against Blight blocks per level (starts at 3.0×)",
+    color: "#ff4b8b",
+    grid: { col: 0, row: -1 },
+    parent: "katana_unlock",
+    maxLevel: 6,
+    baseCost: 40,
+    costMultiplier: 1.65,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => +(KATANA.blightMultiplier + 0.5 * lvl).toFixed(1),
+    formatValue: (v) => `${v}× BLIGHT`,
+    formatDelta: () => "+0.5× MULT",
+    apply: (s, lvl) => {
+      s.katanaBlightMultiplier = +(KATANA.blightMultiplier + 0.5 * lvl).toFixed(1);
+    },
+    icon: "blightCrack",
+  },
+  {
+    id: "katana_pierce",
+    branch: "katana",
+    name: "Flowing Cut",
+    shortDesc: "+1 block pierce per level (slices through multiple blocks in a line)",
+    color: "#38d6ff",
+    grid: { col: 0, row: 1 },
+    parent: "katana_unlock",
+    maxLevel: 6,
+    baseCost: 42,
+    costMultiplier: 1.66,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => KATANA.pierce + lvl,
+    formatValue: (v) => `${v} PIERCE`,
+    formatDelta: () => "+1 PIERCE",
+    apply: (s, lvl) => {
+      s.katanaPierce = KATANA.pierce + lvl;
+    },
+    icon: "pierce",
+  },
+  {
+    id: "katana_fire_rate",
+    branch: "katana",
+    name: "Iaido Strike",
+    shortDesc: "+14% swing rate & +8% slash velocity per level",
+    color: "#ff9d3b",
+    grid: { col: -1, row: 0 },
+    parent: "katana_unlock",
+    maxLevel: 8,
+    baseCost: 35,
+    costMultiplier: 1.58,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => +(KATANA.fireRate * (1 + 0.14 * lvl)).toFixed(2),
+    formatValue: (v) => `${v.toFixed(2)}/s`,
+    formatDelta: () => "+14% RATE",
+    apply: (s, lvl) => {
+      s.katanaFireRate = KATANA.fireRate * (1 + 0.14 * lvl);
+      s.katanaBulletSpeed = KATANA.bulletSpeed * (1 + 0.08 * lvl);
+    },
+    icon: "fireRate",
+  },
+  {
+    id: "katana_arc",
+    branch: "katana",
+    name: "Wide Sweep",
+    shortDesc: "+3 world units slash arc width per level",
+    color: "#52f296",
+    grid: { col: 1, row: 1 },
+    parent: "katana_damage",
+    maxLevel: 6,
+    baseCost: 38,
+    costMultiplier: 1.62,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => KATANA.slashWidth + 3 * lvl,
+    formatValue: (v) => `${v} WIDTH`,
+    formatDelta: () => "+3 WIDTH",
+    apply: (s, lvl) => {
+      s.katanaSlashWidth = KATANA.slashWidth + 3 * lvl;
+    },
+    icon: "blast",
   },
 ];
 

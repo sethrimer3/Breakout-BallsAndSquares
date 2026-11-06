@@ -337,6 +337,19 @@ export class PhysicsSystem {
     const vn = s.vx * nx + s.vy * ny;
     if (vn >= 0) return false;
 
+    // Manually controlled commander or soldiers in formation slide along walls smoothly.
+    if (s.isManual || s.isInFormation) {
+      s.vx -= vn * nx;
+      s.vy -= vn * ny;
+      return true;
+    }
+
+    if (s.behavior === "sentry_slow" || s.behavior === "sentry_fast") {
+      s.vx = 0;
+      s.vy = 0;
+      return true;
+    }
+
     // If a tactical marker is active and within line of sight, bounce directly toward it!
     let redirected = false;
     if (this.marker && hasLineOfSight(this.world, s.x, s.y, this.marker.x, this.marker.y)) {
@@ -357,26 +370,73 @@ export class PhysicsSystem {
         }
         s.vx = tdx * s.speed;
         s.vy = tdy * s.speed;
+        s.facingAngle = Math.atan2(s.vy, s.vx);
         redirected = true;
       }
     }
 
     if (!redirected) {
-      let vx = s.vx - 2 * vn * nx;
-      let vy = s.vy - 2 * vn * ny;
-      // Small random jitter to break axis-locked loops; keep it pointing away from the wall.
-      const a = this.rng.range(-SOLDIER.bounceJitterDeg, SOLDIER.bounceJitterDeg) * DEG;
-      const ca = Math.cos(a);
-      const sa = Math.sin(a);
-      const jx = vx * ca - vy * sa;
-      const jy = vx * sa + vy * ca;
-      if (jx * nx + jy * ny > 0) {
-        vx = jx;
-        vy = jy;
+      if (s.behavior === "orthogonal") {
+        if (Math.abs(nx) > Math.abs(ny)) {
+          s.vx = -s.vx;
+          s.vy = 0;
+          if (Math.abs(s.vx) < 1e-4) s.vx = nx > 0 ? s.speed : -s.speed;
+        } else {
+          s.vy = -s.vy;
+          s.vx = 0;
+          if (Math.abs(s.vy) < 1e-4) s.vy = ny > 0 ? s.speed : -s.speed;
+        }
+        s.facingAngle = Math.atan2(s.vy, s.vx);
+      } else if (s.behavior === "vertical") {
+        s.vx = 0;
+        s.vy = -s.vy;
+        if (Math.abs(s.vy) < 1e-4) s.vy = ny >= 0 ? s.speed : -s.speed;
+        s.facingAngle = Math.atan2(s.vy, 0);
+      } else if (s.behavior === "horizontal") {
+        s.vy = 0;
+        s.vx = -s.vx;
+        if (Math.abs(s.vx) < 1e-4) s.vx = nx >= 0 ? s.speed : -s.speed;
+        s.facingAngle = Math.atan2(0, s.vx);
+      } else if (s.behavior === "turn_left") {
+        let nvx = s.vy;
+        let nvy = -s.vx;
+        if (nvx * nx + nvy * ny <= 0.05) {
+          nvx = s.vx - 2 * vn * nx;
+          nvy = s.vy - 2 * vn * ny;
+        }
+        const nlen = Math.hypot(nvx, nvy) || 1;
+        s.vx = (nvx / nlen) * s.speed;
+        s.vy = (nvy / nlen) * s.speed;
+        s.facingAngle = Math.atan2(s.vy, s.vx);
+      } else if (s.behavior === "turn_right") {
+        let nvx = -s.vy;
+        let nvy = s.vx;
+        if (nvx * nx + nvy * ny <= 0.05) {
+          nvx = s.vx - 2 * vn * nx;
+          nvy = s.vy - 2 * vn * ny;
+        }
+        const nlen = Math.hypot(nvx, nvy) || 1;
+        s.vx = (nvx / nlen) * s.speed;
+        s.vy = (nvy / nlen) * s.speed;
+        s.facingAngle = Math.atan2(s.vy, s.vx);
+      } else {
+        let vx = s.vx - 2 * vn * nx;
+        let vy = s.vy - 2 * vn * ny;
+        // Small random jitter to break axis-locked loops; keep it pointing away from the wall.
+        const a = this.rng.range(-SOLDIER.bounceJitterDeg, SOLDIER.bounceJitterDeg) * DEG;
+        const ca = Math.cos(a);
+        const sa = Math.sin(a);
+        const jx = vx * ca - vy * sa;
+        const jy = vx * sa + vy * ca;
+        if (jx * nx + jy * ny > 0) {
+          vx = jx;
+          vy = jy;
+        }
+        const vlen = Math.hypot(vx, vy) || 1;
+        s.vx = (vx / vlen) * s.speed;
+        s.vy = (vy / vlen) * s.speed;
+        s.facingAngle = Math.atan2(s.vy, s.vx);
       }
-      const vlen = Math.hypot(vx, vy) || 1;
-      s.vx = (vx / vlen) * s.speed;
-      s.vy = (vy / vlen) * s.speed;
     }
     return true;
   }

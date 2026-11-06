@@ -8,6 +8,9 @@ export interface InputHandlers {
   onAimClick?(sx: number, sy: number): void;
   onAimCancel?(): void;
   canPlace?(): boolean;
+  canShootManual?(): boolean;
+  onManualShootStart?(sx: number, sy: number): void;
+  onManualShootEnd?(): void;
   onWheel?(sx: number, sy: number, deltaY: number): void;
   /** Continuous zoom about a canvas point (two-finger pinch). */
   onPinch?(sx: number, sy: number, factor: number): void;
@@ -30,6 +33,8 @@ export class Input {
   mouseY = 0;
   /** True while the aim preview should follow the pointer (hovering mouse, or a finger held still). */
   mouseInside = false;
+  isMouseDown = false;
+  readonly keysDown = new Set<string>();
   private aiming = false;
   private aimStartX = 0;
   private aimStartY = 0;
@@ -37,6 +42,7 @@ export class Input {
   private aimCurY = 0;
   private aimDragging = false;
   private panning = false;
+  private manualShooting = false;
   private lastX = 0;
   private lastY = 0;
   private downX = 0;
@@ -67,6 +73,27 @@ export class Input {
     });
     canvas.addEventListener("wheel", this.onWheel, { passive: false });
     window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("keyup", this.onKeyUp);
+    window.addEventListener("blur", this.onBlur);
+  }
+
+  isKeyDown(code: string): boolean {
+    return this.keysDown.has(code);
+  }
+
+  /** Current WASD/arrow key movement vector, normalized. */
+  getMovementVector(): { x: number; y: number } {
+    let dx = 0;
+    let dy = 0;
+    if (this.isKeyDown("KeyD") || this.isKeyDown("ArrowRight")) dx += 1;
+    if (this.isKeyDown("KeyA") || this.isKeyDown("ArrowLeft")) dx -= 1;
+    if (this.isKeyDown("KeyS") || this.isKeyDown("ArrowDown")) dy += 1;
+    if (this.isKeyDown("KeyW") || this.isKeyDown("ArrowUp")) dy -= 1;
+    const len = Math.hypot(dx, dy);
+    if (len > 1e-4) {
+      return { x: dx / len, y: dy / len };
+    }
+    return { x: 0, y: 0 };
   }
 
   private isTouchLike(e: PointerEvent): boolean {
@@ -100,7 +127,13 @@ export class Input {
     this.downX = e.clientX;
     this.downY = e.clientY;
     if (e.button === 0) {
-      if (!e.shiftKey && this.handlers.canPlace?.()) {
+      if (this.handlers.canShootManual?.()) {
+        this.aiming = false;
+        this.panning = false;
+        this.manualShooting = true;
+        this.isMouseDown = true;
+        this.handlers.onManualShootStart?.(this.mouseX, this.mouseY);
+      } else if (!e.shiftKey && this.handlers.canPlace?.()) {
         this.aiming = true;
         this.aimStartX = this.mouseX;
         this.aimStartY = this.mouseY;
@@ -211,7 +244,11 @@ export class Input {
       return;
     }
 
-    if (this.aiming) {
+    if (this.manualShooting) {
+      this.manualShooting = false;
+      this.isMouseDown = false;
+      this.handlers.onManualShootEnd?.();
+    } else if (this.aiming) {
       this.aiming = false;
       const endX = this.mouseX;
       const endY = this.mouseY;
@@ -240,6 +277,11 @@ export class Input {
   /** The browser took the gesture over (system swipe, call, etc.): drop it without a tap. */
   private onCancel = (e: PointerEvent): void => {
     this.touches.delete(e.pointerId);
+    if (this.manualShooting) {
+      this.manualShooting = false;
+      this.isMouseDown = false;
+      this.handlers.onManualShootEnd?.();
+    }
     if (this.aiming) {
       this.aiming = false;
       this.handlers.onAimCancel?.();
@@ -261,6 +303,20 @@ export class Input {
   private onKeyDown = (e: KeyboardEvent): void => {
     if (e.target instanceof HTMLInputElement) return;
     if (e.code === "Tab" || e.code === "Space") e.preventDefault();
+    this.keysDown.add(e.code);
     this.handlers.onKey?.(e.code, e);
+  };
+
+  private onKeyUp = (e: KeyboardEvent): void => {
+    this.keysDown.delete(e.code);
+  };
+
+  private onBlur = (): void => {
+    this.keysDown.clear();
+    this.isMouseDown = false;
+    if (this.manualShooting) {
+      this.manualShooting = false;
+      this.handlers.onManualShootEnd?.();
+    }
   };
 }
