@@ -14,6 +14,7 @@ export type SoldierUpgradeId =
   | "s_rate"
   | "s_stride"
   | "s_vitality"
+  | "s_dynamo"
   | "s_penetrator"
   | "s_blight_hunter"
   | "s_scavenger"
@@ -40,6 +41,8 @@ export interface SoldierMods {
   dropMult: number;
   /** Chance each shot immediately fires again. */
   twinChance: number;
+  /** Energy gained per block destroyed for secondary weapons. Starts at 0.1, up to 2.0 max. */
+  energyPerBlock: number;
 }
 
 export function baseSoldierMods(): SoldierMods {
@@ -53,6 +56,7 @@ export function baseSoldierMods(): SoldierMods {
     magnetMult: 1,
     dropMult: 1,
     twinChance: 0,
+    energyPerBlock: 0.1,
   };
 }
 
@@ -81,9 +85,13 @@ interface NodeSpec {
   formatValue(v: number): string;
   delta: string;
   apply(mods: SoldierMods, level: number): void;
+  baseCost?: number;
+  costMultiplier?: number;
+  essenceCost?: number;
 }
 
 function node(spec: NodeSpec): SoldierUpgradeDef {
+  const tierDefaults = TIERS[spec.tier];
   return {
     id: spec.id,
     tier: spec.tier,
@@ -98,7 +106,11 @@ function node(spec: NodeSpec): SoldierUpgradeDef {
     formatValue: spec.formatValue,
     formatDelta: () => spec.delta,
     apply: spec.apply,
-    ...TIERS[spec.tier],
+    currency: tierDefaults.currency,
+    color: tierDefaults.color,
+    baseCost: spec.baseCost ?? tierDefaults.baseCost,
+    costMultiplier: spec.costMultiplier ?? tierDefaults.costMultiplier,
+    essenceCost: spec.essenceCost ?? tierDefaults.essenceCost,
   };
 }
 

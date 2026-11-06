@@ -75,10 +75,13 @@ export interface SoldierStats {
   // Secondary Ability: Grenade stats
   grenadeUnlocked: boolean;
   grenadeBlocksRequired: number;
+  grenadeEnergyRequired: number;
   grenadeBlastRadius: number;
   grenadeDamage: number;
   grenadeShrapnel: number;
   grenadeBlightMult: number;
+  /** Autonomous secondary ability activation unlocked via Core upgrade */
+  autoAbility: boolean;
   // Money / Loot / Resources stats
   dropChance: number;
   magnetRange: number;
@@ -146,10 +149,12 @@ export function baseSoldierStats(): SoldierStats {
     katanaSlashWidth: KATANA.slashWidth,
     grenadeUnlocked: false,
     grenadeBlocksRequired: GRENADE.blocksRequired,
+    grenadeEnergyRequired: GRENADE.energyRequired,
     grenadeBlastRadius: GRENADE.blastRadiusCells,
     grenadeDamage: GRENADE.damage,
     grenadeShrapnel: GRENADE.shrapnelCount,
     grenadeBlightMult: GRENADE.blightMultiplier,
+    autoAbility: false,
     dropChance: LOOT.baseDropChance,
     magnetRange: LOOT.baseMagnetRange,
     pickupLifetime: LOOT.baseLifetime,
@@ -179,7 +184,13 @@ export class Soldier {
   speed: number;
   weapon: WeaponType;
   secondary: SecondaryWeaponType | null;
-  secondaryBlocksBroken = 0;
+  secondaryEnergy = 0;
+  get secondaryBlocksBroken(): number {
+    return Math.floor(this.secondaryEnergy);
+  }
+  set secondaryBlocksBroken(val: number) {
+    this.secondaryEnergy = val;
+  }
   behavior: SoldierBehavior;
   slotIndex: number;
   /** This soldier's own upgrade tree, on top of the squad's shared stats. */

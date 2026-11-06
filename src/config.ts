@@ -206,7 +206,9 @@ export const KATANA = {
 };
 
 export const GRENADE = {
-  /** Number of blocks broken required to activate. */
+  /** Energy requirement to activate sticky grenade. */
+  energyRequired: 90,
+  /** Number of blocks broken required to activate (legacy alias). */
   blocksRequired: 90,
   /** Thrown velocity in world units/sec. */
   throwSpeed: 190,
