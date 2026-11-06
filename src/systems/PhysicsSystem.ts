@@ -1,4 +1,5 @@
 import { SOLDIER } from "../config";
+import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import { DEG } from "../core/math";
 import type { Rng } from "../core/Rng";
 import type { Soldier } from "../entities/Soldier";
@@ -91,6 +92,69 @@ interface Contact {
 }
 
 const contact: Contact = { nx: 0, ny: 0, pen: 0 };
+const sightHit = makeRayHit();
+
+/**
+ * True if there is an unobstructed line of sight between (x1, y1) and (x2, y2).
+ * If the ray strikes a solid cell/subcell that is the target itself (e.g. targeting
+ * a wall block directly), it is considered in sight.
+ */
+export function hasLineOfSight(
+  world: PixelWorld,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+): boolean {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 1e-4) return true;
+
+  const ndx = dx / dist;
+  const ndy = dy / dist;
+  const ss = world.subCellSize;
+
+  let startX = x1;
+  let startY = y1;
+  if (world.subSolidAt(Math.floor(startX / ss), Math.floor(startY / ss))) {
+    startX += ndx * 0.5;
+    startY += ndy * 0.5;
+    if (world.subSolidAt(Math.floor(startX / ss), Math.floor(startY / ss))) {
+      return false;
+    }
+  }
+
+  const blocked = gridRaycast(
+    world.subSolidQuery,
+    ss,
+    startX,
+    startY,
+    ndx,
+    ndy,
+    dist,
+    sightHit,
+  );
+
+  if (!blocked) return true;
+
+  // If blocked, check if the hit occurred at the target point / cell
+  const targetSx = Math.floor(x2 / ss);
+  const targetSy = Math.floor(y2 / ss);
+  if (sightHit.cx === targetSx && sightHit.cy === targetSy) {
+    return true;
+  }
+  const cs = world.cellSize;
+  const targetCx = Math.floor(x2 / cs);
+  const targetCy = Math.floor(y2 / cs);
+  const hitCx = Math.floor(sightHit.cx / 2);
+  const hitCy = Math.floor(sightHit.cy / 2);
+  if (hitCx === targetCx && hitCy === targetCy) {
+    return true;
+  }
+
+  return false;
+}
 
 /** Find the deepest contact between the circle and solid cells / sub-pixels. Returns false if none. */
 function deepestContact(world: PixelWorld, x: number, y: number, r: number, out: Contact): boolean {
@@ -216,6 +280,7 @@ export interface PhysicsStats {
 
 export class PhysicsSystem {
   readonly stats: PhysicsStats = { relocations: 0, stuckEvents: 0 };
+  marker: { x: number; y: number } | null = null;
 
   constructor(
     private world: PixelWorld,
@@ -272,21 +337,47 @@ export class PhysicsSystem {
     const vn = s.vx * nx + s.vy * ny;
     if (vn >= 0) return false;
 
-    let vx = s.vx - 2 * vn * nx;
-    let vy = s.vy - 2 * vn * ny;
-    // Small random jitter to break axis-locked loops; keep it pointing away from the wall.
-    const a = this.rng.range(-SOLDIER.bounceJitterDeg, SOLDIER.bounceJitterDeg) * DEG;
-    const ca = Math.cos(a);
-    const sa = Math.sin(a);
-    const jx = vx * ca - vy * sa;
-    const jy = vx * sa + vy * ca;
-    if (jx * nx + jy * ny > 0) {
-      vx = jx;
-      vy = jy;
+    // If a tactical marker is active and within line of sight, bounce directly toward it!
+    let redirected = false;
+    if (this.marker && hasLineOfSight(this.world, s.x, s.y, this.marker.x, this.marker.y)) {
+      const toMx = this.marker.x - s.x;
+      const toMy = this.marker.y - s.y;
+      const dist = Math.hypot(toMx, toMy);
+      if (dist > 1e-4) {
+        let tdx = toMx / dist;
+        let tdy = toMy / dist;
+        // Keep velocity pointing away from or along the wall face to prevent re-entering collision
+        const dotN = tdx * nx + tdy * ny;
+        if (dotN <= 0.05) {
+          tdx += (0.05 - dotN) * nx;
+          tdy += (0.05 - dotN) * ny;
+          const tlen = Math.hypot(tdx, tdy) || 1;
+          tdx /= tlen;
+          tdy /= tlen;
+        }
+        s.vx = tdx * s.speed;
+        s.vy = tdy * s.speed;
+        redirected = true;
+      }
     }
-    const vlen = Math.hypot(vx, vy) || 1;
-    s.vx = (vx / vlen) * s.speed;
-    s.vy = (vy / vlen) * s.speed;
+
+    if (!redirected) {
+      let vx = s.vx - 2 * vn * nx;
+      let vy = s.vy - 2 * vn * ny;
+      // Small random jitter to break axis-locked loops; keep it pointing away from the wall.
+      const a = this.rng.range(-SOLDIER.bounceJitterDeg, SOLDIER.bounceJitterDeg) * DEG;
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      const jx = vx * ca - vy * sa;
+      const jy = vx * sa + vy * ca;
+      if (jx * nx + jy * ny > 0) {
+        vx = jx;
+        vy = jy;
+      }
+      const vlen = Math.hypot(vx, vy) || 1;
+      s.vx = (vx / vlen) * s.speed;
+      s.vy = (vy / vlen) * s.speed;
+    }
     return true;
   }
 

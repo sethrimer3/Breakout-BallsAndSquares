@@ -182,4 +182,21 @@ export class AudioSystem {
       osc.stop(start + 0.15);
     });
   }
+
+  /** Crisp high-tech radar ping when placing a tactical marker. */
+  playMarkerPing(): void {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(1046.5, t);
+    osc.frequency.exponentialRampToValueAtTime(1318.5, t + 0.08);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(this.vol(0.14), t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.13);
+  }
 }

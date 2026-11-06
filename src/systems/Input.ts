@@ -1,6 +1,7 @@
 /** Raw input state + event hooks. Game logic decides what inputs mean. */
 export interface InputHandlers {
   onPrimaryClick?(sx: number, sy: number): void;
+  onSecondaryClick?(sx: number, sy: number): void;
   onAimStart?(sx: number, sy: number): void;
   onAimMove?(sx: number, sy: number): void;
   onAimRelease?(startSx: number, startSy: number, endSx: number, endSy: number): void;
@@ -99,7 +100,7 @@ export class Input {
     this.downX = e.clientX;
     this.downY = e.clientY;
     if (e.button === 0) {
-      if (this.handlers.canPlace?.()) {
+      if (!e.shiftKey && this.handlers.canPlace?.()) {
         this.aiming = true;
         this.aimStartX = this.mouseX;
         this.aimStartY = this.mouseY;
@@ -228,6 +229,10 @@ export class Input {
       }
       this.panning = false;
     } else if (e.button === 1 || e.button === 2) {
+      if (e.button === 2 && this.panning && !this.movedPastSlop(e.clientX, e.clientY)) {
+        const rect = this.canvas.getBoundingClientRect();
+        this.handlers.onSecondaryClick?.(e.clientX - rect.left, e.clientY - rect.top);
+      }
       this.panning = false;
     }
   };

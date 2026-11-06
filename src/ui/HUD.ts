@@ -31,6 +31,7 @@ export class HUD {
   private helpStatusEl: HTMLDivElement;
   private touchBar: HTMLDivElement;
   private followBtn: HTMLButtonElement;
+  private markerBtn: HTMLButtonElement;
   private helpOpen = false;
   private lastUpdate = 0;
 

@@ -27,6 +27,13 @@ import { generateWorld } from "./world/WorldGenerator";
 
 export type Flash = MuzzleLight;
 
+/** Tactical marker for directing bouncing soldiers. */
+export interface Marker {
+  x: number;
+  y: number;
+  placedAt: number;
+}
+
 /** Brief highlight on a terrain cell (hit or destroy). */
 export interface CellFlash {
   cx: number;
@@ -66,6 +73,8 @@ export class Game {
   soldiers: Soldier[] = [];
   flashes: Flash[] = [];
   cellFlashes: CellFlash[] = [];
+  marker: Marker | null = null;
+  markerMode = false;
   reserves = 0;
   canDeploy = true;
   growthRate = 0;
@@ -142,7 +151,8 @@ export class Game {
       onAimRelease: (startSx, startSy, endSx, endSy) =>
         this.onAimRelease(startSx, startSy, endSx, endSy),
       onAimCancel: () => this.onAimCancel(),
-      onPrimaryClick: (sx, sy) => this.tryLaunch(sx, sy),
+      onPrimaryClick: (sx, sy) => this.onPrimaryClick(sx, sy),
+      onSecondaryClick: (sx, sy) => this.onPrimaryClick(sx, sy),
       onWheel: (sx, sy, dy) =>
         this.camera.zoomAt(sx, sy, dy < 0 ? CAMERA.wheelStep : 1 / CAMERA.wheelStep),
       onPinch: (sx, sy, factor) => this.camera.zoomAt(sx, sy, factor),
@@ -239,6 +249,8 @@ export class Game {
     this.bankedThisRun = false;
     this.aimState.active = false;
     this.aimState.isDragging = false;
+    this.clearMarker();
+    this.markerMode = false;
     this.camera.reset();
     this.camera.setViewport(this.canvas.clientWidth, this.canvas.clientHeight);
     this.hud.update(this, performance.now(), true);
@@ -339,8 +351,12 @@ export class Game {
         break;
       case "Escape":
         if (this.aimState.active) this.onAimCancel();
+        else if (this.marker) this.clearMarker();
         else if (this.resultsScreen.visible) this.startRun();
         else this.togglePauseMenu();
+        break;
+      case "KeyT":
+        this.toggleMarkerMode();
         break;
       case "KeyU":
         this.bankCurrentRun();
@@ -360,7 +376,7 @@ export class Game {
   }
 
   canPlaceSoldier(): boolean {
-    return !this.paused && !this.runOver && this.reserves > 0;
+    return !this.paused && !this.runOver && this.reserves > 0 && !this.markerMode;
   }
 
   onAimStart(sx: number, sy: number): void {
@@ -493,6 +509,44 @@ export class Game {
     ];
     const dir = CARDINAL[Math.floor(this.rng.range(0, 4))];
     this.deploySoldier(wx, wy, dir.dx, dir.dy);
+  }
+
+  onPrimaryClick(sx: number, sy: number): void {
+    if (this.paused || this.runOver) return;
+    const wx = this.camera.screenToWorldX(sx);
+    const wy = this.camera.screenToWorldY(sy);
+    this.setMarker(wx, wy);
+  }
+
+  setMarker(wx: number, wy: number): void {
+    if (this.paused || this.runOver) return;
+    const cs = this.world.cellSize;
+    const minX = cs;
+    const minY = cs;
+    const maxX = this.world.width * cs - cs;
+    const maxY = this.world.height * cs - cs;
+    const clampedX = Math.max(minX, Math.min(maxX, wx));
+    const clampedY = Math.max(minY, Math.min(maxY, wy));
+    this.marker = { x: clampedX, y: clampedY, placedAt: performance.now() };
+    this.physics.marker = this.marker;
+    this.audio.playMarkerPing();
+    for (let i = 0; i < 14; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(30, 90);
+      this.particles.spawn(PKind.Spark, clampedX, clampedY, Math.cos(a) * sp, Math.sin(a) * sp, 0.35, 1.5, 0x00ffff, 4);
+    }
+    this.hud.update(this, performance.now(), true);
+  }
+
+  clearMarker(): void {
+    this.marker = null;
+    this.physics.marker = null;
+    this.hud.update(this, performance.now(), true);
+  }
+
+  toggleMarkerMode(): void {
+    this.markerMode = !this.markerMode;
+    this.hud.update(this, performance.now(), true);
   }
 
   isWeaponUnlocked(w: Soldier["weapon"]): boolean {
