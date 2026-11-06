@@ -143,6 +143,14 @@ export const SOLDIER_UPGRADE_DEFS: readonly SoldierUpgradeDef[] = [
     valueAt: (l) => 10 * l, formatValue: health, delta: "+10 HP",
     apply: (m, l) => { m.healthBonus += 10 * l; },
   }),
+  node({
+    id: "s_dynamo", tier: 1, col: 1, row: 1, parent: null, maxLevel: 19,
+    baseCost: 50, costMultiplier: 1.15, essenceCost: 1,
+    name: "Kinetic Dynamo", shortDesc: "+0.1 secondary ability energy per block destroyed", icon: "crystal",
+    valueAt: (l) => Math.round((0.1 + 0.1 * l) * 10) / 10,
+    formatValue: (v) => `${v.toFixed(1)} / BLK`, delta: "+0.1 / BLK",
+    apply: (m, l) => { m.energyPerBlock = Math.round((0.1 + 0.1 * l) * 10) / 10; },
+  }),
 
   // Tier 2: orange crystals.
   node({

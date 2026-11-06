@@ -113,11 +113,11 @@ describe("Soldier upgrade trees", () => {
     const clean = sanitizeSaveData({
       greenCrystals: 7,
       essence: 11,
-      loadouts: [{ weapon: "pistol", behavior: "free", upgrades: { s_marksman: 3, s_rate: 999, nonsense: 2 } }],
+      loadouts: [{ weapon: "pistol", behavior: "free", upgrades: { s_marksman: 3, s_rate: 999, s_dynamo: 10, nonsense: 2 } }],
     });
     expect(clean.greenCrystals).toBe(7);
     expect(clean.essence).toBe(11);
-    expect(clean.loadouts[0].upgrades).toEqual({ s_marksman: 3, s_rate: 5 });
+    expect(clean.loadouts[0].upgrades).toEqual({ s_marksman: 3, s_rate: 5, s_dynamo: 10 });
     expect(clean.loadouts[1].upgrades).toEqual({});
     // A save from before these existed still loads.
     const old = sanitizeSaveData({ bank: 5, crystals: 6, loadouts: [{ weapon: "pistol", behavior: "free" }] });

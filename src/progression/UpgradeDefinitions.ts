@@ -40,6 +40,7 @@ export type UpgradeId =
   | "behavior_patrol"
   | "behavior_turns"
   | "behavior_sentry"
+  | "auto_ability"
   // Resources Matrix: Gold, Tier 2 Orange Crystals & Tier 3 Green Crystals
   | "drop_chance"
   | "multi_drop"
@@ -398,6 +399,27 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     formatDelta: () => "UNLOCK",
     apply: () => {},
     icon: "behaviorSentry",
+  },
+  {
+    id: "auto_ability",
+    branch: "core",
+    name: "Autonomous Primer",
+    shortDesc: "Automatically triggers secondary weapons as soon as full energy is charged",
+    color: "#52f296",
+    grid: { col: -1, row: 1 },
+    parent: "core_velocity",
+    maxLevel: 1,
+    currency: "greenCrystals",
+    baseCost: 5,
+    costMultiplier: 1,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "UNLOCKED" : "LOCKED"),
+    formatDelta: () => "UNLOCK",
+    apply: (s, lvl) => {
+      s.autoAbility = lvl > 0;
+    },
+    icon: "gear",
   },
 
   // =========================================================================
@@ -1455,7 +1477,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "grenade_charge",
     branch: "grenade",
     name: "Fast Primer",
-    shortDesc: "-8 blocks required to activate sticky grenade per level",
+    shortDesc: "-8 energy required to activate sticky grenade per level",
     color: "#38d6ff",
     grid: { col: 0, row: -1 },
     parent: "grenade_unlock",
@@ -1464,11 +1486,13 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     baseCost: 15,
     costMultiplier: 1.6,
     unlockLifetimePixels: 80,
-    valueAt: (lvl) => Math.max(30, GRENADE.blocksRequired - 8 * lvl),
-    formatValue: (v) => `${v} BLOCKS`,
-    formatDelta: () => "-8 BLOCKS",
+    valueAt: (lvl) => Math.max(30, GRENADE.energyRequired - 8 * lvl),
+    formatValue: (v) => `${v} ENERGY`,
+    formatDelta: () => "-8 ENERGY",
     apply: (s, lvl) => {
-      s.grenadeBlocksRequired = Math.max(30, GRENADE.blocksRequired - 8 * lvl);
+      const req = Math.max(30, GRENADE.energyRequired - 8 * lvl);
+      s.grenadeEnergyRequired = req;
+      s.grenadeBlocksRequired = req;
     },
     icon: "fireRate",
   },

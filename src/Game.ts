@@ -421,6 +421,9 @@ export class Game {
         this.toggleFormation("triangle");
         this.hud.update(this, performance.now(), true);
         break;
+      case "KeyG":
+        this.triggerReadySecondary();
+        break;
       case "KeyU":
         this.bankCurrentRun();
         this.openUpgrades();
@@ -923,11 +926,30 @@ export class Game {
   private checkSecondaryCharge(ownerId: number): void {
     if (ownerId <= 0) return;
     const soldier = this.soldiers.find((s) => s.id === ownerId && s.alive);
-    if (!soldier || soldier.secondary !== "grenade") return;
-    soldier.secondaryBlocksBroken++;
+    if (!soldier || !soldier.secondary) return;
+    const rate = soldier.mods?.energyPerBlock ?? 0.1;
+    soldier.secondaryEnergy += rate;
     const req = this.stats.grenadeBlocksRequired;
-    if (soldier.secondaryBlocksBroken >= req) {
-      soldier.secondaryBlocksBroken = 0;
+    if (soldier.secondaryEnergy >= req) {
+      if (this.stats.autoAbility) {
+        this.activateSecondary(soldier);
+      } else {
+        soldier.secondaryEnergy = req;
+      }
+    }
+  }
+
+  /**
+   * Activates a soldier's equipped secondary weapon if fully charged.
+   * Resets their accumulated energy to 0 and executes the weapon action.
+   */
+  activateSecondary(soldier: Soldier): boolean {
+    if (!soldier || !soldier.alive || !soldier.secondary) return false;
+    const req = this.stats.grenadeBlocksRequired;
+    if (soldier.secondaryEnergy < req) return false;
+    soldier.secondaryEnergy = 0;
+
+    if (soldier.secondary === "grenade") {
       this.combat.throwGrenade(
         soldier,
         this.stats.grenadeBlastRadius,
@@ -935,7 +957,19 @@ export class Game {
         this.stats.grenadeShrapnel,
         this.stats.grenadeBlightMult,
       );
+      return true;
     }
+    return false;
+  }
+
+  /** Triggers the first ready secondary ability among alive soldiers (e.g. from hotkey). */
+  triggerReadySecondary(): boolean {
+    const req = this.stats.grenadeBlocksRequired;
+    const ready = this.soldiers.find((s) => s.alive && s.secondary && s.secondaryEnergy >= req);
+    if (ready) {
+      return this.activateSecondary(ready);
+    }
+    return false;
   }
 
   private onGrenadeThrow(_s: Soldier, x: number, y: number, dx: number, dy: number): void {

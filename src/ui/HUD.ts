@@ -37,6 +37,8 @@ export class HUD {
   private autoMoveCheck: HTMLInputElement;
   private lineBtn: HTMLButtonElement;
   private triangleBtn: HTMLButtonElement;
+  private abilityBar: HTMLDivElement;
+  private abilityBtns = new Map<number, HTMLButtonElement>();
   private helpOpen = false;
   private lastUpdate = 0;
 
@@ -194,8 +196,10 @@ export class HUD {
         <div class="help-mouse"><b>RIGHT CLICK</b> Place bounce marker anytime (soldiers in sight bounce toward it)</div>
         <div class="help-mouse"><b>PRESS &amp; DRAG</b> Pull back to aim arrow; release to launch</div>
         <div class="help-mouse"><b>RIGHT DRAG / WHEEL</b> Pan camera around &amp; zoom in/out</div>
+        <div class="help-mouse"><b>G / TAP ABILITY</b> Activate ready secondary ability (Sticky Grenade)</div>
         <div class="help-mouse"><b>ESC</b> Clear marker / Pause menu</div>
         <div class="help-touch"><b>DUAL STICKS</b> Left stick to move, right stick to aim &amp; fire (Auto Move OFF)</div>
+        <div class="help-touch"><b>TAP ABILITY BUTTON</b> Activate ready secondary ability (bottom of screen)</div>
         <div class="help-touch"><b>TAP</b> Place soldier (in reserve) or bounce marker (during play)</div>
         <div class="help-touch"><b>DRAG &amp; RELEASE</b> Pull back to aim arrow; release to launch</div>
         <div class="help-touch"><b>TWO-FINGER PINCH/DRAG</b> Pan camera around &amp; zoom in/out</div>
@@ -213,11 +217,15 @@ export class HUD {
     `;
     this.helpStatusEl = this.helpPopoverEl.querySelector(".help-status") as HTMLDivElement;
 
+    this.abilityBar = document.createElement("div");
+    this.abilityBar.className = "hud-abilities hidden";
+
     this.root.append(
       bar,
       this.tacticalBar,
       this.launchBtn,
       this.touchBar,
+      this.abilityBar,
       this.statsEl,
       this.growthMeterEl,
       this.helpPopoverEl,
@@ -319,9 +327,70 @@ export class HUD {
 
     const grenadier = game.soldiers.find((x) => x.alive && x.secondary === "grenade");
     if (grenadier) {
-      statsHtml += `<div style="color: #ff9d3b"><b>NADE</b> ${grenadier.secondaryBlocksBroken}/${st.grenadeBlocksRequired}</div>`;
+      const rate = (grenadier.mods?.energyPerBlock ?? 0.1).toFixed(1);
+      statsHtml += `<div style="color: #ff9d3b"><b>NADE</b> ${grenadier.secondaryEnergy.toFixed(1)}/${st.grenadeBlocksRequired} (+${rate}/b)</div>`;
     }
     this.statsEl.innerHTML = statsHtml;
+
+    // Ability buttons at the bottom of the screen
+    const equipped = game.soldiers.filter((x) => x.alive && x.secondary);
+    if (equipped.length === 0 || game.runOver) {
+      this.abilityBar.classList.add("hidden");
+    } else {
+      this.abilityBar.classList.remove("hidden");
+      const req = st.grenadeBlocksRequired;
+      const currentIds = new Set(equipped.map((x) => x.id));
+
+      for (const [id, btn] of this.abilityBtns) {
+        if (!currentIds.has(id)) {
+          btn.remove();
+          this.abilityBtns.delete(id);
+        }
+      }
+
+      for (const soldier of equipped) {
+        let btn = this.abilityBtns.get(soldier.id);
+        if (!btn) {
+          btn = document.createElement("button");
+          btn.className = "hud-ability-btn";
+          btn.dataset.soldierId = String(soldier.id);
+          btn.innerHTML = `
+            <svg class="ability-outline-svg" viewBox="0 0 48 48">
+              <path class="ability-outline-bg" d="M 24 1 L 39 1 L 47 9 L 47 39 L 39 47 L 9 47 L 1 39 L 1 9 L 9 1 Z" />
+              <path class="ability-outline-fg" d="M 24 1 L 39 1 L 47 9 L 47 39 L 39 47 L 9 47 L 1 39 L 1 9 L 9 1 Z" />
+            </svg>
+            <div class="ability-icon-wrap">${sprite(soldier.secondary!, { color: UI_COLORS.crystal, scale: 2 })}</div>
+            <div class="ability-badge">S${soldier.slotIndex + 1}</div>
+            <div class="ability-val"></div>
+          `;
+          btn.addEventListener("click", () => {
+            game.activateSecondary(soldier);
+            this.update(game, performance.now(), true);
+          });
+          this.abilityBar.append(btn);
+          this.abilityBtns.set(soldier.id, btn);
+        }
+
+        const pct = Math.max(0, Math.min(1, soldier.secondaryEnergy / req));
+        const isReady = pct >= 1;
+        btn.classList.toggle("ready", isReady);
+        btn.classList.toggle("not-ready", !isReady);
+        btn.title = isReady
+          ? `Secondary Ready: Tap to activate (Hotkey: G)`
+          : `Secondary Charging: ${soldier.secondaryEnergy.toFixed(1)} / ${req} Energy`;
+
+        const fgPath = btn.querySelector(".ability-outline-fg") as SVGPathElement | null;
+        if (fgPath) {
+          const perimeter = 165.25;
+          fgPath.style.strokeDasharray = `${perimeter}`;
+          fgPath.style.strokeDashoffset = `${perimeter * (1 - pct)}`;
+        }
+        const valEl = btn.querySelector(".ability-val") as HTMLElement | null;
+        if (valEl) {
+          valEl.textContent = isReady ? "READY" : `${Math.floor(soldier.secondaryEnergy)}/${req}`;
+        }
+      }
+    }
 
     if (this.helpOpen) {
       let status = "";

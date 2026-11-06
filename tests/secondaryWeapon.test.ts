@@ -4,6 +4,10 @@ import { Rng } from "../src/core/Rng";
 import { Soldier, baseSoldierStats } from "../src/entities/Soldier";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import {
+  SOLDIER_UPGRADE_BY_ID,
+  soldierModsFor,
+} from "../src/progression/SoldierUpgrades";
+import {
   UPGRADE_BY_ID,
   UPGRADE_DEFS,
 } from "../src/progression/UpgradeDefinitions";
@@ -212,5 +216,68 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
       soldier.secondaryBlocksBroken = 0;
     }
     expect(soldier.secondaryBlocksBroken).toBe(0);
+  });
+
+  it("Calculates energy accumulation at base rate (0.1/block) reaching 10% outline at 90 blocks", () => {
+    const soldier = new Soldier(50, 50, 1, 0, 100, "pistol", "free", 0, "grenade");
+    expect(soldier.mods.energyPerBlock).toBe(0.1);
+    expect(soldier.secondaryEnergy).toBe(0);
+
+    // Simulate breaking 90 blocks at 0.1 energy per block
+    for (let i = 0; i < 90; i++) {
+      soldier.secondaryEnergy += soldier.mods.energyPerBlock;
+    }
+    // Float rounding
+    soldier.secondaryEnergy = Math.round(soldier.secondaryEnergy * 10) / 10;
+    expect(soldier.secondaryEnergy).toBe(9.0);
+
+    const req = 90;
+    const pct = soldier.secondaryEnergy / req;
+    expect(pct).toBe(0.10); // 10% full as specified in prompt example
+  });
+
+  it("Soldier-specific Kinetic Dynamo upgrade in individual tree increases energy production up to 2.0 max", () => {
+    const dynamoDef = SOLDIER_UPGRADE_BY_ID.s_dynamo;
+    expect(dynamoDef).toBeDefined();
+    expect(dynamoDef.tier).toBe(1);
+    expect(dynamoDef.maxLevel).toBe(19);
+
+    // Base mods (level 0)
+    const baseMods = soldierModsFor({});
+    expect(baseMods.energyPerBlock).toBe(0.1);
+
+    // Level 1: 0.2
+    const modsL1 = soldierModsFor({ s_dynamo: 1 });
+    expect(modsL1.energyPerBlock).toBe(0.2);
+
+    // Level 9: 1.0
+    const modsL9 = soldierModsFor({ s_dynamo: 9 });
+    expect(modsL9.energyPerBlock).toBe(1.0);
+
+    // Level 19: 2.0 max
+    const modsMax = soldierModsFor({ s_dynamo: 19 });
+    expect(modsMax.energyPerBlock).toBe(2.0);
+
+    // At 2.0 energy per block, breaking 45 blocks produces 90 energy (100% full)
+    const soldier = new Soldier(50, 50, 1, 0, 100, "pistol", "free", 0, "grenade");
+    soldier.mods = modsMax;
+    for (let i = 0; i < 45; i++) {
+      soldier.secondaryEnergy += soldier.mods.energyPerBlock;
+    }
+    expect(soldier.secondaryEnergy).toBe(90);
+  });
+
+  it("Core Autonomous Primer upgrade costs green crystals and gates automatic activation", () => {
+    const autoDef = UPGRADE_BY_ID.auto_ability;
+    expect(autoDef).toBeDefined();
+    expect(autoDef.branch).toBe("core");
+    expect(autoDef.currency).toBe("greenCrystals");
+    expect(autoDef.maxLevel).toBe(1);
+
+    const stats = baseSoldierStats();
+    expect(stats.autoAbility).toBe(false);
+
+    autoDef.apply(stats, 1);
+    expect(stats.autoAbility).toBe(true);
   });
 });

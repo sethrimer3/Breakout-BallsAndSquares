@@ -2,6 +2,7 @@ import { LootKind } from "../entities/LootSystem";
 import { ESSENCE_FPS, ESSENCE_SIZE, essenceFrame, essencePixels, paintPixels } from "./blightEssence";
 import { ART_PIXEL, BULLET, COLORS, GROWTH, SOLDIER } from "../config";
 import type { Bullet } from "../entities/Bullet";
+import type { Soldier } from "../entities/Soldier";
 import { PKind } from "../entities/ParticleSystem";
 import type { Game } from "../Game";
 import { hasLineOfSight } from "../systems/PhysicsSystem";
@@ -303,6 +304,9 @@ export class Renderer {
       // The ring marks the soldier the camera is following (auto or Tab-selected).
       const selected = cam.following && cam.targetId === s.id;
       this.drawSoldierSprite(selected ? this.sprites.soldierSelected : this.sprites.soldier, sx, sy);
+      if (s.secondary) {
+        this.drawSoldierEnergyOutline(s, sx, sy);
+      }
       const br = SOLDIER.renderRadius * cam.zoom;
 
       if (s === game.getCommander()) {
@@ -333,6 +337,114 @@ export class Renderer {
         ctx.fillRect(barX, barY, barW * pct, barH);
       }
     }
+  }
+
+  /**
+   * 1-pixel-thick golden outline around the soldier sprite orthogonally (with cut corners).
+   * Starts at 12 o'clock (top/north) and fills clockwise proportional to secondary energy.
+   * Brightest at the leading tip, leaving a trail of dimmer gold behind.
+   */
+  private drawSoldierEnergyOutline(s: Soldier, sx: number, sy: number): void {
+    const req = this.game.stats.grenadeBlocksRequired;
+    if (req <= 0) return;
+    const pct = Math.max(0, Math.min(1, s.secondaryEnergy / req));
+    if (pct <= 0) return;
+
+    const { ctx } = this;
+    const cam = this.game.camera;
+    const br = Math.max(4, SOLDIER.renderRadius * cam.zoom);
+    // Extent of the cut-corner outline around the soldier's sprite:
+    const R = Math.round(br + Math.max(2.5, 3.5 * cam.zoom));
+    const C = Math.max(2, Math.round(R * 0.35));
+
+    const diag = C * Math.SQRT2;
+    const flatHalf = R - C;
+    const flatFull = 2 * (R - C);
+
+    const segLens = [flatHalf, diag, flatFull, diag, flatFull, diag, flatFull, diag, flatHalf];
+    const segPoints: [number, number, number, number][] = [
+      [0, -R, flatHalf, -R],
+      [flatHalf, -R, R, -flatHalf],
+      [R, -flatHalf, R, flatHalf],
+      [R, flatHalf, flatHalf, R],
+      [flatHalf, R, -flatHalf, R],
+      [-flatHalf, R, -R, flatHalf],
+      [-R, flatHalf, -R, -flatHalf],
+      [-R, -flatHalf, -flatHalf, -R],
+      [-flatHalf, -R, 0, -R],
+    ];
+
+    let totalPerimeter = 0;
+    for (let i = 0; i < 9; i++) totalPerimeter += segLens[i];
+
+    const targetDist = pct * totalPerimeter;
+
+    ctx.save();
+    ctx.lineWidth = 1;
+
+    // Faint dark-gold background guide track so the player sees the outline shape
+    ctx.strokeStyle = "rgba(180, 140, 20, 0.2)";
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - R);
+    for (let i = 0; i < 9; i++) {
+      ctx.lineTo(sx + segPoints[i][2], sy + segPoints[i][3]);
+    }
+    ctx.stroke();
+
+    const getPointAtDist = (d: number): [number, number] => {
+      let cur = d;
+      for (let i = 0; i < 9; i++) {
+        const len = segLens[i];
+        if (cur <= len || i === 8) {
+          const frac = len > 0 ? Math.max(0, Math.min(1, cur / len)) : 0;
+          const [x0, y0, x1, y1] = segPoints[i];
+          return [x0 + (x1 - x0) * frac, y0 + (y1 - y0) * frac];
+        }
+        cur -= len;
+      }
+      return [0, -R];
+    };
+
+    // Render trail with fading gradient from dim gold at origin to brightest gold at the tip
+    const numSteps = Math.max(12, Math.min(54, Math.ceil(targetDist * 0.9)));
+    const stepDist = targetDist / numSteps;
+
+    for (let i = 0; i < numSteps; i++) {
+      const d0 = i * stepDist;
+      const d1 = (i + 1) * stepDist;
+      const [x0, y0] = getPointAtDist(d0);
+      const [x1, y1] = getPointAtDist(d1);
+
+      // u goes from 0 (at 12 o'clock) to 1.0 (at leading tip)
+      const u = (i + 1) / numSteps;
+
+      if (pct >= 1) {
+        // Complete ring pulses with brilliant ready glow
+        const shimmer = 0.8 + 0.2 * Math.sin(performance.now() * 0.008 + u * Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 225, 90, ${shimmer})`;
+      } else {
+        const alpha = 0.25 + 0.75 * Math.pow(u, 1.4);
+        if (u > 0.92) {
+          ctx.strokeStyle = `rgba(255, 255, 220, ${alpha})`;
+        } else if (u > 0.55) {
+          ctx.strokeStyle = `rgba(255, 216, 77, ${alpha})`;
+        } else {
+          ctx.strokeStyle = `rgba(218, 165, 32, ${alpha * 0.75})`;
+        }
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(sx + x0, sy + y0);
+      ctx.lineTo(sx + x1, sy + y1);
+      ctx.stroke();
+    }
+
+    // Bright spark at the leading tip
+    const [tipX, tipY] = getPointAtDist(targetDist);
+    ctx.fillStyle = pct >= 1 ? "#fffef0" : "#ffffff";
+    ctx.fillRect(Math.round(sx + tipX - 0.5), Math.round(sy + tipY - 0.5), 1.5, 1.5);
+
+    ctx.restore();
   }
 
   /** Bright outward-facing muzzle core flare along the firing vector. */
