@@ -32,6 +32,9 @@
 * {
   box-sizing: border-box;
   user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
   border-radius: 0;
 }
 
@@ -42,6 +45,11 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
+  /* No pull-to-refresh, rubber-banding or double-tap zoom on touch screens. */
+  overscroll-behavior: none;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   background: var(--bg-0);
   color: var(--text);
   font-family: "Silkscreen", "Press Start 2P", "Courier New", monospace;
@@ -114,11 +122,17 @@ button {
   position: fixed;
   inset: 0;
   cursor: crosshair;
+  /* The game handles every touch itself (tap, drag-pan, pinch-zoom). */
+  touch-action: none;
 }
 
+/* Keep the HUD clear of notches and home indicators (viewport-fit=cover). */
 #ui {
   position: fixed;
-  inset: 0;
+  top: env(safe-area-inset-top, 0px);
+  right: env(safe-area-inset-right, 0px);
+  bottom: env(safe-area-inset-bottom, 0px);
+  left: env(safe-area-inset-left, 0px);
   pointer-events: none;
 }
 
@@ -129,7 +143,10 @@ button {
   right: 0;
   margin: 0 auto;
   width: fit-content;
+  max-width: calc(100% - 16px);
   display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   background: var(--bg-1);
 }
 
@@ -387,8 +404,11 @@ button {
   display: flex;
   align-items: safe center;
   justify-content: safe center;
-  padding: 8px;
+  padding: max(8px, env(safe-area-inset-top, 0px)) max(8px, env(safe-area-inset-right, 0px))
+    max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   background: rgba(3, 5, 11, 0.8);
   z-index: 20;
 }
@@ -740,8 +760,12 @@ button {
 .tree-overlay {
   background: rgba(3, 8, 14, 0.88);
 }
+.tree-fit-box {
+  flex: none;
+}
 .tree-shell {
   position: relative;
+  transform-origin: 0 0;
   flex: none;
   width: 820px;
   padding: 16px 26px 16px;
@@ -1219,4 +1243,159 @@ button {
   display: flex;
   gap: 10px;
   justify-content: center;
+}
+
+/* ------------------------------------------------------------------ touch */
+
+/* On-screen stand-ins for keyboard shortcuts (pause, camera follow). */
+.hud-touch {
+  display: none;
+  position: absolute;
+  left: 16px;
+  top: 0;
+  bottom: 0;
+  margin: auto 0;
+  height: fit-content;
+  flex-direction: column;
+  gap: 14px;
+}
+.hud-touch-btn {
+  --fc: var(--line);
+  pointer-events: auto;
+  cursor: pointer;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-1);
+  box-shadow:
+    0 calc(-1 * var(--px2)) 0 0 var(--fc),
+    0 var(--px2) 0 0 var(--fc),
+    calc(-1 * var(--px2)) 0 0 0 var(--fc),
+    var(--px2) 0 0 0 var(--fc);
+}
+.hud-touch-btn:active {
+  background: var(--bg-2);
+}
+.hud-touch-btn.active {
+  --fc: var(--cyan);
+}
+
+.help-touch {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .hud-touch {
+    display: flex;
+  }
+  .help-touch {
+    display: block;
+  }
+  .help-mouse,
+  .help-keys,
+  .kbd {
+    display: none;
+  }
+  /* Bigger thumb targets. */
+  .hud-help-btn {
+    width: 44px;
+    height: 44px;
+  }
+  .hud-help-popover {
+    bottom: 70px;
+  }
+  .hud-launch-btn {
+    padding: 12px 14px;
+  }
+  .btn {
+    padding: 12px 18px;
+  }
+  .tree-close {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+/* -------------------------------------------------------------- small screens */
+
+@media (max-width: 700px), (max-height: 500px) {
+  .hud-bar {
+    top: 6px;
+  }
+  .hud-item {
+    min-width: 0;
+    padding: 4px 6px;
+    gap: 2px;
+  }
+  .hud-stats {
+    display: none;
+  }
+  .growth-meter {
+    bottom: 8px;
+    width: min(440px, calc(100% - 140px));
+    padding: 6px 8px;
+  }
+  .gm-title {
+    display: none;
+  }
+  .hud-help-btn {
+    right: 10px;
+    bottom: 8px;
+  }
+  .hud-help-popover {
+    right: 10px;
+    bottom: 64px;
+    max-width: calc(100% - 20px);
+    max-height: calc(100% - 140px);
+    overflow-y: auto;
+  }
+  .hud-launch-btn {
+    right: 10px;
+  }
+  .hud-touch {
+    left: 10px;
+  }
+  .panel,
+  .settings-panel {
+    min-width: 0;
+    width: 100%;
+    max-width: 480px;
+    padding: 18px 14px;
+  }
+  .brand-title {
+    font-size: var(--f24);
+    letter-spacing: 3px;
+  }
+  .res-row {
+    gap: 8px;
+  }
+  .res-best {
+    min-width: 0;
+  }
+  .set-row {
+    flex-wrap: wrap;
+  }
+  .pause-cog-btn {
+    left: 10px;
+    bottom: 10px;
+  }
+}
+
+/* Short landscape phones: the HUD bar sits in one tight row. */
+@media (max-height: 500px) {
+  .hud-label {
+    font-size: var(--f8);
+  }
+  .hud-value {
+    font-size: var(--f8);
+  }
+  .hud-touch {
+    gap: 8px;
+  }
+  .hud-touch-btn {
+    width: 40px;
+    height: 40px;
+  }
 }

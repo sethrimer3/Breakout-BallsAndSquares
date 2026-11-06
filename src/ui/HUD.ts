@@ -29,6 +29,8 @@ export class HUD {
   private helpBtn: HTMLButtonElement;
   private helpPopoverEl: HTMLDivElement;
   private helpStatusEl: HTMLDivElement;
+  private touchBar: HTMLDivElement;
+  private followBtn: HTMLButtonElement;
   private helpOpen = false;
   private lastUpdate = 0;
 
@@ -70,6 +72,26 @@ export class HUD {
     this.launchCountEl = this.launchBtn.querySelector(".launch-count") as HTMLSpanElement;
     this.launchBtn.addEventListener("click", () => this.game.launchInRandomDirection());
 
+    // On-screen stand-ins for keyboard shortcuts, shown on touch screens only (see CSS).
+    this.touchBar = document.createElement("div");
+    this.touchBar.className = "hud-touch";
+    const pauseBtn = document.createElement("button");
+    pauseBtn.className = "hud-touch-btn";
+    pauseBtn.title = "Pause / Menu";
+    pauseBtn.innerHTML = sprite("pause", { color: UI_COLORS.white, scale: 3 });
+    pauseBtn.addEventListener("click", () => this.game.togglePauseMenu(true));
+    this.followBtn = document.createElement("button");
+    this.followBtn.className = "hud-touch-btn";
+    this.followBtn.title = "Follow soldiers (tap again to cycle)";
+    this.followBtn.innerHTML = sprite("follow", { color: UI_COLORS.soldier, scale: 3 });
+    this.followBtn.addEventListener("click", () => {
+      const cam = this.game.camera;
+      if (cam.following) cam.cycleTarget(this.game.soldiers);
+      else cam.resumeAuto();
+      this.update(this.game, performance.now(), true);
+    });
+    this.touchBar.append(pauseBtn, this.followBtn);
+
     this.statsEl = document.createElement("div");
     this.statsEl.className = "hud-stats";
 
@@ -108,13 +130,17 @@ export class HUD {
       <div class="help-title">HOW TO PLAY &amp; CONTROLS</div>
       <div class="help-status"></div>
       <div class="help-list">
-        <div><b>LEFT CLICK</b> Aim &amp; launch reserve soldier</div>
-        <div><b>DRAG / WHEEL</b> Pan camera around &amp; zoom in/out</div>
+        <div class="help-mouse"><b>LEFT CLICK</b> Aim &amp; launch reserve soldier</div>
+        <div class="help-mouse"><b>DRAG / WHEEL</b> Pan camera around &amp; zoom in/out</div>
+        <div class="help-touch"><b>TAP</b> Aim &amp; launch reserve soldier (hold to preview aim)</div>
+        <div class="help-touch"><b>DRAG / PINCH</b> Pan camera around &amp; zoom in/out</div>
+        <div class="help-touch"><b>${sprite("follow", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Follow farthest soldier, tap again to cycle</div>
+        <div class="help-touch"><b>${sprite("pause", { color: UI_COLORS.white, scale: 1 })} BUTTON</b> Pause, restart, upgrades &amp; settings</div>
         <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}; Zone 2 unlocks glowing orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}. Soldiers must touch them to collect!</div>
-        <div><b>F / TAB</b> Follow farthest / Cycle soldiers</div>
-        <div><b>U</b> Open Upgrade Matrix</div>
-        <div><b>SPACE / ESC</b> Pause / Menu (&amp; Settings ${sprite("gear", { color: UI_COLORS.soldier, scale: 1 })})</div>
-        <div><b>R</b> Quick restart run</div>
+        <div class="help-keys"><b>F / TAB</b> Follow farthest / Cycle soldiers</div>
+        <div class="help-keys"><b>U</b> Open Upgrade Matrix</div>
+        <div class="help-keys"><b>SPACE / ESC</b> Pause / Menu (&amp; Settings ${sprite("gear", { color: UI_COLORS.soldier, scale: 1 })})</div>
+        <div class="help-keys"><b>R</b> Quick restart run</div>
       </div>
     `;
     this.helpStatusEl = this.helpPopoverEl.querySelector(".help-status") as HTMLDivElement;
@@ -122,6 +148,7 @@ export class HUD {
     this.root.append(
       bar,
       this.launchBtn,
+      this.touchBar,
       this.statsEl,
       this.growthMeterEl,
       this.helpPopoverEl,
@@ -195,6 +222,8 @@ export class HUD {
       this.launchBtn.classList.add("hidden");
     }
 
+    this.followBtn.classList.toggle("active", game.camera.following);
+
     const st = game.stats;
     this.statsEl.innerHTML =
       `<div><b>SPD</b> ${st.speed.toFixed(0)}</div>` +
@@ -206,9 +235,9 @@ export class HUD {
 
     if (this.helpOpen) {
       let status = "";
-      if (game.paused && !game.runOver) status = "PAUSED — Press Space to resume";
+      if (game.paused && !game.runOver) status = "PAUSED — Press Space or Esc to resume";
       else if (game.reserves > 0 && game.canDeploy)
-        status = `Click arena to aim & launch soldier (${game.reserves} in reserve)`;
+        status = `Click / tap arena to aim & launch soldier (${game.reserves} in reserve)`;
       else if (game.reserves > 0) status = "Spawn room overrun — cannot deploy";
       else status = "Soldiers autonomous — pan camera to explore!";
       this.helpStatusEl.textContent = status;
