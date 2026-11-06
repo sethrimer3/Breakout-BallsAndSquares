@@ -389,7 +389,6 @@ export class Renderer {
         this.drawSlash(b);
         continue;
       }
-
       const maxTracer = isSniper ? BULLET.tracerLength * 2.4 : isRocket ? BULLET.tracerLength * 2 : BULLET.tracerLength;
       const tLen = Math.min(maxTracer, b.traveled);
 
