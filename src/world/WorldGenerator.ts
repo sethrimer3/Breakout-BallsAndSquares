@@ -142,6 +142,7 @@ export function generateWorld(world: PixelWorld, seed: number): void {
       const row = y * width;
       for (let x = x0; x <= x1; x++) {
         const i = row + x;
+        if (world.coreId[i] > 0) continue;
         if (wall[i] === 0) {
           health[i] = 0;
           world.blight[i] = 0;
@@ -174,6 +175,16 @@ export function generateWorld(world: PixelWorld, seed: number): void {
           }
         }
       }
+    }
+  }
+
+  // Ensure Blight Cores are always solid living cells with full core health
+  for (const core of world.blightCores) {
+    for (const idx of core.cells) {
+      const cx = idx % width;
+      const cy = Math.floor(idx / width);
+      health[idx] = world.maxHealthAt(cx, cy);
+      world.blight[idx] = 1;
     }
   }
 

@@ -43,20 +43,54 @@ function floodFromStart(w: PixelWorld): Uint8Array {
 }
 
 describe("lab details", () => {
-  it("is cosmetic: solid cells stay solid with the health their material sets", () => {
+  it("keeps solid cells at max health and carves empty rooms and hallways with ~50% fill", () => {
     for (const seed of SEEDS) {
       const w = world(seed);
-      for (let cy = 0; cy < w.height; cy += 3) {
-        for (let cx = 0; cx < w.width; cx += 3) {
+      // Spawn room is empty
+      for (let cy = w.roomY0; cy <= w.roomY1; cy++) {
+        for (let cx = w.roomX0; cx <= w.roomX1; cx++) {
           const i = cy * w.width + cx;
-          if (cx >= w.roomX0 && cx <= w.roomX1 && cy >= w.roomY0 && cy <= w.roomY1) {
-            expect(w.health[i]).toBe(0);
-            expect(w.decor[i]).toBe(DECOR.none);
-          } else {
-            expect(w.health[i]).toBe(w.maxHealthAt(cx, cy));
+          expect(w.health[i]).toBe(0);
+          expect(w.decor[i]).toBe(DECOR.none);
+        }
+      }
+      // Any cell with health > 0 has its material's max health
+      for (let i = 0; i < w.health.length; i += 7) {
+        if (w.health[i] > 0) {
+          const cx = i % w.width;
+          const cy = Math.floor(i / w.width);
+          expect(w.health[i]).toBe(w.maxHealthAt(cx, cy));
+        }
+      }
+      // Overrun rooms (blight generator rooms) are empty (except 2x2 core cells)
+      const overrunRooms = w.labLayout!.rooms.filter((r) => r.overrun);
+      expect(overrunRooms.length).toBeGreaterThan(0);
+      for (const r of overrunRooms) {
+        expect(r.filled).toBe(false);
+        for (let ry = r.y; ry < r.y + r.size; ry++) {
+          for (let rx = r.x; rx < r.x + r.size; rx++) {
+            const idx = ry * w.width + rx;
+            if (w.coreId[idx] > 0) {
+              expect(w.health[idx]).toBeGreaterThan(0);
+            } else if (w.wall[idx] === 0) {
+              expect(w.health[idx]).toBe(0);
+            }
           }
         }
       }
+      // Non-overrun rooms have ~50% chance to be full of pixels
+      const normalRooms = w.labLayout!.rooms.filter((r) => !r.overrun);
+      const filledNormalRooms = normalRooms.filter((r) => r.filled).length;
+      const roomRatio = filledNormalRooms / normalRooms.length;
+      expect(roomRatio).toBeGreaterThan(0.2);
+      expect(roomRatio).toBeLessThan(0.8);
+
+      // Hallways have ~50% chance to be full of pixels
+      const corridors = w.labLayout!.corridors;
+      const filledCorridors = corridors.filter((c) => c.filled).length;
+      const corridorRatio = filledCorridors / corridors.length;
+      expect(corridorRatio).toBeGreaterThan(0.2);
+      expect(corridorRatio).toBeLessThan(0.8);
     }
   });
 
@@ -180,7 +214,20 @@ describe("lab details", () => {
     const cy = Math.floor(target / w.width);
     w.health[target] = 0;
     const g = new GrowthSystem(w, new Rng(5));
-    g.frontier.rebuildFull();
+    g.frontier.clear();
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ]) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      if (w.inBounds(nx, ny)) {
+        w.health[ny * w.width + nx] = w.maxHealthAt(nx, ny);
+        g.frontier.refresh(nx, ny);
+      }
+    }
     let guard = 0;
     while (w.health[target] === 0 && guard++ < 100) g.replicateOne(0, []);
     expect(w.solidAt(cx, cy)).toBe(true);
