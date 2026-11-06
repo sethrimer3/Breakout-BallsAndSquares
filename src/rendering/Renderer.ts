@@ -73,25 +73,7 @@ export class Renderer {
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
     this.drawCellFlashes();
 
-    const aim = game.aimOrigin();
-    if (aim && game.input.mouseInside) {
-      const sx = cam.worldToScreenX(aim.x);
-      const sy = cam.worldToScreenY(aim.y);
-      ctx.save();
-      ctx.strokeStyle = COLORS.aim;
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([5, 5]);
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.lineTo(game.input.mouseX, game.input.mouseY);
-      ctx.stroke();
-      ctx.restore();
-      const gr = SOLDIER.renderRadius * cam.zoom;
-      ctx.strokeStyle = COLORS.aim;
-      ctx.beginPath();
-      ctx.arc(sx, sy, gr, 0, Math.PI * 2);
-      ctx.stroke();
-    }
+    this.drawAimIndicator();
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -400,5 +382,160 @@ export class Renderer {
       }
     }
     ctx.globalAlpha = 1;
+  }
+
+  private drawAimIndicator(): void {
+    const { ctx, game } = this;
+    const cam = game.camera;
+
+    if (game.aimState.active) {
+      // The player is pressing and may be dragging to aim
+      const sx = cam.worldToScreenX(game.aimState.startWx);
+      const sy = cam.worldToScreenY(game.aimState.startWy);
+      const gr = SOLDIER.glowRadius * cam.zoom;
+      const br = SOLDIER.renderRadius * cam.zoom;
+
+      // Draw ghost soldier at placement origin
+      ctx.drawImage(this.sprites.soldierGlow, sx - gr, sy - gr, gr * 2, gr * 2);
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.drawImage(this.sprites.soldier, sx - br, sy - br, br * 2, br * 2);
+      ctx.restore();
+
+      // Outer targeting ring
+      ctx.save();
+      ctx.strokeStyle = "#9ff3ff";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(sx, sy, br + 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
+      if (game.aimState.isDragging) {
+        // Player is dragging: show the arrow facing the opposite direction of drag
+        const curSx = game.aimState.curSx;
+        const curSy = game.aimState.curSy;
+        const dragDx = curSx - sx;
+        const dragDy = curSy - sy;
+        const dragDist = Math.hypot(dragDx, dragDy);
+
+        if (dragDist > 1e-3) {
+          // Opposite direction: away from where pointer is / away from drag
+          const aimDx = -dragDx / dragDist;
+          const aimDy = -dragDy / dragDist;
+
+          // 1) Pull-back slingshot tether (elastic dotted line to cursor)
+          ctx.save();
+          ctx.strokeStyle = "rgba(160, 230, 255, 0.45)";
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([4, 4]);
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(curSx, curSy);
+          ctx.stroke();
+
+          // Small tether handle at pointer
+          ctx.fillStyle = "rgba(160, 230, 255, 0.75)";
+          ctx.beginPath();
+          ctx.arc(curSx, curSy, 4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          // 2) Arrow facing OPPOSITE direction (away from cursor / where player let go)
+          const arrowLen = Math.min(100, Math.max(35, dragDist * 0.85));
+          const startDist = br + 3;
+          const startX = sx + aimDx * startDist;
+          const startY = sy + aimDy * startDist;
+          const tipX = sx + aimDx * (startDist + arrowLen);
+          const tipY = sy + aimDy * (startDist + arrowLen);
+
+          // Arrow shaft with glow
+          ctx.save();
+          // Glow layer
+          ctx.strokeStyle = "rgba(0, 229, 255, 0.4)";
+          ctx.lineWidth = 6;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(tipX, tipY);
+          ctx.stroke();
+
+          // Core shaft
+          ctx.strokeStyle = "#9ff3ff";
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          ctx.lineTo(tipX, tipY);
+          ctx.stroke();
+
+          // Arrowhead pointing forward
+          const headLen = 14;
+          const headWidth = 11;
+          const nx = -aimDy; // normal vector
+          const ny = aimDx;
+          const baseMidX = tipX - aimDx * headLen;
+          const baseMidY = tipY - aimDy * headLen;
+          const c1X = baseMidX + nx * (headWidth / 2);
+          const c1Y = baseMidY + ny * (headWidth / 2);
+          const c2X = baseMidX - nx * (headWidth / 2);
+          const c2Y = baseMidY - ny * (headWidth / 2);
+          const notchX = tipX - aimDx * (headLen * 0.7);
+          const notchY = tipY - aimDy * (headLen * 0.7);
+
+          ctx.fillStyle = "#ffffff";
+          ctx.shadowColor = "#00e5ff";
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.moveTo(tipX, tipY);
+          ctx.lineTo(c1X, c1Y);
+          ctx.lineTo(notchX, notchY);
+          ctx.lineTo(c2X, c2Y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+      } else {
+        // Active click/press before drag threshold: show 4 cardinal direction hints (straight up, right, down, left)
+        ctx.save();
+        ctx.strokeStyle = "rgba(160, 230, 255, 0.6)";
+        ctx.lineWidth = 2;
+        const tickDist = br + 4;
+        const tickLen = 6;
+        // Up
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - tickDist);
+        ctx.lineTo(sx, sy - tickDist - tickLen);
+        // Right
+        ctx.moveTo(sx + tickDist, sy);
+        ctx.lineTo(sx + tickDist + tickLen, sy);
+        // Down
+        ctx.moveTo(sx, sy + tickDist);
+        ctx.lineTo(sx, sy + tickDist + tickLen);
+        // Left
+        ctx.moveTo(sx - tickDist, sy);
+        ctx.lineTo(sx - tickDist - tickLen, sy);
+        ctx.stroke();
+        ctx.restore();
+      }
+    } else if (game.input.mouseInside && game.canPlaceSoldier()) {
+      // Hovering with mouse while soldiers are in reserve: show placement cursor reticle
+      const sx = game.input.mouseX;
+      const sy = game.input.mouseY;
+      const br = SOLDIER.renderRadius * cam.zoom;
+      ctx.save();
+      ctx.strokeStyle = "rgba(160, 230, 255, 0.45)";
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.arc(sx, sy, br, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Subtle center dot
+      ctx.fillStyle = "rgba(160, 230, 255, 0.6)";
+      ctx.beginPath();
+      ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 }

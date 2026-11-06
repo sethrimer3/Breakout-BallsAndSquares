@@ -71,6 +71,16 @@ export class Game {
   growthRate = 0;
   paused = false;
   runOver = false;
+  aimState = {
+    active: false,
+    startSx: 0,
+    startSy: 0,
+    curSx: 0,
+    curSy: 0,
+    startWx: 0,
+    startWy: 0,
+    isDragging: false,
+  };
   private bankedThisRun = false;
   onUpgradePurchased?: () => void;
   timeScale = 1;
@@ -125,6 +135,13 @@ export class Game {
     this.resultsScreen = new ResultsScreen(uiRoot, this);
     this.upgradeTree = new UpgradeTree(uiRoot, this);
     this.input = new Input(canvas, {
+      canPlace: () => this.canPlaceSoldier(),
+      onAimStart: (sx, sy) => this.onAimStart(sx, sy),
+      onAimMove: (sx, sy) => this.onAimMove(sx, sy),
+      onAimClick: (sx, sy) => this.onAimClick(sx, sy),
+      onAimRelease: (startSx, startSy, endSx, endSy) =>
+        this.onAimRelease(startSx, startSy, endSx, endSy),
+      onAimCancel: () => this.onAimCancel(),
       onPrimaryClick: (sx, sy) => this.tryLaunch(sx, sy),
       onWheel: (sx, sy, dy) =>
         this.camera.zoomAt(sx, sy, dy < 0 ? CAMERA.wheelStep : 1 / CAMERA.wheelStep),
@@ -220,6 +237,8 @@ export class Game {
     this.paused = false;
     this.runOver = false;
     this.bankedThisRun = false;
+    this.aimState.active = false;
+    this.aimState.isDragging = false;
     this.camera.reset();
     this.camera.setViewport(this.canvas.clientWidth, this.canvas.clientHeight);
     this.hud.update(this, performance.now(), true);
@@ -254,6 +273,8 @@ export class Game {
 
   togglePauseMenu(show?: boolean): void {
     if (this.runOver || this.upgradeTree.visible || this.mainMenu.visible) return;
+    this.aimState.active = false;
+    this.aimState.isDragging = false;
     const next = show ?? !this.pauseMenu.visible;
     if (next) {
       this.paused = true;
@@ -266,6 +287,8 @@ export class Game {
   }
 
   openUpgrades(): void {
+    this.aimState.active = false;
+    this.aimState.isDragging = false;
     this.pauseMenu.hide();
     this.resultsScreen.hide();
     this.mainMenu.hide();
@@ -275,6 +298,8 @@ export class Game {
   }
 
   openMainMenu(): void {
+    this.aimState.active = false;
+    this.aimState.isDragging = false;
     this.bankCurrentRun();
     this.pauseMenu.hide();
     this.resultsScreen.hide();
@@ -313,7 +338,8 @@ export class Game {
         if (!this.runOver && !this.pauseMenu.visible) this.paused = !this.paused;
         break;
       case "Escape":
-        if (this.resultsScreen.visible) this.startRun();
+        if (this.aimState.active) this.onAimCancel();
+        else if (this.resultsScreen.visible) this.startRun();
         else this.togglePauseMenu();
         break;
       case "KeyU":
@@ -333,35 +359,97 @@ export class Game {
     this.hud.update(this, performance.now(), true);
   }
 
-  launchInRandomDirection(): void {
-    const spawn = findSpawnPoint(this.world, SOLDIER.collisionRadius);
-    if (!spawn) return;
-    const a = this.rng.range(0, Math.PI * 2);
-    const sx = this.camera.worldToScreenX(spawn.x + Math.cos(a) * 40);
-    const sy = this.camera.worldToScreenY(spawn.y + Math.sin(a) * 40);
-    this.tryLaunch(sx, sy);
+  canPlaceSoldier(): boolean {
+    return !this.paused && !this.runOver && this.reserves > 0;
   }
 
-  /** Launch a reserve soldier from the spawn point toward a screen position. */
-  tryLaunch(sx: number, sy: number): void {
-    if (this.paused || this.runOver || this.reserves <= 0) return;
-    const spawn = findSpawnPoint(this.world, SOLDIER.collisionRadius);
-    if (!spawn) {
-      this.canDeploy = false;
-      return;
+  onAimStart(sx: number, sy: number): void {
+    if (!this.canPlaceSoldier()) return;
+    this.aimState.active = true;
+    this.aimState.startSx = sx;
+    this.aimState.startSy = sy;
+    this.aimState.curSx = sx;
+    this.aimState.curSy = sy;
+    this.aimState.startWx = this.camera.screenToWorldX(sx);
+    this.aimState.startWy = this.camera.screenToWorldY(sy);
+    this.aimState.isDragging = false;
+  }
+
+  onAimMove(sx: number, sy: number): void {
+    if (!this.aimState.active) return;
+    this.aimState.curSx = sx;
+    this.aimState.curSy = sy;
+    const dist = Math.hypot(sx - this.aimState.startSx, sy - this.aimState.startSy);
+    if (dist >= 6) {
+      this.aimState.isDragging = true;
     }
-    const wx = this.camera.screenToWorldX(sx);
-    const wy = this.camera.screenToWorldY(sy);
-    let dx = wx - spawn.x;
-    let dy = wy - spawn.y;
-    if (Math.hypot(dx, dy) < 1e-3) {
-      dx = 1;
-      dy = 0.3;
+  }
+
+  onAimClick(_sx: number, _sy: number): void {
+    if (!this.aimState.active) return;
+    const wx = this.aimState.startWx;
+    const wy = this.aimState.startWy;
+    this.aimState.active = false;
+    this.aimState.isDragging = false;
+
+    // Click and let go: send in a random direction (straight up, right, left, down)
+    const CARDINAL = [
+      { dx: 0, dy: -1 }, // straight up
+      { dx: 1, dy: 0 },  // right
+      { dx: 0, dy: 1 },  // down
+      { dx: -1, dy: 0 }, // left
+    ];
+    const dir = CARDINAL[Math.floor(this.rng.range(0, 4))];
+    this.deploySoldier(wx, wy, dir.dx, dir.dy);
+  }
+
+  onAimRelease(startSx: number, startSy: number, endSx: number, endSy: number): void {
+    if (!this.aimState.active) return;
+    const wx = this.aimState.startWx;
+    const wy = this.aimState.startWy;
+    this.aimState.active = false;
+    this.aimState.isDragging = false;
+
+    // Soldier will go away from where the player let go (endSx, endSy).
+    // Vector from end to start points away from release:
+    const dx = startSx - endSx;
+    const dy = startSy - endSy;
+    this.deploySoldier(wx, wy, dx, dy);
+  }
+
+  onAimCancel(): void {
+    this.aimState.active = false;
+    this.aimState.isDragging = false;
+  }
+
+  /** Deploy a reserve soldier at world coordinates (wx, wy) with direction (dx, dy). */
+  deploySoldier(wx: number, wy: number, dx: number, dy: number): Soldier | null {
+    if (this.paused || this.runOver || this.reserves <= 0) return null;
+
+    const cs = this.world.cellSize;
+    const r = SOLDIER.collisionRadius;
+    const minX = r;
+    const minY = r;
+    const maxX = this.world.width * cs - r;
+    const maxY = this.world.height * cs - r;
+    const clampedX = Math.max(minX, Math.min(maxX, wx));
+    const clampedY = Math.max(minY, Math.min(maxY, wy));
+
+    const len = Math.hypot(dx, dy);
+    let ndx = dx;
+    let ndy = dy;
+    if (len < 1e-4) {
+      ndx = 0;
+      ndy = -1; // straight up default
+    } else {
+      ndx /= len;
+      ndy /= len;
     }
+
     const slotIdx = this.runStats.soldiersDeployed;
     const rawWeapon = this.save.data.loadouts[slotIdx]?.weapon ?? "pistol";
     const weapon = this.isWeaponUnlocked(rawWeapon) ? rawWeapon : "pistol";
-    const s = new Soldier(spawn.x, spawn.y, dx, dy, this.stats.speed, weapon);
+    const s = new Soldier(clampedX, clampedY, ndx, ndy, this.stats.speed, weapon);
     s.maxHealth = this.stats.soldierHealth;
     s.health = this.stats.soldierHealth;
     this.soldiers.push(s);
@@ -371,8 +459,40 @@ export class Game {
     for (let i = 0; i < 14; i++) {
       const a = this.rng.range(0, Math.PI * 2);
       const sp = this.rng.range(20, 70);
-      this.particles.spawn(PKind.Spark, spawn.x, spawn.y, Math.cos(a) * sp, Math.sin(a) * sp, 0.35, 1, 0x9ff3ff, 5);
+      this.particles.spawn(PKind.Spark, clampedX, clampedY, Math.cos(a) * sp, Math.sin(a) * sp, 0.35, 1, 0x9ff3ff, 5);
     }
+    return s;
+  }
+
+  launchInRandomDirection(): void {
+    if (this.reserves <= 0 || this.paused || this.runOver) return;
+    const spawn = findSpawnPoint(this.world, SOLDIER.collisionRadius) ?? {
+      x: this.camera.x,
+      y: this.camera.y,
+    };
+    const CARDINAL = [
+      { dx: 0, dy: -1 },
+      { dx: 1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: -1, dy: 0 },
+    ];
+    const dir = CARDINAL[Math.floor(this.rng.range(0, 4))];
+    this.deploySoldier(spawn.x, spawn.y, dir.dx, dir.dy);
+  }
+
+  /** Launch a reserve soldier toward screen position in a random cardinal direction or directly. */
+  tryLaunch(sx: number, sy: number): void {
+    if (this.paused || this.runOver || this.reserves <= 0) return;
+    const wx = this.camera.screenToWorldX(sx);
+    const wy = this.camera.screenToWorldY(sy);
+    const CARDINAL = [
+      { dx: 0, dy: -1 },
+      { dx: 1, dy: 0 },
+      { dx: 0, dy: 1 },
+      { dx: -1, dy: 0 },
+    ];
+    const dir = CARDINAL[Math.floor(this.rng.range(0, 4))];
+    this.deploySoldier(wx, wy, dir.dx, dir.dy);
   }
 
   isWeaponUnlocked(w: Soldier["weapon"]): boolean {
@@ -652,13 +772,12 @@ export class Game {
       if ((this.cellFlashes[i].life -= dt) <= 0) this.cellFlashes.splice(i, 1);
     }
     if (this.cellFlashes.length > 512) this.cellFlashes.splice(0, this.cellFlashes.length - 512);
-    this.canDeploy = findSpawnPoint(this.world, SOLDIER.collisionRadius) !== null;
+    this.canDeploy = this.reserves > 0;
 
-    // Run ends once at least one soldier has been deployed (or the room is
-    // overrun) and no living or deployable soldiers remain.
+    // Run ends once at least one soldier has been deployed and no living or deployable soldiers remain.
     const alive = this.soldiers.some((s) => s.alive);
     const canStillDeploy = this.reserves > 0 && this.canDeploy;
-    if (!alive && !canStillDeploy && (this.runStats.soldiersDeployed > 0 || !this.canDeploy)) {
+    if (!alive && !canStillDeploy && this.runStats.soldiersDeployed > 0) {
       this.endRun();
     }
   }
@@ -752,7 +871,9 @@ export class Game {
         steps++;
       }
       if (steps >= maxSteps) this.acc = 0;
-      this.camera.update(real, this.soldiers);
+      if (!this.aimState.active) {
+        this.camera.update(real, this.soldiers);
+      }
     }
     const t1 = performance.now();
     this.updateFlashPolygons();

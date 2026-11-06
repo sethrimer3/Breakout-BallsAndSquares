@@ -130,10 +130,12 @@ export class HUD {
       <div class="help-title">HOW TO PLAY &amp; CONTROLS</div>
       <div class="help-status"></div>
       <div class="help-list">
-        <div class="help-mouse"><b>LEFT CLICK</b> Aim &amp; launch reserve soldier</div>
-        <div class="help-mouse"><b>DRAG / WHEEL</b> Pan camera around &amp; zoom in/out</div>
-        <div class="help-touch"><b>TAP</b> Aim &amp; launch reserve soldier (hold to preview aim)</div>
-        <div class="help-touch"><b>DRAG / PINCH</b> Pan camera around &amp; zoom in/out</div>
+        <div class="help-mouse"><b>CLICK &amp; LET GO</b> Place soldier anywhere in random direction</div>
+        <div class="help-mouse"><b>PRESS &amp; DRAG</b> Pull back to aim arrow; release to launch</div>
+        <div class="help-mouse"><b>RIGHT DRAG / WHEEL</b> Pan camera around &amp; zoom in/out</div>
+        <div class="help-touch"><b>TAP</b> Place soldier anywhere in random direction</div>
+        <div class="help-touch"><b>DRAG &amp; RELEASE</b> Pull back to aim arrow; release to launch</div>
+        <div class="help-touch"><b>TWO-FINGER PINCH/DRAG</b> Pan camera around &amp; zoom in/out</div>
         <div class="help-touch"><b>${sprite("follow", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Follow farthest soldier, tap again to cycle</div>
         <div class="help-touch"><b>${sprite("pause", { color: UI_COLORS.white, scale: 1 })} BUTTON</b> Pause, restart, upgrades &amp; settings</div>
         <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}; Zone 2 unlocks glowing orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}. Soldiers must touch them to collect!</div>
@@ -237,8 +239,8 @@ export class HUD {
       let status = "";
       if (game.paused && !game.runOver) status = "PAUSED — Press Space or Esc to resume";
       else if (game.reserves > 0 && game.canDeploy)
-        status = `Click / tap arena to aim & launch soldier (${game.reserves} in reserve)`;
-      else if (game.reserves > 0) status = "Spawn room overrun — cannot deploy";
+        status = `Click to place (random dir) or drag to aim (${game.reserves} in reserve)`;
+      else if (game.reserves > 0) status = "Cannot deploy";
       else status = "Soldiers autonomous — pan camera to explore!";
       this.helpStatusEl.textContent = status;
     }

@@ -1,6 +1,12 @@
 /** Raw input state + event hooks. Game logic decides what inputs mean. */
 export interface InputHandlers {
   onPrimaryClick?(sx: number, sy: number): void;
+  onAimStart?(sx: number, sy: number): void;
+  onAimMove?(sx: number, sy: number): void;
+  onAimRelease?(startSx: number, startSy: number, endSx: number, endSy: number): void;
+  onAimClick?(sx: number, sy: number): void;
+  onAimCancel?(): void;
+  canPlace?(): boolean;
   onWheel?(sx: number, sy: number, deltaY: number): void;
   /** Continuous zoom about a canvas point (two-finger pinch). */
   onPinch?(sx: number, sy: number, factor: number): void;
@@ -23,6 +29,12 @@ export class Input {
   mouseY = 0;
   /** True while the aim preview should follow the pointer (hovering mouse, or a finger held still). */
   mouseInside = false;
+  private aiming = false;
+  private aimStartX = 0;
+  private aimStartY = 0;
+  private aimCurX = 0;
+  private aimCurY = 0;
+  private aimDragging = false;
   private panning = false;
   private lastX = 0;
   private lastY = 0;
@@ -70,6 +82,10 @@ export class Input {
       this.touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
       if (this.touches.size >= 2) {
         // Second finger: switch from pan/tap to pinch.
+        if (this.aiming) {
+          this.aiming = false;
+          this.handlers.onAimCancel?.();
+        }
         this.multiTouch = true;
         this.panning = false;
         this.mouseInside = false;
@@ -82,11 +98,28 @@ export class Input {
     this.downType = e.pointerType;
     this.downX = e.clientX;
     this.downY = e.clientY;
-    if (e.button === 0 || e.button === 1 || e.button === 2) {
+    if (e.button === 0) {
+      if (this.handlers.canPlace?.()) {
+        this.aiming = true;
+        this.aimStartX = this.mouseX;
+        this.aimStartY = this.mouseY;
+        this.aimCurX = this.mouseX;
+        this.aimCurY = this.mouseY;
+        this.aimDragging = false;
+        this.panning = false;
+        this.handlers.onAimStart?.(this.mouseX, this.mouseY);
+      } else {
+        this.aiming = false;
+        this.panning = true;
+        this.lastX = e.clientX;
+        this.lastY = e.clientY;
+      }
+    } else if (e.button === 1 || e.button === 2) {
+      this.aiming = false;
       this.panning = true;
       this.lastX = e.clientX;
       this.lastY = e.clientY;
-      if (e.button !== 0) e.preventDefault();
+      e.preventDefault();
     }
   };
 
@@ -114,7 +147,15 @@ export class Input {
     const rect = this.canvas.getBoundingClientRect();
     this.mouseX = e.clientX - rect.left;
     this.mouseY = e.clientY - rect.top;
-    if (this.panning) {
+    if (this.aiming) {
+      this.aimCurX = this.mouseX;
+      this.aimCurY = this.mouseY;
+      const slop = this.downType === "mouse" ? CLICK_SLOP_MOUSE : CLICK_SLOP_TOUCH;
+      if (Math.abs(this.aimCurX - this.aimStartX) + Math.abs(this.aimCurY - this.aimStartY) > slop) {
+        this.aimDragging = true;
+      }
+      this.handlers.onAimMove?.(this.aimCurX, this.aimCurY);
+    } else if (this.panning) {
       const dx = e.clientX - this.lastX;
       const dy = e.clientY - this.lastY;
       this.lastX = e.clientX;
@@ -169,7 +210,18 @@ export class Input {
       return;
     }
 
-    if (e.button === 0) {
+    if (this.aiming) {
+      this.aiming = false;
+      const endX = this.mouseX;
+      const endY = this.mouseY;
+      const slop = this.downType === "mouse" ? CLICK_SLOP_MOUSE : CLICK_SLOP_TOUCH;
+      const moved = Math.abs(endX - this.aimStartX) + Math.abs(endY - this.aimStartY) > slop;
+      if (this.aimDragging || moved) {
+        this.handlers.onAimRelease?.(this.aimStartX, this.aimStartY, endX, endY);
+      } else {
+        this.handlers.onAimClick?.(this.aimStartX, this.aimStartY);
+      }
+    } else if (e.button === 0) {
       if (this.panning && !this.movedPastSlop(e.clientX, e.clientY)) {
         const rect = this.canvas.getBoundingClientRect();
         this.handlers.onPrimaryClick?.(e.clientX - rect.left, e.clientY - rect.top);
@@ -183,6 +235,10 @@ export class Input {
   /** The browser took the gesture over (system swipe, call, etc.): drop it without a tap. */
   private onCancel = (e: PointerEvent): void => {
     this.touches.delete(e.pointerId);
+    if (this.aiming) {
+      this.aiming = false;
+      this.handlers.onAimCancel?.();
+    }
     if (this.touches.size === 0) {
       this.multiTouch = false;
       this.panning = false;
