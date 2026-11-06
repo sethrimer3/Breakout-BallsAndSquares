@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { GRENADE, WORLD } from "../src/config";
+import { GRENADE, TURRET, WORLD } from "../src/config";
 import { Rng } from "../src/core/Rng";
 import { Soldier, baseSoldierStats } from "../src/entities/Soldier";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
@@ -114,7 +114,7 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
       "sniper_rifle",
       "katana",
     ]);
-    expect(secondaryCat.branches).toEqual(["grenade"]);
+    expect(secondaryCat.branches).toEqual(["grenade", "turret"]);
   });
 
   it("Persists secondary weapon loadout in SaveManager and resets to null if locked", () => {
@@ -279,5 +279,138 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
 
     autoDef.apply(stats, 1);
     expect(stats.autoAbility).toBe(true);
+  });
+
+  it("Turret upgrade tree definitions exist and fit at 100% zoom", () => {
+    const turretDefs = UPGRADE_DEFS.filter((d) => d.branch === "turret");
+    expect(turretDefs.length).toBe(5);
+
+    const homes = turretDefs.map((d) => nodePos(d.grid.col, d.grid.row));
+    homes.push(nodePos(0, 0));
+    const b = treeBounds(homes);
+    const v = fitView(b);
+    expect(v.s).toBe(1);
+
+    const centerNode = turretDefs.find((d) => d.id === "turret_unlock");
+    expect(centerNode).toBeDefined();
+    expect(centerNode!.grid).toEqual({ col: 0, row: 0 });
+
+    const quantityNode = UPGRADE_BY_ID.turret_quantity;
+    expect(quantityNode).toBeDefined();
+    expect(quantityNode.maxLevel).toBe(4);
+    expect(quantityNode.currency).toBe("crystals");
+    // Costs orange crystals and 5 essence per level
+    expect(quantityNode.essenceCost).toBe(5);
+  });
+
+  it("Gates Turret child upgrades behind center unlock node and lifetime pixels", () => {
+    const store = new MemStorage();
+    const save = new SaveManager(store);
+    const mgr = new UpgradeManager(save);
+
+    // Lifetime pixels 0 -> unlock node locked
+    expect(mgr.canBuy("turret_unlock")).toBe(false);
+
+    // Add lifetime pixels to unlock center node
+    save.data.lifetimePixels = 60000;
+    save.data.bank = 10000;
+    save.data.crystals = 10000;
+    save.data.essence = 1000;
+    expect(mgr.isUnlocked("turret_unlock")).toBe(true);
+    expect(mgr.canBuy("turret_unlock")).toBe(true);
+
+    // Child nodes should be locked before turret_unlock is purchased
+    expect(mgr.isUnlocked("turret_damage")).toBe(false);
+    expect(mgr.isUnlocked("turret_quantity")).toBe(false);
+
+    // Purchase center unlock node
+    expect(mgr.buy("turret_unlock")).toBe(true);
+
+    // Child nodes now unlocked
+    expect(mgr.isUnlocked("turret_damage")).toBe(true);
+    expect(mgr.isUnlocked("turret_quantity")).toBe(true);
+  });
+
+  it("Persists turret secondary weapon in SaveManager and resets to null if locked", () => {
+    const store = new MemStorage();
+    const save = new SaveManager(store);
+
+    // Try equipping turret when locked -> resets to null
+    save.data.loadouts[0].secondary = "turret";
+    save.save();
+
+    const save2 = new SaveManager(store);
+    expect(save2.data.loadouts[0].secondary).toBeNull();
+
+    // Now unlock turret in save2
+    save2.data.upgrades.turret_unlock = 1;
+    save2.data.loadouts[0].secondary = "turret";
+    save2.save();
+
+    const save3 = new SaveManager(store);
+    expect(save3.data.loadouts[0].secondary).toBe("turret");
+  });
+
+  it("Deploys 2 temporary autoturrets requiring 150 energy, scaling to 3, 4, 5, 6 with expensive upgrades", () => {
+    const stats = baseSoldierStats();
+    expect(stats.turretEnergyRequired).toBe(150);
+    expect(stats.turretCount).toBe(2);
+
+    // Test upgrade scaling: 3, 4, 5, 6
+    const qtyDef = UPGRADE_BY_ID.turret_quantity;
+    qtyDef.apply(stats, 1);
+    expect(stats.turretCount).toBe(3);
+    qtyDef.apply(stats, 2);
+    expect(stats.turretCount).toBe(4);
+    qtyDef.apply(stats, 3);
+    expect(stats.turretCount).toBe(5);
+    qtyDef.apply(stats, 4);
+    expect(stats.turretCount).toBe(6);
+
+    const w = new PixelWorld(WORLD);
+    generateWorld(w, 54321);
+    const rng = new Rng(54321);
+
+    const combat = new CombatSystem(w, rng, stats);
+    const soldier = new Soldier(w.roomCenterX, w.roomCenterY, 1, 0, 100, "pistol", "free", 0, "turret");
+
+    // Deploy 2 base turrets
+    const deployed2 = combat.deployTurrets(soldier, 2, stats.turretDamage, stats.turretFireRate, stats.turretTurnSpeed);
+    expect(deployed2.length).toBe(2);
+    expect(deployed2[0].active).toBe(true);
+    expect(deployed2[0].maxLife).toBe(TURRET.lifetime);
+    expect(deployed2[0].ownerId).toBe(soldier.id);
+
+    // Clear and test deploying 6 upgraded turrets
+    combat.turrets.clear();
+    const deployed6 = combat.deployTurrets(soldier, 6, stats.turretDamage, stats.turretFireRate, stats.turretTurnSpeed);
+    expect(deployed6.length).toBe(6);
+  });
+
+  it("Autoturret tracks closest block within range, swivels toward it, and fires", () => {
+    const w = new PixelWorld(WORLD);
+    generateWorld(w, 11111);
+    const rng = new Rng(11111);
+    const stats = baseSoldierStats();
+
+    let shotsFired = 0;
+    const combat = new CombatSystem(w, rng, stats, {
+      onShot: (_s, _dx, _dy, _mx, _my) => {
+        shotsFired++;
+      },
+    });
+
+    const soldier = new Soldier(w.roomCenterX, w.roomCenterY, 0, -1, 100, "pistol", "free", 0, "turret");
+    const turrets = combat.deployTurrets(soldier, 2, stats.turretDamage, stats.turretFireRate, stats.turretTurnSpeed);
+    expect(turrets.length).toBe(2);
+
+    // Step simulation for a few frames: autoturrets should acquire closest block, swivel, and fire bullets
+    for (let frame = 0; frame < 60; frame++) {
+      combat.updateTurrets(0.016);
+      combat.updateBullets(0.016);
+    }
+
+    expect(shotsFired).toBeGreaterThan(0);
+    expect(turrets[0].hasTarget).toBe(true);
   });
 });

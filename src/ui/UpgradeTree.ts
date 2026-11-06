@@ -1248,7 +1248,8 @@ export class UpgradeTree {
       this.activeTab === "rocket_launcher" ||
       this.activeTab === "sniper_rifle" ||
       this.activeTab === "katana" ||
-      this.activeTab === "grenade";
+      this.activeTab === "grenade" ||
+      this.activeTab === "turret";
     this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);
     if (!hasCenterUnlockNode) {
       const hubSpec = TAB_ICONS[this.activeTab];

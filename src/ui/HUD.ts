@@ -330,6 +330,11 @@ export class HUD {
       const rate = (grenadier.mods?.energyPerBlock ?? 0.1).toFixed(1);
       statsHtml += `<div style="color: #ff9d3b"><b>NADE</b> ${grenadier.secondaryEnergy.toFixed(1)}/${st.grenadeBlocksRequired} (+${rate}/b)</div>`;
     }
+    const turretier = game.soldiers.find((x) => x.alive && x.secondary === "turret");
+    if (turretier) {
+      const rate = (turretier.mods?.energyPerBlock ?? 0.1).toFixed(1);
+      statsHtml += `<div style="color: #38d6ff"><b>TURRET</b> ${turretier.secondaryEnergy.toFixed(1)}/${st.turretEnergyRequired} (+${rate}/b)</div>`;
+    }
     this.statsEl.innerHTML = statsHtml;
 
     // Ability buttons at the bottom of the screen
@@ -338,7 +343,6 @@ export class HUD {
       this.abilityBar.classList.add("hidden");
     } else {
       this.abilityBar.classList.remove("hidden");
-      const req = st.grenadeBlocksRequired;
       const currentIds = new Set(equipped.map((x) => x.id));
 
       for (const [id, btn] of this.abilityBtns) {
@@ -349,6 +353,7 @@ export class HUD {
       }
 
       for (const soldier of equipped) {
+        const req = game.getSecondaryEnergyRequired(soldier.secondary);
         let btn = this.abilityBtns.get(soldier.id);
         if (!btn) {
           btn = document.createElement("button");
