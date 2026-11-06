@@ -414,7 +414,7 @@ export class Renderer {
       // The player is pressing and may be dragging to aim
       const sx = cam.worldToScreenX(game.aimState.startWx);
       const sy = cam.worldToScreenY(game.aimState.startWy);
-      const gr = SOLDIER.glowRadius * cam.zoom;
+      const gr = SOLDIER.ringRadius * cam.zoom;
       const br = SOLDIER.renderRadius * cam.zoom;
 
       // Draw ghost soldier at placement origin
