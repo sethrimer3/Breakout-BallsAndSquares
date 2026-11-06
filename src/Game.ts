@@ -174,7 +174,7 @@ export class Game {
     });
     window.addEventListener("resize", () => this.resize());
     this.resize();
-    this.startRun();
+    this.openMainMenu();
   }
 
   get bank(): number {
@@ -332,6 +332,14 @@ export class Game {
     this.hud.update(this, performance.now(), true);
   }
 
+  selectSaveSlot(slot: number): void {
+    this.save.selectSlot(slot);
+    this.upgrades = new UpgradeManager(this.save);
+    this.applyUpgrades();
+    this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
+    this.autoMove = this.save.data.settings.autoMove;
+  }
+
   openMainMenu(): void {
     this.aimState.active = false;
     this.aimState.isDragging = false;
@@ -359,6 +367,12 @@ export class Game {
         this.startRun();
       } else if (code === "KeyU") {
         this.openUpgrades();
+      } else if (code === "Digit1" || code === "Numpad1") {
+        this.mainMenu.selectSlot(1);
+      } else if (code === "Digit2" || code === "Numpad2") {
+        this.mainMenu.selectSlot(2);
+      } else if (code === "Digit3" || code === "Numpad3") {
+        this.mainMenu.selectSlot(3);
       }
       return;
     }

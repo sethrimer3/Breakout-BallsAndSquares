@@ -4,6 +4,13 @@ import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
 
 export const SAVE_KEY = "breach.save.v1";
 export const SAVE_VERSION = 1;
+export const SAVE_SLOTS_COUNT = 3;
+export const ACTIVE_SLOT_KEY = "breach.active_slot.v1";
+
+export function getSlotKey(slot: number): string {
+  if (slot <= 1) return SAVE_KEY;
+  return `breach.save.v1.slot.${slot}`;
+}
 
 export type SoldierBehavior =
   | "free"
@@ -86,6 +93,7 @@ export interface SaveData {
     autoMove: boolean;
     alwaysShootWhenAutoMoveOff: boolean;
   };
+  lastSaved?: number;
 }
 
 export function defaultSaveData(): SaveData {
@@ -209,6 +217,10 @@ export function sanitizeSaveData(raw: unknown): SaveData {
       typeof s.alwaysShootWhenAutoMoveOff === "boolean" ? s.alwaysShootWhenAutoMoveOff : false;
   }
 
+  if (typeof obj.lastSaved === "number" && Number.isFinite(obj.lastSaved)) {
+    def.lastSaved = obj.lastSaved;
+  }
+
   return def;
 }
 
@@ -218,37 +230,167 @@ export interface StorageLike {
   removeItem?(key: string): void;
 }
 
+export interface SlotSummary {
+  slot: number;
+  exists: boolean;
+  bank: number;
+  crystals: number;
+  lifetimePixels: number;
+  upgradesCount: number;
+  bestDepth: number;
+  bestTime: number;
+  lastSaved?: number;
+}
+
 export class SaveManager {
   data: SaveData;
+  activeSlot: number;
 
   constructor(private storage: StorageLike | null = typeof localStorage !== "undefined" ? localStorage : null) {
-    this.data = this.load();
+    this.activeSlot = this.readActiveSlot();
+    this.data = this.loadSlot(this.activeSlot);
   }
 
-  load(): SaveData {
+  private readActiveSlot(): number {
+    if (!this.storage) return 1;
+    try {
+      const raw = this.storage.getItem(ACTIVE_SLOT_KEY);
+      if (!raw) return 1;
+      const parsed = parseInt(raw, 10);
+      return parsed >= 1 && parsed <= SAVE_SLOTS_COUNT ? parsed : 1;
+    } catch {
+      return 1;
+    }
+  }
+
+  getSlotKey(slot: number): string {
+    return getSlotKey(slot);
+  }
+
+  slotExists(slot: number): boolean {
+    if (!this.storage) return false;
+    try {
+      const raw = this.storage.getItem(this.getSlotKey(slot));
+      return raw !== null && raw.trim() !== "";
+    } catch {
+      return false;
+    }
+  }
+
+  loadSlot(slot: number): SaveData {
     if (!this.storage) return defaultSaveData();
     try {
-      const raw = this.storage.getItem(SAVE_KEY);
-      if (!raw) return defaultSaveData();
+      const raw = this.storage.getItem(this.getSlotKey(slot));
+      if (!raw || raw.trim() === "") return defaultSaveData();
       const parsed = JSON.parse(raw);
       return sanitizeSaveData(parsed);
     } catch (err) {
-      console.warn("BREACH: corrupted save data, resetting to defaults.", err);
+      console.warn(`BREACH: corrupted save data in slot ${slot}, resetting to defaults.`, err);
       return defaultSaveData();
     }
   }
 
-  save(): void {
+  load(): SaveData {
+    return this.loadSlot(this.activeSlot);
+  }
+
+  peekSlot(slot: number): SaveData | null {
+    if (!this.slotExists(slot)) return null;
+    return this.loadSlot(slot);
+  }
+
+  selectSlot(slot: number): void {
+    if (slot < 1 || slot > SAVE_SLOTS_COUNT) slot = 1;
+    this.activeSlot = slot;
+    if (this.storage) {
+      try {
+        this.storage.setItem(ACTIVE_SLOT_KEY, String(slot));
+      } catch {
+        // ignore
+      }
+    }
+    this.data = this.loadSlot(slot);
+  }
+
+  save(slot?: number): void {
     if (!this.storage) return;
     try {
-      this.storage.setItem(SAVE_KEY, JSON.stringify(this.data));
+      this.data.lastSaved = Date.now();
+      const targetSlot = slot ?? this.activeSlot;
+      this.storage.setItem(this.getSlotKey(targetSlot), JSON.stringify(this.data));
     } catch (err) {
       console.warn("BREACH: failed to write save data.", err);
     }
   }
 
-  reset(): void {
-    this.data = defaultSaveData();
-    this.save();
+  reset(slot?: number): void {
+    const targetSlot = slot ?? this.activeSlot;
+    const def = defaultSaveData();
+    def.lastSaved = Date.now();
+    if (targetSlot === this.activeSlot) {
+      this.data = def;
+    }
+    if (this.storage) {
+      try {
+        this.storage.setItem(this.getSlotKey(targetSlot), JSON.stringify(def));
+      } catch (err) {
+        console.warn("BREACH: failed to reset save slot.", err);
+      }
+    }
+  }
+
+  deleteSlot(slot: number): void {
+    if (slot < 1 || slot > SAVE_SLOTS_COUNT) return;
+    if (this.storage) {
+      try {
+        if (typeof this.storage.removeItem === "function") {
+          this.storage.removeItem(this.getSlotKey(slot));
+        } else {
+          this.storage.setItem(this.getSlotKey(slot), "");
+        }
+      } catch {
+        // ignore
+      }
+    }
+    if (slot === this.activeSlot) {
+      this.data = defaultSaveData();
+    }
+  }
+
+  getSlotSummary(slot: number): SlotSummary {
+    const exists = this.slotExists(slot);
+    if (!exists) {
+      return {
+        slot,
+        exists: false,
+        bank: 0,
+        crystals: 0,
+        lifetimePixels: 0,
+        upgradesCount: 0,
+        bestDepth: 0,
+        bestTime: 0,
+        lastSaved: undefined,
+      };
+    }
+    const data = slot === this.activeSlot ? this.data : this.loadSlot(slot);
+    let upgradesCount = 0;
+    if (data.upgrades) {
+      for (const id of Object.keys(data.upgrades) as UpgradeId[]) {
+        if ((data.upgrades[id] ?? 0) > 0) {
+          upgradesCount += data.upgrades[id]!;
+        }
+      }
+    }
+    return {
+      slot,
+      exists: true,
+      bank: data.bank,
+      crystals: data.crystals,
+      lifetimePixels: data.lifetimePixels,
+      upgradesCount,
+      bestDepth: data.bests?.depth ?? 0,
+      bestTime: data.bests?.time ?? 0,
+      lastSaved: data.lastSaved,
+    };
   }
 }
