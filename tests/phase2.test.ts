@@ -128,4 +128,51 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
     expect(destroyed).toBeGreaterThan(30);
     expect(g.nearSoldierPercent(t)).toBeGreaterThanOrEqual(0);
   });
+
+  it("spawns Blight Cores in dark-pink overrun rooms and reduces the blight timer when a core is killed", () => {
+    const w = new PixelWorld(WORLD);
+    generateWorld(w, 42);
+    const g = new GrowthSystem(w, new Rng(42));
+    g.reset();
+
+    // Verify rooms overrun with dark pink blight and Blight Cores exist across the generated lab.
+    expect(w.blightCores.length).toBeGreaterThanOrEqual(3);
+    const overrunRooms = w.labLayout!.rooms.filter((r) => r.overrun);
+    expect(overrunRooms.length).toBe(w.blightCores.length);
+
+    const core = w.blightCores[0];
+    expect(core.alive).toBe(true);
+    expect(core.cells.length).toBe(9);
+    // Core cells have bonus health above standard zone fill.
+    expect(w.health[core.cells[0]]).toBeGreaterThan(1);
+
+    // Advance blight timer to 40s so growth rate is well above baseRate.
+    g.update(SIM.dt, 40, []);
+    const rateBefore = g.rate;
+    expect(rateBefore).toBeGreaterThan(GROWTH.baseRate);
+
+    // Destroy 8 of the 9 cells -> core is still alive.
+    for (let k = 0; k < 8; k++) {
+      const idx = core.cells[k];
+      const cx = idx % w.width;
+      const cy = Math.floor(idx / w.width);
+      w.damage(cx, cy, 255);
+      expect(w.checkCoreDestroyedAt(cx, cy)).toBeNull();
+    }
+    expect(core.alive).toBe(true);
+
+    // Destroy the 9th cell -> core is killed and blight timer drops!
+    const lastIdx = core.cells[8];
+    const lastCx = lastIdx % w.width;
+    const lastCy = Math.floor(lastIdx / w.width);
+    w.damage(lastCx, lastCy, 255);
+    const killedCore = w.checkCoreDestroyedAt(lastCx, lastCy);
+    expect(killedCore).toBe(core);
+    expect(core.alive).toBe(false);
+
+    g.reduceBlightTimer(40);
+    expect(g.coresDestroyed).toBe(1);
+    expect(g.timeOffset).toBe(GROWTH.coreKillTimeReduction);
+    expect(g.rate).toBeLessThan(rateBefore);
+  });
 });

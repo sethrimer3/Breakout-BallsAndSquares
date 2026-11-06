@@ -95,6 +95,7 @@ export class Renderer {
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
+    this.drawBlightCorePulses();
     this.drawLoot();
     this.drawGrowthPulses();
     this.drawMuzzleFlares();
@@ -173,6 +174,29 @@ export class Renderer {
       ctx.fillRect(-len / 2, -wid / 2, len * 0.45, wid * 0.6);
       ctx.restore();
     }
+  }
+
+  private drawBlightCorePulses(): void {
+    const { ctx, game } = this;
+    const cores = game.world.blightCores;
+    if (!cores || cores.length === 0) return;
+    const cam = game.camera;
+    const cs = game.world.cellSize;
+    const now = game.runStats.time;
+    const pulse = 0.65 + 0.35 * Math.sin(now * 4.5);
+    for (let i = 0; i < cores.length; i++) {
+      const c = cores[i];
+      if (!c.alive) continue;
+      const wx = (c.cx + 0.5) * cs;
+      const wy = (c.cy + 0.5) * cs;
+      const sx = cam.worldToScreenX(wx);
+      const sy = cam.worldToScreenY(wy);
+      const rad = cs * 3.8 * cam.zoom * (0.9 + 0.15 * pulse);
+      if (sx + rad < 0 || sy + rad < 0 || sx - rad > cam.viewW || sy - rad > cam.viewH) continue;
+      ctx.globalAlpha = 0.42 * pulse;
+      ctx.drawImage(this.sprites.crimsonGlow, sx - rad, sy - rad, rad * 2, rad * 2);
+    }
+    ctx.globalAlpha = 1;
   }
 
   private drawGrowthPulses(): void {

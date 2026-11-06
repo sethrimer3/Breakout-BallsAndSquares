@@ -14,6 +14,10 @@ export interface LabRoom {
   size: number;
   /** Wall outline thickness in cells (1..3). */
   wallThickness: number;
+  /** True if this room is overrun with dark pink blight and hosts a Blight Core. */
+  overrun?: boolean;
+  /** 1-based Blight Core id if `overrun` is true. */
+  coreId?: number;
 }
 
 export interface LabCorridorSegment {

@@ -475,6 +475,30 @@ export class Game {
         this.rng,
         lootKind,
       );
+      const destroyedCore = this.world.checkCoreDestroyedAt(cx, cy);
+      if (destroyedCore) {
+        this.growth.reduceBlightTimer(this.runStats.time);
+        this.growthRate = this.growth.rate;
+        const coreWx = (destroyedCore.cx + 0.5) * cs;
+        const coreWy = (destroyedCore.cy + 0.5) * cs;
+        this.particles.spawn(PKind.Burst, coreWx, coreWy, 0, 0, 0.45, 28, 0xff48a4, 1);
+        for (let i = 0; i < 36; i++) {
+          const a = this.rng.range(0, Math.PI * 2);
+          const sp = this.rng.range(45, 220);
+          const col = i % 2 === 0 ? 0xff48a4 : 0xff9ad5;
+          this.particles.spawn(
+            PKind.Spark,
+            coreWx,
+            coreWy,
+            Math.cos(a) * sp,
+            Math.sin(a) * sp,
+            this.rng.range(0.22, 0.5),
+            this.rng.range(1.4, 2.4),
+            col,
+            5,
+          );
+        }
+      }
     }
   }
 

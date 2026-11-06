@@ -150,7 +150,7 @@ export class HUD {
 
     // Dramatic Growth Rate meter update.
     const rate = game.growthRate;
-    const graceRem = Math.max(0, game.stats.blightGraceSeconds - s.time);
+    const graceRem = game.growth.graceRemaining(s.time);
     const norm =
       rate <= 0
         ? 0

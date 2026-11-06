@@ -1,6 +1,18 @@
-import { maxHealthForDistance, wallHealthForZone } from "../config";
+import { GROWTH, maxHealthForDistance, TERRAIN, wallHealthForZone } from "../config";
 import type { SolidQuery } from "../core/gridRaycast";
 import type { LabLayout } from "./WorldGenerator";
+
+export interface BlightCore {
+  id: number;
+  roomId: number;
+  zone: 0 | 1 | 2;
+  /** Center cell coordinates of the 3×3 blight core. */
+  cx: number;
+  cy: number;
+  /** Indices of the 9 cells (or fewer if clipped) belonging to this core. */
+  cells: number[];
+  alive: boolean;
+}
 
 export type CellChangeKind = "damaged" | "destroyed" | "grown" | "set";
 
@@ -45,6 +57,10 @@ export class PixelWorld implements SolidQuery {
   readonly wall: Uint8Array;
   /** Per-cell lab set dressing (`DECOR` in LabDetails.ts). Purely cosmetic. */
   readonly decor: Uint8Array;
+  /** Per-cell Blight Core id (`0` = not a core cell, `id >= 1` = belongs to `blightCores[id - 1]`). */
+  readonly coreId: Uint8Array;
+  /** Active/destroyed Blight Cores located inside blight-overrun rooms. */
+  blightCores: BlightCore[] = [];
   /** Procedurally generated lab rooms & corridors from the most recent `generateWorld` call. */
   labLayout: LabLayout | null = null;
 
@@ -66,6 +82,7 @@ export class PixelWorld implements SolidQuery {
     this.tint = new Uint8Array(dims.width * dims.height);
     this.wall = new Uint8Array(dims.width * dims.height);
     this.decor = new Uint8Array(dims.width * dims.height);
+    this.coreId = new Uint8Array(dims.width * dims.height);
   }
 
   get worldWidth(): number {
@@ -111,10 +128,14 @@ export class PixelWorld implements SolidQuery {
   maxHealthAt(cx: number, cy: number): number {
     const dist = this.distanceOf(cx, cy);
     if (this.inBounds(cx, cy)) {
-      const w = this.wall[cy * this.width + cx];
+      const i = cy * this.width + cx;
+      const w = this.wall[i];
       if (w > 0) {
         const z = Math.min(2, Math.max(0, w - 1)) as 0 | 1 | 2;
         return wallHealthForZone(z, dist);
+      }
+      if (this.coreId[i] > 0) {
+        return Math.min(TERRAIN.maxHealthCap, maxHealthForDistance(dist) + GROWTH.coreHealthBonus);
       }
     }
     return maxHealthForDistance(dist);
@@ -147,6 +168,23 @@ export class PixelWorld implements SolidQuery {
     }
     this.emit(cx, cy, "damaged");
     return 1;
+  }
+
+  /**
+   * Check if destroying cell `(cx, cy)` finished off a Blight Core.
+   * Returns the newly destroyed `BlightCore` (once), or `null`.
+   */
+  checkCoreDestroyedAt(cx: number, cy: number): BlightCore | null {
+    if (!this.inBounds(cx, cy)) return null;
+    const cid = this.coreId[cy * this.width + cx];
+    if (cid === 0) return null;
+    const core = this.blightCores[cid - 1];
+    if (!core || !core.alive) return null;
+    for (let k = 0; k < core.cells.length; k++) {
+      if (this.health[core.cells[k]] > 0) return null;
+    }
+    core.alive = false;
+    return core;
   }
 
   private emit(cx: number, cy: number, kind: CellChangeKind): void {

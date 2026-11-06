@@ -29,6 +29,9 @@ export class GrowthSystem {
   graceSeconds = GROWTH.graceSeconds;
   rateMultiplier = 1;
   weakenChance = 0;
+  /** Cumulative seconds subtracted from the blight timer by destroying Blight Cores. */
+  timeOffset = 0;
+  coresDestroyed = 0;
   totalEvents = 0;
   nearEventsTotal = 0;
   private acc = 0;
@@ -48,12 +51,38 @@ export class GrowthSystem {
     this.frontier.seedFromRoom();
     this.rate = 0;
     this.acc = 0;
+    this.timeOffset = 0;
+    this.coresDestroyed = 0;
     this.totalEvents = 0;
     this.nearEventsTotal = 0;
     this.glowHead = 0;
     this.glowCount = 0;
     this.telTime.length = 0;
     this.telNear.length = 0;
+  }
+
+  /** Effective blight timer (seconds) after accounting for upgrade grace and destroyed Blight Cores. */
+  effectiveBlightTime(runTime: number): number {
+    return Math.max(0, runTime - (this.graceSeconds - GROWTH.graceSeconds) - this.timeOffset);
+  }
+
+  /**Remaining seconds before blight starts/resumes replicating (0 if already active). */
+  graceRemaining(runTime: number): number {
+    const shifted = runTime - (this.graceSeconds - GROWTH.graceSeconds) - this.timeOffset;
+    return Math.max(0, GROWTH.graceSeconds - shifted);
+  }
+
+  /**
+   * Called when the player destroys a Blight Core: reduces the blight timer
+   * by `seconds` (default `GROWTH.coreKillTimeReduction`) and immediately
+   * recalculates the blight replication rate.
+   */
+  reduceBlightTimer(runTime: number, seconds = GROWTH.coreKillTimeReduction): void {
+    this.timeOffset += seconds;
+    this.coresDestroyed++;
+    this.acc = 0;
+    const shiftedTime = runTime - (this.graceSeconds - GROWTH.graceSeconds) - this.timeOffset;
+    this.rate = growthRateAt(shiftedTime) * this.rateMultiplier;
   }
 
   /** Rolling percentage (0..100) of growth events within `nearRadiusCells` of a living soldier. */
@@ -74,7 +103,7 @@ export class GrowthSystem {
   }
 
   update(dt: number, runTime: number, soldiers: readonly Soldier[]): void {
-    const shiftedTime = runTime - (this.graceSeconds - GROWTH.graceSeconds);
+    const shiftedTime = runTime - (this.graceSeconds - GROWTH.graceSeconds) - this.timeOffset;
     this.rate = growthRateAt(shiftedTime) * this.rateMultiplier;
     if (this.rate <= 0 || this.frontier.size === 0) return;
     this.acc += this.rate * dt;

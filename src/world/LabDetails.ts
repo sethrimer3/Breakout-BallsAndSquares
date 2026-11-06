@@ -33,6 +33,10 @@ export const DECOR = {
   bench: 15,
   linen: 16,
   scorch: 17,
+  blightFloor: 18,
+  blightVein: 19,
+  blightCoreShell: 20,
+  blightCoreHeart: 21,
 } as const;
 
 /** Floor tile size, in cells. */
@@ -195,19 +199,98 @@ function breachRoom(world: PixelWorld, r: LabRoom, rng: Rng, seed: number): void
   }
 }
 
+/**
+ * Paint a room completely overrun with dark pink blight and spawn a 3×3
+ * glowing Blight Core at its center. Destroying all cells of the core reduces
+ * the blight timer.
+ */
+function overrunRoomWithBlight(world: PixelWorld, r: LabRoom, seed: number): void {
+  const rcx = r.x + Math.floor(r.size / 2);
+  const rcy = r.y + Math.floor(r.size / 2);
+
+  // Overrun room interior with dark pink blight floor & glowing veins radiating from the core.
+  for (let y = r.y; y < r.y + r.size; y++) {
+    for (let x = r.x; x < r.x + r.size; x++) {
+      const i = y * world.width + x;
+      const dx = x - rcx;
+      const dy = y - rcy;
+      const dist = Math.hypot(dx, dy);
+      const ang = Math.atan2(dy, dx);
+      // Organic radiating tendrils + noise blotches.
+      const n = valueNoise(x, y, 4, seed + 73);
+      const ray = Math.abs(Math.sin(ang * 4 + n * 2.2));
+      const isVein = ray < 0.24 || n > 0.62 || dist <= 3.2;
+      world.decor[i] = isVein ? DECOR.blightVein : DECOR.blightFloor;
+    }
+  }
+
+  // Place a 3×3 Blight Core centered at (rcx, rcy).
+  const cid = world.blightCores.length + 1;
+  const cells: number[] = [];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const cx = rcx + dx;
+      const cy = rcy + dy;
+      if (!world.inBounds(cx, cy)) continue;
+      const idx = cy * world.width + cx;
+      world.wall[idx] = 0;
+      world.coreId[idx] = cid;
+      world.decor[idx] = dx === 0 && dy === 0 ? DECOR.blightCoreHeart : DECOR.blightCoreShell;
+      cells.push(idx);
+    }
+  }
+  r.overrun = true;
+  r.coreId = cid;
+  world.blightCores.push({
+    id: cid,
+    roomId: r.id,
+    zone: r.zone,
+    cx: rcx,
+    cy: rcy,
+    cells,
+    alive: true,
+  });
+}
+
 /** Dress a generated maze. Call before cell health is computed from `wall`. */
 export function decorateLab(world: PixelWorld, layout: LabLayout): void {
   const seed = layout.seed;
   const rng = new Rng((seed ^ 0x2f6e2b1d) >>> 0 || 1);
+  world.coreId.fill(0);
+  world.blightCores = [];
+
   for (const seg of layout.corridors) paintCorridor(world, seg);
+
+  // Pick rooms in each zone to be overrun with dark pink blight and host a Blight Core
+  // (~30% of rooms, and at least 1 room per zone that has rooms).
+  const byZone: LabRoom[][] = [[], [], []];
+  for (const room of layout.rooms) byZone[room.zone].push(room);
+  const overrunIds = new Set<number>();
+  for (const zRooms of byZone) {
+    if (zRooms.length === 0) continue;
+    const count = Math.max(1, Math.round(zRooms.length * 0.3));
+    const startIdx = rng.int(zRooms.length);
+    const step = Math.max(1, Math.floor(zRooms.length / count));
+    for (let k = 0; k < count; k++) {
+      const r = zRooms[(startIdx + k * step) % zRooms.length];
+      overrunIds.add(r.id);
+    }
+  }
+
   for (const room of layout.rooms) {
-    paintRoomFloor(world, room);
-    const stamp = STAMP_NAMES[rng.int(STAMP_NAMES.length)];
-    furnishRoom(world, room, ROOM_STAMPS[stamp]);
+    if (overrunIds.has(room.id)) {
+      overrunRoomWithBlight(world, room, seed);
+    } else {
+      paintRoomFloor(world, room);
+      const stamp = STAMP_NAMES[rng.int(STAMP_NAMES.length)];
+      furnishRoom(world, room, ROOM_STAMPS[stamp]);
+    }
   }
   for (const room of layout.rooms) paintDoors(world, room);
   for (const room of layout.rooms) {
-    if (rng.next() < BREACHED_ROOM_CHANCE) breachRoom(world, room, rng, seed);
+    if (overrunIds.has(room.id) || rng.next() < BREACHED_ROOM_CHANCE) {
+      breachRoom(world, room, rng, seed);
+    }
   }
   // The starting room stays bare.
   for (let y = world.roomY0; y <= world.roomY1; y++) {

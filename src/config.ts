@@ -220,6 +220,10 @@ export const GROWTH = {
   localRadiusCells: 16,
   /** Rejection-sample attempts before falling back to uniform pick. */
   localSamples: 12,
+  /** Seconds subtracted from the blight timer when the player destroys a Blight Core. */
+  coreKillTimeReduction: 12,
+  /** Health bonus added to a Blight Core cell relative to normal cell health at its distance. */
+  coreHealthBonus: 4,
 };
 
 /** Growth rate (copy events / second) at `runTime` seconds into the run (spec §7). */
@@ -361,9 +365,13 @@ export const COLORS = {
     [128, 118, 100], // bench top
     [170, 176, 184], // bunk linen
     [22, 16, 16], // scorched breach
+    [76, 14, 46], // dark pink blight overrun floor
+    [138, 24, 78], // dark pink blight vein / tendril
+    [185, 28, 98], // blight core outer shell
+    [255, 72, 164], // blight core pulsing heart
   ] as const,
   /** How strongly each lab detail covers the cell's own color (same order). */
-  labDecorMix: [0, 0.45, 0.55, 0.7, 0.55, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1] as const,
+  labDecorMix: [0, 0.45, 0.55, 0.7, 0.55, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.85, 0.92, 1, 1] as const,
   /** Emergency-power glow added over the dark scene (same order; black = none). */
   labGlow: [
     [0, 0, 0], // none
@@ -384,6 +392,10 @@ export const COLORS = {
     [0, 0, 0], // bench top
     [0, 0, 0], // bunk linen
     [0, 0, 0], // scorched breach
+    [52, 8, 30], // dark pink blight overrun floor
+    [110, 18, 64], // dark pink blight vein / tendril
+    [175, 28, 96], // blight core outer shell
+    [255, 90, 180], // blight core pulsing heart
   ] as const,
   /** Tint applied to damaged cells. */
   damage: [120, 70, 52] as const,
