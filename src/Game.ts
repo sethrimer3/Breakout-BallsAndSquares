@@ -4,7 +4,7 @@ import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
 import { LootKind, LootSystem } from "./entities/LootSystem";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
-import { Soldier, baseSoldierStats, type SoldierStats } from "./entities/Soldier";
+import { Soldier, baseSoldierStats, type SecondaryWeaponType, type SoldierStats } from "./entities/Soldier";
 import { MUZZLE_FLASH_MULTIPLIER, SaveManager, type SoldierBehavior } from "./progression/SaveManager";
 import { UpgradeManager } from "./progression/UpgradeManager";
 import { Renderer } from "./rendering/Renderer";
@@ -124,8 +124,12 @@ export class Game {
     this.physics = new PhysicsSystem(this.world, this.rng);
     this.combat = new CombatSystem(this.world, this.rng, this.stats, {
       onShot: (s, dx, dy, mx, my) => this.onShot(s, dx, dy, mx, my),
-      onImpact: (x, y, nx, ny, cx, cy, result, sub) => this.onImpact(x, y, nx, ny, cx, cy, result, sub),
+      onImpact: (x, y, nx, ny, cx, cy, result, sub, ownerId) =>
+        this.onImpact(x, y, nx, ny, cx, cy, result, sub, ownerId),
       onExplosion: (x, y, rad) => this.onExplosion(x, y, rad),
+      onGrenadeThrow: (s, x, y, dx, dy) => this.onGrenadeThrow(s, x, y, dx, dy),
+      onGrenadeStick: (x, y, nx, ny) => this.onGrenadeStick(x, y, nx, ny),
+      onGrenadeBeep: (x, y, pct) => this.onGrenadeBeep(x, y, pct),
     });
     this.growth = new GrowthSystem(this.world, this.rng, {
       onSoldierKilled: (s) => this.onSoldierKilled(s),
@@ -260,6 +264,7 @@ export class Game {
     this.flashes = [];
     this.cellFlashes = [];
     this.combat.bullets.clear();
+    this.combat.grenades.clear();
     this.particles.clear();
     this.casings.clear();
     this.loot.clear();
@@ -513,7 +518,9 @@ export class Game {
     const weapon = this.isWeaponUnlocked(rawWeapon) ? rawWeapon : "pistol";
     const rawBehavior = this.save.data.loadouts[slotIdx]?.behavior ?? "free";
     const behavior = this.isBehaviorUnlocked(rawBehavior) ? rawBehavior : "free";
-    const s = new Soldier(clampedX, clampedY, ndx, ndy, this.stats.speed, weapon, behavior, slotIdx);
+    const rawSecondary = this.save.data.loadouts[slotIdx]?.secondary ?? null;
+    const secondary = rawSecondary && this.isSecondaryUnlocked(rawSecondary) ? rawSecondary : null;
+    const s = new Soldier(clampedX, clampedY, ndx, ndy, this.stats.speed, weapon, behavior, slotIdx, secondary);
     s.maxHealth = this.stats.soldierHealth;
     s.health = this.stats.soldierHealth;
     this.soldiers.push(s);

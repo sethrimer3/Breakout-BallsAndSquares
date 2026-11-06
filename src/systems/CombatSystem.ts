@@ -1,9 +1,10 @@
-import { ASSAULT_RIFLE, BULLET, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE } from "../config";
+import { ASSAULT_RIFLE, BULLET, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE } from "../config";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Rng } from "../core/Rng";
 import { BulletPool, type Bullet } from "../entities/Bullet";
 import type { Soldier, SoldierStats } from "../entities/Soldier";
+import { StickyGrenadePool, type StickyGrenade } from "../entities/StickyGrenade";
 import type { PixelWorld } from "../world/PixelWorld";
 
 export interface CombatEvents {
@@ -19,15 +20,23 @@ export interface CombatEvents {
     cy: number,
     result: 0 | 1 | 2,
     sub?: boolean,
+    ownerId?: number,
   ): void;
   /** A rocket or cluster bomb detonated at (x, y) with radius (world units). */
   onExplosion?(x: number, y: number, radiusWorld: number): void;
+  /** A sticky grenade was thrown. */
+  onGrenadeThrow?(s: Soldier, x: number, y: number, dx: number, dy: number): void;
+  /** A sticky grenade stuck to a surface. */
+  onGrenadeStick?(x: number, y: number, nx: number, ny: number): void;
+  /** A sticky grenade beeped during fuse countdown. */
+  onGrenadeBeep?(x: number, y: number, pct: number): void;
 }
 
 const hit = makeRayHit();
 
 export class CombatSystem {
   readonly bullets = new BulletPool(BULLET.poolSize);
+  readonly grenades = new StickyGrenadePool(GRENADE.poolSize);
   stats: SoldierStats;
 
   constructor(
@@ -390,7 +399,7 @@ export class CombatSystem {
           hitDmg = Math.round(hitDmg * b.blightMultiplier);
         }
         const result = w.damageSub(hit.cx, hit.cy, hitDmg);
-        this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, result, isSub);
+        this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, result, isSub, b.ownerId);
 
         // Katana slashes cleave adjacent subcells across the slash arc width!
         if (b.style === 3 && b.slashWidth > 0) {
@@ -492,7 +501,7 @@ export class CombatSystem {
         if (res > 0) {
           const wx = (sx + 0.5) * ss;
           const wy = (sy + 0.5) * ss;
-          this.events.onImpact?.(wx, wy, nx, ny, hcx, hcy, res, isSub);
+          this.events.onImpact?.(wx, wy, nx, ny, hcx, hcy, res, isSub, b.ownerId);
         }
       }
     }
@@ -531,7 +540,7 @@ export class CombatSystem {
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
           const wy = (cy + 0.5) * cs;
-          this.events.onImpact?.(wx, wy, nx, ny, cx, cy, res, wasSub);
+          this.events.onImpact?.(wx, wy, nx, ny, cx, cy, res, wasSub, b.ownerId);
         }
       }
     }
@@ -561,5 +570,185 @@ export class CombatSystem {
         );
       }
     }
+  }
+
+  /** Throw an equippable secondary sticky grenade from a soldier. */
+  throwGrenade(
+    s: Soldier,
+    blastRadius: number,
+    damage: number,
+    shrapnelCount: number,
+    blightMult: number,
+    overrideDx?: number,
+    overrideDy?: number,
+  ): StickyGrenade | null {
+    let dx = 0;
+    let dy = 0;
+    if (overrideDx !== undefined && overrideDy !== undefined) {
+      const len = Math.hypot(overrideDx, overrideDy);
+      if (len > 1e-6) {
+        dx = overrideDx / len;
+        dy = overrideDy / len;
+      }
+    }
+    if (dx === 0 && dy === 0) {
+      const vlen = Math.hypot(s.vx, s.vy);
+      if (vlen > 1e-6) {
+        dx = s.vx / vlen;
+        dy = s.vy / vlen;
+      } else if (Number.isFinite(s.facingAngle)) {
+        dx = Math.cos(s.facingAngle);
+        dy = Math.sin(s.facingAngle);
+      } else {
+        dx = 0;
+        dy = 1;
+      }
+    }
+
+    const g = this.grenades.acquire();
+    if (!g) return null;
+    g.x = s.x + dx * 6;
+    g.y = s.y + dy * 6;
+    g.dx = dx;
+    g.dy = dy;
+    g.speed = GRENADE.throwSpeed;
+    g.stuck = false;
+    g.stuckCx = 0;
+    g.stuckCy = 0;
+    g.stuckNx = 0;
+    g.stuckNy = 0;
+    g.fuse = GRENADE.fuseSeconds;
+    g.maxFuse = GRENADE.fuseSeconds;
+    g.radiusCells = blastRadius;
+    g.damage = damage + this.stats.globalDamageBonus;
+    g.shrapnelCount = shrapnelCount;
+    g.blightMultiplier = blightMult;
+    g.ownerId = s.id;
+    g.age = 0;
+    g.beepTimer = 0.25;
+    g.rotation = Math.atan2(dy, dx);
+    this.events.onGrenadeThrow?.(s, g.x, g.y, dx, dy);
+    return g;
+  }
+
+  /** Update all active flying and stuck grenades. */
+  updateGrenades(dt: number): void {
+    const items = this.grenades.items;
+    const w = this.world;
+    const cs = w.cellSize;
+    const ss = w.subCellSize;
+
+    for (let i = 0; i < items.length; i++) {
+      const g = items[i];
+      if (!g.active) continue;
+
+      g.age += dt;
+
+      if (!g.stuck) {
+        g.rotation += 10 * dt;
+        const dist = g.speed * dt;
+        if (gridRaycast(w.subSolidQuery, ss, g.x, g.y, g.dx, g.dy, dist, hit)) {
+          g.stuck = true;
+          g.x = hit.x;
+          g.y = hit.y;
+          g.stuckNx = hit.nx;
+          g.stuckNy = hit.ny;
+          g.stuckCx = hit.cx >> 1;
+          g.stuckCy = hit.cy >> 1;
+          g.fuse = g.maxFuse;
+          g.beepTimer = 0.2;
+          this.events.onGrenadeStick?.(g.x, g.y, g.stuckNx, g.stuckNy);
+        } else {
+          g.x += g.dx * dist;
+          g.y += g.dy * dist;
+          if (g.age > 2.5 || !w.inBounds(Math.floor(g.x / cs), Math.floor(g.y / cs))) {
+            this.detonateGrenade(g);
+          }
+        }
+      } else {
+        g.fuse -= dt;
+        g.beepTimer -= dt;
+        if (g.beepTimer <= 0) {
+          g.beepTimer = Math.max(0.08, g.fuse * 0.35);
+          this.events.onGrenadeBeep?.(g.x, g.y, Math.max(0, g.fuse / g.maxFuse));
+        }
+
+        const inside = w.inBounds(g.stuckCx, g.stuckCy);
+        const cellIdx = g.stuckCy * w.width + g.stuckCx;
+        if (inside && w.health[cellIdx] === 0 && w.subHealth[cellIdx] === 0) {
+          this.detonateGrenade(g);
+        } else if (g.fuse <= 0) {
+          this.detonateGrenade(g);
+        }
+      }
+    }
+  }
+
+  /** Detonate a sticky grenade, creating explosive damage and secondary shrapnel. */
+  detonateGrenade(g: StickyGrenade): void {
+    const w = this.world;
+    const cs = w.cellSize;
+    const centerCx = Math.floor(g.x / cs);
+    const centerCy = Math.floor(g.y / cs);
+    const radCells = g.radiusCells;
+    const rCeil = Math.ceil(radCells);
+    const r2 = radCells * radCells;
+
+    for (let dy = -rCeil; dy <= rCeil; dy++) {
+      const cy = centerCy + dy;
+      if (cy < 0 || cy >= w.height) continue;
+      for (let dx = -rCeil; dx <= rCeil; dx++) {
+        const cx = centerCx + dx;
+        if (cx < 0 || cx >= w.width) continue;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > r2) continue;
+
+        const falloff = 1 - 0.3 * (Math.sqrt(d2) / Math.max(1, radCells));
+        const idx = cy * w.width + cx;
+        const wasSub = w.health[idx] === 0;
+        const isCore = !wasSub && w.coreId[idx] > 0;
+        const isBlight = wasSub ? w.isBlightSubAt(cx * 2, cy * 2) : w.isBlightAt(cx, cy);
+
+        let dmg = Math.max(1, Math.round(g.damage * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
+        if (isBlight && g.blightMultiplier > 1) {
+          dmg = Math.round(dmg * g.blightMultiplier);
+        }
+
+        const res = w.damage(cx, cy, dmg);
+        if (res > 0) {
+          const wx = (cx + 0.5) * cs;
+          const wy = (cy + 0.5) * cs;
+          this.events.onImpact?.(wx, wy, g.stuckNx || 0, g.stuckNy || -1, cx, cy, res, wasSub, g.ownerId);
+        }
+      }
+    }
+
+    this.events.onExplosion?.(g.x, g.y, radCells * cs);
+
+    // Expel shrapnel fragments if upgraded
+    if (g.shrapnelCount > 0) {
+      const baseAng = Math.atan2(g.stuckNy || -g.dy, g.stuckNx || -g.dx);
+      for (let i = 0; i < g.shrapnelCount; i++) {
+        const a = baseAng + this.rng.range(-1.4, 1.4);
+        const spd = this.rng.range(130, 220);
+        this.spawnBullet(
+          g.x + (g.stuckNx || 0) * 2,
+          g.y + (g.stuckNy || 0) * 2,
+          Math.cos(a),
+          Math.sin(a),
+          spd,
+          Math.max(1, Math.ceil(g.damage * 0.4)),
+          this.rng.range(0.25, 0.45),
+          0,
+          g.ownerId,
+          0,
+          0,
+          0,
+          0,
+        );
+      }
+    }
+
+    this.grenades.release(g);
   }
 }

@@ -1,5 +1,5 @@
 import { clamp } from "../core/math";
-import type { WeaponType } from "../entities/Soldier";
+import type { SecondaryWeaponType, WeaponType } from "../entities/Soldier";
 import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
 
 export const SAVE_KEY = "breach.save.v1";
@@ -35,9 +35,12 @@ export const VALID_BEHAVIORS: readonly SoldierBehavior[] = [
 
 export interface SoldierLoadout {
   weapon: WeaponType;
+  secondary?: SecondaryWeaponType | null;
   behavior: SoldierBehavior;
   equipment: (string | null)[];
 }
+
+export const VALID_SECONDARY_WEAPONS: readonly SecondaryWeaponType[] = ["grenade"];
 
 const VALID_WEAPONS: readonly WeaponType[] = [
   "pistol",
@@ -101,7 +104,7 @@ export function defaultSaveData(): SaveData {
   for (const d of UPGRADE_DEFS) upgrades[d.id] = 0;
   const loadouts: SoldierLoadout[] = [];
   for (let i = 0; i < MAX_SOLDIER_SLOTS; i++) {
-    loadouts.push({ weapon: "pistol", behavior: "free", equipment: [null, null] });
+    loadouts.push({ weapon: "pistol", secondary: null, behavior: "free", equipment: [null, null] });
   }
   return {
     version: SAVE_VERSION,
@@ -162,6 +165,12 @@ export function sanitizeSaveData(raw: unknown): SaveData {
         if (typeof b === "string" && (VALID_BEHAVIORS as readonly string[]).includes(b)) {
           def.loadouts[i].behavior = b as SoldierBehavior;
         }
+        const s = item.secondary;
+        if (typeof s === "string" && (VALID_SECONDARY_WEAPONS as readonly string[]).includes(s as SecondaryWeaponType)) {
+          def.loadouts[i].secondary = s as SecondaryWeaponType;
+        } else {
+          def.loadouts[i].secondary = null;
+        }
       }
     }
   }
@@ -177,6 +186,10 @@ export function sanitizeSaveData(raw: unknown): SaveData {
       ld.weapon = "pistol";
     } else if (ld.weapon === "katana" && (def.upgrades.katana_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
+    }
+
+    if (ld.secondary === "grenade" && (def.upgrades.grenade_unlock ?? 0) === 0) {
+      ld.secondary = null;
     }
 
     if (ld.behavior === "orthogonal" && (def.upgrades.behavior_orthogonal ?? 0) === 0) {

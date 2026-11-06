@@ -1,5 +1,6 @@
 import {
   ASSAULT_RIFLE,
+  GRENADE,
   GROWTH,
   KATANA,
   LOOT,
@@ -17,6 +18,8 @@ export type WeaponType =
   | "rocket_launcher"
   | "sniper_rifle"
   | "katana";
+
+export type SecondaryWeaponType = "grenade";
 
 /** Derived soldier & run stats (base config combined with upgrades). */
 export interface SoldierStats {
@@ -68,6 +71,13 @@ export interface SoldierStats {
   katanaBulletSpeed: number;
   katanaPierce: number;
   katanaSlashWidth: number;
+  // Secondary Ability: Grenade stats
+  grenadeUnlocked: boolean;
+  grenadeBlocksRequired: number;
+  grenadeBlastRadius: number;
+  grenadeDamage: number;
+  grenadeShrapnel: number;
+  grenadeBlightMult: number;
   // Money / Loot / Resources stats
   dropChance: number;
   magnetRange: number;
@@ -133,6 +143,12 @@ export function baseSoldierStats(): SoldierStats {
     katanaBulletSpeed: KATANA.bulletSpeed,
     katanaPierce: KATANA.pierce,
     katanaSlashWidth: KATANA.slashWidth,
+    grenadeUnlocked: false,
+    grenadeBlocksRequired: GRENADE.blocksRequired,
+    grenadeBlastRadius: GRENADE.blastRadiusCells,
+    grenadeDamage: GRENADE.damage,
+    grenadeShrapnel: GRENADE.shrapnelCount,
+    grenadeBlightMult: GRENADE.blightMultiplier,
     dropChance: LOOT.baseDropChance,
     magnetRange: LOOT.baseMagnetRange,
     pickupLifetime: LOOT.baseLifetime,
@@ -161,6 +177,8 @@ export class Soldier {
   vy: number;
   speed: number;
   weapon: WeaponType;
+  secondary: SecondaryWeaponType | null;
+  secondaryBlocksBroken = 0;
   behavior: SoldierBehavior;
   slotIndex: number;
   radius = SOLDIER.collisionRadius;
@@ -189,11 +207,13 @@ export class Soldier {
     weapon: WeaponType = "pistol",
     behavior: SoldierBehavior = "free",
     slotIndex = 0,
+    secondary: SecondaryWeaponType | null = null,
   ) {
     this.x = x;
     this.y = y;
     this.speed = speed;
     this.weapon = weapon;
+    this.secondary = secondary;
     this.behavior = behavior;
     this.slotIndex = slotIndex;
     this.fireCooldown = 0.15;

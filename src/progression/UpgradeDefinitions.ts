@@ -1,5 +1,6 @@
 import {
   ASSAULT_RIFLE,
+  GRENADE,
   GROWTH,
   KATANA,
   LOOT,
@@ -20,7 +21,8 @@ export type UpgradeBranch =
   | "assault_rifle"
   | "rocket_launcher"
   | "sniper_rifle"
-  | "katana";
+  | "katana"
+  | "grenade";
 
 export type UpgradeId =
   // Core Matrix: Upgrades All Soldiers (#38d6ff)
@@ -93,7 +95,14 @@ export type UpgradeId =
   | "katana_blight_mult"
   | "katana_pierce"
   | "katana_fire_rate"
-  | "katana_arc";
+  | "katana_arc"
+  // Grenade Tree (Secondary Weapon)
+  | "grenade_unlock"
+  | "grenade_charge"
+  | "grenade_damage"
+  | "grenade_radius"
+  | "grenade_shrapnel"
+  | "grenade_blight_mult";
 
 export interface UpgradeDef {
   id: UpgradeId;
@@ -1380,6 +1389,130 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.katanaSlashWidth = KATANA.slashWidth + 3 * lvl;
     },
     icon: "blast",
+  },
+
+  // =========================================================================
+  // 10) GRENADE TREE (Secondary Weapon / Equippable Ability)
+  // =========================================================================
+  {
+    id: "grenade_unlock",
+    branch: "grenade",
+    name: "Unlock Grenade",
+    shortDesc: "Unlocks the Sticky Grenade secondary ability — throws a sticky explosive after breaking blocks",
+    color: "#ff9d3b",
+    grid: { col: 0, row: 0 },
+    parent: null,
+    maxLevel: 1,
+    baseCost: 120,
+    costMultiplier: 1,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "UNLOCKED" : "LOCKED"),
+    formatDelta: () => "UNLOCK ABILITY",
+    apply: (s, lvl) => {
+      s.grenadeUnlocked = lvl > 0;
+    },
+    icon: "grenade",
+  },
+  {
+    id: "grenade_charge",
+    branch: "grenade",
+    name: "Fast Primer",
+    shortDesc: "-8 blocks required to activate sticky grenade per level",
+    color: "#38d6ff",
+    grid: { col: 0, row: -1 },
+    parent: "grenade_unlock",
+    maxLevel: 6,
+    baseCost: 45,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => Math.max(30, GRENADE.blocksRequired - 8 * lvl),
+    formatValue: (v) => `${v} BLOCKS`,
+    formatDelta: () => "-8 BLOCKS",
+    apply: (s, lvl) => {
+      s.grenadeBlocksRequired = Math.max(30, GRENADE.blocksRequired - 8 * lvl);
+    },
+    icon: "fireRate",
+  },
+  {
+    id: "grenade_damage",
+    branch: "grenade",
+    name: "High Explosive",
+    shortDesc: "+3 center blast damage per level",
+    color: "#ff5c7c",
+    grid: { col: 1, row: 0 },
+    parent: "grenade_unlock",
+    maxLevel: 6,
+    baseCost: 50,
+    costMultiplier: 1.65,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => GRENADE.damage + 3 * lvl,
+    formatValue: (v) => `${v} DMG`,
+    formatDelta: () => "+3 DMG",
+    apply: (s, lvl) => {
+      s.grenadeDamage = GRENADE.damage + 3 * lvl;
+    },
+    icon: "warhead",
+  },
+  {
+    id: "grenade_radius",
+    branch: "grenade",
+    name: "Expanded Charge",
+    shortDesc: "+0.4 cells explosion blast radius per level",
+    color: "#ff9d3b",
+    grid: { col: -1, row: 0 },
+    parent: "grenade_unlock",
+    maxLevel: 6,
+    baseCost: 48,
+    costMultiplier: 1.62,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => +(GRENADE.blastRadiusCells + 0.4 * lvl).toFixed(1),
+    formatValue: (v) => `${v.toFixed(1)} RAD`,
+    formatDelta: () => "+0.4 RAD",
+    apply: (s, lvl) => {
+      s.grenadeBlastRadius = +(GRENADE.blastRadiusCells + 0.4 * lvl).toFixed(1);
+    },
+    icon: "blast",
+  },
+  {
+    id: "grenade_shrapnel",
+    branch: "grenade",
+    name: "Shrapnel Blast",
+    shortDesc: "+2 high-velocity shrapnel fragments expelled on detonation per level",
+    color: "#c56bff",
+    grid: { col: 0, row: 1 },
+    parent: "grenade_unlock",
+    maxLevel: 4,
+    baseCost: 75,
+    costMultiplier: 1.7,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => 2 * lvl,
+    formatValue: (v) => `${v} FRAGS`,
+    formatDelta: () => "+2 FRAGS",
+    apply: (s, lvl) => {
+      s.grenadeShrapnel = 2 * lvl;
+    },
+    icon: "multishot",
+  },
+  {
+    id: "grenade_blight_mult",
+    branch: "grenade",
+    name: "Thermite Core",
+    shortDesc: "+0.75× damage multiplier against Blight blocks per level",
+    color: "#ff4b8b",
+    grid: { col: 1, row: 1 },
+    parent: "grenade_damage",
+    maxLevel: 4,
+    baseCost: 55,
+    costMultiplier: 1.65,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => +(GRENADE.blightMultiplier + 0.75 * lvl).toFixed(2),
+    formatValue: (v) => `${v}× BLIGHT`,
+    formatDelta: () => "+0.75× MULT",
+    apply: (s, lvl) => {
+      s.grenadeBlightMult = +(GRENADE.blightMultiplier + 0.75 * lvl).toFixed(2);
+    },
+    icon: "blightCrack",
   },
 ];
 

@@ -205,6 +205,25 @@ export const KATANA = {
   lifetime: 0.28,
 };
 
+export const GRENADE = {
+  /** Number of blocks broken required to activate. */
+  blocksRequired: 90,
+  /** Thrown velocity in world units/sec. */
+  throwSpeed: 190,
+  /** Fuse duration after sticking before detonation (seconds). */
+  fuseSeconds: 0.9,
+  /** Explosion blast radius in grid cells. */
+  blastRadiusCells: 2.8,
+  /** Center explosion damage against blocks. */
+  damage: 8,
+  /** Number of shrapnel bullets expelled on detonation. */
+  shrapnelCount: 0,
+  /** Damage multiplier against blight blocks. */
+  blightMultiplier: 2.0,
+  /** Object pool capacity. */
+  poolSize: 32,
+};
+
 export const CAMERA = {
   defaultZoom: 2.5,
   minZoom: 0.5,
