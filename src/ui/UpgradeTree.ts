@@ -75,6 +75,7 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   assault_rifle: { icon: "rifle", color: "#52f296" },
   rocket_launcher: { icon: "launcher", color: "#ff5c40" },
   sniper_rifle: { icon: "sniper", color: UI_COLORS.soldier },
+  katana: { icon: "katana", color: "#38d6ff" },
 };
 
 const lockIcon = (): string => sprite("lock", { color: "#6d8197", scale: 1 });
@@ -158,6 +159,7 @@ export class UpgradeTree {
             <button class="tree-tab" data-tab="assault_rifle"></button>
             <button class="tree-tab" data-tab="rocket_launcher"></button>
             <button class="tree-tab" data-tab="sniper_rifle"></button>
+            <button class="tree-tab" data-tab="katana"></button>
           </div>
           <div class="tree-legend">
             <span class="leg-item" style="--leg-c: #ffd84d">${goldIcon()} MONEY</span>
@@ -708,7 +710,8 @@ export class UpgradeTree {
         (def.branch === "shotgun" && def.id !== "shotgun_unlock" && u.levelOf("shotgun_unlock") === 0) ||
         (def.branch === "assault_rifle" && def.id !== "ar_unlock" && u.levelOf("ar_unlock") === 0) ||
         (def.branch === "rocket_launcher" && def.id !== "rocket_unlock" && u.levelOf("rocket_unlock") === 0) ||
-        (def.branch === "sniper_rifle" && def.id !== "sniper_unlock" && u.levelOf("sniper_unlock") === 0);
+        (def.branch === "sniper_rifle" && def.id !== "sniper_unlock" && u.levelOf("sniper_unlock") === 0) ||
+        (def.branch === "katana" && def.id !== "katana_unlock" && u.levelOf("katana_unlock") === 0);
       const rem = Math.max(0, def.unlockLifetimePixels - this.game.lifetimePixels);
       const lockMsg =
         rem > 0
@@ -766,6 +769,7 @@ export class UpgradeTree {
       { id: "assault_rifle", label: "ASSAULT", unlocked: st.arUnlocked },
       { id: "rocket_launcher", label: "ROCKET", unlocked: st.rocketUnlocked },
       { id: "sniper_rifle", label: "SNIPER", unlocked: st.sniperUnlocked },
+      { id: "katana", label: "KATANA", unlocked: st.katanaUnlocked },
     ];
     const socket = sprite("socket", { color: "#3d5267" });
 
@@ -782,6 +786,8 @@ export class UpgradeTree {
         wSummary = `AoE ${st.rocketBlastRadius.toFixed(1)}r · ${st.rocketDamage} DMG · ${st.rocketFireRate.toFixed(2)}/s`;
       } else if (curW === "sniper_rifle") {
         wSummary = `Sniper · ${st.sniperDamage} DMG · ${st.sniperPierce} Pierce · ${Math.round(st.sniperCritChance * 100)}% Crit`;
+      } else if (curW === "katana") {
+        wSummary = `Slash · ${st.katanaDamage} DMG (${st.katanaBlightMultiplier}× Blight) · ${st.katanaPierce} Pierce · ${st.katanaFireRate.toFixed(1)}/s`;
       }
 
       const wBtnsHtml = weaponDefs
@@ -856,6 +862,7 @@ export class UpgradeTree {
       ["assault_rifle", "ASSAULT RIFLE", st.arUnlocked],
       ["rocket_launcher", "ROCKET", st.rocketUnlocked],
       ["sniper_rifle", "SNIPER", st.sniperUnlocked],
+      ["katana", "KATANA", st.katanaUnlocked],
     ];
     for (const [tabId, label, unlocked] of tabLocks) {
       const btn = this.root.querySelector(`[data-tab="${tabId}"]`) as HTMLButtonElement | null;
@@ -875,7 +882,8 @@ export class UpgradeTree {
       this.activeTab === "shotgun" ||
       this.activeTab === "assault_rifle" ||
       this.activeTab === "rocket_launcher" ||
-      this.activeTab === "sniper_rifle";
+      this.activeTab === "sniper_rifle" ||
+      this.activeTab === "katana";
     this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);
     if (!hasCenterUnlockNode) {
       const hubSpec = TAB_ICONS[this.activeTab];
