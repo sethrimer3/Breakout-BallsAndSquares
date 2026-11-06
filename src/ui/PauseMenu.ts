@@ -119,6 +119,15 @@ export class PauseMenu {
         </div>
         <div class="set-row">
           <div class="set-info">
+            <div class="set-label">ALWAYS SHOOT (AUTO MOVE OFF)</div>
+            <div class="set-desc">Automatically shoot toward pointer/crosshair when manual control is active</div>
+          </div>
+          <button class="btn set-toggle ${set.alwaysShootWhenAutoMoveOff ? "btn-primary" : ""}" data-set="alwaysshoot">
+            ${set.alwaysShootWhenAutoMoveOff ? "ON" : "OFF"}
+          </button>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
             <div class="set-label">RECENTER CAMERA</div>
             <div class="set-desc">Snap camera back to the starting excavation room</div>
           </div>
@@ -129,6 +138,11 @@ export class PauseMenu {
         set.autoFollowCamera = !set.autoFollowCamera;
         this.game.camera.defaultFollow = set.autoFollowCamera;
         this.game.camera.following = set.autoFollowCamera;
+        this.game.save.save();
+        this.renderSettingsTab();
+      });
+      body.querySelector('[data-set="alwaysshoot"]')!.addEventListener("click", () => {
+        set.alwaysShootWhenAutoMoveOff = !set.alwaysShootWhenAutoMoveOff;
         this.game.save.save();
         this.renderSettingsTab();
       });

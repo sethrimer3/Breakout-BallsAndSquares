@@ -5,8 +5,30 @@ import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
 export const SAVE_KEY = "breach.save.v1";
 export const SAVE_VERSION = 1;
 
+export type SoldierBehavior =
+  | "free"
+  | "orthogonal"
+  | "vertical"
+  | "horizontal"
+  | "turn_left"
+  | "turn_right"
+  | "sentry_slow"
+  | "sentry_fast";
+
+export const VALID_BEHAVIORS: readonly SoldierBehavior[] = [
+  "free",
+  "orthogonal",
+  "vertical",
+  "horizontal",
+  "turn_left",
+  "turn_right",
+  "sentry_slow",
+  "sentry_fast",
+];
+
 export interface SoldierLoadout {
   weapon: WeaponType;
+  behavior: SoldierBehavior;
   equipment: (string | null)[];
 }
 
@@ -61,6 +83,8 @@ export interface SaveData {
     /** Blur shadow edges in open-air light instead of crisp lines. */
     softShadows: boolean;
     autoFollowCamera: boolean;
+    autoMove: boolean;
+    alwaysShootWhenAutoMoveOff: boolean;
   };
 }
 
@@ -69,7 +93,7 @@ export function defaultSaveData(): SaveData {
   for (const d of UPGRADE_DEFS) upgrades[d.id] = 0;
   const loadouts: SoldierLoadout[] = [];
   for (let i = 0; i < MAX_SOLDIER_SLOTS; i++) {
-    loadouts.push({ weapon: "pistol", equipment: [null, null] });
+    loadouts.push({ weapon: "pistol", behavior: "free", equipment: [null, null] });
   }
   return {
     version: SAVE_VERSION,
@@ -86,6 +110,8 @@ export function defaultSaveData(): SaveData {
       fieryMuzzleFlash: false,
       softShadows: false,
       autoFollowCamera: false,
+      autoMove: true,
+      alwaysShootWhenAutoMoveOff: false,
     },
   };
 }
@@ -124,10 +150,14 @@ export function sanitizeSaveData(raw: unknown): SaveData {
         if (typeof w === "string" && (VALID_WEAPONS as readonly string[]).includes(w)) {
           def.loadouts[i].weapon = w as WeaponType;
         }
+        const b = item.behavior;
+        if (typeof b === "string" && (VALID_BEHAVIORS as readonly string[]).includes(b)) {
+          def.loadouts[i].behavior = b as SoldierBehavior;
+        }
       }
     }
   }
-  // If any weapon is not unlocked in this save, fall back those loadouts to pistol.
+  // If any weapon or behavior is not unlocked in this save, fall back to safe defaults.
   for (const ld of def.loadouts) {
     if (ld.weapon === "shotgun" && (def.upgrades.shotgun_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
@@ -139,6 +169,16 @@ export function sanitizeSaveData(raw: unknown): SaveData {
       ld.weapon = "pistol";
     } else if (ld.weapon === "katana" && (def.upgrades.katana_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
+    }
+
+    if (ld.behavior === "orthogonal" && (def.upgrades.behavior_orthogonal ?? 0) === 0) {
+      ld.behavior = "free";
+    } else if ((ld.behavior === "vertical" || ld.behavior === "horizontal") && (def.upgrades.behavior_patrol ?? 0) === 0) {
+      ld.behavior = "free";
+    } else if ((ld.behavior === "turn_left" || ld.behavior === "turn_right") && (def.upgrades.behavior_turns ?? 0) === 0) {
+      ld.behavior = "free";
+    } else if ((ld.behavior === "sentry_slow" || ld.behavior === "sentry_fast") && (def.upgrades.behavior_sentry ?? 0) === 0) {
+      ld.behavior = "free";
     }
   }
 
@@ -164,6 +204,9 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     def.settings.softShadows = typeof s.softShadows === "boolean" ? s.softShadows : false;
     def.settings.autoFollowCamera =
       typeof s.autoFollowCamera === "boolean" ? s.autoFollowCamera : false;
+    def.settings.autoMove = typeof s.autoMove === "boolean" ? s.autoMove : true;
+    def.settings.alwaysShootWhenAutoMoveOff =
+      typeof s.alwaysShootWhenAutoMoveOff === "boolean" ? s.alwaysShootWhenAutoMoveOff : false;
   }
 
   return def;

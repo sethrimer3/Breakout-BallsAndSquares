@@ -261,6 +261,23 @@ export class Renderer {
       const selected = cam.following && cam.targetId === s.id;
       this.drawSoldierSprite(selected ? this.sprites.soldierSelected : this.sprites.soldier, sx, sy);
       const br = SOLDIER.renderRadius * cam.zoom;
+
+      if (s === game.getCommander()) {
+        ctx.save();
+        ctx.fillStyle = "#ffd84d";
+        ctx.strokeStyle = "#fffbe0";
+        ctx.lineWidth = 1;
+        const cy = sy - br - (s.maxHealth > 0 ? 9 : 5);
+        ctx.beginPath();
+        ctx.moveTo(sx - 3.5, cy);
+        ctx.lineTo(sx, cy - 3.5);
+        ctx.lineTo(sx + 3.5, cy);
+        ctx.lineTo(sx, cy - 1.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
       if (s.maxHealth > 0) {
         const barW = Math.max(12, 10 * cam.zoom);
         const barH = 2.5;
@@ -673,40 +690,75 @@ export class Renderer {
       ctx.fill();
       ctx.restore();
     } else if (game.input.mouseInside && !game.canPlaceSoldier() && !game.paused && !game.runOver) {
-      // Hovering with mouse when soldiers are deployed: show marker placement preview reticle
       const sx = game.input.mouseX;
       const sy = game.input.mouseY;
-      ctx.save();
-      ctx.strokeStyle = "rgba(0, 240, 255, 0.45)";
-      ctx.lineWidth = 1.5;
-      const r = 8;
-      // Diamond
-      ctx.beginPath();
-      ctx.moveTo(sx, sy - r);
-      ctx.lineTo(sx + r, sy);
-      ctx.lineTo(sx, sy + r);
-      ctx.lineTo(sx - r, sy);
-      ctx.closePath();
-      ctx.stroke();
+      const cmdr = game.getCommander();
 
-      // Crosshair ticks
-      ctx.beginPath();
-      ctx.moveTo(sx - r - 4, sy);
-      ctx.lineTo(sx - r + 1, sy);
-      ctx.moveTo(sx + r - 1, sy);
-      ctx.lineTo(sx + r + 4, sy);
-      ctx.moveTo(sx, sy - r - 4);
-      ctx.lineTo(sx, sy - r + 1);
-      ctx.moveTo(sx, sy + r - 1);
-      ctx.lineTo(sx, sy + r + 4);
-      ctx.stroke();
+      if (!game.autoMove && cmdr) {
+        // Manual commander aiming reticle and dashed line from commander to cursor
+        const csx = cam.worldToScreenX(cmdr.x);
+        const csy = cam.worldToScreenY(cmdr.y);
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 216, 77, 0.4)";
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(csx, csy);
+        ctx.lineTo(sx, sy);
+        ctx.stroke();
 
-      // Center dot
-      ctx.fillStyle = "rgba(0, 240, 255, 0.75)";
-      ctx.beginPath();
-      ctx.arc(sx, sy, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+        ctx.strokeStyle = "#ffd84d";
+        ctx.setLineDash([]);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(sx - 10, sy);
+        ctx.lineTo(sx - 4, sy);
+        ctx.moveTo(sx + 4, sy);
+        ctx.lineTo(sx + 10, sy);
+        ctx.moveTo(sx, sy - 10);
+        ctx.lineTo(sx, sy - 4);
+        ctx.moveTo(sx, sy + 4);
+        ctx.lineTo(sx, sy + 10);
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        // Hovering with mouse when soldiers are deployed: show marker placement preview reticle
+        ctx.save();
+        ctx.strokeStyle = "rgba(0, 240, 255, 0.45)";
+        ctx.lineWidth = 1.5;
+        const r = 8;
+        // Diamond
+        ctx.beginPath();
+        ctx.moveTo(sx, sy - r);
+        ctx.lineTo(sx + r, sy);
+        ctx.lineTo(sx, sy + r);
+        ctx.lineTo(sx - r, sy);
+        ctx.closePath();
+        ctx.stroke();
+
+        // Crosshair ticks
+        ctx.beginPath();
+        ctx.moveTo(sx - r - 4, sy);
+        ctx.lineTo(sx - r + 1, sy);
+        ctx.moveTo(sx + r - 1, sy);
+        ctx.lineTo(sx + r + 4, sy);
+        ctx.moveTo(sx, sy - r - 4);
+        ctx.lineTo(sx, sy - r + 1);
+        ctx.moveTo(sx, sy + r - 1);
+        ctx.lineTo(sx, sy + r + 4);
+        ctx.stroke();
+
+        // Center dot
+        ctx.fillStyle = "rgba(0, 240, 255, 0.75)";
+        ctx.beginPath();
+        ctx.arc(sx, sy, 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
     }
   }
 

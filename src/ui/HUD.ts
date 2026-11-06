@@ -32,6 +32,10 @@ export class HUD {
   private touchBar: HTMLDivElement;
   private followBtn: HTMLButtonElement;
   private markerBtn: HTMLButtonElement;
+  private tacticalBar: HTMLDivElement;
+  private autoMoveCheck: HTMLInputElement;
+  private lineBtn: HTMLButtonElement;
+  private triangleBtn: HTMLButtonElement;
   private helpOpen = false;
   private lastUpdate = 0;
 
@@ -105,6 +109,44 @@ export class HUD {
     });
     this.touchBar.append(pauseBtn, this.followBtn, this.markerBtn);
 
+    this.tacticalBar = document.createElement("div");
+    this.tacticalBar.className = "hud-tactical-bar";
+    this.tacticalBar.innerHTML = `
+      <label class="hud-check-label" title="Toggle autonomous soldier movement vs manual commander control">
+        <input type="checkbox" class="hud-automove" ${this.game.autoMove ? "checked" : ""} />
+        <span class="hud-check-custom"></span>
+        <span class="hud-check-text">AUTO MOVE</span>
+      </label>
+      <div class="hud-formations">
+        <button class="hud-form-btn hud-form-line hidden" title="Line Formation (Hotkey: 1) — soldiers follow in a line">
+          ${sprite("formationLine", { color: UI_COLORS.soldier, scale: 1 })}
+          <span>LINE</span>
+        </button>
+        <button class="hud-form-btn hud-form-triangle hidden" title="Triangle Formation (Hotkey: 2) — soldiers form a wedge">
+          ${sprite("formationTriangle", { color: UI_COLORS.soldier, scale: 1 })}
+          <span>TRI</span>
+        </button>
+      </div>
+    `;
+
+    this.autoMoveCheck = this.tacticalBar.querySelector(".hud-automove") as HTMLInputElement;
+    this.autoMoveCheck.addEventListener("change", () => {
+      this.game.setAutoMove(this.autoMoveCheck.checked);
+      this.update(this.game, performance.now(), true);
+    });
+
+    this.lineBtn = this.tacticalBar.querySelector(".hud-form-line") as HTMLButtonElement;
+    this.lineBtn.addEventListener("click", () => {
+      this.game.toggleFormation("line");
+      this.update(this.game, performance.now(), true);
+    });
+
+    this.triangleBtn = this.tacticalBar.querySelector(".hud-form-triangle") as HTMLButtonElement;
+    this.triangleBtn.addEventListener("click", () => {
+      this.game.toggleFormation("triangle");
+      this.update(this.game, performance.now(), true);
+    });
+
     this.statsEl = document.createElement("div");
     this.statsEl.className = "hud-stats";
 
@@ -143,11 +185,14 @@ export class HUD {
       <div class="help-title">HOW TO PLAY &amp; CONTROLS</div>
       <div class="help-status"></div>
       <div class="help-list">
+        <div class="help-mouse"><b>WASD / ARROWS</b> Move commander (when Auto Move is OFF)</div>
+        <div class="help-mouse"><b>MOUSE + CLICK</b> Aim &amp; shoot (or enable "Always shoot" in Settings)</div>
         <div class="help-mouse"><b>CLICK</b> Place soldier (in reserve) or bounce marker (during play)</div>
         <div class="help-mouse"><b>RIGHT CLICK</b> Place bounce marker anytime (soldiers in sight bounce toward it)</div>
         <div class="help-mouse"><b>PRESS &amp; DRAG</b> Pull back to aim arrow; release to launch</div>
         <div class="help-mouse"><b>RIGHT DRAG / WHEEL</b> Pan camera around &amp; zoom in/out</div>
         <div class="help-mouse"><b>ESC</b> Clear marker / Pause menu</div>
+        <div class="help-touch"><b>DUAL STICKS</b> Left stick to move, right stick to aim &amp; fire (Auto Move OFF)</div>
         <div class="help-touch"><b>TAP</b> Place soldier (in reserve) or bounce marker (during play)</div>
         <div class="help-touch"><b>DRAG &amp; RELEASE</b> Pull back to aim arrow; release to launch</div>
         <div class="help-touch"><b>TWO-FINGER PINCH/DRAG</b> Pan camera around &amp; zoom in/out</div>
@@ -155,6 +200,7 @@ export class HUD {
         <div class="help-touch"><b>${sprite("follow", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Follow farthest soldier, tap again to cycle</div>
         <div class="help-touch"><b>${sprite("pause", { color: UI_COLORS.white, scale: 1 })} BUTTON</b> Pause, restart, upgrades &amp; settings</div>
         <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}; Zone 2 unlocks glowing orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}. Soldiers must touch them to collect!</div>
+        <div class="help-keys"><b>1 / 2</b> Toggle Line / Triangle formation</div>
         <div class="help-keys"><b>F / TAB</b> Follow farthest / Cycle soldiers</div>
         <div class="help-keys"><b>T</b> Toggle marker mode</div>
         <div class="help-keys"><b>U</b> Open Upgrade Matrix</div>
@@ -166,6 +212,7 @@ export class HUD {
 
     this.root.append(
       bar,
+      this.tacticalBar,
       this.launchBtn,
       this.touchBar,
       this.statsEl,
@@ -244,6 +291,14 @@ export class HUD {
     this.followBtn.classList.toggle("active", game.camera.following);
     this.markerBtn.classList.toggle("active", Boolean(game.marker || game.markerMode));
 
+    this.autoMoveCheck.checked = game.autoMove;
+    const hasLine = game.upgrades.levelOf("formation_line") > 0;
+    const hasTriangle = game.upgrades.levelOf("formation_triangle") > 0;
+    this.lineBtn.classList.toggle("hidden", !hasLine);
+    this.triangleBtn.classList.toggle("hidden", !hasTriangle);
+    this.lineBtn.classList.toggle("active", game.activeFormation === "line");
+    this.triangleBtn.classList.toggle("active", game.activeFormation === "triangle");
+
     const st = game.stats;
     this.statsEl.innerHTML =
       `<div><b>SPD</b> ${st.speed.toFixed(0)}</div>` +
@@ -256,7 +311,12 @@ export class HUD {
     if (this.helpOpen) {
       let status = "";
       if (game.paused && !game.runOver) status = "PAUSED — Press Space or Esc to resume";
-      else if (game.marker) status = "Marker active — soldiers in sight bounce toward it (Esc to clear)";
+      else if (!game.autoMove) {
+        const cmdr = game.getCommander();
+        status = cmdr
+          ? `MANUAL COMMANDER #${cmdr.slotIndex + 1} ACTIVE — WASD to move, aim & click to shoot`
+          : "MANUAL CONTROL — All soldiers defeated";
+      } else if (game.marker) status = "Marker active — soldiers in sight bounce toward it (Esc to clear)";
       else if (game.markerMode) status = "Marker mode active — click anywhere to place marker (T to cancel)";
       else if (game.reserves > 0 && game.canDeploy)
         status = `Click to place (random dir) or drag to aim (${game.reserves} in reserve)`;
