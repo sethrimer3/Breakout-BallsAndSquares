@@ -1,4 +1,6 @@
-/** Pre-rendered gradient sprites (avoid creating gradients per particle per frame). */
+import { ART_PIXEL, SOLDIER } from "../config";
+
+/** Pre-rendered sprites (avoid creating gradients per particle per frame). */
 
 function makeCanvas(size: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement("canvas");
@@ -18,24 +20,64 @@ export function radialSprite(size: number, stops: [number, string][]): HTMLCanva
   return c;
 }
 
-/** Shaded metallic soldier sphere with a cyan rim highlight. */
-export function soldierSprite(size: number): HTMLCanvasElement {
-  const [c, g] = makeCanvas(size);
-  const r = size / 2;
-  const body = g.createRadialGradient(r * 0.7, r * 0.6, r * 0.05, r, r, r);
-  body.addColorStop(0, "#d8fbff");
-  body.addColorStop(0.18, "#6fb6d0");
-  body.addColorStop(0.55, "#1f3a52");
-  body.addColorStop(1, "#0b1420");
-  g.fillStyle = body;
-  g.beginPath();
-  g.arc(r, r, r - 1, 0, Math.PI * 2);
-  g.fill();
-  g.strokeStyle = "rgba(140, 240, 255, 0.55)";
-  g.lineWidth = Math.max(1, size * 0.05);
-  g.beginPath();
-  g.arc(r, r, r - g.lineWidth, Math.PI * 0.15, Math.PI * 0.95);
-  g.stroke();
+/** Palette for the pixel-art soldier: shadow, body, light, highlight, ring. */
+export const SOLDIER_PALETTE = {
+  "-": "#1c6b80",
+  "#": "#38d6ff",
+  "+": "#92e8ff",
+  w: "#ffffff",
+  o: "#38d6ff",
+} as const;
+
+/**
+ * Pixel grid for the soldier: a shaded sphere (lit from the upper left) inside a
+ * one-pixel ring. One character per pixel; "." is transparent, the rest index
+ * `SOLDIER_PALETTE`. The grid is square with an odd side so the sphere has a
+ * center pixel.
+ */
+export function soldierGrid(sphereRadius: number, ringRadius: number): string[] {
+  const n = 2 * Math.ceil(ringRadius - 0.5) + 1;
+  const c = n / 2;
+  const lx = -0.5;
+  const ly = -0.55;
+  const lz = 0.67;
+  const lm = Math.hypot(lx, ly, lz);
+  const rows: string[] = [];
+  for (let y = 0; y < n; y++) {
+    let row = "";
+    for (let x = 0; x < n; x++) {
+      const dx = x + 0.5 - c;
+      const dy = y + 0.5 - c;
+      const d = Math.hypot(dx, dy);
+      if (d <= sphereRadius) {
+        const nx = dx / sphereRadius;
+        const ny = dy / sphereRadius;
+        const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+        const i = (nx * lx + ny * ly + nz * lz) / lm;
+        row += i > 0.96 ? "w" : i > 0.82 ? "+" : i > 0.3 ? "#" : "-";
+      } else if (d <= ringRadius && d > ringRadius - 1) {
+        row += "o";
+      } else {
+        row += ".";
+      }
+    }
+    rows.push(row);
+  }
+  return rows;
+}
+
+/** Pixel-art soldier sprite at one canvas pixel per art pixel (draw with smoothing off). */
+export function soldierSprite(sphereRadius: number, ringRadius: number): HTMLCanvasElement {
+  const grid = soldierGrid(sphereRadius, ringRadius);
+  const [c, g] = makeCanvas(grid.length);
+  for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid.length; x++) {
+      const ch = grid[y][x] as keyof typeof SOLDIER_PALETTE | ".";
+      if (ch === ".") continue;
+      g.fillStyle = SOLDIER_PALETTE[ch];
+      g.fillRect(x, y, 1, 1);
+    }
+  }
   return c;
 }
 
@@ -123,7 +165,7 @@ export interface Sprites {
 
 export function createSprites(): Sprites {
   return {
-    soldier: soldierSprite(64),
+    soldier: soldierSprite(SOLDIER.renderRadius / ART_PIXEL, SOLDIER.ringRadius / ART_PIXEL),
     soldierGlow: radialSprite(64, [
       [0, "rgba(120, 225, 255, 0.45)"],
       [0.4, "rgba(80, 180, 255, 0.15)"],

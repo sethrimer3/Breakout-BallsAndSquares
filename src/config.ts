@@ -79,13 +79,16 @@ export function wallHealthForZone(zone: 0 | 1 | 2, distance: number): number {
   return Math.min(TERRAIN.maxHealthCap, Math.max(300, baseHp + 50));
 }
 
+/** Size of one pixel-art pixel (soldier sprites, bullets) in world units. */
+export const ART_PIXEL = 1;
+
 export const SOLDIER = {
   /** Collision radius. Must be < cellSize / 2 so soldiers fit one-cell tunnels. */
   collisionRadius: 3.2,
-  /** Visual body radius (purely cosmetic). */
+  /** Visual body radius (purely cosmetic), in world units = pixel-art pixels. */
   renderRadius: 4.5,
-  /** Visual glow halo radius. */
-  glowRadius: 7,
+  /** Outer radius of the one-pixel ring drawn around each soldier sphere. */
+  ringRadius: 8.5,
   /** Radius used when soldiers occlude light. */
   occluderRadius: 3.6,
   /** Base movement speed (units/s). Cut in half: 125 -> 62.5 */
