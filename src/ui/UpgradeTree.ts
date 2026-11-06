@@ -1,6 +1,7 @@
 import { TERRAIN } from "../config";
 import type { WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
+import type { SoldierBehavior } from "../progression/SaveManager";
 import {
   UPGRADE_BY_ID,
   UPGRADE_DEFS,
@@ -248,10 +249,16 @@ export class UpgradeTree {
     parent.append(this.root);
   }
 
-  /** True once the player has unlocked at least one second weapon beyond the starter Pistol. */
+  /** True once the player has unlocked multiple soldiers, another weapon, or custom behaviors. */
   isLoadoutUnlocked(): boolean {
     const st = this.game.upgrades.getSoldierStats();
-    return st.shotgunUnlocked || st.arUnlocked || st.rocketUnlocked || st.sniperUnlocked;
+    const u = this.game.upgrades;
+    const hasBehaviors =
+      u.levelOf("behavior_orthogonal") > 0 ||
+      u.levelOf("behavior_patrol") > 0 ||
+      u.levelOf("behavior_turns") > 0 ||
+      u.levelOf("behavior_sentry") > 0;
+    return st.maxSoldiers > 1 || st.shotgunUnlocked || st.arUnlocked || st.rocketUnlocked || st.sniperUnlocked || hasBehaviors;
   }
 
   /** Advance from Upgrade Matrix -> Loadout (if unlocked), or deploy the run. */
@@ -767,12 +774,26 @@ export class UpgradeTree {
       { id: "rocket_launcher", label: "ROCKET", unlocked: st.rocketUnlocked },
       { id: "sniper_rifle", label: "SNIPER", unlocked: st.sniperUnlocked },
     ];
+
+    const behaviorDefs: { id: SoldierBehavior; label: string; desc: string; icon: SpriteName }[] = [
+      { id: "free", label: "FREE", desc: "Default angled bounce", icon: "soldierDash" },
+      { id: "orthogonal", label: "ORTHO", desc: "Strict cardinal grid movement", icon: "behaviorGrid" },
+      { id: "vertical", label: "PATROL V", desc: "Up & down vertical patrol", icon: "behaviorPatrol" },
+      { id: "horizontal", label: "PATROL H", desc: "Side to side horizontal patrol", icon: "behaviorPatrol" },
+      { id: "turn_left", label: "TURN L", desc: "Turns left 90° on wall impact", icon: "behaviorTurns" },
+      { id: "turn_right", label: "TURN R", desc: "Turns right 90° on wall impact", icon: "behaviorTurns" },
+      { id: "sentry_slow", label: "TURRET 1", desc: "Stationary sentry, slow rotation", icon: "behaviorSentry" },
+      { id: "sentry_fast", label: "TURRET 2", desc: "Stationary sentry, fast rotation", icon: "behaviorSentry" },
+    ];
+
     const socket = sprite("socket", { color: "#3d5267" });
 
     let cardsHtml = "";
     for (let i = 0; i < count; i++) {
-      const ld = loadouts[i] ?? { weapon: "pistol", equipment: [null, null] };
+      const ld = loadouts[i] ?? { weapon: "pistol", behavior: "free", equipment: [null, null] };
       const curW: WeaponType = this.game.isWeaponUnlocked(ld.weapon) ? ld.weapon : "pistol";
+      const curB: SoldierBehavior = this.game.isBehaviorUnlocked(ld.behavior) ? ld.behavior : "free";
+
       let wSummary = `1 round · ${st.damage} DMG · ${st.fireRate.toFixed(2)}/s`;
       if (curW === "shotgun") {
         wSummary = `${st.shotgunPellets} pellets · ${st.shotgunDamage} DMG · ${st.shotgunFireRate.toFixed(2)}/s`;
@@ -795,6 +816,19 @@ export class UpgradeTree {
         )
         .join("");
 
+      const bBtnsHtml = behaviorDefs
+        .map((b) => {
+          const unlocked = this.game.isBehaviorUnlocked(b.id);
+          const isEquipped = curB === b.id;
+          return `
+            <button class="lc-bbtn ${isEquipped ? "equipped" : ""} ${!unlocked ? "locked" : ""}" data-slot="${i}" data-behavior="${b.id}" title="${b.label}: ${b.desc}" ${!unlocked ? "disabled" : ""}>
+              ${sprite(b.icon, { color: unlocked ? (isEquipped ? "#ffd84d" : UI_COLORS.soldier) : "#6d8197", scale: 1 })}
+              ${unlocked ? `<span class="lc-bname">${b.label}</span>` : `<span class="lc-bname">${lockIcon()}</span>`}
+            </button>
+          `;
+        })
+        .join("");
+
       cardsHtml += `
         <div class="loadout-card">
           <div class="lc-header">
@@ -806,6 +840,8 @@ export class UpgradeTree {
           </div>
           <div class="lc-section-lbl">PRIMARY WEAPON (1 PER SOLDIER)</div>
           <div class="lc-weapons">${wBtnsHtml}</div>
+          <div class="lc-section-lbl">BEHAVIOR PROTOCOL</div>
+          <div class="lc-behaviors">${bBtnsHtml}</div>
           <div class="lc-section-lbl">EQUIPMENT SLOTS (COMING SOON)</div>
           <div class="lc-gear-row">
             <div class="lc-gear-slot" title="Equipment slot 1 — coming soon">${socket}</div>
@@ -832,8 +868,23 @@ export class UpgradeTree {
         const slot = Number(el.dataset.slot);
         const weapon = el.dataset.weapon as WeaponType;
         if (!this.game.isWeaponUnlocked(weapon)) return;
-        if (!loadouts[slot]) loadouts[slot] = { weapon: "pistol", equipment: [null, null] };
+        if (!loadouts[slot]) loadouts[slot] = { weapon: "pistol", behavior: "free", equipment: [null, null] };
         loadouts[slot].weapon = weapon;
+        this.game.save.save();
+        this.game.audio.playPickup();
+        this.renderLoadout();
+      });
+    });
+
+    this.loadoutWrap.querySelectorAll(".lc-bbtn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const el = btn as HTMLButtonElement;
+        if (el.disabled) return;
+        const slot = Number(el.dataset.slot);
+        const behavior = el.dataset.behavior as SoldierBehavior;
+        if (!this.game.isBehaviorUnlocked(behavior)) return;
+        if (!loadouts[slot]) loadouts[slot] = { weapon: "pistol", behavior: "free", equipment: [null, null] };
+        loadouts[slot].behavior = behavior;
         this.game.save.save();
         this.game.audio.playPickup();
         this.renderLoadout();
