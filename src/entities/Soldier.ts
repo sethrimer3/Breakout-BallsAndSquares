@@ -7,6 +7,7 @@ import {
   SNIPER_RIFLE,
   SOLDIER,
 } from "../config";
+import type { SoldierBehavior } from "../progression/SaveManager";
 
 export type WeaponType =
   | "pistol"
@@ -143,11 +144,16 @@ export class Soldier {
   vy: number;
   speed: number;
   weapon: WeaponType;
+  behavior: SoldierBehavior;
+  slotIndex: number;
   radius = SOLDIER.collisionRadius;
   alive = true;
   health = 0;
   maxHealth = 0;
   fireCooldown: number;
+  facingAngle: number;
+  isManual = false;
+  isInFormation = false;
   /** Which side shell casings eject to (+1 / -1). */
   ejectSide: number;
   /** Consecutive substeps the soldier could not be freed from terrain (debug). */
@@ -162,15 +168,47 @@ export class Soldier {
     dirY: number,
     speed: number,
     weapon: WeaponType = "pistol",
+    behavior: SoldierBehavior = "free",
+    slotIndex = 0,
   ) {
     this.x = x;
     this.y = y;
-    const len = Math.hypot(dirX, dirY) || 1;
-    this.vx = (dirX / len) * speed;
-    this.vy = (dirY / len) * speed;
     this.speed = speed;
     this.weapon = weapon;
+    this.behavior = behavior;
+    this.slotIndex = slotIndex;
     this.fireCooldown = 0.15;
     this.ejectSide = Math.random() < 0.5 ? 1 : -1;
+
+    let len = Math.hypot(dirX, dirY) || 1;
+    let dx = dirX / len;
+    let dy = dirY / len;
+
+    if (behavior === "vertical") {
+      this.vx = 0;
+      this.vy = (dy >= 0 ? 1 : -1) * speed;
+      this.facingAngle = this.vy >= 0 ? Math.PI / 2 : -Math.PI / 2;
+    } else if (behavior === "horizontal") {
+      this.vy = 0;
+      this.vx = (dx >= 0 ? 1 : -1) * speed;
+      this.facingAngle = this.vx >= 0 ? 0 : Math.PI;
+    } else if (behavior === "orthogonal") {
+      if (Math.abs(dx) >= Math.abs(dy)) {
+        this.vy = 0;
+        this.vx = (dx >= 0 ? 1 : -1) * speed;
+      } else {
+        this.vx = 0;
+        this.vy = (dy >= 0 ? 1 : -1) * speed;
+      }
+      this.facingAngle = Math.atan2(this.vy, this.vx);
+    } else if (behavior === "sentry_slow" || behavior === "sentry_fast") {
+      this.vx = 0;
+      this.vy = 0;
+      this.facingAngle = Math.atan2(dy, dx);
+    } else {
+      this.vx = dx * speed;
+      this.vy = dy * speed;
+      this.facingAngle = Math.atan2(this.vy, this.vx);
+    }
   }
 }
