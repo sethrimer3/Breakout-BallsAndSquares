@@ -1492,7 +1492,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => {
       s.grenadeShrapnel = 2 * lvl;
     },
-    icon: "multishot",
+    icon: "cluster",
   },
   {
     id: "grenade_blight_mult",

@@ -100,10 +100,12 @@ button {
 .hud-launch-btn,
 .tree-shell,
 .tree-close,
+.tree-cat-btn,
 .tree-tab,
 .loadout-card,
 .lc-avatar,
 .lc-wbtn,
+.lc-sbtn,
 .lc-gear-slot,
 .loadout-hint,
 .tree-node,
@@ -1090,6 +1092,64 @@ button {
   font-size: var(--f8);
   color: var(--muted);
 }
+.tree-tabs-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.tree-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+.tree-cat-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: auto;
+  cursor: pointer;
+  font-family: var(--font-small);
+  font-size: var(--f8);
+  padding: 3px 8px;
+  color: #88a8c8;
+  background: var(--bg-1);
+  transition: background 0.1s, color 0.1s;
+}
+.tree-cat-btn:hover {
+  --fc: #8ee6ff;
+  color: #e4f4ff;
+}
+.tree-cat-btn.active {
+  --fc: var(--cyan);
+  color: #ffffff;
+  background: #123c55;
+}
+.tree-cat-name {
+  letter-spacing: 0.5px;
+}
+.cat-caret {
+  font-size: 8px;
+  opacity: 0.8;
+  margin-left: 2px;
+}
+.tree-category-panels {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+.tree-cat-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  min-height: 26px;
+}
+.tree-cat-panel.hidden {
+  display: none !important;
+}
 .tree-tabs {
   display: flex;
   flex-wrap: wrap;
@@ -1240,6 +1300,41 @@ button {
 }
 .lc-wbtn.locked .px:first-child {
   opacity: 0.45;
+}
+.lc-secondaries {
+  display: flex;
+  gap: 6px;
+}
+.lc-sbtn {
+  --fw: var(--px1);
+  flex: 1 1 0;
+  min-width: 0;
+  height: 32px;
+  padding: 2px 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--muted);
+  background: var(--bg-0);
+  font-family: var(--font-small);
+  font-size: var(--f8);
+}
+.lc-sbtn:hover {
+  --fc: #8ee6ff;
+  color: var(--text);
+}
+.lc-sbtn.equipped {
+  --fw: var(--px2);
+  --fc: #ff9d3b;
+  background: #382410;
+  color: #ffc477;
+}
+.lc-sbtn.locked {
+  --fc: #1c2733;
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 .lc-gear-row {
   display: flex;

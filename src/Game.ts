@@ -621,6 +621,12 @@ export class Game {
     }
   }
 
+  isSecondaryUnlocked(s: SecondaryWeaponType | null): boolean {
+    if (!s) return true;
+    if (s === "grenade") return this.stats.grenadeUnlocked;
+    return false;
+  }
+
   setAutoMove(enabled: boolean): void {
     this.autoMove = enabled;
     this.save.data.settings.autoMove = enabled;
@@ -764,6 +770,7 @@ export class Game {
     cy: number,
     result: 0 | 1 | 2,
     sub = false,
+    ownerId = 0,
   ): void {
     const destroyed = result === 2;
     if (destroyed) this.audio.playDestroy();
@@ -784,6 +791,7 @@ export class Game {
         }
         const lootKind = zoneForDepth(this.world.depthOf(cx, cy)) >= 1 ? LootKind.Crystal : LootKind.Gold;
         this.loot.spawnDropsForBlock(x, y, this.stats.dropChance * 0.25, this.stats.pickupLifetime, this.rng, lootKind);
+        this.checkSecondaryCharge(ownerId);
       }
       return;
     }
@@ -801,6 +809,7 @@ export class Game {
         this.particles.spawn(PKind.Debris, ccx + this.rng.range(-3, 3), ccy + this.rng.range(-3, 3), Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.4, 0.8), this.rng.range(1, 2), col, 4);
       }
       this.runStats.pixelsDestroyed++;
+      this.checkSecondaryCharge(ownerId);
       const depth = this.world.depthOf(cx, cy);
       if (depth > this.runStats.maxDepth) this.runStats.maxDepth = depth;
       const zone = zoneForDepth(depth);
@@ -881,6 +890,46 @@ export class Game {
         6,
       );
     }
+  }
+
+  private checkSecondaryCharge(ownerId: number): void {
+    if (ownerId <= 0) return;
+    const soldier = this.soldiers.find((s) => s.id === ownerId && s.alive);
+    if (!soldier || soldier.secondary !== "grenade") return;
+    soldier.secondaryBlocksBroken++;
+    const req = this.stats.grenadeBlocksRequired;
+    if (soldier.secondaryBlocksBroken >= req) {
+      soldier.secondaryBlocksBroken = 0;
+      this.combat.throwGrenade(
+        soldier,
+        this.stats.grenadeBlastRadius,
+        this.stats.grenadeDamage,
+        this.stats.grenadeShrapnel,
+        this.stats.grenadeBlightMult,
+      );
+    }
+  }
+
+  private onGrenadeThrow(_s: Soldier, x: number, y: number, dx: number, dy: number): void {
+    this.audio.playShot();
+    for (let i = 0; i < 4; i++) {
+      const a = Math.atan2(dy, dx) + this.rng.range(-0.4, 0.4);
+      const sp = this.rng.range(15, 35);
+      this.particles.spawn(PKind.Smoke, x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0.25, 2, 0x4a5a6a, 2);
+    }
+  }
+
+  private onGrenadeStick(x: number, y: number, nx: number, ny: number): void {
+    this.audio.playImpact();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.atan2(ny, nx) + this.rng.range(-0.8, 0.8);
+      const sp = this.rng.range(30, 80);
+      this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0.2, 1, 0xff7830, 5);
+    }
+  }
+
+  private onGrenadeBeep(x: number, y: number, _pct: number): void {
+    this.particles.spawn(PKind.Spark, x, y, 0, 0, 0.08, 1, 0xff2040, 3);
   }
 
   private onSoldierKilled(s: Soldier): void {
@@ -1046,6 +1095,7 @@ export class Game {
       this.combat.updateSoldier(s, dt);
     }
     this.combat.updateBullets(dt);
+    this.combat.updateGrenades(dt);
     this.growth.update(dt, this.runStats.time, this.soldiers);
     this.growthRate = this.growth.rate;
     this.runStats.recordSampleIfDue(this.growthRate);
@@ -1112,7 +1162,15 @@ export class Game {
       }
     }
     this.lighting.lastShadowLights = shadowed;
-    this.lighting.updateSoftLights(this.soldiers, this.world.roomCenterX, this.world.roomCenterY, cam);
+    const grenadeLights: { x: number; y: number; radius: number; strength: number }[] = [];
+    for (let i = 0; i < this.combat.grenades.items.length; i++) {
+      const g = this.combat.grenades.items[i];
+      if (g.active && g.stuck) {
+        const flash = (g.fuse % 0.22) < 0.11;
+        grenadeLights.push({ x: g.x, y: g.y, radius: 24, strength: flash ? 0.9 : 0.45 });
+      }
+    }
+    this.lighting.updateSoftLights(this.soldiers, this.world.roomCenterX, this.world.roomCenterY, cam, grenadeLights);
     const elapsed = performance.now() - t0;
     this.lighting.lastComputeMs = elapsed;
     this.debugInfo.lightMs = elapsed;

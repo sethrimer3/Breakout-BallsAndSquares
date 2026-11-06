@@ -183,6 +183,7 @@ export class LightingSystem {
     roomX: number,
     roomY: number,
     cam: CameraSystem,
+    extraLights?: readonly { x: number; y: number; radius: number; strength: number }[],
   ): void {
     this.softCount = 0;
     this.addSoftLight(roomX, roomY, LIGHT.roomLightRadius, LIGHT.roomLightStrength, -1, soldiers, cam);
@@ -192,6 +193,12 @@ export class LightingSystem {
       this.addSoftLight(
         s.x, s.y, LIGHT.soldierLightRadius, LIGHT.soldierLightStrength, s.id, soldiers, cam,
       );
+    }
+    if (extraLights) {
+      for (let i = 0; i < extraLights.length; i++) {
+        const el = extraLights[i];
+        this.addSoftLight(el.x, el.y, el.radius, el.strength, -2, soldiers, cam);
+      }
     }
   }
 

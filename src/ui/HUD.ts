@@ -300,13 +300,19 @@ export class HUD {
     this.triangleBtn.classList.toggle("active", game.activeFormation === "triangle");
 
     const st = game.stats;
-    this.statsEl.innerHTML =
+    let statsHtml =
       `<div><b>SPD</b> ${st.speed.toFixed(0)}</div>` +
       `<div><b>ROF</b> ${st.fireRate.toFixed(2)}/s</div>` +
       `<div><b>DMG</b> ${st.damage}</div>` +
       `<div><b>DROP</b> ${(st.dropChance * 100).toFixed(0)}%</div>` +
       `<div><b>MAG</b> ${st.magnetRange.toFixed(0)}</div>` +
       `<div><b>MAX</b> ${st.maxSoldiers}</div>`;
+
+    const grenadier = game.soldiers.find((x) => x.alive && x.secondary === "grenade");
+    if (grenadier) {
+      statsHtml += `<div style="color: #ff9d3b"><b>NADE</b> ${grenadier.secondaryBlocksBroken}/${st.grenadeBlocksRequired}</div>`;
+    }
+    this.statsEl.innerHTML = statsHtml;
 
     if (this.helpOpen) {
       let status = "";

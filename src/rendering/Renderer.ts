@@ -75,6 +75,7 @@ export class Renderer {
     // Soldiers are drawn after lighting so the pixel-art sprite keeps its full
     // palette instead of being darkened by the lightmap.
     this.drawSoldiers();
+    this.drawGrenades();
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
@@ -849,5 +850,70 @@ export class Renderer {
     ctx.stroke();
 
     ctx.restore();
+  }
+
+  /** Draw equippable secondary sticky grenades (both flying and stuck to walls). */
+  private drawGrenades(): void {
+    const { ctx, game } = this;
+    const cam = game.camera;
+    const items = game.combat.grenades.items;
+
+    for (let i = 0; i < items.length; i++) {
+      const g = items[i];
+      if (!g.active) continue;
+
+      const sx = cam.worldToScreenX(g.x);
+      const sy = cam.worldToScreenY(g.y);
+      if (sx < -40 || sy < -40 || sx > cam.viewW + 40 || sy > cam.viewH + 40) continue;
+
+      ctx.save();
+      ctx.translate(sx, sy);
+
+      if (!g.stuck) {
+        // Rotating grenade in flight
+        ctx.rotate(g.rotation);
+        const sz = Math.max(3, 5 * cam.zoom);
+        ctx.fillStyle = "#2c3d4f";
+        ctx.fillRect(-sz / 2, -sz / 2, sz, sz);
+        ctx.fillStyle = "#ff6a38";
+        ctx.fillRect(-sz / 4, -sz / 4, sz / 2, sz / 2);
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(-0.5, -0.5, 1, 1);
+      } else {
+        // Stuck grenade anchored to wall
+        const normAngle = Math.atan2(g.stuckNy, g.stuckNx);
+        ctx.rotate(normAngle);
+
+        const w = Math.max(4, 7 * cam.zoom);
+        const h = Math.max(3, 5 * cam.zoom);
+
+        // Base clamps against the wall
+        ctx.fillStyle = "#1e2a38";
+        ctx.fillRect(-h, -w / 2, h, w);
+
+        // Body canister
+        ctx.fillStyle = "#3e566d";
+        ctx.fillRect(-h * 0.85, -w * 0.35, h * 0.85, w * 0.7);
+
+        // Pulsing red/white LED diode
+        const flash = (g.fuse % 0.22) < 0.11;
+        ctx.fillStyle = flash ? "#ffffff" : "#ff2244";
+        ctx.beginPath();
+        ctx.arc(-h * 0.45, 0, Math.max(1.5, 1.8 * cam.zoom), 0, Math.PI * 2);
+        ctx.fill();
+
+        // Expanding warning pulse ring when about to detonate
+        if (g.fuse < 0.35) {
+          const p = 1 - g.fuse / 0.35;
+          ctx.strokeStyle = `rgba(255, 60, 40, ${1 - p})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(-h * 0.45, 0, (3 + p * 18) * cam.zoom, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      }
+
+      ctx.restore();
+    }
   }
 }

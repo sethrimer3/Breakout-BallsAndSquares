@@ -1,5 +1,5 @@
 import { TERRAIN } from "../config";
-import type { WeaponType } from "../entities/Soldier";
+import type { SecondaryWeaponType, WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
 import type { SoldierBehavior } from "../progression/SaveManager";
 import {
@@ -67,6 +67,46 @@ interface PanDrag {
   viewY: number;
 }
 
+export type UpgradeCategory = "systems" | "primary" | "secondary";
+
+export interface CategoryInfo {
+  id: UpgradeCategory;
+  name: string;
+  icon: SpriteName;
+  color: string;
+  branches: UpgradeBranch[];
+}
+
+export const CATEGORIES: readonly CategoryInfo[] = [
+  {
+    id: "systems",
+    name: "CORE / MONEY / BLIGHT",
+    icon: "soldier",
+    color: UI_COLORS.soldier,
+    branches: ["core", "resources", "blight"],
+  },
+  {
+    id: "primary",
+    name: "PRIMARY WEAPONS",
+    icon: "rifle",
+    color: "#52f296",
+    branches: ["pistol", "shotgun", "assault_rifle", "rocket_launcher", "sniper_rifle", "katana"],
+  },
+  {
+    id: "secondary",
+    name: "SECONDARY WEAPONS",
+    icon: "grenade",
+    color: "#ff9d3b",
+    branches: ["grenade"],
+  },
+];
+
+export function categoryForBranch(b: UpgradeBranch): UpgradeCategory {
+  if (b === "core" || b === "resources" || b === "blight") return "systems";
+  if (b === "grenade") return "secondary";
+  return "primary";
+}
+
 const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   core: { icon: "soldier", color: UI_COLORS.soldier },
   resources: { icon: "gold", color: UI_COLORS.gold },
@@ -77,6 +117,7 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   rocket_launcher: { icon: "launcher", color: "#ff5c40" },
   sniper_rifle: { icon: "sniper", color: UI_COLORS.soldier },
   katana: { icon: "katana", color: "#38d6ff" },
+  grenade: { icon: "grenade", color: "#ff9d3b" },
 };
 
 const lockIcon = (): string => sprite("lock", { color: "#6d8197", scale: 1 });
@@ -115,6 +156,7 @@ export class UpgradeTree {
   private nodeEls = new Map<UpgradeId, HTMLButtonElement>();
   private hoveredId: UpgradeId | null = null;
   private activeTab: UpgradeBranch = "core";
+  private expandedCategory: UpgradeCategory = "systems";
   private inLoadoutScreen = false;
   private bodies = new Map<string, ElasticBody>();
   private activeBodies: ElasticBody[] = [];
@@ -151,16 +193,42 @@ export class UpgradeTree {
         <div class="tree-header">
           <div class="tree-title">UPGRADE MATRIX</div>
           <div class="tree-sub">CORE SYSTEMS, WEAPON TREES &amp; SQUAD LOADOUT</div>
-          <div class="tree-tabs">
-            <button class="tree-tab active" data-tab="core">${tabHtml("core", "CORE")}</button>
-            <button class="tree-tab" data-tab="resources">${tabHtml("resources", "RESOURCES")}</button>
-            <button class="tree-tab" data-tab="blight">${tabHtml("blight", "BLIGHT")}</button>
-            <button class="tree-tab" data-tab="pistol">${tabHtml("pistol", "PISTOL")}</button>
-            <button class="tree-tab" data-tab="shotgun"></button>
-            <button class="tree-tab" data-tab="assault_rifle"></button>
-            <button class="tree-tab" data-tab="rocket_launcher"></button>
-            <button class="tree-tab" data-tab="sniper_rifle"></button>
-            <button class="tree-tab" data-tab="katana"></button>
+          <div class="tree-tabs-container">
+            <div class="tree-categories">
+              <button class="tree-cat-btn active expanded" data-cat="systems">
+                ${sprite("soldier", { color: UI_COLORS.soldier, scale: 1 })}
+                <span class="tree-cat-name">CORE / MONEY / BLIGHT</span>
+                <span class="cat-caret">▼</span>
+              </button>
+              <button class="tree-cat-btn" data-cat="primary">
+                ${sprite("rifle", { color: "#52f296", scale: 1 })}
+                <span class="tree-cat-name">PRIMARY WEAPONS</span>
+                <span class="cat-caret">▶</span>
+              </button>
+              <button class="tree-cat-btn" data-cat="secondary">
+                ${sprite("grenade", { color: "#ff9d3b", scale: 1 })}
+                <span class="tree-cat-name">SECONDARY WEAPONS</span>
+                <span class="cat-caret">▶</span>
+              </button>
+            </div>
+            <div class="tree-category-panels">
+              <div class="tree-cat-panel" data-cat="systems">
+                <button class="tree-tab active" data-tab="core">${tabHtml("core", "CORE")}</button>
+                <button class="tree-tab" data-tab="resources">${tabHtml("resources", "RESOURCES")}</button>
+                <button class="tree-tab" data-tab="blight">${tabHtml("blight", "BLIGHT")}</button>
+              </div>
+              <div class="tree-cat-panel hidden" data-cat="primary">
+                <button class="tree-tab" data-tab="pistol">${tabHtml("pistol", "PISTOL")}</button>
+                <button class="tree-tab" data-tab="shotgun"></button>
+                <button class="tree-tab" data-tab="assault_rifle"></button>
+                <button class="tree-tab" data-tab="rocket_launcher"></button>
+                <button class="tree-tab" data-tab="sniper_rifle"></button>
+                <button class="tree-tab" data-tab="katana"></button>
+              </div>
+              <div class="tree-cat-panel hidden" data-cat="secondary">
+                <button class="tree-tab" data-tab="grenade"></button>
+              </div>
+            </div>
           </div>
           <div class="tree-legend">
             <span class="leg-item" style="--leg-c: #ffd84d">${goldIcon()} MONEY</span>
@@ -211,7 +279,7 @@ export class UpgradeTree {
     this.lifeValEl = this.root.querySelector(".life-num") as HTMLSpanElement;
     this.titleEl = this.root.querySelector(".tree-title") as HTMLDivElement;
     this.subEl = this.root.querySelector(".tree-sub") as HTMLDivElement;
-    this.tabsEl = this.root.querySelector(".tree-tabs") as HTMLDivElement;
+    this.tabsEl = this.root.querySelector(".tree-tabs-container") as HTMLDivElement;
     this.legendEl = this.root.querySelector(".tree-legend") as HTMLDivElement;
     this.backBtnEl = this.root.querySelector('[data-act="back-matrix"]') as HTMLButtonElement;
     this.primaryBtnEl = this.root.querySelector('[data-act="primary"]') as HTMLButtonElement;
@@ -238,6 +306,13 @@ export class UpgradeTree {
     this.backBtnEl.addEventListener("click", () => this.closeLoadoutScreen());
     this.primaryBtnEl.addEventListener("click", () => this.onPrimaryAction());
 
+    this.root.querySelectorAll(".tree-cat-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const cat = (btn as HTMLElement).dataset.cat as UpgradeCategory;
+        this.selectCategory(cat);
+      });
+    });
+
     this.root.querySelectorAll(".tree-tab").forEach((btn) => {
       btn.addEventListener("click", () => {
         const tab = (btn as HTMLElement).dataset.tab as UpgradeBranch;
@@ -251,6 +326,39 @@ export class UpgradeTree {
     parent.append(this.root);
   }
 
+  selectCategory(cat: UpgradeCategory): void {
+    this.expandedCategory = cat;
+    const catInfo = CATEGORIES.find((c) => c.id === cat)!;
+    if (!catInfo.branches.includes(this.activeTab)) {
+      this.switchTab(catInfo.branches[0]);
+    } else {
+      this.updateCategoryUI();
+    }
+  }
+
+  private updateCategoryUI(): void {
+    this.root.querySelectorAll(".tree-cat-btn").forEach((btn) => {
+      const el = btn as HTMLElement;
+      const cat = el.dataset.cat as UpgradeCategory;
+      const isExpanded = cat === this.expandedCategory;
+      const containsActive = CATEGORIES.find((c) => c.id === cat)?.branches.includes(this.activeTab);
+      el.classList.toggle("active", Boolean(containsActive));
+      el.classList.toggle("expanded", isExpanded);
+      const caret = el.querySelector(".cat-caret");
+      if (caret) caret.textContent = isExpanded ? "▼" : "▶";
+    });
+
+    this.root.querySelectorAll(".tree-cat-panel").forEach((panel) => {
+      const el = panel as HTMLElement;
+      const cat = el.dataset.cat as UpgradeCategory;
+      el.classList.toggle("hidden", cat !== this.expandedCategory);
+    });
+
+    this.root.querySelectorAll(".tree-tab").forEach((btn) => {
+      btn.classList.toggle("active", (btn as HTMLElement).dataset.tab === this.activeTab);
+    });
+  }
+
   /** True once the player has unlocked multiple soldiers, another weapon, or custom behaviors. */
   isLoadoutUnlocked(): boolean {
     const st = this.game.upgrades.getSoldierStats();
@@ -260,7 +368,16 @@ export class UpgradeTree {
       u.levelOf("behavior_patrol") > 0 ||
       u.levelOf("behavior_turns") > 0 ||
       u.levelOf("behavior_sentry") > 0;
-    return st.maxSoldiers > 1 || st.shotgunUnlocked || st.arUnlocked || st.rocketUnlocked || st.sniperUnlocked || hasBehaviors;
+    return (
+      st.maxSoldiers > 1 ||
+      st.shotgunUnlocked ||
+      st.arUnlocked ||
+      st.rocketUnlocked ||
+      st.sniperUnlocked ||
+      st.katanaUnlocked ||
+      st.grenadeUnlocked ||
+      hasBehaviors
+    );
   }
 
   /** Advance from Upgrade Matrix -> Loadout (if unlocked), or deploy the run. */
@@ -287,11 +404,10 @@ export class UpgradeTree {
   switchTab(tab: UpgradeBranch): void {
     this.inLoadoutScreen = false;
     this.activeTab = tab;
+    this.expandedCategory = categoryForBranch(tab);
     this.hideTooltip();
     this.activateBranch(true);
-    this.root.querySelectorAll(".tree-tab").forEach((btn) => {
-      btn.classList.toggle("active", (btn as HTMLElement).dataset.tab === tab);
-    });
+    this.updateCategoryUI();
     this.refresh();
   }
 
@@ -318,6 +434,10 @@ export class UpgradeTree {
         this.subEl.textContent = "ROCKET LAUNCHER WEAPON TREE — HEAVY EXPLOSIVE BLAST & CLUSTER MUNITIONS";
       } else if (tab === "sniper_rifle") {
         this.subEl.textContent = "SNIPER RIFLE WEAPON TREE — HIGH-VELOCITY PENETRATING ROUNDS & CRITS";
+      } else if (tab === "katana") {
+        this.subEl.textContent = "KATANA WEAPON TREE — RAPID HIGH-PIERCE ENERGY SLASHES & ANTI-BLIGHT CRITS";
+      } else if (tab === "grenade") {
+        this.subEl.textContent = "STICKY GRENADE SECONDARY WEAPON TREE — HIGH-EXPLOSIVE STICKY ORDNANCE";
       }
     }
     this.tabsEl.classList.toggle("hidden", this.inLoadoutScreen);
@@ -718,7 +838,8 @@ export class UpgradeTree {
         (def.branch === "assault_rifle" && def.id !== "ar_unlock" && u.levelOf("ar_unlock") === 0) ||
         (def.branch === "rocket_launcher" && def.id !== "rocket_unlock" && u.levelOf("rocket_unlock") === 0) ||
         (def.branch === "sniper_rifle" && def.id !== "sniper_unlock" && u.levelOf("sniper_unlock") === 0) ||
-        (def.branch === "katana" && def.id !== "katana_unlock" && u.levelOf("katana_unlock") === 0);
+        (def.branch === "katana" && def.id !== "katana_unlock" && u.levelOf("katana_unlock") === 0) ||
+        (def.branch === "grenade" && def.id !== "grenade_unlock" && u.levelOf("grenade_unlock") === 0);
       const rem = Math.max(0, def.unlockLifetimePixels - this.game.lifetimePixels);
       const lockMsg =
         rem > 0
@@ -779,6 +900,11 @@ export class UpgradeTree {
       { id: "katana", label: "KATANA", unlocked: st.katanaUnlocked },
     ];
 
+    const secondaryDefs: { id: SecondaryWeaponType | null; label: string; unlocked: boolean; icon: SpriteName }[] = [
+      { id: null, label: "NONE", unlocked: true, icon: "close" },
+      { id: "grenade", label: "GRENADE", unlocked: st.grenadeUnlocked, icon: "grenade" },
+    ];
+
     const behaviorDefs: { id: SoldierBehavior; label: string; desc: string; icon: SpriteName }[] = [
       { id: "free", label: "FREE", desc: "Default angled bounce", icon: "soldierDash" },
       { id: "orthogonal", label: "ORTHO", desc: "Strict cardinal grid movement", icon: "behaviorGrid" },
@@ -790,12 +916,12 @@ export class UpgradeTree {
       { id: "sentry_fast", label: "TURRET 2", desc: "Stationary sentry, fast rotation", icon: "behaviorSentry" },
     ];
 
-    const socket = sprite("socket", { color: "#3d5267" });
-
     let cardsHtml = "";
     for (let i = 0; i < count; i++) {
-      const ld = loadouts[i] ?? { weapon: "pistol", behavior: "free", equipment: [null, null] };
+      const ld = loadouts[i] ?? { weapon: "pistol", behavior: "free", equipment: [null, null], secondary: null };
       const curW: WeaponType = this.game.isWeaponUnlocked(ld.weapon) ? ld.weapon : "pistol";
+      const curS: SecondaryWeaponType | null =
+        ld.secondary && this.game.isSecondaryUnlocked(ld.secondary) ? ld.secondary : null;
       const curB: SoldierBehavior = this.game.isBehaviorUnlocked(ld.behavior) ? ld.behavior : "free";
 
       let wSummary = `1 round · ${st.damage} DMG · ${st.fireRate.toFixed(2)}/s`;
@@ -810,6 +936,9 @@ export class UpgradeTree {
       } else if (curW === "katana") {
         wSummary = `Slash · ${st.katanaDamage} DMG (${st.katanaBlightMultiplier}× Blight) · ${st.katanaPierce} Pierce · ${st.katanaFireRate.toFixed(1)}/s`;
       }
+      if (curS === "grenade") {
+        wSummary += ` · NADE: ${st.grenadeBlocksRequired} blk (${st.grenadeDamage} dmg)`;
+      }
 
       const wBtnsHtml = weaponDefs
         .map(
@@ -817,6 +946,17 @@ export class UpgradeTree {
             <button class="lc-wbtn ${curW === w.id ? "equipped" : ""} ${!w.unlocked ? "locked" : ""}" data-slot="${i}" data-weapon="${w.id}" title="${w.label}" ${!w.unlocked ? "disabled" : ""}>
               ${sprite(TAB_ICONS[w.id].icon, { color: w.unlocked ? TAB_ICONS[w.id].color : "#6d8197", scale: 2 })}
               ${w.unlocked ? `<span class="lc-wname">${w.label}</span>` : `<span class="lc-wname">${lockIcon()}</span>`}
+            </button>
+          `,
+        )
+        .join("");
+
+      const sBtnsHtml = secondaryDefs
+        .map(
+          (sec) => `
+            <button class="lc-sbtn ${curS === sec.id ? "equipped" : ""} ${!sec.unlocked ? "locked" : ""}" data-slot="${i}" data-secondary="${sec.id ?? ""}" title="${sec.label}" ${!sec.unlocked ? "disabled" : ""}>
+              ${sprite(sec.icon, { color: sec.unlocked ? (curS === sec.id ? "#ffd84d" : "#ff9d3b") : "#6d8197", scale: 1 })}
+              ${sec.unlocked ? `<span class="lc-sname">${sec.label}</span>` : `<span class="lc-sname">${lockIcon()}</span>`}
             </button>
           `,
         )
@@ -846,13 +986,10 @@ export class UpgradeTree {
           </div>
           <div class="lc-section-lbl">PRIMARY WEAPON (1 PER SOLDIER)</div>
           <div class="lc-weapons">${wBtnsHtml}</div>
+          <div class="lc-section-lbl">SECONDARY ABILITY (1 PER SOLDIER)</div>
+          <div class="lc-secondaries">${sBtnsHtml}</div>
           <div class="lc-section-lbl">BEHAVIOR PROTOCOL</div>
           <div class="lc-behaviors">${bBtnsHtml}</div>
-          <div class="lc-section-lbl">EQUIPMENT SLOTS (COMING SOON)</div>
-          <div class="lc-gear-row">
-            <div class="lc-gear-slot" title="Equipment slot 1 — coming soon">${socket}</div>
-            <div class="lc-gear-slot" title="Equipment slot 2 — coming soon">${socket}</div>
-          </div>
         </div>
       `;
     }
@@ -889,8 +1026,26 @@ export class UpgradeTree {
         const slot = Number(el.dataset.slot);
         const behavior = el.dataset.behavior as SoldierBehavior;
         if (!this.game.isBehaviorUnlocked(behavior)) return;
-        if (!loadouts[slot]) loadouts[slot] = { weapon: "pistol", behavior: "free", equipment: [null, null] };
+        if (!loadouts[slot]) loadouts[slot] = { weapon: "pistol", behavior: "free", equipment: [null, null], secondary: null };
         loadouts[slot].behavior = behavior;
+        this.game.save.save();
+        this.game.audio.playPickup();
+        this.renderLoadout();
+      });
+    });
+
+    this.loadoutWrap.querySelectorAll(".lc-sbtn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const el = btn as HTMLButtonElement;
+        if (el.disabled) return;
+        const slot = Number(el.dataset.slot);
+        const secVal = el.dataset.secondary;
+        const secondary = (secVal ? secVal : null) as SecondaryWeaponType | null;
+        if (secondary && !this.game.isSecondaryUnlocked(secondary)) return;
+        if (!loadouts[slot]) {
+          loadouts[slot] = { weapon: "pistol", behavior: "free", equipment: [null, null], secondary: null };
+        }
+        loadouts[slot].secondary = secondary;
         this.game.save.save();
         this.game.audio.playPickup();
         this.renderLoadout();
@@ -914,6 +1069,7 @@ export class UpgradeTree {
       ["rocket_launcher", "ROCKET", st.rocketUnlocked],
       ["sniper_rifle", "SNIPER", st.sniperUnlocked],
       ["katana", "KATANA", st.katanaUnlocked],
+      ["grenade", "GRENADE", st.grenadeUnlocked],
     ];
     for (const [tabId, label, unlocked] of tabLocks) {
       const btn = this.root.querySelector(`[data-tab="${tabId}"]`) as HTMLButtonElement | null;
@@ -934,7 +1090,8 @@ export class UpgradeTree {
       this.activeTab === "assault_rifle" ||
       this.activeTab === "rocket_launcher" ||
       this.activeTab === "sniper_rifle" ||
-      this.activeTab === "katana";
+      this.activeTab === "katana" ||
+      this.activeTab === "grenade";
     this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);
     if (!hasCenterUnlockNode) {
       const hubSpec = TAB_ICONS[this.activeTab];
