@@ -345,6 +345,13 @@ export const COLORS = {
     [88, 94, 112], // brushed steel bulkhead
     [64, 54, 88], // reinforced violet-grey plating
   ] as const,
+  /** Pink blight subcell four-stop color ramp (RGB) for 50% sub-pixels grown by Blight Cores. */
+  pinkBlight: [
+    [175, 24, 96], // deep magenta-pink
+    [215, 38, 122], // vivid blight pink
+    [245, 68, 152], // bright hot pink
+    [255, 118, 188], // glowing pale pink highlight
+  ] as const,
   /** Lab detail colors, indexed by `DECOR` in world/LabDetails.ts. */
   labDecor: [
     [0, 0, 0], // none

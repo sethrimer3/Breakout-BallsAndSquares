@@ -61,12 +61,15 @@ export class Frontier {
     const w = this.world;
     if (!w.inBounds(cx, cy)) return;
     const i = cy * w.width + cx;
+    // Blight Cores generate pink sub-pixel blight instead of normal blight, and a
+    // cell holding pink sub-pixels is not open space for normal blight.
     const isFront =
       w.health[i] > 0 &&
-      ((cx > 0 && w.health[i - 1] === 0) ||
-        (cx < w.width - 1 && w.health[i + 1] === 0) ||
-        (cy > 0 && w.health[i - w.width] === 0) ||
-        (cy < w.height - 1 && w.health[i + w.width] === 0));
+      w.coreId[i] === 0 &&
+      ((cx > 0 && !w.anySolidInCell(cx - 1, cy)) ||
+        (cx < w.width - 1 && !w.anySolidInCell(cx + 1, cy)) ||
+        (cy > 0 && !w.anySolidInCell(cx, cy - 1)) ||
+        (cy < w.height - 1 && !w.anySolidInCell(cx, cy + 1)));
     if (isFront) this.add(i);
     else this.remove(i);
   }

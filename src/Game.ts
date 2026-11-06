@@ -101,7 +101,7 @@ export class Game {
     this.physics = new PhysicsSystem(this.world, this.rng);
     this.combat = new CombatSystem(this.world, this.rng, this.stats, {
       onShot: (s, dx, dy, mx, my) => this.onShot(s, dx, dy, mx, my),
-      onImpact: (x, y, nx, ny, cx, cy, result) => this.onImpact(x, y, nx, ny, cx, cy, result),
+      onImpact: (x, y, nx, ny, cx, cy, result, sub) => this.onImpact(x, y, nx, ny, cx, cy, result, sub),
       onExplosion: (x, y, rad) => this.onExplosion(x, y, rad),
     });
     this.growth = new GrowthSystem(this.world, this.rng, {

@@ -5,11 +5,12 @@ import type { Soldier } from "../entities/Soldier";
 import type { PixelWorld } from "../world/PixelWorld";
 
 /**
- * True if a circle at (x, y) with radius r overlaps no solid cell.
- * Out-of-bounds counts as solid.
+ * True if a circle at (x, y) with radius r overlaps no solid cell or solid
+ * 50% sub-pixel (pink core blight). Out-of-bounds counts as solid.
  */
 export function circleIsClear(world: PixelWorld, x: number, y: number, r: number): boolean {
   const cs = world.cellSize;
+  const ss = world.subCellSize;
   const x0 = Math.floor((x - r) / cs);
   const x1 = Math.floor((x + r) / cs);
   const y0 = Math.floor((y - r) / cs);
@@ -17,15 +18,27 @@ export function circleIsClear(world: PixelWorld, x: number, y: number, r: number
   const r2 = r * r;
   for (let cy = y0; cy <= y1; cy++) {
     for (let cx = x0; cx <= x1; cx++) {
-      if (!world.solidAt(cx, cy)) continue;
-      const px = x < cx * cs ? cx * cs : x > (cx + 1) * cs ? (cx + 1) * cs : x;
-      const py = y < cy * cs ? cy * cs : y > (cy + 1) * cs ? (cy + 1) * cs : y;
-      const dx = x - px;
-      const dy = y - py;
-      if (dx * dx + dy * dy < r2 - 1e-6) return false;
+      if (world.solidAt(cx, cy)) {
+        if (boxOverlapsCircle(cx * cs, cy * cs, cs, x, y, r2)) return false;
+      } else if (world.anySolidInCell(cx, cy)) {
+        for (let sy = cy * 2; sy <= cy * 2 + 1; sy++) {
+          for (let sx = cx * 2; sx <= cx * 2 + 1; sx++) {
+            if (world.subHealth[sy * world.subWidth + sx] === 0) continue;
+            if (boxOverlapsCircle(sx * ss, sy * ss, ss, x, y, r2)) return false;
+          }
+        }
+      }
     }
   }
   return true;
+}
+
+function boxOverlapsCircle(left: number, top: number, size: number, x: number, y: number, r2: number): boolean {
+  const px = x < left ? left : x > left + size ? left + size : x;
+  const py = y < top ? top : y > top + size ? top + size : y;
+  const dx = x - px;
+  const dy = y - py;
+  return dx * dx + dy * dy < r2 - 1e-6;
 }
 
 /**
@@ -79,7 +92,7 @@ interface Contact {
 
 const contact: Contact = { nx: 0, ny: 0, pen: 0 };
 
-/** Find the deepest contact between the circle and solid cells. Returns false if none. */
+/** Find the deepest contact between the circle and solid cells / sub-pixels. Returns false if none. */
 function deepestContact(world: PixelWorld, x: number, y: number, r: number, out: Contact): boolean {
   const cs = world.cellSize;
   const x0 = Math.floor((x - r) / cs);
@@ -90,79 +103,110 @@ function deepestContact(world: PixelWorld, x: number, y: number, r: number, out:
   out.pen = 0;
   for (let cy = y0; cy <= y1; cy++) {
     for (let cx = x0; cx <= x1; cx++) {
-      if (!world.solidAt(cx, cy)) continue;
-      const left = cx * cs;
-      const top = cy * cs;
-      const right = left + cs;
-      const bottom = top + cs;
-      const px = x < left ? left : x > right ? right : x;
-      const py = y < top ? top : y > bottom ? bottom : y;
-      const dx = x - px;
-      const dy = y - py;
-      const d2 = dx * dx + dy * dy;
-      if (d2 >= r * r) continue;
-      let nx: number;
-      let ny: number;
-      let pen: number;
-      if (d2 > 1e-10) {
-        // When the closest point lies on a cell corner that is shared with an
-        // adjacent solid cell, suppress the normal component along the shared
-        // wall: two neighbor cells form a flat wall, not an exposed corner.
-        const atLeft = px === left && x < left;
-        const atRight = px === right && x > right;
-        const atTop = py === top && y < top;
-        const atBottom = py === bottom && y > bottom;
-        let cdx = dx;
-        let cdy = dy;
-        if (atTop && ((atLeft && world.solidAt(cx - 1, cy)) || (atRight && world.solidAt(cx + 1, cy)))) {
-          cdx = 0;
-        }
-        if (atBottom && ((atLeft && world.solidAt(cx - 1, cy)) || (atRight && world.solidAt(cx + 1, cy)))) {
-          cdx = 0;
-        }
-        if (atLeft && ((atTop && world.solidAt(cx, cy - 1)) || (atBottom && world.solidAt(cx, cy + 1)))) {
-          cdy = 0;
-        }
-        if (atRight && ((atTop && world.solidAt(cx, cy - 1)) || (atBottom && world.solidAt(cx, cy + 1)))) {
-          cdy = 0;
-        }
-        const cd2 = cdx * cdx + cdy * cdy;
-        if (cd2 >= r * r || cd2 < 1e-10) continue;
-        const d = Math.sqrt(cd2);
-        nx = cdx / d;
-        ny = cdy / d;
-        pen = r - d;
-      } else {
-        // Center inside the cell: exit through the nearest face, preferring
-        // faces that open onto empty space.
-        const cand = [
-          { d: x - left, nx: -1, ny: 0, open: !world.solidAt(cx - 1, cy) },
-          { d: right - x, nx: 1, ny: 0, open: !world.solidAt(cx + 1, cy) },
-          { d: y - top, nx: 0, ny: -1, open: !world.solidAt(cx, cy - 1) },
-          { d: bottom - y, nx: 0, ny: 1, open: !world.solidAt(cx, cy + 1) },
-        ];
-        let best = cand[0];
-        let bestScore = Infinity;
-        for (const c of cand) {
-          const score = c.d + (c.open ? 0 : 1000);
-          if (score < bestScore) {
-            bestScore = score;
-            best = c;
+      if (world.solidAt(cx, cy)) {
+        if (boxContact(world, x, y, r, cx, cy, false, out)) found = true;
+      } else if (world.anySolidInCell(cx, cy)) {
+        for (let sy = cy * 2; sy <= cy * 2 + 1; sy++) {
+          for (let sx = cx * 2; sx <= cx * 2 + 1; sx++) {
+            if (world.subHealth[sy * world.subWidth + sx] === 0) continue;
+            if (boxContact(world, x, y, r, sx, sy, true, out)) found = true;
           }
         }
-        nx = best.nx;
-        ny = best.ny;
-        pen = best.d + r;
-      }
-      if (pen > out.pen) {
-        out.pen = pen;
-        out.nx = nx;
-        out.ny = ny;
-        found = true;
       }
     }
   }
   return found;
+}
+
+function solidNeighbor(world: PixelWorld, sub: boolean, gx: number, gy: number): boolean {
+  return sub ? world.subSolidAt(gx, gy) : world.solidAt(gx, gy);
+}
+
+/**
+ * Contact against one solid box: normal cell `(gx, gy)`, or sub-pixel `(gx, gy)` when `sub`.
+ * Updates `out` and returns true if this is the deepest contact so far.
+ */
+function boxContact(
+  world: PixelWorld,
+  x: number,
+  y: number,
+  r: number,
+  gx: number,
+  gy: number,
+  sub: boolean,
+  out: Contact,
+): boolean {
+  const size = sub ? world.subCellSize : world.cellSize;
+  const left = gx * size;
+  const top = gy * size;
+  const right = left + size;
+  const bottom = top + size;
+  const px = x < left ? left : x > right ? right : x;
+  const py = y < top ? top : y > bottom ? bottom : y;
+  const dx = x - px;
+  const dy = y - py;
+  const d2 = dx * dx + dy * dy;
+  if (d2 >= r * r) return false;
+  let nx: number;
+  let ny: number;
+  let pen: number;
+  if (d2 > 1e-10) {
+    // When the closest point lies on a box corner that is shared with an
+    // adjacent solid box, suppress the normal component along the shared
+    // wall: two neighbor boxes form a flat wall, not an exposed corner.
+    const atLeft = px === left && x < left;
+    const atRight = px === right && x > right;
+    const atTop = py === top && y < top;
+    const atBottom = py === bottom && y > bottom;
+    let cdx = dx;
+    let cdy = dy;
+    if (atTop && ((atLeft && solidNeighbor(world, sub, gx - 1, gy)) || (atRight && solidNeighbor(world, sub, gx + 1, gy)))) {
+      cdx = 0;
+    }
+    if (atBottom && ((atLeft && solidNeighbor(world, sub, gx - 1, gy)) || (atRight && solidNeighbor(world, sub, gx + 1, gy)))) {
+      cdx = 0;
+    }
+    if (atLeft && ((atTop && solidNeighbor(world, sub, gx, gy - 1)) || (atBottom && solidNeighbor(world, sub, gx, gy + 1)))) {
+      cdy = 0;
+    }
+    if (atRight && ((atTop && solidNeighbor(world, sub, gx, gy - 1)) || (atBottom && solidNeighbor(world, sub, gx, gy + 1)))) {
+      cdy = 0;
+    }
+    const cd2 = cdx * cdx + cdy * cdy;
+    if (cd2 >= r * r || cd2 < 1e-10) return false;
+    const d = Math.sqrt(cd2);
+    nx = cdx / d;
+    ny = cdy / d;
+    pen = r - d;
+  } else {
+    // Center inside the box: exit through the nearest face, preferring
+    // faces that open onto empty space.
+    const cand = [
+      { d: x - left, nx: -1, ny: 0, open: !solidNeighbor(world, sub, gx - 1, gy) },
+      { d: right - x, nx: 1, ny: 0, open: !solidNeighbor(world, sub, gx + 1, gy) },
+      { d: y - top, nx: 0, ny: -1, open: !solidNeighbor(world, sub, gx, gy - 1) },
+      { d: bottom - y, nx: 0, ny: 1, open: !solidNeighbor(world, sub, gx, gy + 1) },
+    ];
+    let best = cand[0];
+    let bestScore = Infinity;
+    for (const c of cand) {
+      const score = c.d + (c.open ? 0 : 1000);
+      if (score < bestScore) {
+        bestScore = score;
+        best = c;
+      }
+    }
+    nx = best.nx;
+    ny = best.ny;
+    pen = best.d + r;
+  }
+  if (pen > out.pen) {
+    out.pen = pen;
+    out.nx = nx;
+    out.ny = ny;
+    return true;
+  }
+  return false;
 }
 
 export interface PhysicsStats {

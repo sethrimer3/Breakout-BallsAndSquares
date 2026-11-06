@@ -200,42 +200,44 @@ function breachRoom(world: PixelWorld, r: LabRoom, rng: Rng, seed: number): void
 }
 
 /**
- * Paint a room completely overrun with dark pink blight and spawn a 3×3
+ * Paint a room completely overrun with dark pink blight and spawn a 2×2
  * glowing Blight Core at its center. Destroying all cells of the core reduces
  * the blight timer.
  */
 function overrunRoomWithBlight(world: PixelWorld, r: LabRoom, seed: number): void {
-  const rcx = r.x + Math.floor(r.size / 2);
-  const rcy = r.y + Math.floor(r.size / 2);
+  const rcx = r.x + Math.floor((r.size - 2) / 2);
+  const rcy = r.y + Math.floor((r.size - 2) / 2);
+  const centerFx = rcx + 0.5;
+  const centerFy = rcy + 0.5;
 
   // Overrun room interior with dark pink blight floor & glowing veins radiating from the core.
   for (let y = r.y; y < r.y + r.size; y++) {
     for (let x = r.x; x < r.x + r.size; x++) {
       const i = y * world.width + x;
-      const dx = x - rcx;
-      const dy = y - rcy;
+      const dx = x - centerFx;
+      const dy = y - centerFy;
       const dist = Math.hypot(dx, dy);
       const ang = Math.atan2(dy, dx);
       // Organic radiating tendrils + noise blotches.
       const n = valueNoise(x, y, 4, seed + 73);
       const ray = Math.abs(Math.sin(ang * 4 + n * 2.2));
-      const isVein = ray < 0.24 || n > 0.62 || dist <= 3.2;
+      const isVein = ray < 0.24 || n > 0.62 || dist <= 2.8;
       world.decor[i] = isVein ? DECOR.blightVein : DECOR.blightFloor;
     }
   }
 
-  // Place a 3×3 Blight Core centered at (rcx, rcy).
+  // Place a 2×2 Blight Core of normal-sized pixels at (rcx..rcx+1, rcy..rcy+1).
   const cid = world.blightCores.length + 1;
   const cells: number[] = [];
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
+  for (let dy = 0; dy <= 1; dy++) {
+    for (let dx = 0; dx <= 1; dx++) {
       const cx = rcx + dx;
       const cy = rcy + dy;
       if (!world.inBounds(cx, cy)) continue;
       const idx = cy * world.width + cx;
       world.wall[idx] = 0;
       world.coreId[idx] = cid;
-      world.decor[idx] = dx === 0 && dy === 0 ? DECOR.blightCoreHeart : DECOR.blightCoreShell;
+      world.decor[idx] = dx === dy ? DECOR.blightCoreHeart : DECOR.blightCoreShell;
       cells.push(idx);
     }
   }

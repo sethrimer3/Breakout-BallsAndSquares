@@ -6,10 +6,10 @@ export interface BlightCore {
   id: number;
   roomId: number;
   zone: 0 | 1 | 2;
-  /** Center cell coordinates of the 3×3 blight core. */
+  /** Top-left cell coordinates of the 2×2 blight core. */
   cx: number;
   cy: number;
-  /** Indices of the 9 cells (or fewer if clipped) belonging to this core. */
+  /** Indices of the 4 normal cells (or fewer if clipped) belonging to this core. */
   cells: number[];
   alive: boolean;
 }
@@ -26,14 +26,20 @@ export interface WorldDims {
 }
 
 /**
- * Typed-array pixel terrain. health[i] == 0 means empty; > 0 means solid with
- * that much remaining health. Cells outside the world are solid and
- * indestructible (the world border).
+ * Typed-array pixel terrain with dual-resolution support:
+ * - Normal grid (`width × height`, edge `cellSize`): `health[i] > 0` means solid normal pixel.
+ * - Sub-grid (`subWidth × subHeight`, edge `subCellSize = cellSize / 2`, 4 subcells per normal cell):
+ *   `subHealth[si] > 0` means a 50%-smaller pink blight pixel occupying that subcell when the parent
+ *   normal cell is empty (`health[i] === 0`).
+ * Cells outside the world are solid and indestructible (the world border).
  */
 export class PixelWorld implements SolidQuery {
   readonly width: number;
   readonly height: number;
   readonly cellSize: number;
+  readonly subWidth: number;
+  readonly subHeight: number;
+  readonly subCellSize: number;
   readonly roomSize: number;
   /** Center cell coordinates (used for distance / depth). */
   readonly centerX: number;
@@ -59,10 +65,21 @@ export class PixelWorld implements SolidQuery {
   readonly decor: Uint8Array;
   /** Per-cell Blight Core id (`0` = not a core cell, `id >= 1` = belongs to `blightCores[id - 1]`). */
   readonly coreId: Uint8Array;
-  /** Active/destroyed Blight Cores located inside blight-overrun rooms. */
+
+  /**
+   * 50%-smaller sub-pixel grid (4 subcells fit inside 1 normal cell).
+   * `subHealth[sy * subWidth + sx]` > 0 when a small pink blight pixel occupies `(sx, sy)`.
+   */
+  readonly subHealth: Uint8Array;
+  readonly subTint: Uint8Array;
+
+  /** Active/destroyed Blight Cores (each 2×2 normal cells) located inside blight-overrun rooms. */
   blightCores: BlightCore[] = [];
   /** Procedurally generated lab rooms & corridors from the most recent `generateWorld` call. */
   labLayout: LabLayout | null = null;
+
+  /** Fine-gridSolidQuery view for `gridRaycast` at `subCellSize` resolution. */
+  readonly subSolidQuery: SolidQuery;
 
   private listeners: CellListener[] = [];
 
@@ -70,6 +87,9 @@ export class PixelWorld implements SolidQuery {
     this.width = dims.width;
     this.height = dims.height;
     this.cellSize = dims.cellSize;
+    this.subWidth = dims.width * 2;
+    this.subHeight = dims.height * 2;
+    this.subCellSize = dims.cellSize / 2;
     this.roomSize = dims.roomSize;
     this.centerX = Math.floor(dims.width / 2);
     this.centerY = Math.floor(dims.height / 2);
@@ -83,6 +103,11 @@ export class PixelWorld implements SolidQuery {
     this.wall = new Uint8Array(dims.width * dims.height);
     this.decor = new Uint8Array(dims.width * dims.height);
     this.coreId = new Uint8Array(dims.width * dims.height);
+    this.subHealth = new Uint8Array(this.subWidth * this.subHeight);
+    this.subTint = new Uint8Array(this.subWidth * this.subHeight);
+    this.subSolidQuery = {
+      solidAt: (sx: number, sy: number) => this.subSolidAt(sx, sy),
+    };
   }
 
   get worldWidth(): number {
@@ -110,9 +135,43 @@ export class PixelWorld implements SolidQuery {
     return cx >= 0 && cy >= 0 && cx < this.width && cy < this.height;
   }
 
+  subInBounds(sx: number, sy: number): boolean {
+    return sx >= 0 && sy >= 0 && sx < this.subWidth && sy < this.subHeight;
+  }
+
   solidAt(cx: number, cy: number): boolean {
     if (cx < 0 || cy < 0 || cx >= this.width || cy >= this.height) return true;
     return this.health[cy * this.width + cx] > 0;
+  }
+
+  /**
+   * True if the 50% sub-pixel at `(sx, sy)` is solid — either because its parent
+   * normal cell `(sx >> 1, sy >> 1)` is solid OR because a small pink blight pixel
+   * (`subHealth > 0`) occupies `(sx, sy)`.
+   */
+  subSolidAt(sx: number, sy: number): boolean {
+    if (sx < 0 || sy < 0 || sx >= this.subWidth || sy >= this.subHeight) return true;
+    const cx = sx >> 1;
+    const cy = sy >> 1;
+    if (this.health[cy * this.width + cx] > 0) return true;
+    return this.subHealth[sy * this.subWidth + sx] > 0;
+  }
+
+  /** True if the normal cell `(cx, cy)` or any of its 4 subcells is solid. */
+  anySolidInCell(cx: number, cy: number): boolean {
+    if (cx < 0 || cy < 0 || cx >= this.width || cy >= this.height) return true;
+    if (this.health[cy * this.width + cx] > 0) return true;
+    const sx0 = cx * 2;
+    const sy0 = cy * 2;
+    const sw = this.subWidth;
+    const row0 = sy0 * sw + sx0;
+    const row1 = row0 + sw;
+    return (
+      this.subHealth[row0] > 0 ||
+      this.subHealth[row0 + 1] > 0 ||
+      this.subHealth[row1] > 0 ||
+      this.subHealth[row1 + 1] > 0
+    );
   }
 
   /** Chebyshev distance of a cell from the world center. */
@@ -135,33 +194,97 @@ export class PixelWorld implements SolidQuery {
         return wallHealthForZone(z, dist);
       }
       if (this.coreId[i] > 0) {
-        return Math.min(TERRAIN.maxHealthCap, maxHealthForDistance(dist) + GROWTH.coreHealthBonus);
+        return Math.min(TERRAIN.maxHealthCap, maxHealthAtCore(dist));
       }
     }
     return maxHealthForDistance(dist);
   }
 
+  /** Max health for a 50% pink blight sub-pixel at `(sx, sy)`. */
+  maxSubHealthAt(sx: number, sy: number): number {
+    const dist = this.distanceOf(sx >> 1, sy >> 1);
+    return Math.max(1, Math.ceil(maxHealthForDistance(dist) * 0.5));
+  }
+
   /**
-   * Directly set a cell's health (used by generation and growth).
-   * Fires listeners unless `silent`.
+   * Directly set a normal cell's health (used by generation and growth).
+   * Also clears any subcells inside `(cx, cy)`. Fires listeners unless `silent`.
    */
   setCell(cx: number, cy: number, hp: number, kind: CellChangeKind = "set", silent = false): void {
     if (!this.inBounds(cx, cy)) return;
     this.health[cy * this.width + cx] = hp;
+    const sx0 = cx * 2;
+    const sy0 = cy * 2;
+    const sw = this.subWidth;
+    const row0 = sy0 * sw + sx0;
+    const row1 = row0 + sw;
+    this.subHealth[row0] = 0;
+    this.subHealth[row0 + 1] = 0;
+    this.subHealth[row1] = 0;
+    this.subHealth[row1 + 1] = 0;
     if (!silent) this.emit(cx, cy, kind);
   }
 
   /**
-   * Apply damage. Returns 0 if nothing happened (empty / out of bounds),
-   * 1 if damaged, 2 if destroyed.
+   * Directly set a 50% subcell's health (pink blight pixel).
+   * Fires listeners on the parent normal cell `(sx >> 1, sy >> 1)` unless `silent`.
+   */
+  setSubCell(sx: number, sy: number, hp: number, kind: CellChangeKind = "grown", silent = false): void {
+    if (!this.subInBounds(sx, sy)) return;
+    this.subHealth[sy * this.subWidth + sx] = hp;
+    if (!silent) this.emit(sx >> 1, sy >> 1, kind);
+  }
+
+  /**
+   * Apply damage to a normal cell `(cx, cy)`. If the normal cell is empty (`hp === 0`)
+   * and any of its 4 subcells are solid, damages those subcells instead.
+   * Returns 0 if nothing happened, 1 if damaged, 2 if destroyed.
    */
   damage(cx: number, cy: number, amount: number): 0 | 1 | 2 {
     if (!this.inBounds(cx, cy)) return 0;
     const i = cy * this.width + cx;
     const hp = this.health[i];
-    if (hp === 0) return 0;
+    if (hp === 0) {
+      // Check if any subcell in this normal cell is occupied.
+      const sx0 = cx * 2;
+      const sy0 = cy * 2;
+      let bestRes: 0 | 1 | 2 = 0;
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < 2; dx++) {
+          const r = this.damageSub(sx0 + dx, sy0 + dy, amount);
+          if (r > bestRes) bestRes = r;
+        }
+      }
+      return bestRes;
+    }
     const next = Math.max(0, hp - amount);
     this.health[i] = next;
+    if (next === 0) {
+      this.emit(cx, cy, "destroyed");
+      return 2;
+    }
+    this.emit(cx, cy, "damaged");
+    return 1;
+  }
+
+  /**
+   * Apply damage at subcell coordinates `(sx, sy)`.
+   * If the parent normal cell `(sx >> 1, sy >> 1)` is solid, damages the parent normal cell.
+   * Otherwise damages the 50% pink blight subcell at `(sx, sy)`.
+   */
+  damageSub(sx: number, sy: number, amount: number): 0 | 1 | 2 {
+    if (!this.subInBounds(sx, sy)) return 0;
+    const cx = sx >> 1;
+    const cy = sy >> 1;
+    const i = cy * this.width + cx;
+    if (this.health[i] > 0) {
+      return this.damage(cx, cy, amount);
+    }
+    const si = sy * this.subWidth + sx;
+    const hp = this.subHealth[si];
+    if (hp === 0) return 0;
+    const next = Math.max(0, hp - amount);
+    this.subHealth[si] = next;
     if (next === 0) {
       this.emit(cx, cy, "destroyed");
       return 2;
@@ -190,4 +313,8 @@ export class PixelWorld implements SolidQuery {
   private emit(cx: number, cy: number, kind: CellChangeKind): void {
     for (let k = 0; k < this.listeners.length; k++) this.listeners[k](cx, cy, kind);
   }
+}
+
+function maxHealthAtCore(dist: number): number {
+  return maxHealthForDistance(dist) + GROWTH.coreHealthBonus;
 }

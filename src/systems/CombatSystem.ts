@@ -9,7 +9,7 @@ import type { PixelWorld } from "../world/PixelWorld";
 export interface CombatEvents {
   /** A soldier fired (once per trigger pull). */
   onShot?(s: Soldier, dirX: number, dirY: number, muzzleX: number, muzzleY: number): void;
-  /** A bullet or explosion damaged/destroyed terrain. result: 1 damaged, 2 destroyed, 0 border. */
+  /** A bullet or explosion damaged/destroyed terrain. result: 1 damaged, 2 destroyed, 0 border. `sub`: hit a 50% pink sub-pixel in cell (cx, cy). */
   onImpact?(
     x: number,
     y: number,
@@ -18,6 +18,7 @@ export interface CombatEvents {
     cx: number,
     cy: number,
     result: 0 | 1 | 2,
+    sub?: boolean,
   ): void;
   /** A rocket or cluster bomb detonated at (x, y) with radius (world units). */
   onExplosion?(x: number, y: number, radiusWorld: number): void;
@@ -253,24 +254,32 @@ export class CombatSystem {
 
     let remDist = b.speed * dt + b.pendingAdvance;
     b.pendingAdvance = 0;
-    const cs = this.world.cellSize;
+    const w = this.world;
+    const cs = w.cellSize;
+    const ss = w.subCellSize;
     let curX = b.x;
     let curY = b.y;
     let guard = 0;
 
     while (remDist > 1e-4 && guard++ < 8) {
-      if (gridRaycast(this.world, cs, curX, curY, b.dx, b.dy, remDist, hit)) {
+      // Fine-grid traversal: sees normal cells and 50% pink sub-pixels alike.
+      if (gridRaycast(w.subSolidQuery, ss, curX, curY, b.dx, b.dy, remDist, hit)) {
+        const hcx = hit.cx >> 1;
+        const hcy = hit.cy >> 1;
         // Rocket / explosive projectile detonates on impact!
         if (b.explosionRadius > 0) {
-          this.detonateRocket(b, hit.x, hit.y, hit.nx, hit.ny, hit.cx, hit.cy);
+          this.detonateRocket(b, hit.x, hit.y, hit.nx, hit.ny, hcx, hcy);
           this.bullets.release(b);
           return;
         }
 
-        const isCore = this.world.coreId[hit.cy * this.world.width + hit.cx] > 0;
+        const inside = w.inBounds(hcx, hcy);
+        const cellIdx = hcy * w.width + hcx;
+        const isSub = inside && w.health[cellIdx] === 0;
+        const isCore = inside && !isSub && w.coreId[cellIdx] > 0;
         const hitDmg = b.damage + (isCore ? this.stats.coreDamageBonus : 0);
-        const result = this.world.damage(hit.cx, hit.cy, hitDmg);
-        this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hit.cx, hit.cy, result);
+        const result = w.damageSub(hit.cx, hit.cy, hitDmg);
+        this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, result, isSub);
 
         // If the bullet hit the indestructible world border (result === 0) or has no pierce left, stop.
         if (result === 0 || b.pierceLeft <= 0) {
@@ -280,7 +289,7 @@ export class CombatSystem {
 
         // Pierce! Step past the impacted cell and continue along the ray.
         b.pierceLeft--;
-        const stepPast = Math.max(0.5, hit.t + cs * 0.65);
+        const stepPast = Math.max(0.5, hit.t + (isSub ? ss : cs) * 0.65);
         b.traveled += stepPast;
         remDist -= stepPast;
         curX += b.dx * stepPast;
@@ -328,13 +337,15 @@ export class CombatSystem {
         if (d2 > r2) continue;
         // Full damage near epicenter, tapering slightly at outer blast edge.
         const falloff = 1 - 0.35 * (Math.sqrt(d2) / Math.max(1, radCells));
-        const isCore = w.coreId[cy * w.width + cx] > 0;
+        const idx = cy * w.width + cx;
+        const wasSub = w.health[idx] === 0;
+        const isCore = !wasSub && w.coreId[idx] > 0;
         const dmg = Math.max(1, Math.round(b.damage * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
         const res = w.damage(cx, cy, dmg);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
           const wy = (cy + 0.5) * cs;
-          this.events.onImpact?.(wx, wy, nx, ny, cx, cy, res);
+          this.events.onImpact?.(wx, wy, nx, ny, cx, cy, res, wasSub);
         }
       }
     }
