@@ -176,6 +176,11 @@ export class Game {
     return MUZZLE_FLASH_MULTIPLIER[this.save.data.settings.muzzleFlash] ?? 1;
   }
 
+  /** Soft, orange "fiery" muzzle flashes (visual setting). */
+  get fieryMuzzleFlash(): boolean {
+    return this.save.data.settings.fieryMuzzleFlash;
+  }
+
   get lifetimePixels(): number {
     return this.save.data.lifetimePixels;
   }

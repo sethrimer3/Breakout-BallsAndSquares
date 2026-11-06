@@ -21,6 +21,22 @@ const SCATTER_STOPS: readonly Stop[] = [
   [1, 255, 90, 0, 0],
 ];
 
+/** Fiery-mode variants: deeper orange with less white, for flame-lit air. */
+const FIERY_FLASH_STOPS: readonly Stop[] = [
+  [0, 255, 228, 170, 1],
+  [0.16, 255, 178, 85, 0.9],
+  [0.48, 255, 110, 28, 0.55],
+  [0.8, 200, 55, 10, 0.2],
+  [1, 120, 25, 0, 0],
+];
+
+const FIERY_SCATTER_STOPS: readonly Stop[] = [
+  [0, 255, 200, 130, 0.3],
+  [0.25, 255, 140, 50, 0.18],
+  [0.6, 230, 80, 15, 0.07],
+  [1, 180, 40, 0, 0],
+];
+
 /** Matches the `soldierGlow` sprite. */
 const SOFT_STOPS: readonly Stop[] = [
   [0, 120, 225, 255, 0.45],
@@ -47,6 +63,7 @@ function buildLut(stops: readonly Stop[]): Float32Array {
 }
 
 const FLASH_LUT = buildLut(FLASH_STOPS);
+const FIERY_FLASH_LUT = buildLut(FIERY_FLASH_STOPS);
 const SOFT_LUT = buildLut(SOFT_STOPS);
 
 function makeLayer(alpha: boolean): [HTMLCanvasElement, CanvasRenderingContext2D] {
@@ -145,6 +162,9 @@ export class LightRenderer {
       }
     }
     const flashMult = game.muzzleFlashMultiplier;
+    const fiery = game.fieryMuzzleFlash;
+    const flashStops = fiery ? FIERY_FLASH_STOPS : FLASH_STOPS;
+    const scatterStops = fiery ? FIERY_SCATTER_STOPS : SCATTER_STOPS;
     if (flashMult > 0) {
       for (const fl of game.flashes) {
         const intensity = Math.pow(Math.max(0, fl.life / fl.maxLife), 0.65) * flashMult;
@@ -154,7 +174,7 @@ export class LightRenderer {
         if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
         if (fl.hasPolygon) {
           this.tracePolygonPath(air, game, fl.poly, fl.polyCount);
-          air.fillStyle = gradientFor(air, sx, sy, rad, FLASH_STOPS, intensity);
+          air.fillStyle = gradientFor(air, sx, sy, rad, flashStops, intensity);
           air.fill();
         } else {
           // Fallback cheap glow when over the shadow-light budget.
@@ -220,7 +240,7 @@ export class LightRenderer {
         if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
         scatter ??= this.beginLayer(devW, devH, dpr);
         this.tracePolygonPath(scatter, game, fl.poly, fl.polyCount);
-        scatter.fillStyle = gradientFor(scatter, sx, sy, rad, SCATTER_STOPS, intensity);
+        scatter.fillStyle = gradientFor(scatter, sx, sy, rad, scatterStops, intensity);
         scatter.fill();
       }
     }
@@ -300,11 +320,12 @@ export class LightRenderer {
       this.addWallLight(game, l.lit, l.x, l.y, l.radius, l.strength, SOFT_LUT);
     }
     const flashMult = game.muzzleFlashMultiplier;
+    const flashLut = game.fieryMuzzleFlash ? FIERY_FLASH_LUT : FLASH_LUT;
     if (flashMult > 0) {
       for (const fl of game.flashes) {
         if (!fl.hasPolygon) continue;
         const intensity = Math.pow(Math.max(0, fl.life / fl.maxLife), 0.65) * flashMult;
-        this.addWallLight(game, fl.lit, fl.x, fl.y, fl.radius, intensity, FLASH_LUT);
+        this.addWallLight(game, fl.lit, fl.x, fl.y, fl.radius, intensity, flashLut);
       }
     }
 

@@ -2,6 +2,7 @@ import { ART_PIXEL, BULLET, COLORS, GROWTH, SOLDIER } from "../config";
 import { PKind } from "../entities/ParticleSystem";
 import type { Game } from "../Game";
 import { hasLineOfSight } from "../systems/PhysicsSystem";
+import { FieryFlashRenderer } from "./FieryFlashRenderer";
 import { LightRenderer } from "./LightRenderer";
 import { createSprites, type Sprites } from "./sprites";
 
@@ -14,6 +15,7 @@ export class Renderer {
   private dpr = 1;
   private sprites: Sprites;
   private lightRenderer: LightRenderer;
+  private fieryFlash: FieryFlashRenderer;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -22,6 +24,7 @@ export class Renderer {
     this.ctx = canvas.getContext("2d", { alpha: false })!;
     this.sprites = createSprites();
     this.lightRenderer = new LightRenderer(this.sprites);
+    this.fieryFlash = new FieryFlashRenderer(this.lightRenderer);
   }
 
   resize(): void {
@@ -79,12 +82,18 @@ export class Renderer {
     this.drawAimIndicator();
     this.drawMarker();
 
+    // Fiery mode: soft flames via a blurred low-res light buffer (screen blend),
+    // drawn before tracers/sparks so those stay crisp on top.
+    const fiery = game.fieryMuzzleFlash;
+    if (fiery) this.fieryFlash.render(ctx, game);
+
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     this.drawBlightCorePulses();
     this.drawLoot();
     this.drawGrowthPulses();
-    this.drawMuzzleFlares();
+    if (fiery) this.fieryFlash.drawHotPixels(ctx, game);
+    else this.drawMuzzleFlares();
     this.drawBullets();
     this.drawAdditiveParticles();
     ctx.restore();

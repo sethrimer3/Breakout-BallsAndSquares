@@ -662,6 +662,24 @@ button {
   padding: 6px 12px;
 }
 
+.set-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.px-check {
+  flex: none;
+  width: var(--f8);
+  height: var(--f8);
+  box-shadow: 0 0 0 var(--px2) var(--muted);
+  background: transparent;
+}
+.set-check.is-checked .px-check {
+  box-shadow: 0 0 0 var(--px2) var(--orange);
+  background: var(--orange);
+}
+
 .set-slider {
   flex: none;
   width: 160px;
