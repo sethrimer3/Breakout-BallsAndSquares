@@ -42,8 +42,8 @@ export class CasingSystem {
     if (this.count < this.cap) i = this.count++;
     else i = rng.int(this.cap);
 
-    // Perpendicular direction with +/-22° jitter and a slight backward kick.
-    const baseAngle = Math.atan2(dirY, dirX) + side * (Math.PI * 0.58) + rng.range(-0.38, 0.38);
+    // Perpendicular direction with slight forward/side ejection.
+    const baseAngle = Math.atan2(dirY, dirX) + side * (Math.PI * 0.44) + rng.range(-0.15, 0.15);
     const sp = rng.range(CASING.minSpeed, CASING.maxSpeed);
     const life = rng.range(CASING.minLife, CASING.maxLife);
 

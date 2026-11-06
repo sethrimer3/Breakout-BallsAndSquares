@@ -34,10 +34,10 @@ describe("Phase 2 — Frontier O(1) indexed set", () => {
 });
 
 describe("Phase 2 — GrowthSystem rules & escalation", () => {
-  it("honors the 12s grace period, exponential rise and 150/s cap", () => {
+  it("honors the grace period, exponential rise and 150/s cap", () => {
     expect(growthRateAt(0)).toBe(0);
-    expect(growthRateAt(11.99)).toBe(0);
-    expect(growthRateAt(12)).toBeCloseTo(GROWTH.baseRate, 5);
+    expect(growthRateAt(GROWTH.graceSeconds - 0.01)).toBe(0);
+    expect(growthRateAt(GROWTH.graceSeconds)).toBeCloseTo(GROWTH.baseRate, 5);
     expect(growthRateAt(30)).toBeGreaterThan(growthRateAt(15));
     expect(growthRateAt(1000)).toBe(GROWTH.maxRate);
   });
@@ -242,12 +242,12 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
     const g = new GrowthSystem(w, new Rng(1234));
     g.reset();
 
-    // At runTime = 65s, growth rate is ~6 sub-pixels per second.
+    // At runTime = 38s, growth rate is ~6 sub-pixels per second.
     // In 1 second, Core 1 alone produces ~6 sub-pixels.
     core2.alive = false;
     // Step 1 second (60 dt steps)
     for (let step = 0; step < 60; step++) {
-      g.update(1 / 60, 65, []);
+      g.update(1 / 60, 38, []);
     }
 
     let pinkCountCore1Only = 0;
@@ -272,7 +272,7 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
 
     // Step 1 second with compounding connected cores
     for (let step = 0; step < 60; step++) {
-      g.update(1 / 60, 65, []);
+      g.update(1 / 60, 38, []);
     }
 
     let pinkCountCompounded = 0;

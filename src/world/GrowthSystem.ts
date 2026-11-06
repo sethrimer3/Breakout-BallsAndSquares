@@ -389,6 +389,31 @@ export class GrowthSystem {
   replicateOne(runTime: number, soldiers: readonly Soldier[]): boolean {
     const w = this.world;
     const f = this.frontier;
+
+    if (f.size === 0) {
+      const dx = w.centerX;
+      const dy = w.centerY;
+      const dest = dy * w.width + dx;
+      const hp = this.weakenChance > 0 && this.rng.next() < this.weakenChance ? 1 : w.maxHealthAt(dx, dy);
+      w.setCell(dx, dy, hp, "grown");
+      w.decor[dest] = 0;
+      this.recordGlow(dest, runTime);
+      this.recordTelemetry(dx, dy, runTime, soldiers);
+      this.totalEvents++;
+      this.events.onGrow?.(dx, dy);
+
+      if (this.explosiveChance > 0 && this.rng.next() < this.explosiveChance) {
+        this.pendingExplosions.push({
+          cx: dx,
+          cy: dy,
+          timer: this.rng.range(0.2, 0.45),
+          radius: this.explosiveRadius,
+          damage: this.explosiveDamage,
+        });
+      }
+      return true;
+    }
+
     const neighbors: number[] = [];
     for (let attempt = 0; attempt < 8 && f.size > 0; attempt++) {
       const src = this.pickSource(soldiers);

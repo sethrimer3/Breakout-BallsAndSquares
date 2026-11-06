@@ -585,11 +585,11 @@ export class Game {
     this.particles.spawn(PKind.Burst, s.x, s.y, 0, 0, 0.35, 16, 0x9ff3ff, 1);
   }
 
-  private onSoldierRescued(s: Soldier, fromCx: number, fromCy: number, toCx: number, toCy: number, hpCost: number): void {
+  private onSoldierRescued(s: Soldier, fromCx: number, fromCy: number, _toCx: number, _toCy: number, _hpCost: number): void {
     const cs = this.world.cellSize;
     const fromWx = (fromCx + 0.5) * cs;
     const fromWy = (fromCy + 0.5) * cs;
-    this.audio.playRicochet();
+    this.audio.playImpact();
     for (let i = 0; i < 16; i++) {
       const a = this.rng.range(0, Math.PI * 2);
       const sp = this.rng.range(50, 160);

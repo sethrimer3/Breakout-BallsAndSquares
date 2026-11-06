@@ -257,6 +257,17 @@ export class Renderer {
       ctx.drawImage(this.sprites.soldierGlow, sx - gr, sy - gr, gr * 2, gr * 2);
       const br = SOLDIER.renderRadius * cam.zoom;
       ctx.drawImage(this.sprites.soldier, sx - br, sy - br, br * 2, br * 2);
+      if (s.maxHealth > 0) {
+        const barW = Math.max(12, 10 * cam.zoom);
+        const barH = 2.5;
+        const barX = sx - barW / 2;
+        const barY = sy - br - 5;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
+        ctx.fillRect(barX - 0.5, barY - 0.5, barW + 1, barH + 1);
+        const pct = Math.max(0, Math.min(1, s.health / s.maxHealth));
+        ctx.fillStyle = pct > 0.4 ? "#38d6ff" : "#ff4b7d";
+        ctx.fillRect(barX, barY, barW * pct, barH);
+      }
       if (cam.manualTarget && cam.targetId === s.id) {
         ctx.strokeStyle = "rgba(160, 245, 255, 0.85)";
         ctx.lineWidth = 1.5;

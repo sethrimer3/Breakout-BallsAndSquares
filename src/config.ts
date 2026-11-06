@@ -22,8 +22,8 @@ export const WORLD = {
 export const TERRAIN = {
   /** Depth (cells beyond the room edge) per additional point of max health. */
   healthBandWidth: 12,
-  /** Hard cap on pixel health (must fit in a Uint8). */
-  maxHealthCap: 12,
+  /** Hard cap on pixel health (must fit in a Uint16). */
+  maxHealthCap: 500,
   /** Distance from center (Chebyshev, cells) still considered "room" for depth. */
   roomRadius: 5,
   /** Max dirty chunks rebuilt per rendered frame. */
@@ -43,10 +43,24 @@ export function zoneForDepth(depth: number): 0 | 1 | 2 {
   return 2;
 }
 
-/** Configurable distance -> health curve (spec §3). */
+/** Configurable distance -> health curve with order-of-magnitude tier progression. */
 export function maxHealthForDistance(distance: number): number {
   const depth = Math.max(0, distance - TERRAIN.roomRadius);
-  return Math.min(TERRAIN.maxHealthCap, 1 + Math.floor(depth / TERRAIN.healthBandWidth));
+  if (depth < TERRAIN.zone2Depth) {
+    // Tier 1 (Zone 1): 1 - 5 HP
+    const span = Math.max(1, TERRAIN.zone2Depth - 1);
+    return Math.min(5, Math.max(1, 1 + Math.floor((depth * 4) / span)));
+  } else if (depth < TERRAIN.zone3Depth) {
+    // Tier 2 (Zone 2): 10 - 50 HP (order of magnitude tougher)
+    const depthInZone = depth - TERRAIN.zone2Depth;
+    const span = Math.max(1, TERRAIN.zone3Depth - TERRAIN.zone2Depth - 1);
+    return Math.min(50, Math.max(10, 10 + Math.floor((depthInZone * 40) / span)));
+  } else {
+    // Tier 3 (Zone 3): 100 - 500 HP
+    const depthInZone = depth - TERRAIN.zone3Depth;
+    const span = 40;
+    return Math.min(TERRAIN.maxHealthCap, Math.max(100, 100 + Math.floor((depthInZone * 400) / span)));
+  }
 }
 
 /**
@@ -57,14 +71,12 @@ export function maxHealthForDistance(distance: number): number {
 export function wallHealthForZone(zone: 0 | 1 | 2, distance: number): number {
   const baseHp = maxHealthForDistance(distance);
   if (zone === 0) {
-    const nextZoneMinHp = maxHealthForDistance(TERRAIN.roomRadius + TERRAIN.zone2Depth);
-    return Math.min(TERRAIN.maxHealthCap, Math.max(nextZoneMinHp, baseHp + 2));
+    return Math.min(TERRAIN.maxHealthCap, Math.max(10, baseHp * 2));
   }
   if (zone === 1) {
-    const nextZoneMinHp = maxHealthForDistance(TERRAIN.roomRadius + TERRAIN.zone3Depth);
-    return Math.min(TERRAIN.maxHealthCap, Math.max(nextZoneMinHp, baseHp + 2));
+    return Math.min(TERRAIN.maxHealthCap, Math.max(100, baseHp * 2));
   }
-  return Math.min(TERRAIN.maxHealthCap, Math.max(8, baseHp + 4));
+  return Math.min(TERRAIN.maxHealthCap, Math.max(300, baseHp + 50));
 }
 
 export const SOLDIER = {
@@ -76,8 +88,8 @@ export const SOLDIER = {
   glowRadius: 7,
   /** Radius used when soldiers occlude light. */
   occluderRadius: 3.6,
-  /** Base movement speed (units/s). */
-  speed: 125,
+  /** Base movement speed (units/s). Cut in half: 125 -> 62.5 */
+  speed: 62.5,
   /** Base shots per second. */
   fireRate: 2.5,
   /** Base bullet damage. */
@@ -193,10 +205,10 @@ export const SIM = {
 };
 
 export const GROWTH = {
-  /** Seconds at the start of a run with zero growth. */
-  graceSeconds: 12,
+  /** Seconds at the start of a run with zero growth (starts at 5s, upgrades to 15s). */
+  graceSeconds: 5,
   /** Initial successful copy events per second right after the grace period. */
-  baseRate: 0.35,
+  baseRate: 1.0,
   /** Exponential base per elapsed second after the grace period. */
   expBase: 1.055,
   /** Hard cap on copy events per second. */
@@ -230,7 +242,7 @@ export const GROWTH = {
 export function growthRateAt(runTime: number, startRate = GROWTH.baseRate): number {
   if (runTime < GROWTH.graceSeconds) return 0;
   const elapsed = Math.max(0, runTime - GROWTH.graceSeconds);
-  return Math.min(GROWTH.maxRate, startRate * Math.pow(GROWTH.expBase, elapsed));
+  return Math.min(GROWTH.maxRate, Math.max(0, startRate + Math.pow(GROWTH.expBase, elapsed) - 1));
 }
 
 export const LIGHT = {

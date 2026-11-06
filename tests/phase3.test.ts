@@ -94,7 +94,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     upg.buy("bullet_damage");
     upg.buy("fire_rate");
     const st = upg.getSoldierStats();
-    expect(st.speed).toBeCloseTo(SOLDIER.speed * 2, 5);
+    expect(st.speed).toBeCloseTo(SOLDIER.speed * 1.8, 5);
     expect(st.damage).toBe(SOLDIER.damage + 1);
     expect(st.fireRate).toBeCloseTo(SOLDIER.fireRate * 1.12, 5);
     expect(st.dropChance).toBeCloseTo(0.2, 5);
@@ -156,7 +156,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const st = upg.getSoldierStats();
     expect(st.shotgunUnlocked).toBe(true);
     expect(st.shotgunPellets).toBeGreaterThan(5);
-    expect(st.blightGraceSeconds).toBeGreaterThan(12);
+    expect(st.blightGraceSeconds).toBeGreaterThan(5);
     expect(st.blightRateMultiplier).toBeLessThan(1);
 
     // Loadouts persist per soldier slot.

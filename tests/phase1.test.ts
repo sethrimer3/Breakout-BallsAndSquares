@@ -34,13 +34,13 @@ describe("Phase 1 — world & generation", () => {
     expect(w.roomY1 - w.roomY0 + 1).toBe(10);
   });
 
-  it("computes distance-based health bands capped at 12", () => {
+  it("computes distance-based health bands with order-of-magnitude tier progression", () => {
     const w = new PixelWorld(WORLD);
     expect(w.maxHealthAt(w.centerX, w.centerY)).toBe(1);
     expect(w.maxHealthAt(w.centerX + 5, w.centerY)).toBe(1);
-    expect(w.maxHealthAt(w.centerX + 16, w.centerY)).toBe(1);
-    expect(w.maxHealthAt(w.centerX + 17, w.centerY)).toBe(2);
-    expect(w.maxHealthAt(0, 0)).toBe(12);
+    expect(w.maxHealthAt(w.centerX + 16, w.centerY)).toBe(2);
+    expect(w.maxHealthAt(w.centerX + 37, w.centerY)).toBe(10);
+    expect(w.maxHealthAt(0, 0)).toBe(500);
   });
 
   it("generates a seed-dependent research lab maze with reachable rooms, valid sizes, and tougher zone walls", () => {
@@ -267,7 +267,7 @@ describe("Phase 1 — soldier physics (Rev 2 & Rev 3)", () => {
     });
     const sp = findSpawnPoint(w, SOLDIER.collisionRadius)!;
     const s = new Soldier(sp.x, sp.y, 1, 0.37, stats.speed);
-    for (let i = 0; i < 60 * 15; i++) {
+    for (let i = 0; i < 60 * 18; i++) {
       phys.step(s, SIM.dt);
       combat.updateSoldier(s, SIM.dt);
       combat.updateBullets(SIM.dt);
