@@ -85,6 +85,30 @@ export class AudioSystem {
     osc.stop(t + 0.055);
   }
 
+  /** Sharp blade slice / whoosh. */
+  playSlash(): void {
+    const now = performance.now();
+    if (now - this.lastShotAt < 28) return;
+    this.lastShotAt = now;
+    const ctx = this.ensure();
+    if (!ctx || !this.noiseBuf) return;
+    const t = ctx.currentTime;
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(2600 + Math.random() * 400, t);
+    filter.frequency.exponentialRampToValueAtTime(700, t + 0.07);
+    filter.Q.value = 3.2;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(this.vol(0.2), t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.start(t);
+    src.stop(t + 0.075);
+  }
+
   /** Subtle tick when a bullet damages a pixel without destroying it. */
   playImpact(): void {
     const now = performance.now();

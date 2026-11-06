@@ -223,6 +223,7 @@ function overrunRoomWithBlight(world: PixelWorld, r: LabRoom, seed: number): voi
       const ray = Math.abs(Math.sin(ang * 4 + n * 2.2));
       const isVein = ray < 0.24 || n > 0.62 || dist <= 2.8;
       world.decor[i] = isVein ? DECOR.blightVein : DECOR.blightFloor;
+      world.blight[i] = 1;
     }
   }
 

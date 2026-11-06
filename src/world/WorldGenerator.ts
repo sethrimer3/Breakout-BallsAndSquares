@@ -78,6 +78,8 @@ export function generateWorld(world: PixelWorld, seed: number): void {
   const { width, height, health, tint, wall } = world;
   wall.fill(0);
   world.decor.fill(0);
+  world.coreId.fill(0);
+  world.blight.fill(0);
   world.subHealth.fill(0);
   world.subTint.fill(0);
 

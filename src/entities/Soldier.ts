@@ -1,6 +1,7 @@
 import {
   ASSAULT_RIFLE,
   GROWTH,
+  KATANA,
   LOOT,
   ROCKET_LAUNCHER,
   SHOTGUN,
@@ -13,7 +14,8 @@ export type WeaponType =
   | "shotgun"
   | "assault_rifle"
   | "rocket_launcher"
-  | "sniper_rifle";
+  | "sniper_rifle"
+  | "katana";
 
 /** Derived soldier & run stats (base config combined with upgrades). */
 export interface SoldierStats {
@@ -57,6 +59,14 @@ export interface SoldierStats {
   sniperBulletSpeed: number;
   sniperPierce: number;
   sniperCritChance: number;
+  // Katana stats
+  katanaUnlocked: boolean;
+  katanaFireRate: number;
+  katanaDamage: number;
+  katanaBlightMultiplier: number;
+  katanaBulletSpeed: number;
+  katanaPierce: number;
+  katanaSlashWidth: number;
   // Money / Loot / Resources stats
   dropChance: number;
   magnetRange: number;
@@ -115,6 +125,13 @@ export function baseSoldierStats(): SoldierStats {
     sniperBulletSpeed: SNIPER_RIFLE.bulletSpeed,
     sniperPierce: SNIPER_RIFLE.pierce,
     sniperCritChance: SNIPER_RIFLE.critChance,
+    katanaUnlocked: false,
+    katanaFireRate: KATANA.fireRate,
+    katanaDamage: KATANA.damage,
+    katanaBlightMultiplier: KATANA.blightMultiplier,
+    katanaBulletSpeed: KATANA.bulletSpeed,
+    katanaPierce: KATANA.pierce,
+    katanaSlashWidth: KATANA.slashWidth,
     dropChance: LOOT.baseDropChance,
     magnetRange: LOOT.baseMagnetRange,
     pickupLifetime: LOOT.baseLifetime,
@@ -148,6 +165,8 @@ export class Soldier {
   health = 0;
   maxHealth = 0;
   fireCooldown: number;
+  /** Alternating swing index for katana slashes. */
+  slashIndex = 0;
   /** Which side shell casings eject to (+1 / -1). */
   ejectSide: number;
   /** Consecutive substeps the soldier could not be freed from terrain (debug). */

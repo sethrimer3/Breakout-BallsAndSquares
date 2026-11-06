@@ -1,4 +1,4 @@
-import { ASSAULT_RIFLE, BULLET, ROCKET_LAUNCHER, SNIPER_RIFLE } from "../config";
+import { ASSAULT_RIFLE, BULLET, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE } from "../config";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Rng } from "../core/Rng";
@@ -55,6 +55,9 @@ export class CombatSystem {
         break;
       case "sniper_rifle":
         rate = this.stats.sniperFireRate;
+        break;
+      case "katana":
+        rate = this.stats.katanaFireRate;
         break;
     }
     rate *= this.stats.globalFireRateMult;
@@ -153,6 +156,44 @@ export class CombatSystem {
         0,
         2,
       );
+    } else if (s.weapon === "katana") {
+      s.slashIndex = ((s.slashIndex ?? 0) + 1) % 2;
+      const tilt = (s.slashIndex === 0 ? -1 : 1) * 0.38;
+
+      this.spawnSlash(
+        s.x,
+        s.y,
+        dx,
+        dy,
+        this.stats.katanaBulletSpeed,
+        this.stats.katanaDamage,
+        KATANA.lifetime,
+        s.radius + BULLET.muzzleGap,
+        s.id,
+        this.stats.katanaPierce,
+        this.stats.katanaBlightMultiplier,
+        this.stats.katanaSlashWidth,
+        tilt,
+      );
+
+      // Multishot: fire a cross-slash in the opposite direction!
+      if (this.stats.multishotChance > 0 && this.rng.next() < this.stats.multishotChance) {
+        this.spawnSlash(
+          s.x,
+          s.y,
+          dx,
+          dy,
+          this.stats.katanaBulletSpeed,
+          this.stats.katanaDamage,
+          KATANA.lifetime,
+          s.radius + BULLET.muzzleGap,
+          s.id,
+          this.stats.katanaPierce,
+          this.stats.katanaBlightMultiplier,
+          this.stats.katanaSlashWidth,
+          -tilt,
+        );
+      }
     } else {
       // Pistol
       this.spawnBullet(
@@ -213,7 +254,7 @@ export class CombatSystem {
     pierceLeft: number,
     explosionRadius: number,
     clusterCount: number,
-    style: 0 | 1 | 2,
+    style: 0 | 1 | 2 | 3,
   ): void {
     const b = this.bullets.acquire();
     if (!b) return;
@@ -224,6 +265,7 @@ export class CombatSystem {
     b.speed = speed * this.stats.globalBulletSpeedMult;
     b.damage = damage + this.stats.globalDamageBonus;
     b.life = life;
+    b.maxLife = life;
     b.traveled = 0;
     b.pendingAdvance = pendingAdvance;
     b.ownerId = ownerId;
@@ -231,6 +273,46 @@ export class CombatSystem {
     b.explosionRadius = explosionRadius;
     b.clusterCount = clusterCount;
     b.style = style;
+    b.blightMultiplier = 1;
+    b.slashWidth = 0;
+    b.slashAngle = 0;
+  }
+
+  private spawnSlash(
+    x: number,
+    y: number,
+    dx: number,
+    dy: number,
+    speed: number,
+    damage: number,
+    life: number,
+    pendingAdvance: number,
+    ownerId: number,
+    pierceLeft: number,
+    blightMultiplier: number,
+    slashWidth: number,
+    slashAngle: number,
+  ): void {
+    const b = this.bullets.acquire();
+    if (!b) return;
+    b.x = x;
+    b.y = y;
+    b.dx = dx;
+    b.dy = dy;
+    b.speed = speed * this.stats.globalBulletSpeedMult;
+    b.damage = damage + this.stats.globalDamageBonus;
+    b.life = life;
+    b.maxLife = life;
+    b.traveled = 0;
+    b.pendingAdvance = pendingAdvance;
+    b.ownerId = ownerId;
+    b.pierceLeft = pierceLeft;
+    b.explosionRadius = 0;
+    b.clusterCount = 0;
+    b.style = 3;
+    b.blightMultiplier = blightMultiplier;
+    b.slashWidth = slashWidth;
+    b.slashAngle = slashAngle;
   }
 
   updateBullets(dt: number): void {
@@ -277,9 +359,18 @@ export class CombatSystem {
         const cellIdx = hcy * w.width + hcx;
         const isSub = inside && w.health[cellIdx] === 0;
         const isCore = inside && !isSub && w.coreId[cellIdx] > 0;
-        const hitDmg = b.damage + (isCore ? this.stats.coreDamageBonus : 0);
+        const isBlight = isSub ? w.isBlightSubAt(hit.cx, hit.cy) : w.isBlightAt(hcx, hcy);
+        let hitDmg = b.damage + (isCore ? this.stats.coreDamageBonus : 0);
+        if (isBlight && b.blightMultiplier > 1) {
+          hitDmg = Math.round(hitDmg * b.blightMultiplier);
+        }
         const result = w.damageSub(hit.cx, hit.cy, hitDmg);
         this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, result, isSub);
+
+        // Katana slashes cleave adjacent subcells across the slash arc width!
+        if (b.style === 3 && b.slashWidth > 0) {
+          this.cleaveSlashSides(b, hit.cx, hit.cy, hit.nx, hit.ny);
+        }
 
         // If the bullet hit the indestructible world border (result === 0) or has no pierce left, stop.
         if (result === 0 || b.pierceLeft <= 0) {
@@ -289,7 +380,23 @@ export class CombatSystem {
 
         // Pierce! Step past the impacted cell and continue along the ray.
         b.pierceLeft--;
-        const stepPast = Math.max(0.5, hit.t + (isSub ? ss : cs) * 0.65);
+        const S = isSub ? ss : cs;
+        const targetX = isSub ? hit.cx : hcx;
+        const targetY = isSub ? hit.cy : hcy;
+
+        let distToExit = hit.t + S * 1.05;
+        if (Math.abs(b.dx) > 1e-6) {
+          const exitX = (b.dx > 0 ? targetX + 1 : targetX) * S;
+          const tx = (exitX - curX) / b.dx;
+          if (tx > hit.t) distToExit = Math.min(distToExit, tx + 0.5);
+        }
+        if (Math.abs(b.dy) > 1e-6) {
+          const exitY = (b.dy > 0 ? targetY + 1 : targetY) * S;
+          const ty = (exitY - curY) / b.dy;
+          if (ty > hit.t) distToExit = Math.min(distToExit, ty + 0.5);
+        }
+
+        const stepPast = Math.max(0.5, distToExit);
         b.traveled += stepPast;
         remDist -= stepPast;
         curX += b.dx * stepPast;
@@ -310,6 +417,60 @@ export class CombatSystem {
 
     b.x = curX;
     b.y = curY;
+  }
+
+  /** Cleave adjacent cells across the katana slash arc width. */
+  private cleaveSlashSides(
+    b: Bullet,
+    hitSubX: number,
+    hitSubY: number,
+    nx: number,
+    ny: number,
+  ): void {
+    const w = this.world;
+    const ss = w.subCellSize;
+    // Perpendicular vector to projectile direction: (-dy, dx)
+    const px = -b.dy;
+    const py = b.dx;
+    const maxSteps = Math.min(2, Math.max(1, Math.floor(b.slashWidth / (ss * 2))));
+    const centerNormIdx = (hitSubY >> 1) * w.width + (hitSubX >> 1);
+    let cleavedNormIdx = -1;
+
+    for (let step = 1; step <= maxSteps; step++) {
+      for (const sign of [-1, 1]) {
+        const sx = hitSubX + Math.round(px * step * sign);
+        const sy = hitSubY + Math.round(py * step * sign);
+        if (!w.subInBounds(sx, sy)) continue;
+        if (!w.subSolidAt(sx, sy)) continue;
+
+        const hcx = sx >> 1;
+        const hcy = sy >> 1;
+        const inside = w.inBounds(hcx, hcy);
+        if (!inside) continue;
+        const cellIdx = hcy * w.width + hcx;
+
+        // If this is a normal solid cell, don't re-damage the center cell or a cell already cleaved this strike
+        const isSub = w.health[cellIdx] === 0;
+        if (!isSub) {
+          if (cellIdx === centerNormIdx || cellIdx === cleavedNormIdx) continue;
+          cleavedNormIdx = cellIdx;
+        }
+
+        const isCore = !isSub && w.coreId[cellIdx] > 0;
+        const isBlight = isSub ? w.isBlightSubAt(sx, sy) : w.isBlightAt(hcx, hcy);
+
+        let dmg = b.damage + (isCore ? this.stats.coreDamageBonus : 0);
+        if (isBlight && b.blightMultiplier > 1) {
+          dmg = Math.round(dmg * b.blightMultiplier);
+        }
+        const res = w.damageSub(sx, sy, dmg);
+        if (res > 0) {
+          const wx = (sx + 0.5) * ss;
+          const wy = (sy + 0.5) * ss;
+          this.events.onImpact?.(wx, wy, nx, ny, hcx, hcy, res, isSub);
+        }
+      }
+    }
   }
 
   private detonateRocket(

@@ -14,8 +14,16 @@ export class Bullet {
   explosionRadius = 0;
   /** Number of secondary cluster mini-bombs spawned upon detonation. */
   clusterCount = 0;
-  /** Visual style: 0 = standard round, 1 = rocket, 2 = sniper hyper-velocity tracer. */
-  style: 0 | 1 | 2 = 0;
+  /** Visual style: 0 = standard round, 1 = rocket, 2 = sniper hyper-velocity tracer, 3 = katana slash. */
+  style: 0 | 1 | 2 | 3 = 0;
+  /** Damage multiplier against blight blocks (blight cores, pink sub-blight, grown blight). */
+  blightMultiplier = 1;
+  /** Slash arc width in world units (for katana slashes). */
+  slashWidth = 0;
+  /** Arc tilt/curvature angle (for katana slashes). */
+  slashAngle = 0;
+  /** Initial max lifetime for alpha/animation scaling. */
+  maxLife = 0;
   /** Distance traveled (used to clamp the tracer so it never trails behind the muzzle). */
   traveled = 0;
   /**

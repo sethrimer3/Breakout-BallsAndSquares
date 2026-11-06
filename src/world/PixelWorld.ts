@@ -65,6 +65,8 @@ export class PixelWorld implements SolidQuery {
   readonly decor: Uint8Array;
   /** Per-cell Blight Core id (`0` = not a core cell, `id >= 1` = belongs to `blightCores[id - 1]`). */
   readonly coreId: Uint8Array;
+  /** Per-cell Blight flag (`1` = block generated/replicated by Blight or overrun with Blight). */
+  readonly blight: Uint8Array;
 
   /**
    * 50%-smaller sub-pixel grid (4 subcells fit inside 1 normal cell).
@@ -103,6 +105,7 @@ export class PixelWorld implements SolidQuery {
     this.wall = new Uint8Array(dims.width * dims.height);
     this.decor = new Uint8Array(dims.width * dims.height);
     this.coreId = new Uint8Array(dims.width * dims.height);
+    this.blight = new Uint8Array(dims.width * dims.height);
     this.subHealth = new Uint16Array(this.subWidth * this.subHeight);
     this.subTint = new Uint8Array(this.subWidth * this.subHeight);
     this.subSolidQuery = {
@@ -212,7 +215,13 @@ export class PixelWorld implements SolidQuery {
    */
   setCell(cx: number, cy: number, hp: number, kind: CellChangeKind = "set", silent = false): void {
     if (!this.inBounds(cx, cy)) return;
-    this.health[cy * this.width + cx] = hp;
+    const idx = cy * this.width + cx;
+    this.health[idx] = hp;
+    if (kind === "grown") {
+      this.blight[idx] = 1;
+    } else if (hp === 0) {
+      this.blight[idx] = 0;
+    }
     const sx0 = cx * 2;
     const sy0 = cy * 2;
     const sw = this.subWidth;
@@ -233,6 +242,46 @@ export class PixelWorld implements SolidQuery {
     if (!this.subInBounds(sx, sy)) return;
     this.subHealth[sy * this.subWidth + sx] = hp;
     if (!silent) this.emit(sx >> 1, sy >> 1, kind);
+  }
+
+  /**
+   * True if normal cell `(cx, cy)` is a Blight block (Blight Core, grown blight,
+   * blight decor, or contains pink sub-pixel blight).
+   */
+  isBlightAt(cx: number, cy: number): boolean {
+    if (!this.inBounds(cx, cy)) return false;
+    const i = cy * this.width + cx;
+    if (this.health[i] > 0) {
+      if (this.coreId[i] > 0 || this.blight[i] > 0) return true;
+      const d = this.decor[i];
+      if (d === 4 || (d >= 18 && d <= 21)) return true;
+    }
+    const sx0 = cx * 2;
+    const sy0 = cy * 2;
+    const sw = this.subWidth;
+    const row0 = sy0 * sw + sx0;
+    const row1 = row0 + sw;
+    return (
+      this.subHealth[row0] > 0 ||
+      this.subHealth[row0 + 1] > 0 ||
+      this.subHealth[row1] > 0 ||
+      this.subHealth[row1 + 1] > 0
+    );
+  }
+
+  /**
+   * True if subcell `(sx, sy)` is a Blight block (either because its parent normal cell
+   * is a solid Blight block or because `(sx, sy)` has pink sub-blight).
+   */
+  isBlightSubAt(sx: number, sy: number): boolean {
+    if (!this.subInBounds(sx, sy)) return false;
+    const cx = sx >> 1;
+    const cy = sy >> 1;
+    const i = cy * this.width + cx;
+    if (this.health[i] > 0) {
+      return this.isBlightAt(cx, cy);
+    }
+    return this.subHealth[sy * this.subWidth + sx] > 0;
   }
 
   /**
@@ -260,6 +309,7 @@ export class PixelWorld implements SolidQuery {
     const next = Math.max(0, hp - amount);
     this.health[i] = next;
     if (next === 0) {
+      this.blight[i] = 0;
       this.emit(cx, cy, "destroyed");
       return 2;
     }

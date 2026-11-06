@@ -188,6 +188,23 @@ export const SNIPER_RIFLE = {
   lifetime: 1.8,
 };
 
+export const KATANA = {
+  /** Base swings per second. */
+  fireRate: 2.2,
+  /** Base damage per slash against normal blocks. */
+  damage: 3,
+  /** Damage multiplier that ONLY affects blight blocks. */
+  blightMultiplier: 3.0,
+  /** Slash wave velocity (units/s). */
+  bulletSpeed: 420,
+  /** Base pierce count (blocks penetrated per slash). */
+  pierce: 3,
+  /** Slash arc width in world units (perpendicular to slash cut). */
+  slashWidth: 16,
+  /** Slash lifetime (seconds). */
+  lifetime: 0.28,
+};
+
 export const CAMERA = {
   defaultZoom: 2.5,
   minZoom: 0.5,
