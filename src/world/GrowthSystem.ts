@@ -1,13 +1,23 @@
 import { GROWTH, growthRateAt } from "../config";
 import type { Rng } from "../core/Rng";
 import type { Soldier } from "../entities/Soldier";
-import { cellOverlapsCircle } from "../systems/PhysicsSystem";
+import { cellOverlapsCircle, circleIsClear } from "../systems/PhysicsSystem";
 import { Frontier } from "./Frontier";
 import type { PixelWorld } from "./PixelWorld";
 
 export interface GrowthEvents {
   onGrow?(cx: number, cy: number): void;
   onSoldierKilled?(soldier: Soldier, cx: number, cy: number): void;
+  onSoldierRescued?(soldier: Soldier, fromCx: number, fromCy: number, toCx: number, toCy: number, hpCost: number): void;
+  onBlightExplode?(cx: number, cy: number, radiusCells: number, damage: number): void;
+}
+
+interface PendingExplosion {
+  cx: number;
+  cy: number;
+  timer: number;
+  radius: number;
+  damage: number;
 }
 
 const DX = [1, -1, 0, 0];
@@ -31,8 +41,13 @@ export class GrowthSystem {
   /** Number of living Blight Cores currently exposed to open air via their connected pink blight. */
   exposedCoresCount = 0;
   graceSeconds = GROWTH.graceSeconds;
+  startRate = GROWTH.baseRate;
   rateMultiplier = 1;
   weakenChance = 0;
+  explosiveChance = 0;
+  explosiveDamage = 1;
+  explosiveRadius = 1.2;
+  readonly pendingExplosions: PendingExplosion[] = [];
   /** Cumulative seconds subtracted from the blight timer by destroying Blight Cores. */
   timeOffset = 0;
   coresDestroyed = 0;
@@ -81,6 +96,7 @@ export class GrowthSystem {
     this.glowCount = 0;
     this.telTime.length = 0;
     this.telNear.length = 0;
+    this.pendingExplosions.length = 0;
   }
 
   /** Effective blight timer (seconds) after accounting for upgrade grace and destroyed Blight Cores. */
@@ -104,7 +120,7 @@ export class GrowthSystem {
     this.coresDestroyed++;
     this.acc = 0;
     const shiftedTime = runTime - (this.graceSeconds - GROWTH.graceSeconds) - this.timeOffset;
-    this.rate = growthRateAt(shiftedTime) * this.rateMultiplier;
+    this.rate = growthRateAt(shiftedTime, this.startRate) * this.rateMultiplier;
   }
 
   /** Rolling percentage (0..100) of growth events within `nearRadiusCells` of a living soldier. */
@@ -125,8 +141,23 @@ export class GrowthSystem {
   }
 
   update(dt: number, runTime: number, soldiers: readonly Soldier[]): void {
+    // Process pending explosive blight detonations
+    let pIdx = 0;
+    while (pIdx < this.pendingExplosions.length) {
+      const exp = this.pendingExplosions[pIdx];
+      exp.timer -= dt;
+      if (exp.timer <= 0) {
+        this.pendingExplosions.splice(pIdx, 1);
+        if (this.world.inBounds(exp.cx, exp.cy)) {
+          this.events.onBlightExplode?.(exp.cx, exp.cy, exp.radius, exp.damage);
+        }
+      } else {
+        pIdx++;
+      }
+    }
+
     const shiftedTime = runTime - (this.graceSeconds - GROWTH.graceSeconds) - this.timeOffset;
-    this.rate = growthRateAt(shiftedTime) * this.rateMultiplier;
+    this.rate = growthRateAt(shiftedTime, this.startRate) * this.rateMultiplier;
     if (this.rate <= 0) {
       this.coreRate = 0;
       this.exposedCoresCount = 0;
@@ -331,14 +362,26 @@ export class GrowthSystem {
     this.totalSubBlightEvents++;
     this.events.onGrow?.(cx, cy);
 
-    // Kill any soldier whose collision circle overlaps the newly grown 50% sub-pixel.
+    // Kill or rescue any soldier whose collision circle overlaps the newly grown 50% sub-pixel.
     const subCs = w.subCellSize;
     for (let i = 0; i < soldiers.length; i++) {
       const s = soldiers[i];
       if (s.alive && cellOverlapsCircle(subCs, sx, sy, s.x, s.y, s.radius)) {
-        s.alive = false;
-        this.events.onSoldierKilled?.(s, cx, cy);
+        if (!this.tryRescueSoldier(s, cx, cy)) {
+          s.alive = false;
+          this.events.onSoldierKilled?.(s, cx, cy);
+        }
       }
+    }
+
+    if (this.explosiveChance > 0 && this.rng.next() < this.explosiveChance) {
+      this.pendingExplosions.push({
+        cx,
+        cy,
+        timer: this.rng.range(0.2, 0.45),
+        radius: this.explosiveRadius,
+        damage: this.explosiveDamage,
+      });
     }
   }
 
@@ -381,17 +424,83 @@ export class GrowthSystem {
       this.totalEvents++;
       this.events.onGrow?.(dx, dy);
 
-      // Kill any soldier whose collision circle overlaps the new cell.
+      if (this.explosiveChance > 0 && this.rng.next() < this.explosiveChance) {
+        this.pendingExplosions.push({
+          cx: dx,
+          cy: dy,
+          timer: this.rng.range(0.2, 0.45),
+          radius: this.explosiveRadius,
+          damage: this.explosiveDamage,
+        });
+      }
+
+      // Kill or rescue any soldier whose collision circle overlaps the new cell.
       const cs = w.cellSize;
       for (let i = 0; i < soldiers.length; i++) {
         const s = soldiers[i];
         if (s.alive && cellOverlapsCircle(cs, dx, dy, s.x, s.y, s.radius)) {
-          s.alive = false;
-          this.events.onSoldierKilled?.(s, dx, dy);
+          if (!this.tryRescueSoldier(s, dx, dy)) {
+            s.alive = false;
+            this.events.onSoldierKilled?.(s, dx, dy);
+          }
         }
       }
       return true;
     }
+    return false;
+  }
+
+  /**
+   * Attempt to rescue a soldier enclosed by blight using soldier health.
+   * Costs 1 HP per block needed to travel to the nearest open space.
+   * Returns true if rescued, false if health was insufficient (soldier dies).
+   */
+  private tryRescueSoldier(s: Soldier, originCx: number, originCy: number): boolean {
+    if (s.health <= 0 || s.maxHealth <= 0) return false;
+    const w = this.world;
+    const cs = w.cellSize;
+    const maxDist = Math.min(30, s.health);
+    let bestDist = Infinity;
+    let bestX = 0;
+    let bestY = 0;
+    let bestCost = Infinity;
+
+    // Search outward in rings for the nearest open cell where the soldier fits.
+    for (let rad = 1; rad <= maxDist; rad++) {
+      for (let dy = -rad; dy <= rad; dy++) {
+        for (let dx = -rad; dx <= rad; dx++) {
+          if (Math.max(Math.abs(dx), Math.abs(dy)) !== rad) continue;
+          const cx = originCx + dx;
+          const cy = originCy + dy;
+          if (!w.inBounds(cx, cy)) continue;
+          if (w.solidAt(cx, cy) || w.anySolidInCell(cx, cy)) continue;
+          const px = (cx + 0.5) * cs;
+          const py = (cy + 0.5) * cs;
+          if (!circleIsClear(w, px, py, s.radius)) continue;
+          const distBlocks = Math.hypot(dx, dy);
+          const cost = Math.max(1, Math.round(distBlocks));
+          if (cost <= s.health && distBlocks < bestDist) {
+            bestDist = distBlocks;
+            bestCost = cost;
+            bestX = px;
+            bestY = py;
+          }
+        }
+      }
+      if (bestDist < Infinity) break;
+    }
+
+    if (bestDist < Infinity && bestCost <= s.health) {
+      s.health -= bestCost;
+      s.x = bestX;
+      s.y = bestY;
+      s.stuckFrames = 0;
+      const destCx = Math.floor(bestX / cs);
+      const destCy = Math.floor(bestY / cs);
+      this.events.onSoldierRescued?.(s, originCx, originCy, destCx, destCy, bestCost);
+      return true;
+    }
+
     return false;
   }
 

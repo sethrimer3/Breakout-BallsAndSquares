@@ -227,10 +227,10 @@ export const GROWTH = {
 };
 
 /** Growth rate (copy events / second) at `runTime` seconds into the run (spec §7). */
-export function growthRateAt(runTime: number): number {
+export function growthRateAt(runTime: number, startRate = GROWTH.baseRate): number {
   if (runTime < GROWTH.graceSeconds) return 0;
   const elapsed = Math.max(0, runTime - GROWTH.graceSeconds);
-  return Math.min(GROWTH.maxRate, GROWTH.baseRate * Math.pow(GROWTH.expBase, elapsed));
+  return Math.min(GROWTH.maxRate, startRate * Math.pow(GROWTH.expBase, elapsed));
 }
 
 export const LIGHT = {

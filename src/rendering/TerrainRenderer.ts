@@ -35,13 +35,14 @@ export class TerrainRenderer {
   constructor(private world: PixelWorld, chunkSize: number) {
     this.chunks = new TerrainChunks(world, chunkSize);
     const n = this.chunks.cols * this.chunks.rows;
+    const subChunk = chunkSize * 2;
     for (let i = 0; i < n; i++) {
       const c = document.createElement("canvas");
-      c.width = chunkSize;
-      c.height = chunkSize;
+      c.width = subChunk;
+      c.height = subChunk;
       this.canvases.push(c);
     }
-    this.image = new ImageData(chunkSize, chunkSize);
+    this.image = new ImageData(subChunk, subChunk);
     this.chunks.markAll();
     this.glowCanvas = document.createElement("canvas");
     this.glowCanvas.width = world.width;
@@ -90,6 +91,7 @@ export class TerrainRenderer {
   private buildChunk(k: number): void {
     const { world } = this;
     const cs = this.chunks.chunkSize;
+    const subCs = cs * 2;
     const kx = k % this.chunks.cols;
     const ky = Math.floor(k / this.chunks.cols);
     const data = this.image.data;
@@ -102,18 +104,64 @@ export class TerrainRenderer {
       const cy = ky * cs + ly;
       for (let lx = 0; lx < cs; lx++) {
         const cx = kx * cs + lx;
-        const p = (ly * cs + lx) * 4;
         if (cx >= W || cy >= world.height) {
-          data[p + 3] = 0;
+          for (let dy = 0; dy < 2; dy++) {
+            for (let dx = 0; dx < 2; dx++) {
+              const p = ((ly * 2 + dy) * subCs + (lx * 2 + dx)) * 4;
+              data[p + 3] = 0;
+            }
+          }
           continue;
         }
         const i = cy * W + cx;
         const hp = health[i];
         if (hp === 0) {
-          data[p] = 0;
-          data[p + 1] = 0;
-          data[p + 2] = 0;
-          data[p + 3] = 0;
+          // Check 4 sub-pixels in this cell (pink core blight)
+          for (let dy = 0; dy < 2; dy++) {
+            for (let dx = 0; dx < 2; dx++) {
+              const slx = lx * 2 + dx;
+              const sly = ly * 2 + dy;
+              const p = (sly * subCs + slx) * 4;
+              const sx = cx * 2 + dx;
+              const sy = cy * 2 + dy;
+              const si = sy * world.subWidth + sx;
+              const subHp = world.subHealth[si];
+              if (subHp === 0) {
+                data[p] = 0;
+                data[p + 1] = 0;
+                data[p + 2] = 0;
+                data[p + 3] = 0;
+              } else {
+                const subT = world.subTint[si] / 255;
+                sampleRamp(COLORS.pinkBlight, subT, col);
+                const maxSubHp = world.maxSubHealthAt(sx, sy);
+                if (subHp < maxSubHp) {
+                  const d = 1 - subHp / maxSubHp;
+                  const lighten = d * 0.55;
+                  col[0] += (255 - col[0]) * lighten;
+                  col[1] += (255 - col[1]) * lighten;
+                  col[2] += (255 - col[2]) * lighten;
+                }
+                const subUp = sy > 0 && !world.subSolidAt(sx, sy - 1);
+                const subLeft = sx > 0 && !world.subSolidAt(sx - 1, sy);
+                const subDown = sy < world.subHeight - 1 && !world.subSolidAt(sx, sy + 1);
+                const subRight = sx < world.subWidth - 1 && !world.subSolidAt(sx + 1, sy);
+                let sm = 1;
+                let sadd = 0;
+                if (subUp || subLeft) {
+                  sm = 1.35;
+                  sadd = 10;
+                } else if (subDown || subRight) {
+                  sm = 1.15;
+                  sadd = 4;
+                }
+                data[p] = Math.min(255, col[0] * sm + sadd);
+                data[p + 1] = Math.min(255, col[1] * sm + sadd);
+                data[p + 2] = Math.min(255, col[2] * sm + sadd * 1.2);
+                data[p + 3] = 255;
+              }
+            }
+          }
           continue;
         }
         const t = tint[i] / 255;
@@ -155,13 +203,13 @@ export class TerrainRenderer {
           col[2] *= shade;
         }
 
-        // Damage tint.
+        // Damage indicator: lighter shade of cell color proportional to relative damage percent.
         if (hp < maxHp) {
           const d = 1 - hp / maxHp;
-          const f = 0.25 + d * 0.4;
-          col[0] += (COLORS.damage[0] - col[0]) * f;
-          col[1] += (COLORS.damage[1] - col[1]) * f;
-          col[2] += (COLORS.damage[2] - col[2]) * f;
+          const lighten = d * 0.55;
+          col[0] += (255 - col[0]) * lighten;
+          col[1] += (255 - col[1]) * lighten;
+          col[2] += (255 - col[2]) * lighten;
         }
 
         // Edge highlights where terrain faces open space.
@@ -178,10 +226,19 @@ export class TerrainRenderer {
           m = 1.3;
           add = 3;
         }
-        data[p] = Math.min(255, col[0] * m + add);
-        data[p + 1] = Math.min(255, col[1] * m + add);
-        data[p + 2] = Math.min(255, col[2] * m + add * 1.3);
-        data[p + 3] = 255;
+        const rVal = Math.min(255, col[0] * m + add);
+        const gVal = Math.min(255, col[1] * m + add);
+        const bVal = Math.min(255, col[2] * m + add * 1.3);
+
+        for (let dy = 0; dy < 2; dy++) {
+          for (let dx = 0; dx < 2; dx++) {
+            const p = ((ly * 2 + dy) * subCs + (lx * 2 + dx)) * 4;
+            data[p] = rVal;
+            data[p + 1] = gVal;
+            data[p + 2] = bVal;
+            data[p + 3] = 255;
+          }
+        }
       }
     }
     this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0);

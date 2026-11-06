@@ -3,7 +3,7 @@ import { GROWTH, SIM, SOLDIER, WORLD, growthRateAt } from "../src/config";
 import { Rng } from "../src/core/Rng";
 import { Soldier, baseSoldierStats } from "../src/entities/Soldier";
 import { CombatSystem } from "../src/systems/CombatSystem";
-import { PhysicsSystem, findSpawnPoint } from "../src/systems/PhysicsSystem";
+import { PhysicsSystem, circleIsClear, findSpawnPoint } from "../src/systems/PhysicsSystem";
 import { Frontier } from "../src/world/Frontier";
 import { GrowthSystem } from "../src/world/GrowthSystem";
 import { PixelWorld } from "../src/world/PixelWorld";
@@ -142,7 +142,7 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
 
     const core = w.blightCores[0];
     expect(core.alive).toBe(true);
-    expect(core.cells.length).toBe(9);
+    expect(core.cells.length).toBe(4);
     // Core cells have bonus health above standard zone fill.
     expect(w.health[core.cells[0]]).toBeGreaterThan(1);
 
@@ -151,8 +151,8 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
     const rateBefore = g.rate;
     expect(rateBefore).toBeGreaterThan(GROWTH.baseRate);
 
-    // Destroy 8 of the 9 cells -> core is still alive.
-    for (let k = 0; k < 8; k++) {
+    // Destroy 3 of the 4 cells -> core is still alive.
+    for (let k = 0; k < 3; k++) {
       const idx = core.cells[k];
       const cx = idx % w.width;
       const cy = Math.floor(idx / w.width);
@@ -161,8 +161,8 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
     }
     expect(core.alive).toBe(true);
 
-    // Destroy the 9th cell -> core is killed and blight timer drops!
-    const lastIdx = core.cells[8];
+    // Destroy the 4th cell -> core is killed and blight timer drops!
+    const lastIdx = core.cells[3];
     const lastCx = lastIdx % w.width;
     const lastCy = Math.floor(lastIdx / w.width);
     w.damage(lastCx, lastCy, 255);
@@ -174,5 +174,140 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
     expect(g.coresDestroyed).toBe(1);
     expect(g.timeOffset).toBe(GROWTH.coreKillTimeReduction);
     expect(g.rate).toBeLessThan(rateBefore);
+  });
+
+  it("supports 50% sub-pixel grid where 4 smaller pixels fit into 1 normal pixel", () => {
+    const w = new PixelWorld({
+      width: 20,
+      height: 20,
+      cellSize: 8,
+      roomSize: 4,
+    });
+    expect(w.subWidth).toBe(40);
+    expect(w.subHeight).toBe(40);
+    expect(w.subCellSize).toBe(4);
+
+    // Set 4 sub-pixels inside normal cell (5, 5)
+    expect(w.anySolidInCell(5, 5)).toBe(false);
+    w.setSubCell(10, 10, 3, "grown");
+    expect(w.anySolidInCell(5, 5)).toBe(true);
+    expect(w.subSolidAt(10, 10)).toBe(true);
+    expect(w.subSolidAt(11, 10)).toBe(false);
+
+    w.setSubCell(11, 10, 3, "grown");
+    w.setSubCell(10, 11, 3, "grown");
+    w.setSubCell(11, 11, 3, "grown");
+
+    expect(w.subHealth[10 + 10 * w.subWidth]).toBe(3);
+    expect(w.subHealth[11 + 10 * w.subWidth]).toBe(3);
+
+    // Damage a sub-pixel
+    const res = w.damageSub(10, 10, 2);
+    expect(res).toBe(1); // damaged
+    expect(w.subHealth[10 + 10 * w.subWidth]).toBe(1);
+    const res2 = w.damageSub(10, 10, 2);
+    expect(res2).toBe(2); // destroyed
+    expect(w.subSolidAt(10, 10)).toBe(false);
+    // Other 3 sub-cells are still solid
+    expect(w.anySolidInCell(5, 5)).toBe(true);
+  });
+
+  it("compounds pink blight generation across connected cores into open air", () => {
+    const w = new PixelWorld({
+      width: 30,
+      height: 30,
+      cellSize: 8,
+      roomSize: 4,
+    });
+
+    // Create 2 blight cores placed near each other in empty space:
+    // Core 1 at (10, 10), 2x2 cells -> (10,10), (11,10), (10,11), (11,11)
+    const core1Cells = [10 + 10 * 30, 11 + 10 * 30, 10 + 11 * 30, 11 + 11 * 30];
+    for (const idx of core1Cells) {
+      w.health[idx] = 10;
+      w.coreId[idx] = 1;
+    }
+    const core1 = { id: 1, roomId: 1, zone: 0 as const, cx: 10, cy: 10, cells: core1Cells, alive: true };
+
+    // Core 2 at (13, 10), 2x2 cells -> 1 cell gap from core 1 (cell 12 is between 11 and 13)
+    const core2Cells = [13 + 10 * 30, 14 + 10 * 30, 13 + 11 * 30, 14 + 11 * 30];
+    for (const idx of core2Cells) {
+      w.health[idx] = 10;
+      w.coreId[idx] = 2;
+    }
+    const core2 = { id: 2, roomId: 1, zone: 0 as const, cx: 13, cy: 10, cells: core2Cells, alive: true };
+
+    w.blightCores = [core1, core2];
+
+    const g = new GrowthSystem(w, new Rng(1234));
+    g.reset();
+
+    // At runTime = 65s, growth rate is ~6 sub-pixels per second.
+    // In 1 second, Core 1 alone produces ~6 sub-pixels.
+    core2.alive = false;
+    // Step 1 second (60 dt steps)
+    for (let step = 0; step < 60; step++) {
+      g.update(1 / 60, 65, []);
+    }
+
+    let pinkCountCore1Only = 0;
+    for (let i = 0; i < w.subHealth.length; i++) {
+      if (w.subHealth[i] > 0) pinkCountCore1Only++;
+    }
+    // Single core: produced ~6 sub-pixels
+    expect(pinkCountCore1Only).toBeGreaterThanOrEqual(4);
+    expect(pinkCountCore1Only).toBeLessThanOrEqual(8);
+
+    // Now clear subcells and resurrect Core 2
+    w.subHealth.fill(0);
+    w.subTint.fill(0);
+    core2.alive = true;
+
+    // Bridge the gap between Core 1 and Core 2 with pink sub-pixels so they are connected!
+    // Normal cell 12 sits between Core 1 (x=10,11) and Core 2 (x=13,14).
+    // In subcells: Core 1 right edge is sx=23. Core 2 left edge is sx=26.
+    // Bridging sx=24 and sx=25 connects both cores!
+    w.setSubCell(24, 20, 2, "grown");
+    w.setSubCell(25, 20, 2, "grown");
+
+    // Step 1 second with compounding connected cores
+    for (let step = 0; step < 60; step++) {
+      g.update(1 / 60, 65, []);
+    }
+
+    let pinkCountCompounded = 0;
+    for (let i = 0; i < w.subHealth.length; i++) {
+      if (w.subHealth[i] > 0) pinkCountCompounded++;
+    }
+
+    // Two connected cores compound: each contributes rate, so total rate is 2 * 6 = 12/s!
+    // Accounting for the 2 bridge pixels already set, newly added pixels should be around 12.
+    const addedPixels = pinkCountCompounded - 2;
+    expect(addedPixels).toBeGreaterThanOrEqual(9);
+    expect(addedPixels).toBeLessThanOrEqual(16);
+  });
+
+  it("pink blight sub-pixels provide physical collision against circles", () => {
+    const w = new PixelWorld({
+      width: 10,
+      height: 10,
+      cellSize: 8,
+      roomSize: 10,
+    });
+    // Center at (40, 40) in world coordinates. Room is fully empty.
+    const radius = 3;
+    expect(circleIsClear(w, 20, 20, radius)).toBe(true);
+
+    // Place a 50% pink blight sub-pixel near (20, 20).
+    // Cell size is 8, subCellSize is 4.
+    // Subcell (5, 5) spans world coords [20, 24] x [20, 24].
+    w.setSubCell(5, 5, 2, "grown");
+
+    // Circle at (20, 20) with radius 3 overlaps [20, 24] x [20, 24]!
+    expect(circleIsClear(w, 20, 20, radius)).toBe(false);
+
+    // Destroy the sub-pixel -> space is clear again.
+    w.damageSub(5, 5, 10);
+    expect(circleIsClear(w, 20, 20, radius)).toBe(true);
   });
 });

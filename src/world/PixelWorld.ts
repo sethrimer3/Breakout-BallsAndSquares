@@ -50,7 +50,7 @@ export class PixelWorld implements SolidQuery {
   readonly roomX1: number;
   readonly roomY1: number;
 
-  readonly health: Uint8Array;
+  readonly health: Uint16Array;
   /** Per-cell color variation seed (0..255). */
   readonly tint: Uint8Array;
   /**
@@ -70,7 +70,7 @@ export class PixelWorld implements SolidQuery {
    * 50%-smaller sub-pixel grid (4 subcells fit inside 1 normal cell).
    * `subHealth[sy * subWidth + sx]` > 0 when a small pink blight pixel occupies `(sx, sy)`.
    */
-  readonly subHealth: Uint8Array;
+  readonly subHealth: Uint16Array;
   readonly subTint: Uint8Array;
 
   /** Active/destroyed Blight Cores (each 2×2 normal cells) located inside blight-overrun rooms. */
@@ -98,12 +98,12 @@ export class PixelWorld implements SolidQuery {
     this.roomY0 = this.centerY - half;
     this.roomX1 = this.roomX0 + dims.roomSize - 1;
     this.roomY1 = this.roomY0 + dims.roomSize - 1;
-    this.health = new Uint8Array(dims.width * dims.height);
+    this.health = new Uint16Array(dims.width * dims.height);
     this.tint = new Uint8Array(dims.width * dims.height);
     this.wall = new Uint8Array(dims.width * dims.height);
     this.decor = new Uint8Array(dims.width * dims.height);
     this.coreId = new Uint8Array(dims.width * dims.height);
-    this.subHealth = new Uint8Array(this.subWidth * this.subHeight);
+    this.subHealth = new Uint16Array(this.subWidth * this.subHeight);
     this.subTint = new Uint8Array(this.subWidth * this.subHeight);
     this.subSolidQuery = {
       solidAt: (sx: number, sy: number) => this.subSolidAt(sx, sy),

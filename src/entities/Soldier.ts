@@ -63,10 +63,16 @@ export interface SoldierStats {
   pickupLifetime: number;
   crystalDropBonus: number;
   tier3ResourceBonus: number;
+  // Soldier health / survival upgrade
+  soldierHealth: number;
   // Blight (Growth) & Blight Core stats
   blightGraceSeconds: number;
   blightRateMultiplier: number;
+  blightStartRate: number;
   blightWeakenChance: number;
+  explosiveBlightChance: number;
+  explosiveBlightDamage: number;
+  explosiveBlightRadius: number;
   coreTimeReduction: number;
   coreDamageBonus: number;
   coreLootBurst: number;
@@ -76,6 +82,7 @@ export function baseSoldierStats(): SoldierStats {
   return {
     speed: SOLDIER.speed,
     maxSoldiers: SOLDIER.maxSoldiers,
+    soldierHealth: 0,
     globalFireRateMult: 1,
     globalDamageBonus: 0,
     globalBulletSpeedMult: 1,
@@ -115,7 +122,11 @@ export function baseSoldierStats(): SoldierStats {
     tier3ResourceBonus: 0,
     blightGraceSeconds: GROWTH.graceSeconds,
     blightRateMultiplier: 1,
+    blightStartRate: GROWTH.baseRate,
     blightWeakenChance: 0,
+    explosiveBlightChance: 0,
+    explosiveBlightDamage: 1,
+    explosiveBlightRadius: 1.2,
     coreTimeReduction: GROWTH.coreKillTimeReduction,
     coreDamageBonus: 0,
     coreLootBurst: 8,
@@ -134,6 +145,8 @@ export class Soldier {
   weapon: WeaponType;
   radius = SOLDIER.collisionRadius;
   alive = true;
+  health = 0;
+  maxHealth = 0;
   fireCooldown: number;
   /** Which side shell casings eject to (+1 / -1). */
   ejectSide: number;

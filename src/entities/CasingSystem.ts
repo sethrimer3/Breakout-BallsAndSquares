@@ -1,9 +1,10 @@
 import { CASING } from "../config";
 import type { Rng } from "../core/Rng";
+import type { PixelWorld } from "../world/PixelWorld";
 
 /**
  * Struct-of-arrays pool of spinning brass shell casings ejected on every shot.
- * Purely visual (spec §6): never participates in terrain collision.
+ * Bounces off terrain walls with restitution damping.
  */
 export class CasingSystem {
   readonly cap: number;
@@ -57,7 +58,8 @@ export class CasingSystem {
     this.bounceAt[i] = life - rng.range(0.18, 0.35);
   }
 
-  update(dt: number): void {
+  update(dt: number, world?: PixelWorld): void {
+    const cs = world?.cellSize ?? 8;
     let i = 0;
     while (i < this.count) {
       const prevLife = this.life[i];
@@ -77,8 +79,39 @@ export class CasingSystem {
       const d = Math.exp(-CASING.drag * dt);
       this.vx[i] *= d;
       this.vy[i] = (this.vy[i] + CASING.gravity * dt * 0.35) * d;
-      this.x[i] += this.vx[i] * dt;
-      this.y[i] += this.vy[i] * dt;
+
+      let curX = this.x[i];
+      let curY = this.y[i];
+
+      if (world) {
+        // Advance X with terrain collision & bounce
+        const nextX = curX + this.vx[i] * dt;
+        const cellX = Math.floor(nextX / cs);
+        const curCellY = Math.floor(curY / cs);
+        if (cellX < 0 || cellX >= world.width || world.solidAt(cellX, curCellY) || world.anySolidInCell(cellX, curCellY)) {
+          this.vx[i] = -this.vx[i] * 0.55;
+          this.angVel[i] *= -0.6;
+        } else {
+          curX = nextX;
+        }
+
+        // Advance Y with terrain collision & bounce
+        const nextY = curY + this.vy[i] * dt;
+        const curCellX = Math.floor(curX / cs);
+        const cellY = Math.floor(nextY / cs);
+        if (cellY < 0 || cellY >= world.height || world.solidAt(curCellX, cellY) || world.anySolidInCell(curCellX, cellY)) {
+          this.vy[i] = -this.vy[i] * 0.55;
+          this.angVel[i] *= -0.6;
+        } else {
+          curY = nextY;
+        }
+      } else {
+        curX += this.vx[i] * dt;
+        curY += this.vy[i] * dt;
+      }
+
+      this.x[i] = curX;
+      this.y[i] = curY;
       this.angle[i] += this.angVel[i] * dt * d;
       i++;
     }

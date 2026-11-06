@@ -106,6 +106,9 @@ export class Game {
     });
     this.growth = new GrowthSystem(this.world, this.rng, {
       onSoldierKilled: (s) => this.onSoldierKilled(s),
+      onSoldierRescued: (s, fromCx, fromCy, toCx, toCy, hpCost) =>
+        this.onSoldierRescued(s, fromCx, fromCy, toCx, toCy, hpCost),
+      onBlightExplode: (cx, cy, rad, dmg) => this.onBlightExplode(cx, cy, rad, dmg),
     });
     this.lighting = new LightingSystem(this.world);
     this.camera = new CameraSystem(this.world);
@@ -158,14 +161,19 @@ export class Game {
     this.stats = this.upgrades.getSoldierStats();
     this.combat.stats = this.stats;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
+    this.growth.startRate = this.stats.blightStartRate;
     this.growth.rateMultiplier = this.stats.blightRateMultiplier;
     this.growth.weakenChance = this.stats.blightWeakenChance;
+    this.growth.explosiveChance = this.stats.explosiveBlightChance;
+    this.growth.explosiveDamage = this.stats.explosiveBlightDamage;
+    this.growth.explosiveRadius = this.stats.explosiveBlightRadius;
     for (const s of this.soldiers) {
       if (!s.alive) continue;
       const len = Math.hypot(s.vx, s.vy) || 1;
       s.vx = (s.vx / len) * this.stats.speed;
       s.vy = (s.vy / len) * this.stats.speed;
       s.speed = this.stats.speed;
+      s.maxHealth = this.stats.soldierHealth;
     }
   }
 
@@ -188,8 +196,12 @@ export class Game {
     this.stats = this.upgrades.getSoldierStats();
     this.combat.stats = this.stats;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
+    this.growth.startRate = this.stats.blightStartRate;
     this.growth.rateMultiplier = this.stats.blightRateMultiplier;
     this.growth.weakenChance = this.stats.blightWeakenChance;
+    this.growth.explosiveChance = this.stats.explosiveBlightChance;
+    this.growth.explosiveDamage = this.stats.explosiveBlightDamage;
+    this.growth.explosiveRadius = this.stats.explosiveBlightRadius;
     this.soldiers = [];
     for (const fl of this.flashes) {
       this.flashPolyPool.push(fl.poly);
@@ -350,6 +362,8 @@ export class Game {
     const rawWeapon = this.save.data.loadouts[slotIdx]?.weapon ?? "pistol";
     const weapon = this.isWeaponUnlocked(rawWeapon) ? rawWeapon : "pistol";
     const s = new Soldier(spawn.x, spawn.y, dx, dy, this.stats.speed, weapon);
+    s.maxHealth = this.stats.soldierHealth;
+    s.health = this.stats.soldierHealth;
     this.soldiers.push(s);
     this.reserves--;
     this.runStats.soldiersDeployed++;
@@ -440,6 +454,7 @@ export class Game {
     cx: number,
     cy: number,
     result: 0 | 1 | 2,
+    sub = false,
   ): void {
     const destroyed = result === 2;
     if (destroyed) this.audio.playDestroy();
@@ -448,7 +463,20 @@ export class Game {
     for (let i = 0; i < n; i++) {
       const a = Math.atan2(ny, nx) + this.rng.range(-1.1, 1.1);
       const sp = this.rng.range(40, destroyed ? 150 : 110);
-      this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.08, 0.2), 1, 0xffc070, 8);
+      this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.08, 0.2), 1, sub ? 0xff6ab8 : 0xffc070, 8);
+    }
+    if (sub) {
+      // A 50% pink core-blight pixel: pink debris, quarter-cell loot odds, no normal terrain stats.
+      if (destroyed) {
+        for (let i = 0; i < 3; i++) {
+          const a = Math.atan2(ny, nx) + this.rng.range(-1.3, 1.3);
+          const sp = this.rng.range(20, 70);
+          this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, 0xd8267a, 4);
+        }
+        const lootKind = zoneForDepth(this.world.depthOf(cx, cy)) >= 1 ? LootKind.Crystal : LootKind.Gold;
+        this.loot.spawnDropsForBlock(x, y, this.stats.dropChance * 0.25, this.stats.pickupLifetime, this.rng, lootKind);
+      }
+      return;
     }
     if (result > 0) {
       this.cellFlashes.push({ cx, cy, life: TERRAIN.hitFlashTime * (destroyed ? 2 : 1), maxLife: TERRAIN.hitFlashTime * (destroyed ? 2 : 1), destroyed });
@@ -482,8 +510,9 @@ export class Game {
       if (destroyedCore) {
         this.growth.reduceBlightTimer(this.runStats.time, this.stats.coreTimeReduction);
         this.growthRate = this.growth.rate;
-        const coreWx = (destroyedCore.cx + 0.5) * cs;
-        const coreWy = (destroyedCore.cy + 0.5) * cs;
+        // 2×2 core: its center is the shared corner of its four cells.
+        const coreWx = (destroyedCore.cx + 1) * cs;
+        const coreWy = (destroyedCore.cy + 1) * cs;
         for (let i = 0; i < this.stats.coreLootBurst; i++) {
           this.loot.spawnOne(coreWx, coreWy, this.stats.pickupLifetime, this.rng, lootKind);
         }
@@ -556,6 +585,41 @@ export class Game {
     this.particles.spawn(PKind.Burst, s.x, s.y, 0, 0, 0.35, 16, 0x9ff3ff, 1);
   }
 
+  private onSoldierRescued(s: Soldier, fromCx: number, fromCy: number, toCx: number, toCy: number, hpCost: number): void {
+    const cs = this.world.cellSize;
+    const fromWx = (fromCx + 0.5) * cs;
+    const fromWy = (fromCy + 0.5) * cs;
+    this.audio.playRicochet();
+    for (let i = 0; i < 16; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(50, 160);
+      this.particles.spawn(PKind.Spark, fromWx, fromWy, Math.cos(a) * sp, Math.sin(a) * sp, 0.25, 1.5, 0x38d6ff, 4);
+      this.particles.spawn(PKind.Spark, s.x, s.y, Math.cos(a) * sp, Math.sin(a) * sp, 0.25, 1.5, 0x9ff3ff, 4);
+    }
+    this.particles.spawn(PKind.Burst, s.x, s.y, 0, 0, 0.25, 12, 0x38d6ff, 1);
+  }
+
+  private onBlightExplode(centerCx: number, centerCy: number, radiusCells: number, damage: number): void {
+    const w = this.world;
+    const cs = w.cellSize;
+    const rCeil = Math.ceil(radiusCells);
+    const r2 = radiusCells * radiusCells;
+    const wx = (centerCx + 0.5) * cs;
+    const wy = (centerCy + 0.5) * cs;
+
+    for (let dy = -rCeil; dy <= rCeil; dy++) {
+      const cy = centerCy + dy;
+      for (let dx = -rCeil; dx <= rCeil; dx++) {
+        const cx = centerCx + dx;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > r2 || !w.inBounds(cx, cy)) continue;
+        w.damage(cx, cy, damage);
+      }
+    }
+
+    this.onExplosion(wx, wy, radiusCells * cs);
+  }
+
   /** One fixed simulation step. */
   step(dt: number): void {
     this.runStats.time += dt;
@@ -570,7 +634,7 @@ export class Game {
     this.growthRate = this.growth.rate;
     this.runStats.recordSampleIfDue(this.growthRate);
     this.particles.update(dt);
-    this.casings.update(dt);
+    this.casings.update(dt, this.world);
     const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange);
     if (collected > 0) {
       this.runStats.currency += this.loot.collectedGold;

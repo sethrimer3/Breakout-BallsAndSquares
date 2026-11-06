@@ -23,6 +23,7 @@ export type UpgradeBranch =
 export type UpgradeId =
   // Core Matrix: Upgrades All Soldiers (#38d6ff)
   | "ball_speed"
+  | "soldier_health"
   | "extra_soldier"
   | "core_fire_rate"
   | "core_damage"
@@ -38,8 +39,12 @@ export type UpgradeId =
   | "tier3_quantum_extractor"
   // Blight Matrix: Blight Suppression & Blight Core Upgrades (#ff4b8b)
   | "blight_delay"
+  | "blight_start_rate"
   | "blight_slow"
   | "blight_weaken"
+  | "explosive_blight_chance"
+  | "explosive_blight_damage"
+  | "explosive_blight_radius"
   | "core_time_drain"
   | "core_breaker"
   | "core_bounty"
@@ -119,7 +124,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "ball_speed",
     branch: "core",
     name: "Soldier Speed",
-    shortDesc: "+10% movement velocity for all soldiers per level",
+    shortDesc: "+8% movement velocity for all soldiers per level",
     color: "#38d6ff",
     grid: { col: 0, row: -1 },
     parent: null,
@@ -127,13 +132,33 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     baseCost: 15,
     costMultiplier: 1.55,
     unlockLifetimePixels: 0,
-    valueAt: (lvl) => Math.round((1 + 0.1 * lvl) * 100),
+    valueAt: (lvl) => Math.round((1 + 0.08 * lvl) * 100),
     formatValue: (v) => `${v}%`,
-    formatDelta: () => "+10%",
+    formatDelta: () => "+8%",
     apply: (s, lvl) => {
-      s.speed = SOLDIER.speed * (1 + 0.1 * lvl);
+      s.speed = SOLDIER.speed * (1 + 0.08 * lvl);
     },
     icon: "soldierDash",
+  },
+  {
+    id: "soldier_health",
+    branch: "core",
+    name: "Soldier Health",
+    shortDesc: "+10 Soldier HP — survives being enclosed in Blight (costs 1 HP per block traveled to safety)",
+    color: "#38d6ff",
+    grid: { col: -1, row: -1 },
+    parent: "ball_speed",
+    maxLevel: 10,
+    baseCost: 30,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 30,
+    valueAt: (lvl) => lvl * 10,
+    formatValue: (v) => `${v} HP`,
+    formatDelta: () => "+10 HP",
+    apply: (s, lvl) => {
+      s.soldierHealth = lvl * 10;
+    },
+    icon: "soldierPlus",
   },
   {
     id: "extra_soldier",
@@ -387,27 +412,47 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "blight_delay",
     branch: "blight",
     name: "Blight Ward",
-    shortDesc: "+3.0s initial grace period before Blight begins replicating",
+    shortDesc: "+1.0s initial grace period before Blight begins replicating (5s up to 15s)",
     color: "#ff4b8b",
     grid: { col: 0, row: -1 },
     parent: null,
-    maxLevel: 8,
-    baseCost: 18,
-    costMultiplier: 1.55,
+    maxLevel: 10,
+    baseCost: 16,
+    costMultiplier: 1.5,
     unlockLifetimePixels: 0,
-    valueAt: (lvl) => GROWTH.graceSeconds + 3 * lvl,
+    valueAt: (lvl) => GROWTH.graceSeconds + 1 * lvl,
     formatValue: (v) => `${v}s GRACE`,
-    formatDelta: () => "+3.0s",
+    formatDelta: () => "+1.0s",
     apply: (s, lvl) => {
-      s.blightGraceSeconds = GROWTH.graceSeconds + 3 * lvl;
+      s.blightGraceSeconds = GROWTH.graceSeconds + 1 * lvl;
     },
     icon: "blightShield",
+  },
+  {
+    id: "blight_start_rate",
+    branch: "blight",
+    name: "Initial Suppression",
+    shortDesc: "-0.1/s initial Blight replication rate when grace period ends (1.0/s down to 0.0/s)",
+    color: "#ff4b8b",
+    grid: { col: -1, row: -1 },
+    parent: "blight_delay",
+    maxLevel: 10,
+    baseCost: 20,
+    costMultiplier: 1.55,
+    unlockLifetimePixels: 15,
+    valueAt: (lvl) => Math.max(0, +(1.0 - 0.1 * lvl).toFixed(1)),
+    formatValue: (v) => `${v.toFixed(1)}/s`,
+    formatDelta: () => "-0.1/s",
+    apply: (s, lvl) => {
+      s.blightStartRate = Math.max(0, +(1.0 - 0.1 * lvl).toFixed(1));
+    },
+    icon: "blightSlow",
   },
   {
     id: "blight_slow",
     branch: "blight",
     name: "Blight Dampener",
-    shortDesc: "-8% Blight replication speed per level",
+    shortDesc: "-5% Blight replication speed per level (-50% when maxed)",
     color: "#ff4b8b",
     grid: { col: -1, row: 0 },
     parent: null,
@@ -415,11 +460,11 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     baseCost: 26,
     costMultiplier: 1.6,
     unlockLifetimePixels: 20,
-    valueAt: (lvl) => Math.round(Math.pow(0.92, lvl) * 100),
+    valueAt: (lvl) => Math.round((1 - 0.05 * lvl) * 100),
     formatValue: (v) => `${v}% SPD`,
-    formatDelta: () => "-8% RATE",
+    formatDelta: () => "-5% RATE",
     apply: (s, lvl) => {
-      s.blightRateMultiplier = Math.pow(0.92, lvl);
+      s.blightRateMultiplier = Math.max(0.5, 1 - 0.05 * lvl);
     },
     icon: "blightSlow",
   },
@@ -429,8 +474,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     name: "Blight Decay",
     shortDesc: "+10% chance newly grown Blight pixels spawn with only 1 HP",
     color: "#ff4b8b",
-    grid: { col: 0, row: 1 },
-    parent: null,
+    grid: { col: -2, row: 0 },
+    parent: "blight_slow",
     maxLevel: 8,
     baseCost: 35,
     costMultiplier: 1.65,
@@ -442,6 +487,66 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.blightWeakenChance = Math.min(0.8, lvl * 0.1);
     },
     icon: "blightCrack",
+  },
+  {
+    id: "explosive_blight_chance",
+    branch: "blight",
+    name: "Explosive Blight",
+    shortDesc: "+5% chance for newly formed pink Blight to combust and explode",
+    color: "#ff4b8b",
+    grid: { col: 0, row: 1 },
+    parent: null,
+    maxLevel: 10,
+    baseCost: 28,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 35,
+    valueAt: (lvl) => lvl * 5,
+    formatValue: (v) => `${v}%`,
+    formatDelta: () => "+5%",
+    apply: (s, lvl) => {
+      s.explosiveBlightChance = lvl * 0.05;
+    },
+    icon: "blast",
+  },
+  {
+    id: "explosive_blight_damage",
+    branch: "blight",
+    name: "Combustion Power",
+    shortDesc: "+1 damage dealt by Blight combustion explosions",
+    color: "#ff4b8b",
+    grid: { col: -1, row: 1 },
+    parent: "explosive_blight_chance",
+    maxLevel: 8,
+    baseCost: 35,
+    costMultiplier: 1.65,
+    unlockLifetimePixels: 50,
+    valueAt: (lvl) => 1 + lvl,
+    formatValue: (v) => `${v} DMG`,
+    formatDelta: () => "+1 DMG",
+    apply: (s, lvl) => {
+      s.explosiveBlightDamage = 1 + lvl;
+    },
+    icon: "impact",
+  },
+  {
+    id: "explosive_blight_radius",
+    branch: "blight",
+    name: "Blast Wave",
+    shortDesc: "+0.4 cell radius for Blight combustion explosions",
+    color: "#ff4b8b",
+    grid: { col: 1, row: 1 },
+    parent: "explosive_blight_chance",
+    maxLevel: 6,
+    baseCost: 32,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 45,
+    valueAt: (lvl) => +(1.2 + 0.4 * lvl).toFixed(1),
+    formatValue: (v) => `${v.toFixed(1)} RAD`,
+    formatDelta: () => "+0.4 RAD",
+    apply: (s, lvl) => {
+      s.explosiveBlightRadius = +(1.2 + 0.4 * lvl).toFixed(1);
+    },
+    icon: "warhead",
   },
   {
     id: "core_time_drain",

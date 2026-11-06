@@ -187,8 +187,8 @@ export class Renderer {
     for (let i = 0; i < cores.length; i++) {
       const c = cores[i];
       if (!c.alive) continue;
-      const wx = (c.cx + 0.5) * cs;
-      const wy = (c.cy + 0.5) * cs;
+      const wx = (c.cx + 1) * cs;
+      const wy = (c.cy + 1) * cs;
       const sx = cam.worldToScreenX(wx);
       const sy = cam.worldToScreenY(wy);
       const rad = cs * 3.8 * cam.zoom * (0.9 + 0.15 * pulse);
