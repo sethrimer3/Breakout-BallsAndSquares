@@ -35,9 +35,6 @@ export class UpgradeManager {
     if (def.branch === "sniper_rifle" && def.id !== "sniper_unlock") {
       if (this.levelOf("sniper_unlock") === 0) return false;
     }
-    if (def.branch === "katana" && def.id !== "katana_unlock") {
-      if (this.levelOf("katana_unlock") === 0) return false;
-    }
     return true;
   }
 

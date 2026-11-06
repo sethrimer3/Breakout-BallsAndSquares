@@ -322,12 +322,6 @@ export class Renderer {
       if (sx < -40 || sy < -40 || sx > cam.viewW + 40 || sy > cam.viewH + 40) continue;
       const isRocket = b.style === 1;
       const isSniper = b.style === 2;
-      const isSlash = b.style === 3;
-
-      if (isSlash) {
-        this.drawSlash(b);
-        continue;
-      }
 
       const maxTracer = isSniper ? BULLET.tracerLength * 2.4 : isRocket ? BULLET.tracerLength * 2 : BULLET.tracerLength;
       const tLen = Math.min(maxTracer, b.traveled);
@@ -387,72 +381,6 @@ export class Renderer {
     this.fillArtPixel(hx - 1, hy - 1, 3);
     ctx.fillStyle = "#fffbe0";
     this.fillArtPixel(hx, hy, 1);
-    ctx.restore();
-  }
-
-  /**
-   * Katana slash: a luminous crescent cutting wave.
-   * Actual sword is not visible — only the razor-sharp energy slash.
-   */
-  private drawSlash(b: Bullet): void {
-    const { ctx, game } = this;
-    const cam = game.camera;
-    const sx = cam.worldToScreenX(b.x);
-    const sy = cam.worldToScreenY(b.y);
-    const pad = (b.slashWidth || 16) * cam.zoom + 30;
-    if (sx < -pad || sy < -pad || sx > cam.viewW + pad || sy > cam.viewH + pad) return;
-
-    const lifePct = b.maxLife > 0 ? Math.max(0, b.life / b.maxLife) : 1;
-    const alpha = Math.min(1, lifePct * 1.5);
-    const w = (b.slashWidth || 16) * cam.zoom;
-    const bulge = w * 0.42;
-    const dir = Math.atan2(b.dy, b.dx);
-    const tilt = b.slashAngle;
-
-    ctx.save();
-    ctx.translate(sx, sy);
-    ctx.rotate(dir + tilt);
-
-    const tipY = w * 0.5;
-    const tipX = -bulge * 0.35;
-
-    // 1. Faint outer cyan glow aura
-    ctx.beginPath();
-    ctx.moveTo(tipX - 2, -tipY);
-    ctx.quadraticCurveTo(bulge * 1.25, 0, tipX - 2, tipY);
-    ctx.quadraticCurveTo(bulge * 0.1, 0, tipX - 2, -tipY);
-    ctx.closePath();
-    ctx.fillStyle = `rgba(56, 214, 255, ${0.35 * alpha})`;
-    ctx.fill();
-
-    // 2. Main crescent slash blade
-    ctx.beginPath();
-    ctx.moveTo(tipX, -tipY);
-    ctx.quadraticCurveTo(bulge * 1.15, 0, tipX, tipY);
-    ctx.quadraticCurveTo(bulge * 0.28, 0, tipX, -tipY);
-    ctx.closePath();
-    ctx.fillStyle = `rgba(168, 245, 255, ${0.85 * alpha})`;
-    ctx.fill();
-
-    // 3. Razor-sharp white leading cutting edge
-    ctx.beginPath();
-    ctx.moveTo(tipX, -tipY);
-    ctx.quadraticCurveTo(bulge * 1.15, 0, tipX, tipY);
-    ctx.lineWidth = Math.max(1, 1.8 * cam.zoom);
-    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-    ctx.stroke();
-
-    // 4. Subtle trailing motion streaks (air cut effect)
-    const trailOffset = Math.min(8 * cam.zoom, b.traveled * cam.zoom * 0.5);
-    if (trailOffset > 1) {
-      ctx.beginPath();
-      ctx.moveTo(tipX - trailOffset, -tipY * 0.7);
-      ctx.quadraticCurveTo((bulge - trailOffset) * 0.8, 0, tipX - trailOffset, tipY * 0.7);
-      ctx.lineWidth = Math.max(0.8, 1.0 * cam.zoom);
-      ctx.strokeStyle = `rgba(90, 220, 255, ${0.4 * alpha})`;
-      ctx.stroke();
-    }
-
     ctx.restore();
   }
 

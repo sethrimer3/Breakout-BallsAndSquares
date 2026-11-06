@@ -571,8 +571,6 @@ export class Game {
         return this.stats.rocketUnlocked;
       case "sniper_rifle":
         return this.stats.sniperUnlocked;
-      case "katana":
-        return this.stats.katanaUnlocked;
     }
   }
 
@@ -584,25 +582,6 @@ export class Game {
 
   private onShot(s: Soldier, dx: number, dy: number, mx: number, my: number): void {
     this.runStats.shotsFired++;
-    if (s.weapon === "katana") {
-      this.audio.playSlash();
-      for (let i = 0; i < 4; i++) {
-        const a = Math.atan2(dy, dx) + this.rng.range(-0.7, 0.7);
-        const sp = this.rng.range(50, 130);
-        this.particles.spawn(
-          PKind.Spark,
-          mx,
-          my,
-          Math.cos(a) * sp,
-          Math.sin(a) * sp,
-          this.rng.range(0.06, 0.12),
-          1,
-          0xa0f4ff,
-          8,
-        );
-      }
-      return;
-    }
     this.audio.playShot();
     const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
     const lit = this.flashLitPool.pop() ?? makeLitCells();

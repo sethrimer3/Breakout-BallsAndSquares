@@ -75,7 +75,6 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   assault_rifle: { icon: "rifle", color: "#52f296" },
   rocket_launcher: { icon: "launcher", color: "#ff5c40" },
   sniper_rifle: { icon: "sniper", color: UI_COLORS.soldier },
-  katana: { icon: "katana", color: "#38d6ff" },
 };
 
 const lockIcon = (): string => sprite("lock", { color: "#6d8197", scale: 1 });
