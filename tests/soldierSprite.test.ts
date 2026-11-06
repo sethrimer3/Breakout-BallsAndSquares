@@ -43,3 +43,13 @@ describe("pixel-art soldier sprite", () => {
     expect(mid).toMatch(/o\.+[-#+w]/);
   });
 });
+
+describe("unselected soldier sprite", () => {
+  it("has the same size as the selected one but no ring", () => {
+    const ringed = soldierGrid(SOLDIER.renderRadius, SOLDIER.ringRadius, true);
+    const plain = soldierGrid(SOLDIER.renderRadius, SOLDIER.ringRadius, false);
+    expect(plain.length).toBe(ringed.length);
+    expect(plain.join("")).not.toContain("o");
+    expect(plain.join("").replace(/o/g, ".")).toBe(ringed.join("").replace(/o/g, "."));
+  });
+});

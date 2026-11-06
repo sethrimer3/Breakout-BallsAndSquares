@@ -241,19 +241,24 @@ export class Renderer {
     }
   }
 
+  /** Draw a pixel-art soldier sprite centred on a screen point (nearest-neighbour, pixel-snapped). */
+  private drawSoldierSprite(sprite: HTMLCanvasElement, sx: number, sy: number): void {
+    const size = Math.max(1, Math.round(sprite.width * ART_PIXEL * this.game.camera.zoom));
+    const half = size / 2;
+    this.ctx.imageSmoothingEnabled = false;
+    this.ctx.drawImage(sprite, Math.round(sx - half), Math.round(sy - half), size, size);
+  }
+
   private drawSoldiers(): void {
     const { ctx, game } = this;
     const cam = game.camera;
-    const sprite = this.sprites.soldier;
-    // Pixel-art sprite: nearest-neighbour scaling, snapped to whole screen pixels.
-    const size = Math.max(1, Math.round(sprite.width * ART_PIXEL * cam.zoom));
-    const half = size / 2;
-    ctx.imageSmoothingEnabled = false;
     for (const s of game.soldiers) {
       if (!s.alive) continue;
       const sx = cam.worldToScreenX(s.x);
       const sy = cam.worldToScreenY(s.y);
-      ctx.drawImage(sprite, Math.round(sx - half), Math.round(sy - half), size, size);
+      // The ring marks the soldier the camera is following (auto or Tab-selected).
+      const selected = cam.following && cam.targetId === s.id;
+      this.drawSoldierSprite(selected ? this.sprites.soldierSelected : this.sprites.soldier, sx, sy);
       const br = SOLDIER.renderRadius * cam.zoom;
       if (s.maxHealth > 0) {
         const barW = Math.max(12, 10 * cam.zoom);
@@ -265,13 +270,6 @@ export class Renderer {
         const pct = Math.max(0, Math.min(1, s.health / s.maxHealth));
         ctx.fillStyle = pct > 0.4 ? "#38d6ff" : "#ff4b7d";
         ctx.fillRect(barX, barY, barW * pct, barH);
-      }
-      if (cam.manualTarget && cam.targetId === s.id) {
-        ctx.strokeStyle = "rgba(160, 245, 255, 0.85)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(sx, sy, br + 4, 0, Math.PI * 2);
-        ctx.stroke();
       }
     }
   }
@@ -324,7 +322,7 @@ export class Renderer {
       if (sx < -40 || sy < -40 || sx > cam.viewW + 40 || sy > cam.viewH + 40) continue;
       const isRocket = b.style === 1;
       const isSniper = b.style === 2;
-      const maxTracer = isSniper ? BULLET.tracerLength * 2.4 : isRocket ? BULLET.tracerLength * 1.4 : BULLET.tracerLength;
+      const maxTracer = isSniper ? BULLET.tracerLength * 2.4 : isRocket ? BULLET.tracerLength * 2 : BULLET.tracerLength;
       const tLen = Math.min(maxTracer, b.traveled);
 
       // Head and tail in art-pixel grid coordinates.
@@ -334,7 +332,12 @@ export class Renderer {
       const ty = Math.floor((b.y - b.dy * tLen) / px);
       const steps = Math.max(Math.abs(hx - tx), Math.abs(hy - ty));
 
-      ctx.fillStyle = isSniper ? "#d7fcff" : isRocket ? "#ffc86e" : "#fff2c3";
+      if (isRocket) {
+        this.drawRocket(hx, hy, tx, ty, steps);
+        continue;
+      }
+
+      ctx.fillStyle = isSniper ? "#d7fcff" : "#fff2c3";
       // Trail: tail (k = 0) is faint, the pixel just behind the head is brightest.
       for (let k = 0; k < steps; k++) {
         const t = k / steps;
@@ -342,14 +345,42 @@ export class Renderer {
         this.fillArtPixel(Math.round(tx + (hx - tx) * t), Math.round(ty + (hy - ty) * t), 1);
       }
       ctx.globalAlpha = 1;
-      if (isRocket) {
-        this.fillArtPixel(hx, hy, 2);
-      } else {
-        ctx.fillStyle = "#ffffff";
-        this.fillArtPixel(hx, hy, 1);
-      }
+      ctx.fillStyle = "#ffffff";
+      this.fillArtPixel(hx, hy, 1);
     }
     ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Rocket: a 3x3 pixel head with a fiery trail that tapers from 3 pixels wide
+   * behind the head to 1 pixel at the tail, cooling from white-yellow through
+   * orange to deep red, with a little per-frame flicker.
+   */
+  private drawRocket(hx: number, hy: number, tx: number, ty: number, steps: number): void {
+    const ctx = this.ctx;
+    // Normal blending: the 3-wide trail squares overlap, and additive blending
+    // would wash them out to white.
+    ctx.save();
+    ctx.globalCompositeOperation = "source-over";
+    for (let k = 0; k < steps; k++) {
+      const t = k / steps; // 0 = tail, 1 = just behind the head
+      // Ragged, flickering tail end.
+      if (t < 0.35 && Math.random() < 0.35) continue;
+      const w = t > 0.7 ? 3 : t > 0.35 ? 2 : 1;
+      const jitter = t < 0.5 && Math.random() < 0.3 ? (Math.random() < 0.5 ? -1 : 1) : 0;
+      const cx = Math.round(tx + (hx - tx) * t) + (Math.abs(hx - tx) >= Math.abs(hy - ty) ? 0 : jitter);
+      const cy = Math.round(ty + (hy - ty) * t) + (Math.abs(hx - tx) >= Math.abs(hy - ty) ? jitter : 0);
+      ctx.fillStyle = t > 0.82 ? "#ffd84a" : t > 0.6 ? "#ff9a1c" : t > 0.35 ? "#f2530e" : "#a8200a";
+      ctx.globalAlpha = (0.4 + 0.6 * t) * (0.75 + 0.25 * Math.random());
+      const o = Math.floor((w - 1) / 2);
+      this.fillArtPixel(cx - o, cy - o, w);
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = "#ffc23a";
+    this.fillArtPixel(hx - 1, hy - 1, 3);
+    ctx.fillStyle = "#fffbe0";
+    this.fillArtPixel(hx, hy, 1);
+    ctx.restore();
   }
 
   /** Fill `n` x `n` art pixels starting at grid cell (gx, gy), snapped to screen pixels. */
@@ -430,7 +461,7 @@ export class Renderer {
       ctx.drawImage(this.sprites.soldierGlow, sx - gr, sy - gr, gr * 2, gr * 2);
       ctx.save();
       ctx.globalAlpha = 0.85;
-      ctx.drawImage(this.sprites.soldier, sx - br, sy - br, br * 2, br * 2);
+      this.drawSoldierSprite(this.sprites.soldier, sx, sy);
       ctx.restore();
 
       // Outer targeting ring

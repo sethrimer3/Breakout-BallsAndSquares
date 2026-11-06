@@ -30,12 +30,12 @@ export const SOLDIER_PALETTE = {
 } as const;
 
 /**
- * Pixel grid for the soldier: a shaded sphere (lit from the upper left) inside a
- * one-pixel ring. One character per pixel; "." is transparent, the rest index
+ * Pixel grid for the soldier: a shaded sphere (lit from the upper left), optionally
+ * inside a one-pixel ring (shown only on the selected soldier). One character per pixel; "." is transparent, the rest index
  * `SOLDIER_PALETTE`. The grid is square with an odd side so the sphere has a
  * center pixel.
  */
-export function soldierGrid(sphereRadius: number, ringRadius: number): string[] {
+export function soldierGrid(sphereRadius: number, ringRadius: number, withRing = true): string[] {
   const n = 2 * Math.ceil(ringRadius - 0.5) + 1;
   const c = n / 2;
   const lx = -0.5;
@@ -55,7 +55,7 @@ export function soldierGrid(sphereRadius: number, ringRadius: number): string[] 
         const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
         const i = (nx * lx + ny * ly + nz * lz) / lm;
         row += i > 0.96 ? "w" : i > 0.82 ? "+" : i > 0.3 ? "#" : "-";
-      } else if (d <= ringRadius && d > ringRadius - 1) {
+      } else if (withRing && d <= ringRadius && d > ringRadius - 1) {
         row += "o";
       } else {
         row += ".";
@@ -67,8 +67,8 @@ export function soldierGrid(sphereRadius: number, ringRadius: number): string[] 
 }
 
 /** Pixel-art soldier sprite at one canvas pixel per art pixel (draw with smoothing off). */
-export function soldierSprite(sphereRadius: number, ringRadius: number): HTMLCanvasElement {
-  const grid = soldierGrid(sphereRadius, ringRadius);
+export function soldierSprite(sphereRadius: number, ringRadius: number, withRing = true): HTMLCanvasElement {
+  const grid = soldierGrid(sphereRadius, ringRadius, withRing);
   const [c, g] = makeCanvas(grid.length);
   for (let y = 0; y < grid.length; y++) {
     for (let x = 0; x < grid.length; x++) {
@@ -153,7 +153,10 @@ export function orangeCrystalSprite(size: number): HTMLCanvasElement {
 }
 
 export interface Sprites {
+  /** Sphere only. Same canvas size as `soldierSelected`, so both draw identically. */
   soldier: HTMLCanvasElement;
+  /** Sphere inside the pixel ring, for the soldier the camera is following. */
+  soldierSelected: HTMLCanvasElement;
   soldierGlow: HTMLCanvasElement;
   warmGlow: HTMLCanvasElement;
   hotGlow: HTMLCanvasElement;
@@ -165,7 +168,8 @@ export interface Sprites {
 
 export function createSprites(): Sprites {
   return {
-    soldier: soldierSprite(SOLDIER.renderRadius / ART_PIXEL, SOLDIER.ringRadius / ART_PIXEL),
+    soldier: soldierSprite(SOLDIER.renderRadius / ART_PIXEL, SOLDIER.ringRadius / ART_PIXEL, false),
+    soldierSelected: soldierSprite(SOLDIER.renderRadius / ART_PIXEL, SOLDIER.ringRadius / ART_PIXEL, true),
     soldierGlow: radialSprite(64, [
       [0, "rgba(120, 225, 255, 0.45)"],
       [0.4, "rgba(80, 180, 255, 0.15)"],
