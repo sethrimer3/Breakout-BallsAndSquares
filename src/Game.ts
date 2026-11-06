@@ -181,6 +181,11 @@ export class Game {
     return this.save.data.settings.fieryMuzzleFlash;
   }
 
+  /** Blurred shadow edges in the open-air light (visual setting). */
+  get softShadows(): boolean {
+    return this.save.data.settings.softShadows;
+  }
+
   get lifetimePixels(): number {
     return this.save.data.lifetimePixels;
   }

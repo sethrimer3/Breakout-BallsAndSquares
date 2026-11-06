@@ -1,7 +1,20 @@
 import { GROWTH, LIGHT } from "../config";
 import type { Game } from "../Game";
 import type { LitCells } from "../systems/LightingSystem";
+import { CanvasSoftener } from "./SoftLight";
 import type { Sprites } from "./sprites";
+
+/**
+ * Soft-shadow tuning: the open-air light layer is blurred at this fraction of
+ * device resolution before terrain is cut out, so shadow edges fade over a few
+ * pixels while walls (cut out afterwards at full res) stay crisp.
+ */
+export const SOFT_SHADOWS = {
+  /** Low-res copy size per device pixel. Lower = softer + cheaper. */
+  scale: 0.25,
+  /** Blur radius in low-res pixels (x 1/scale device pixels). */
+  blur: 1.5,
+} as const;
 
 /** Gradient stop: `[offset, r, g, b, alpha]`. */
 type Stop = readonly [number, number, number, number, number];
@@ -91,6 +104,9 @@ export class LightRenderer {
   private maskCanvas: HTMLCanvasElement;
   private maskCtx: CanvasRenderingContext2D;
   private vignetteCanvas: HTMLCanvasElement;
+  private softener = new CanvasSoftener(SOFT_SHADOWS);
+  /** Set per frame from the visual setting. */
+  private softShadows = false;
   private vigW = 0;
   private vigH = 0;
 
@@ -114,6 +130,7 @@ export class LightRenderer {
   /** Build the lightmap and composite it onto the scene in `ctx`. */
   renderLighting(ctx: CanvasRenderingContext2D, game: Game, dpr: number): void {
     const cam = game.camera;
+    this.softShadows = game.softShadows;
     const viewW = Math.max(1, Math.round(cam.viewW));
     const viewH = Math.max(1, Math.round(cam.viewH));
     const devW = ctx.canvas.width;
@@ -280,6 +297,8 @@ export class LightRenderer {
     dpr: number,
   ): void {
     const l = this.layerCtx;
+    // Soften shadow edges before the terrain cut, which stays pixel-sharp.
+    if (this.softShadows) this.softener.soften(l, devW, devH);
     l.setTransform(1, 0, 0, 1, 0, 0);
     l.globalCompositeOperation = "destination-out";
     l.drawImage(this.maskCanvas, 0, 0, devW, devH);

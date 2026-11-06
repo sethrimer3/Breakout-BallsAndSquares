@@ -204,3 +204,47 @@ export class SoftLightBuffer {
     target.restore();
   }
 }
+
+/**
+ * Softens the hard edges already drawn on a full-resolution canvas (e.g. shadow
+ * polygon boundaries) by round-tripping it through a small blurred copy:
+ * downsample + blur into a low-res canvas, then upscale back over the source.
+ * One small blur and two `drawImage`s per call; the low-res canvas is reused.
+ */
+export class CanvasSoftener {
+  private small: HTMLCanvasElement;
+  private smallCtx: CanvasRenderingContext2D;
+
+  constructor(public opts: SoftLightBufferOptions) {
+    this.small = document.createElement("canvas");
+    this.smallCtx = this.small.getContext("2d")!;
+  }
+
+  /** Soften `ctx.canvas` in place (`w` x `h` device pixels). */
+  soften(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+    const sw = Math.max(1, Math.ceil(w * this.opts.scale));
+    const sh = Math.max(1, Math.ceil(h * this.opts.scale));
+    if (this.small.width !== sw || this.small.height !== sh) {
+      this.small.width = sw;
+      this.small.height = sh;
+    }
+    const s = this.smallCtx;
+    s.setTransform(1, 0, 0, 1, 0, 0);
+    s.globalCompositeOperation = "source-over";
+    s.clearRect(0, 0, sw, sh);
+    s.imageSmoothingEnabled = true;
+    const blur = supportsCanvasFilter(s) && this.opts.blur > 0;
+    if (blur) s.filter = `blur(${this.opts.blur}px)`;
+    // Without filter support the bilinear down/upsample alone does the softening.
+    s.drawImage(ctx.canvas, 0, 0, w, h, 0, 0, sw, sh);
+    if (blur) s.filter = "none";
+
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "copy";
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(this.small, 0, 0, sw, sh, 0, 0, w, h);
+    ctx.restore();
+  }
+}
