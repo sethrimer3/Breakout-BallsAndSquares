@@ -243,4 +243,91 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(explosions).toBeGreaterThanOrEqual(2);
     expect(rocketDestroyed).toBeGreaterThan(5);
   });
+
+  it("organizes Core (all-soldier buffs), Resources (gold + Tier 2/3 placeholders), and Blight (Blight Core upgrades) into separate branches", async () => {
+    const { UPGRADE_DEFS } = await import("../src/progression/UpgradeDefinitions");
+    const { PixelWorld } = await import("../src/world/PixelWorld");
+    const { CombatSystem } = await import("../src/systems/CombatSystem");
+    const { Soldier } = await import("../src/entities/Soldier");
+
+    // 1. Verify branch separation.
+    const coreIds = UPGRADE_DEFS.filter((d) => d.branch === "core").map((d) => d.id);
+    const resourceIds = UPGRADE_DEFS.filter((d) => d.branch === "resources").map((d) => d.id);
+    const blightIds = UPGRADE_DEFS.filter((d) => d.branch === "blight").map((d) => d.id);
+
+    expect(coreIds).toEqual(
+      expect.arrayContaining(["ball_speed", "extra_soldier", "core_fire_rate", "core_damage", "core_velocity"]),
+    );
+    expect(resourceIds).toEqual(
+      expect.arrayContaining([
+        "drop_chance",
+        "multi_drop",
+        "magnet_range",
+        "pickup_lifetime",
+        "tier2_crystal_yield",
+        "tier2_crystal_refinery",
+        "tier3_dark_matter",
+        "tier3_quantum_extractor",
+      ]),
+    );
+    expect(blightIds).toEqual(
+      expect.arrayContaining([
+        "blight_delay",
+        "blight_slow",
+        "blight_weaken",
+        "core_time_drain",
+        "core_breaker",
+        "core_bounty",
+      ]),
+    );
+
+    // 2. Verify Core upgrades boost all soldiers & weapons, and Blight Core upgrades boost damage vs Blight Core cells.
+    const store = new MemStorage();
+    const save = new SaveManager(store);
+    const upg = new UpgradeManager(save);
+    save.data.bank = 500_000;
+    save.data.lifetimePixels = 1000;
+
+    expect(upg.buy("core_fire_rate")).toBe(true);
+    expect(upg.buy("core_damage")).toBe(true);
+    expect(upg.buy("core_velocity")).toBe(true);
+    expect(upg.buy("core_time_drain")).toBe(true);
+    expect(upg.buy("core_breaker")).toBe(true);
+    expect(upg.buy("core_bounty")).toBe(true);
+    expect(upg.buy("tier2_crystal_yield")).toBe(true);
+    expect(upg.buy("tier3_dark_matter")).toBe(true);
+
+    const st = upg.getSoldierStats();
+    expect(st.globalFireRateMult).toBeCloseTo(1.08, 5);
+    expect(st.globalDamageBonus).toBe(1);
+    expect(st.globalBulletSpeedMult).toBeCloseTo(1.08, 5);
+    expect(st.coreTimeReduction).toBe(16);
+    expect(st.coreDamageBonus).toBe(2);
+    expect(st.coreLootBurst).toBe(12);
+    expect(st.crystalDropBonus).toBeCloseTo(0.15, 5);
+    expect(st.tier3ResourceBonus).toBeCloseTo(0.2, 5);
+
+    // Verify CombatSystem applies globalDamageBonus + coreDamageBonus against a Blight Core cell.
+    const w = new PixelWorld({ width: 20, height: 20, cellSize: 10, roomSize: 6 });
+    const cellIdx = 5 * w.width + 8;
+    w.setCell(8, 5, 10, "set", true);
+    w.coreId[cellIdx] = 1;
+    w.blightCores.push({
+      id: 1,
+      roomId: 0,
+      zone: 0,
+      cx: 8,
+      cy: 5,
+      cells: [cellIdx],
+      alive: true,
+    });
+
+    const combat = new CombatSystem(w, new Rng(99), st);
+    const pistolSoldier = new Soldier(20, 55, 100, 0, 3, "pistol");
+    combat.fire(pistolSoldier);
+    combat.updateBullets(0.2);
+
+    // Base pistol damage (1) + globalDamageBonus (1) + coreDamageBonus (2) = 4 damage -> 10 - 4 = 6 HP remaining.
+    expect(w.health[cellIdx]).toBe(6);
+  });
 });

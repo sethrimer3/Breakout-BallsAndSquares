@@ -12,6 +12,8 @@ import type { SpriteName } from "../ui/pixelArt";
 
 export type UpgradeBranch =
   | "core"
+  | "resources"
+  | "blight"
   | "pistol"
   | "shotgun"
   | "assault_rifle"
@@ -19,18 +21,28 @@ export type UpgradeBranch =
   | "sniper_rifle";
 
 export type UpgradeId =
-  // Core Matrix: General Soldier (#38d6ff)
+  // Core Matrix: Upgrades All Soldiers (#38d6ff)
   | "ball_speed"
   | "extra_soldier"
-  // Core Matrix: Money / Economy (#ffd84d)
+  | "core_fire_rate"
+  | "core_damage"
+  | "core_velocity"
+  // Resources Matrix: Gold, Tier 2 Crystals & Tier 3 Placeholders
   | "drop_chance"
   | "multi_drop"
   | "magnet_range"
   | "pickup_lifetime"
-  // Core Matrix: Blight Suppression (#ff4b8b)
+  | "tier2_crystal_yield"
+  | "tier2_crystal_refinery"
+  | "tier3_dark_matter"
+  | "tier3_quantum_extractor"
+  // Blight Matrix: Blight Suppression & Blight Core Upgrades (#ff4b8b)
   | "blight_delay"
   | "blight_slow"
   | "blight_weaken"
+  | "core_time_drain"
+  | "core_breaker"
+  | "core_bounty"
   // Pistol Tree
   | "fire_rate"
   | "bullet_speed"
@@ -101,13 +113,13 @@ export function upgradeCost(def: UpgradeDef, currentLevel: number): number {
 
 export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   // =========================================================================
-  // 1) CORE MATRIX: GENERAL SOLDIER UPGRADES (Cyan #38d6ff, connected together)
+  // 1) CORE MATRIX: UPGRADES ALL SOLDIERS (Cyan #38d6ff)
   // =========================================================================
   {
     id: "ball_speed",
     branch: "core",
     name: "Soldier Speed",
-    shortDesc: "+10% soldier movement velocity per level",
+    shortDesc: "+10% movement velocity for all soldiers per level",
     color: "#38d6ff",
     grid: { col: 0, row: -1 },
     parent: null,
@@ -143,13 +155,73 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     },
     icon: "soldierPlus",
   },
+  {
+    id: "core_fire_rate",
+    branch: "core",
+    name: "Squad Overclock",
+    shortDesc: "+8% global fire rate across all soldiers & weapons",
+    color: "#38d6ff",
+    grid: { col: -1, row: 0 },
+    parent: null,
+    maxLevel: 10,
+    baseCost: 25,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 0,
+    valueAt: (lvl) => Math.round((1 + 0.08 * lvl) * 100),
+    formatValue: (v) => `${v}% RATE`,
+    formatDelta: () => "+8% ALL",
+    apply: (s, lvl) => {
+      s.globalFireRateMult = 1 + 0.08 * lvl;
+    },
+    icon: "fireRate",
+  },
+  {
+    id: "core_damage",
+    branch: "core",
+    name: "Squad Firepower",
+    shortDesc: "+1 global terrain damage bonus for all soldiers & weapons",
+    color: "#38d6ff",
+    grid: { col: 1, row: 0 },
+    parent: null,
+    maxLevel: 8,
+    baseCost: 45,
+    costMultiplier: 1.75,
+    unlockLifetimePixels: 25,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => `+${v} DMG`,
+    formatDelta: () => "+1 DMG ALL",
+    apply: (s, lvl) => {
+      s.globalDamageBonus = lvl;
+    },
+    icon: "impact",
+  },
+  {
+    id: "core_velocity",
+    branch: "core",
+    name: "Squad Ballistics",
+    shortDesc: "+8% global projectile velocity for all soldiers & weapons",
+    color: "#38d6ff",
+    grid: { col: 0, row: 1 },
+    parent: null,
+    maxLevel: 8,
+    baseCost: 20,
+    costMultiplier: 1.55,
+    unlockLifetimePixels: 0,
+    valueAt: (lvl) => Math.round((1 + 0.08 * lvl) * 100),
+    formatValue: (v) => `${v}% VEL`,
+    formatDelta: () => "+8% ALL",
+    apply: (s, lvl) => {
+      s.globalBulletSpeedMult = 1 + 0.08 * lvl;
+    },
+    icon: "bulletFast",
+  },
 
   // =========================================================================
-  // 2) CORE MATRIX: MONEY UPGRADES (Gold #ffd84d, connected together)
+  // 2) RESOURCES TAB: GOLD, TIER 2 CRYSTALS & TIER 3 PLACEHOLDERS
   // =========================================================================
   {
     id: "drop_chance",
-    branch: "core",
+    branch: "resources",
     name: "Gold Drop Chance",
     shortDesc: "+10% chance for broken pixels to drop currency",
     color: "#ffd84d",
@@ -169,7 +241,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
   {
     id: "multi_drop",
-    branch: "core",
+    branch: "resources",
     name: "Multi-Drop",
     shortDesc: "+25% drop yield per level — drops 2 or more currency items!",
     color: "#ffd84d",
@@ -189,12 +261,12 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
   {
     id: "magnet_range",
-    branch: "core",
+    branch: "resources",
     name: "Magnet Range",
     shortDesc: "+25% currency magnetic attraction radius per level",
     color: "#ffd84d",
-    grid: { col: -1, row: 1 },
-    parent: "drop_chance",
+    grid: { col: 0, row: -1 },
+    parent: null,
     maxLevel: 10,
     baseCost: 10,
     costMultiplier: 1.48,
@@ -209,12 +281,12 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
   {
     id: "pickup_lifetime",
-    branch: "core",
+    branch: "resources",
     name: "Loot Duration",
     shortDesc: "+2.0s before dropped currency despawns",
     color: "#ffd84d",
-    grid: { col: -2, row: 1 },
-    parent: "magnet_range",
+    grid: { col: 0, row: 1 },
+    parent: null,
     maxLevel: 8,
     baseCost: 12,
     costMultiplier: 1.5,
@@ -227,17 +299,97 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     },
     icon: "hourglass",
   },
+  {
+    id: "tier2_crystal_yield",
+    branch: "resources",
+    name: "Crystal Harvester [T2]",
+    shortDesc: "[Tier 2 Resource] +15% Zone 2 Orange Crystal yield (Placeholder)",
+    color: "#ff8c2e",
+    grid: { col: 1, row: 0 },
+    parent: null,
+    maxLevel: 8,
+    baseCost: 40,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 50,
+    valueAt: (lvl) => Math.round((1 + 0.15 * lvl) * 100),
+    formatValue: (v) => `${v}% T2`,
+    formatDelta: () => "+15% T2",
+    apply: (s, lvl) => {
+      s.crystalDropBonus = 0.15 * lvl;
+    },
+    icon: "goldDrop",
+  },
+  {
+    id: "tier2_crystal_refinery",
+    branch: "resources",
+    name: "Crystal Refinery [T2]",
+    shortDesc: "[Tier 2 Resource] +20% Orange Crystal refinement purity (Placeholder)",
+    color: "#ff8c2e",
+    grid: { col: 1, row: -1 },
+    parent: "tier2_crystal_yield",
+    maxLevel: 5,
+    baseCost: 75,
+    costMultiplier: 1.75,
+    unlockLifetimePixels: 100,
+    valueAt: (lvl) => lvl * 20,
+    formatValue: (v) => `+${v}% T2`,
+    formatDelta: () => "+20% T2",
+    apply: (s, lvl) => {
+      s.crystalDropBonus += 0.2 * lvl;
+    },
+    icon: "goldStack",
+  },
+  {
+    id: "tier3_dark_matter",
+    branch: "resources",
+    name: "Xenotime Siphon [T3]",
+    shortDesc: "[Tier 3 Resource] +20% Zone 3 Deep-Core Xenotime extraction (Placeholder)",
+    color: "#52f296",
+    grid: { col: 2, row: 0 },
+    parent: "tier2_crystal_yield",
+    maxLevel: 5,
+    baseCost: 150,
+    costMultiplier: 1.85,
+    unlockLifetimePixels: 200,
+    valueAt: (lvl) => Math.round((1 + 0.2 * lvl) * 100),
+    formatValue: (v) => `${v}% T3`,
+    formatDelta: () => "+20% T3",
+    apply: (s, lvl) => {
+      s.tier3ResourceBonus = 0.2 * lvl;
+    },
+    icon: "cluster",
+  },
+  {
+    id: "tier3_quantum_extractor",
+    branch: "resources",
+    name: "Quantum Extractor [T3]",
+    shortDesc: "[Tier 3 Resource] +25% Deep-Lab Exotic Matter synthesis (Placeholder)",
+    color: "#52f296",
+    grid: { col: 2, row: 1 },
+    parent: "tier3_dark_matter",
+    maxLevel: 5,
+    baseCost: 220,
+    costMultiplier: 1.95,
+    unlockLifetimePixels: 300,
+    valueAt: (lvl) => lvl * 25,
+    formatValue: (v) => `+${v}% T3`,
+    formatDelta: () => "+25% T3",
+    apply: (s, lvl) => {
+      s.tier3ResourceBonus += 0.25 * lvl;
+    },
+    icon: "blast",
+  },
 
   // =========================================================================
-  // 3) CORE MATRIX: BLIGHT UPGRADES (Crimson/Magenta #ff4b8b, connected together)
+  // 3) BLIGHT TAB: BLIGHT SUPPRESSION & BLIGHT CORE UPGRADES
   // =========================================================================
   {
     id: "blight_delay",
-    branch: "core",
+    branch: "blight",
     name: "Blight Ward",
     shortDesc: "+3.0s initial grace period before Blight begins replicating",
     color: "#ff4b8b",
-    grid: { col: 1, row: 0 },
+    grid: { col: 0, row: -1 },
     parent: null,
     maxLevel: 8,
     baseCost: 18,
@@ -253,12 +405,12 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
   {
     id: "blight_slow",
-    branch: "core",
+    branch: "blight",
     name: "Blight Dampener",
     shortDesc: "-8% Blight replication speed per level",
     color: "#ff4b8b",
-    grid: { col: 2, row: 0 },
-    parent: "blight_delay",
+    grid: { col: -1, row: 0 },
+    parent: null,
     maxLevel: 10,
     baseCost: 26,
     costMultiplier: 1.6,
@@ -273,12 +425,12 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
   {
     id: "blight_weaken",
-    branch: "core",
+    branch: "blight",
     name: "Blight Decay",
     shortDesc: "+10% chance newly grown Blight pixels spawn with only 1 HP",
     color: "#ff4b8b",
-    grid: { col: 1, row: 1 },
-    parent: "blight_delay",
+    grid: { col: 0, row: 1 },
+    parent: null,
     maxLevel: 8,
     baseCost: 35,
     costMultiplier: 1.65,
@@ -290,6 +442,66 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.blightWeakenChance = Math.min(0.8, lvl * 0.1);
     },
     icon: "blightCrack",
+  },
+  {
+    id: "core_time_drain",
+    branch: "blight",
+    name: "Core Purge",
+    shortDesc: "+4.0s extra Blight timer reduction when destroying a Blight Core",
+    color: "#ff4b8b",
+    grid: { col: 1, row: 0 },
+    parent: null,
+    maxLevel: 8,
+    baseCost: 28,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 0,
+    valueAt: (lvl) => GROWTH.coreKillTimeReduction + 4 * lvl,
+    formatValue: (v) => `-${v}s CORE`,
+    formatDelta: () => "-4.0s TIMER",
+    apply: (s, lvl) => {
+      s.coreTimeReduction = GROWTH.coreKillTimeReduction + 4 * lvl;
+    },
+    icon: "hourglass",
+  },
+  {
+    id: "core_breaker",
+    branch: "blight",
+    name: "Core Shatterer",
+    shortDesc: "+2 bonus damage against Blight Core cells per level",
+    color: "#ff5c7c",
+    grid: { col: 2, row: 0 },
+    parent: "core_time_drain",
+    maxLevel: 6,
+    baseCost: 35,
+    costMultiplier: 1.65,
+    unlockLifetimePixels: 25,
+    valueAt: (lvl) => lvl * 2,
+    formatValue: (v) => `+${v} DMG`,
+    formatDelta: () => "+2 CORE DMG",
+    apply: (s, lvl) => {
+      s.coreDamageBonus = 2 * lvl;
+    },
+    icon: "impact",
+  },
+  {
+    id: "core_bounty",
+    branch: "blight",
+    name: "Core Harvest",
+    shortDesc: "+4 bonus currency drops erupted when destroying a Blight Core",
+    color: "#ffd84d",
+    grid: { col: 1, row: -1 },
+    parent: "core_time_drain",
+    maxLevel: 8,
+    baseCost: 30,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 25,
+    valueAt: (lvl) => 8 + 4 * lvl,
+    formatValue: (v) => `${v} DROPS`,
+    formatDelta: () => "+4 DROPS",
+    apply: (s, lvl) => {
+      s.coreLootBurst = 8 + 4 * lvl;
+    },
+    icon: "goldDrop",
   },
 
   // =========================================================================

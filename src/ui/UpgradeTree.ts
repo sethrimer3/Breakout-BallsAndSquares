@@ -68,6 +68,8 @@ interface PanDrag {
 
 const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   core: { icon: "soldier", color: UI_COLORS.soldier },
+  resources: { icon: "gold", color: UI_COLORS.gold },
+  blight: { icon: "warn", color: UI_COLORS.blight },
   pistol: { icon: "pistol", color: "#ff9d3b" },
   shotgun: { icon: "shotgun", color: "#ff7832" },
   assault_rifle: { icon: "rifle", color: "#52f296" },
@@ -139,6 +141,8 @@ export class UpgradeTree {
           <div class="tree-sub">CORE SYSTEMS, WEAPON TREES &amp; SQUAD LOADOUT</div>
           <div class="tree-tabs">
             <button class="tree-tab active" data-tab="core">${tabHtml("core", "CORE")}</button>
+            <button class="tree-tab" data-tab="resources">${tabHtml("resources", "RESOURCES")}</button>
+            <button class="tree-tab" data-tab="blight">${tabHtml("blight", "BLIGHT")}</button>
             <button class="tree-tab" data-tab="pistol">${tabHtml("pistol", "PISTOL")}</button>
             <button class="tree-tab" data-tab="shotgun"></button>
             <button class="tree-tab" data-tab="assault_rifle"></button>
@@ -275,7 +279,11 @@ export class UpgradeTree {
     } else {
       this.titleEl.textContent = "UPGRADE MATRIX";
       if (tab === "core") {
-        this.subEl.textContent = "MONEY (LEFT) · SOLDIER (TOP) · BLIGHT SUPPRESSION (RIGHT)";
+        this.subEl.textContent = "CORE SQUAD ENHANCEMENTS — UPGRADES ALL SOLDIERS & WEAPONS";
+      } else if (tab === "resources") {
+        this.subEl.textContent = "RESOURCE EXTRACTION — GOLD DROPS, TIER 2 CRYSTALS & TIER 3 PLACEHOLDERS";
+      } else if (tab === "blight") {
+        this.subEl.textContent = "BLIGHT CONTAINMENT — REPLICATION DAMPENING & BLIGHT CORE PURGES";
       } else if (tab === "pistol") {
         this.subEl.textContent = "SIDEARM WEAPON TREE — STANDARD ISSUE (UNLOCKED)";
       } else if (tab === "shotgun") {
@@ -291,7 +299,7 @@ export class UpgradeTree {
     this.tabsEl.classList.toggle("hidden", this.inLoadoutScreen);
     // Keeps its height on other tabs so the panel doesn't jump when switching.
     this.legendEl.classList.toggle("hidden", this.inLoadoutScreen);
-    this.legendEl.style.visibility = !this.inLoadoutScreen && tab === "core" ? "" : "hidden";
+    this.legendEl.style.visibility = "hidden";
     this.stageEl.classList.toggle("hidden", this.inLoadoutScreen);
     this.loadoutWrap.classList.toggle("hidden", !this.inLoadoutScreen);
 
@@ -506,13 +514,14 @@ export class UpgradeTree {
     const u = this.game.upgrades;
     for (const b of this.activeBodies) {
       const def = b.id === HUB_ID ? null : UPGRADE_BY_ID[b.id as UpgradeId];
+      const hubColor = TAB_ICONS[this.activeTab].color;
       const node: CircuitNode = {
         id: b.id,
         x: toArt(b.x),
         y: toArt(b.y),
         hx: b.hx,
         hy: b.hy,
-        color: def?.color ?? UI_COLORS.soldier,
+        color: def?.color ?? hubColor,
         live: def ? u.isUnlocked(def.id) : true,
       };
       this.circuit.nodes.set(b.id, node);
@@ -776,7 +785,7 @@ export class UpgradeTree {
       return;
     }
 
-    // Center hub ball is shown on Core & Pistol (where 0,0 has no upgrade node),
+    // Center hub ball is shown on Core, Resources, Blight & Pistol (where 0,0 has no upgrade node),
     // and hidden on weapon trees where their unlock node sits at (0,0).
     const hasCenterUnlockNode =
       this.activeTab === "shotgun" ||
@@ -784,6 +793,12 @@ export class UpgradeTree {
       this.activeTab === "rocket_launcher" ||
       this.activeTab === "sniper_rifle";
     this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);
+    if (!hasCenterUnlockNode) {
+      const hubSpec = TAB_ICONS[this.activeTab];
+      this.coreHubEl.innerHTML =
+        sprite("ring", { color: hubSpec.color, scale: 3, cls: "node-ring" }) +
+        sprite("soldier", { color: hubSpec.color, scale: 3 });
+    }
     this.drawCircuit(0);
 
     for (const def of UPGRADE_DEFS) {

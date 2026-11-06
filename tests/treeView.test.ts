@@ -14,7 +14,16 @@ import {
   type Bounds,
 } from "../src/ui/treeView";
 
-const BRANCHES: UpgradeBranch[] = ["core", "pistol", "shotgun", "assault_rifle", "rocket_launcher", "sniper_rifle"];
+const BRANCHES: UpgradeBranch[] = [
+  "core",
+  "resources",
+  "blight",
+  "pistol",
+  "shotgun",
+  "assault_rifle",
+  "rocket_launcher",
+  "sniper_rifle",
+];
 
 /** A rectangular tree of `cols` by `rows` cells around the center. */
 function gridBounds(cols: number, rows: number): Bounds {

@@ -467,20 +467,25 @@ export class Game {
       if (depth > this.runStats.maxDepth) this.runStats.maxDepth = depth;
       const zone = zoneForDepth(depth);
       const lootKind = zone >= 1 ? LootKind.Crystal : LootKind.Gold;
+      const dropChance =
+        zone >= 1 ? this.stats.dropChance * (1 + this.stats.crystalDropBonus) : this.stats.dropChance;
       this.loot.spawnDropsForBlock(
         ccx,
         ccy,
-        this.stats.dropChance,
+        dropChance,
         this.stats.pickupLifetime,
         this.rng,
         lootKind,
       );
       const destroyedCore = this.world.checkCoreDestroyedAt(cx, cy);
       if (destroyedCore) {
-        this.growth.reduceBlightTimer(this.runStats.time);
+        this.growth.reduceBlightTimer(this.runStats.time, this.stats.coreTimeReduction);
         this.growthRate = this.growth.rate;
         const coreWx = (destroyedCore.cx + 0.5) * cs;
         const coreWy = (destroyedCore.cy + 0.5) * cs;
+        for (let i = 0; i < this.stats.coreLootBurst; i++) {
+          this.loot.spawnOne(coreWx, coreWy, this.stats.pickupLifetime, this.rng, lootKind);
+        }
         this.particles.spawn(PKind.Burst, coreWx, coreWy, 0, 0, 0.45, 28, 0xff48a4, 1);
         for (let i = 0; i < 36; i++) {
           const a = this.rng.range(0, Math.PI * 2);

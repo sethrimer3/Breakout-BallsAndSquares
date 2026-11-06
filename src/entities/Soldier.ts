@@ -19,6 +19,10 @@ export type WeaponType =
 export interface SoldierStats {
   speed: number;
   maxSoldiers: number;
+  // Core global soldier combat buffs (apply to ALL soldiers regardless of weapon)
+  globalFireRateMult: number;
+  globalDamageBonus: number;
+  globalBulletSpeedMult: number;
   // Pistol stats
   fireRate: number;
   damage: number;
@@ -53,20 +57,28 @@ export interface SoldierStats {
   sniperBulletSpeed: number;
   sniperPierce: number;
   sniperCritChance: number;
-  // Money / Loot stats
+  // Money / Loot / Resources stats
   dropChance: number;
   magnetRange: number;
   pickupLifetime: number;
-  // Blight (Growth) stats
+  crystalDropBonus: number;
+  tier3ResourceBonus: number;
+  // Blight (Growth) & Blight Core stats
   blightGraceSeconds: number;
   blightRateMultiplier: number;
   blightWeakenChance: number;
+  coreTimeReduction: number;
+  coreDamageBonus: number;
+  coreLootBurst: number;
 }
 
 export function baseSoldierStats(): SoldierStats {
   return {
     speed: SOLDIER.speed,
     maxSoldiers: SOLDIER.maxSoldiers,
+    globalFireRateMult: 1,
+    globalDamageBonus: 0,
+    globalBulletSpeedMult: 1,
     fireRate: SOLDIER.fireRate,
     damage: SOLDIER.damage,
     bulletSpeed: SOLDIER.bulletSpeed,
@@ -99,9 +111,14 @@ export function baseSoldierStats(): SoldierStats {
     dropChance: LOOT.baseDropChance,
     magnetRange: LOOT.baseMagnetRange,
     pickupLifetime: LOOT.baseLifetime,
+    crystalDropBonus: 0,
+    tier3ResourceBonus: 0,
     blightGraceSeconds: GROWTH.graceSeconds,
     blightRateMultiplier: 1,
     blightWeakenChance: 0,
+    coreTimeReduction: GROWTH.coreKillTimeReduction,
+    coreDamageBonus: 0,
+    coreLootBurst: 8,
   };
 }
 

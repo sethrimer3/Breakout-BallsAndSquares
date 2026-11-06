@@ -56,6 +56,7 @@ export class CombatSystem {
         rate = this.stats.sniperFireRate;
         break;
     }
+    rate *= this.stats.globalFireRateMult;
     const interval = 1 / Math.max(0.05, rate);
     let guard = 0;
     while (s.fireCooldown <= 0 && guard++ < 8) {
@@ -219,8 +220,8 @@ export class CombatSystem {
     b.y = y;
     b.dx = dx;
     b.dy = dy;
-    b.speed = speed;
-    b.damage = damage;
+    b.speed = speed * this.stats.globalBulletSpeedMult;
+    b.damage = damage + this.stats.globalDamageBonus;
     b.life = life;
     b.traveled = 0;
     b.pendingAdvance = pendingAdvance;
@@ -266,7 +267,9 @@ export class CombatSystem {
           return;
         }
 
-        const result = this.world.damage(hit.cx, hit.cy, b.damage);
+        const isCore = this.world.coreId[hit.cy * this.world.width + hit.cx] > 0;
+        const hitDmg = b.damage + (isCore ? this.stats.coreDamageBonus : 0);
+        const result = this.world.damage(hit.cx, hit.cy, hitDmg);
         this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hit.cx, hit.cy, result);
 
         // If the bullet hit the indestructible world border (result === 0) or has no pierce left, stop.
@@ -325,7 +328,8 @@ export class CombatSystem {
         if (d2 > r2) continue;
         // Full damage near epicenter, tapering slightly at outer blast edge.
         const falloff = 1 - 0.35 * (Math.sqrt(d2) / Math.max(1, radCells));
-        const dmg = Math.max(1, Math.round(b.damage * falloff));
+        const isCore = w.coreId[cy * w.width + cx] > 0;
+        const dmg = Math.max(1, Math.round(b.damage * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
         const res = w.damage(cx, cy, dmg);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
