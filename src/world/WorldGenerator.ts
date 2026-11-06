@@ -18,6 +18,8 @@ export interface LabRoom {
   overrun?: boolean;
   /** 1-based Blight Core id if `overrun` is true. */
   coreId?: number;
+  /** True if this room interior is full of pixels rather than empty space. */
+  filled?: boolean;
 }
 
 export interface LabCorridorSegment {
@@ -33,6 +35,8 @@ export interface LabCorridorSegment {
   width: number;
   /** Wall outline thickness in cells (1..3). */
   wallThickness: number;
+  /** True if this hallway interior is full of pixels rather than empty space. */
+  filled?: boolean;
 }
 
 export interface LabLayout {
@@ -127,12 +131,59 @@ export function generateWorld(world: PixelWorld, seed: number): void {
     }
   }
 
+  // Carve empty corridors (about 50% chance a hallway is empty space rather than full of pixels).
+  for (const seg of layout.corridors) {
+    if (seg.filled) continue;
+    const x0 = Math.max(0, seg.x0);
+    const y0 = Math.max(0, seg.y0);
+    const x1 = Math.min(width - 1, seg.x1);
+    const y1 = Math.min(height - 1, seg.y1);
+    for (let y = y0; y <= y1; y++) {
+      const row = y * width;
+      for (let x = x0; x <= x1; x++) {
+        const i = row + x;
+        if (wall[i] === 0) {
+          health[i] = 0;
+          world.blight[i] = 0;
+        }
+      }
+    }
+  }
+
+  // Carve empty rooms (blight generator rooms are ALWAYS empty; other rooms have ~50% chance to be full of pixels).
+  // Also refills interiors of rooms marked `filled: true` that empty corridors may have clipped into.
+  for (const room of layout.rooms) {
+    const x0 = Math.max(0, room.x);
+    const y0 = Math.max(0, room.y);
+    const x1 = Math.min(width - 1, room.x + room.size - 1);
+    const y1 = Math.min(height - 1, room.y + room.size - 1);
+    const isFilled = room.filled ?? false;
+
+    for (let y = y0; y <= y1; y++) {
+      const row = y * width;
+      for (let x = x0; x <= x1; x++) {
+        const i = row + x;
+        // Blight Core cells must always remain solid so the core is alive and can generate blight!
+        if (world.coreId[i] > 0) continue;
+        if (wall[i] === 0) {
+          if (isFilled) {
+            health[i] = world.maxHealthAt(x, y);
+          } else {
+            health[i] = 0;
+            world.blight[i] = 0;
+          }
+        }
+      }
+    }
+  }
+
   // Carve the empty starting room.
   for (let cy = world.roomY0; cy <= world.roomY1; cy++) {
     for (let cx = world.roomX0; cx <= world.roomX1; cx++) {
       const i = cy * width + cx;
       wall[i] = 0;
       health[i] = 0;
+      world.blight[i] = 0;
     }
   }
 }
@@ -464,6 +515,7 @@ function connectPointsL(
 ): void {
   const width = 3 + rng.int(3); // 3..5
   const wallThickness = 1 + rng.int(3); // 1..3
+  const filled = rng.next() < 0.5; // ~50% chance a hallway is full of pixels rather than empty space
   const halfLo = Math.floor((width - 1) / 2);
   const halfHi = width - 1 - halfLo;
 
@@ -480,14 +532,14 @@ function connectPointsL(
       const x1 = Math.max(ax, bx) + halfHi;
       const y0 = ay - halfLo;
       const y1 = ay + halfHi;
-      corridors.push({ zone, axis: "h", x0, y0, x1, y1, width, wallThickness });
+      corridors.push({ zone, axis: "h", x0, y0, x1, y1, width, wallThickness, filled });
     }
     if (ay !== by) {
       const x0 = bx - halfLo;
       const x1 = bx + halfHi;
       const y0 = Math.min(ay, by) - halfLo;
       const y1 = Math.max(ay, by) + halfHi;
-      corridors.push({ zone, axis: "v", x0, y0, x1, y1, width, wallThickness });
+      corridors.push({ zone, axis: "v", x0, y0, x1, y1, width, wallThickness, filled });
     }
   } else {
     if (ay !== by) {
@@ -495,14 +547,14 @@ function connectPointsL(
       const x1 = ax + halfHi;
       const y0 = Math.min(ay, by) - halfLo;
       const y1 = Math.max(ay, by) + halfHi;
-      corridors.push({ zone, axis: "v", x0, y0, x1, y1, width, wallThickness });
+      corridors.push({ zone, axis: "v", x0, y0, x1, y1, width, wallThickness, filled });
     }
     if (ax !== bx) {
       const x0 = Math.min(ax, bx) - halfLo;
       const x1 = Math.max(ax, bx) + halfHi;
       const y0 = by - halfLo;
       const y1 = by + halfHi;
-      corridors.push({ zone, axis: "h", x0, y0, x1, y1, width, wallThickness });
+      corridors.push({ zone, axis: "h", x0, y0, x1, y1, width, wallThickness, filled });
     }
   }
 }

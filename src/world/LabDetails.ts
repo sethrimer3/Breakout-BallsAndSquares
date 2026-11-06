@@ -223,7 +223,6 @@ function overrunRoomWithBlight(world: PixelWorld, r: LabRoom, seed: number): voi
       const ray = Math.abs(Math.sin(ang * 4 + n * 2.2));
       const isVein = ray < 0.24 || n > 0.62 || dist <= 2.8;
       world.decor[i] = isVein ? DECOR.blightVein : DECOR.blightFloor;
-      world.blight[i] = 1;
     }
   }
 
@@ -238,6 +237,7 @@ function overrunRoomWithBlight(world: PixelWorld, r: LabRoom, seed: number): voi
       const idx = cy * world.width + cx;
       world.wall[idx] = 0;
       world.coreId[idx] = cid;
+      world.blight[idx] = 1;
       world.decor[idx] = dx === dy ? DECOR.blightCoreHeart : DECOR.blightCoreShell;
       cells.push(idx);
     }
@@ -282,8 +282,11 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
 
   for (const room of layout.rooms) {
     if (overrunIds.has(room.id)) {
+      room.overrun = true;
+      room.filled = false; // Rooms that blight generators are in are always empty so generators can fill them
       overrunRoomWithBlight(world, room, seed);
     } else {
+      room.filled = rng.next() < 0.5; // ~50% chance a room is full of pixels rather than empty space
       paintRoomFloor(world, room);
       const stamp = STAMP_NAMES[rng.int(STAMP_NAMES.length)];
       furnishRoom(world, room, ROOM_STAMPS[stamp]);
