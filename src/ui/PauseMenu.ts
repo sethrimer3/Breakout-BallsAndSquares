@@ -187,7 +187,18 @@ export class PauseMenu {
         )
         .join("");
 
+      const fiery = set.fieryMuzzleFlash;
       body.innerHTML = `
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-label">FIERY MUZZLE FLASH</div>
+            <div class="set-desc">Soft orange flames with blurred, glowing edges</div>
+          </div>
+          <button class="btn set-toggle set-check ${fiery ? "btn-primary is-checked" : ""}" data-set="fiery"
+            role="checkbox" aria-checked="${fiery}">
+            <span class="px-check" aria-hidden="true"></span>${fiery ? "ON" : "OFF"}
+          </button>
+        </div>
         <div class="set-group">
           <div class="set-label">MUZZLE FLASH BRIGHTNESS</div>
           <div class="set-desc">Tune dynamic muzzle flash illumination and flare intensity</div>
@@ -199,6 +210,12 @@ export class PauseMenu {
           <div class="set-chips">${qualBtns}</div>
         </div>
       `;
+
+      body.querySelector('[data-set="fiery"]')!.addEventListener("click", () => {
+        set.fieryMuzzleFlash = !set.fieryMuzzleFlash;
+        this.game.save.save();
+        this.renderSettingsTab();
+      });
 
       body.querySelectorAll("[data-flash]").forEach((btn) => {
         btn.addEventListener("click", () => {

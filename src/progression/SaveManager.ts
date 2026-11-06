@@ -55,6 +55,8 @@ export interface SaveData {
     muted: boolean;
     volume: number;
     muzzleFlash: MuzzleFlashLevel;
+    /** Soft, orange flame-style muzzle flashes. */
+    fieryMuzzleFlash: boolean;
     autoFollowCamera: boolean;
   };
 }
@@ -78,6 +80,7 @@ export function defaultSaveData(): SaveData {
       muted: false,
       volume: 0.6,
       muzzleFlash: "brightest",
+      fieryMuzzleFlash: false,
       autoFollowCamera: false,
     },
   };
@@ -150,6 +153,8 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     ) {
       def.settings.muzzleFlash = s.muzzleFlash as MuzzleFlashLevel;
     }
+    def.settings.fieryMuzzleFlash =
+      typeof s.fieryMuzzleFlash === "boolean" ? s.fieryMuzzleFlash : false;
     def.settings.autoFollowCamera =
       typeof s.autoFollowCamera === "boolean" ? s.autoFollowCamera : false;
   }
