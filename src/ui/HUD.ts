@@ -334,9 +334,9 @@ export class HUD {
       } else if (game.marker) status = "Marker active — soldiers in sight bounce toward it (Esc to clear)";
       else if (game.markerMode) status = "Marker mode active — click anywhere to place marker (T to cancel)";
       else if (game.reserves > 0 && game.canDeploy)
-        status = `Click to place (random dir) or drag to aim (${game.reserves} in reserve)`;
+        status = `Click / tap to place (random dir) or drag to aim (${game.reserves} in reserve)`;
       else if (game.reserves > 0) status = "Cannot deploy";
-      else status = "Soldiers autonomous — click to place bounce marker!";
+      else status = "Soldiers autonomous — click / tap to place bounce marker!";
       this.helpStatusEl.textContent = status;
     }
   }
