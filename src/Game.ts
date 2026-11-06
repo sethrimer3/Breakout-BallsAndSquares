@@ -5,7 +5,7 @@ import { CasingSystem } from "./entities/CasingSystem";
 import { LootKind, LootSystem } from "./entities/LootSystem";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, baseSoldierStats, type SoldierStats } from "./entities/Soldier";
-import { MUZZLE_FLASH_MULTIPLIER, SaveManager } from "./progression/SaveManager";
+import { MUZZLE_FLASH_MULTIPLIER, SaveManager, type SoldierBehavior } from "./progression/SaveManager";
 import { UpgradeManager } from "./progression/UpgradeManager";
 import { Renderer } from "./rendering/Renderer";
 import { TerrainRenderer } from "./rendering/TerrainRenderer";
@@ -17,6 +17,7 @@ import { PhysicsSystem, findSpawnPoint } from "./systems/PhysicsSystem";
 import { RunStats } from "./systems/RunStats";
 import { HUD } from "./ui/HUD";
 import { DebugOverlay } from "./ui/DebugOverlay";
+import { DualStick } from "./ui/DualStick";
 import { MainMenu } from "./ui/MainMenu";
 import { PauseMenu } from "./ui/PauseMenu";
 import { ResultsScreen } from "./ui/ResultsScreen";
@@ -67,8 +68,11 @@ export class Game {
   readonly pauseMenu: PauseMenu;
   readonly resultsScreen: ResultsScreen;
   readonly upgradeTree: UpgradeTree;
+  readonly dualStick: DualStick;
   readonly input: Input;
 
+  autoMove = true;
+  activeFormation: "none" | "line" | "triangle" = "none";
   stats: SoldierStats = baseSoldierStats();
   soldiers: Soldier[] = [];
   flashes: Flash[] = [];
@@ -137,6 +141,8 @@ export class Game {
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
     this.terrain.rebuildAll();
     this.renderer = new Renderer(canvas, this);
+    this.autoMove = this.save.data.settings.autoMove;
+    this.dualStick = new DualStick(uiRoot, this);
     this.hud = new HUD(uiRoot, this);
     this.debugOverlay = new DebugOverlay(uiRoot, this);
     this.mainMenu = new MainMenu(uiRoot, this);
@@ -145,6 +151,13 @@ export class Game {
     this.upgradeTree = new UpgradeTree(uiRoot, this);
     this.input = new Input(canvas, {
       canPlace: () => this.canPlaceSoldier(),
+      canShootManual: () => this.canShootManual(),
+      onManualShootStart: () => {
+        if (this.canShootManual()) {
+          const cmdr = this.getCommander();
+          if (cmdr) this.shootCommanderManual(cmdr);
+        }
+      },
       onAimStart: (sx, sy) => this.onAimStart(sx, sy),
       onAimMove: (sx, sy) => this.onAimMove(sx, sy),
       onAimClick: (sx, sy) => this.onAimClick(sx, sy),
@@ -368,6 +381,14 @@ export class Game {
       case "KeyT":
         this.toggleMarkerMode();
         break;
+      case "Digit1":
+        this.toggleFormation("line");
+        this.hud.update(this, performance.now(), true);
+        break;
+      case "Digit2":
+        this.toggleFormation("triangle");
+        this.hud.update(this, performance.now(), true);
+        break;
       case "KeyU":
         this.bankCurrentRun();
         this.openUpgrades();
@@ -475,7 +496,9 @@ export class Game {
     const slotIdx = this.runStats.soldiersDeployed;
     const rawWeapon = this.save.data.loadouts[slotIdx]?.weapon ?? "pistol";
     const weapon = this.isWeaponUnlocked(rawWeapon) ? rawWeapon : "pistol";
-    const s = new Soldier(clampedX, clampedY, ndx, ndy, this.stats.speed, weapon);
+    const rawBehavior = this.save.data.loadouts[slotIdx]?.behavior ?? "free";
+    const behavior = this.isBehaviorUnlocked(rawBehavior) ? rawBehavior : "free";
+    const s = new Soldier(clampedX, clampedY, ndx, ndy, this.stats.speed, weapon, behavior, slotIdx);
     s.maxHealth = this.stats.soldierHealth;
     s.health = this.stats.soldierHealth;
     this.soldiers.push(s);
@@ -571,6 +594,65 @@ export class Game {
         return this.stats.rocketUnlocked;
       case "sniper_rifle":
         return this.stats.sniperUnlocked;
+    }
+  }
+
+  setAutoMove(enabled: boolean): void {
+    this.autoMove = enabled;
+    this.save.data.settings.autoMove = enabled;
+    this.save.save();
+    if (!enabled) {
+      const cmdr = this.getCommander();
+      if (cmdr) {
+        this.camera.targetId = cmdr.id;
+        this.camera.following = true;
+      }
+    }
+  }
+
+  toggleFormation(formation: "line" | "triangle"): void {
+    if (formation === "line" && this.upgrades.levelOf("formation_line") === 0) return;
+    if (formation === "triangle" && this.upgrades.levelOf("formation_triangle") === 0) return;
+    if (this.activeFormation === formation) {
+      this.activeFormation = "none";
+    } else {
+      this.activeFormation = formation;
+    }
+    this.audio.playPickup();
+  }
+
+  getCommander(): Soldier | null {
+    const living = this.soldiers.filter((s) => s.alive);
+    if (living.length === 0) return null;
+    living.sort((a, b) => a.slotIndex - b.slotIndex || a.id - b.id);
+    return living[0];
+  }
+
+  isBehaviorUnlocked(b: SoldierBehavior): boolean {
+    if (b === "free") return true;
+    if (b === "orthogonal") return this.upgrades.levelOf("behavior_orthogonal") > 0;
+    if (b === "vertical" || b === "horizontal") return this.upgrades.levelOf("behavior_patrol") > 0;
+    if (b === "turn_left" || b === "turn_right") return this.upgrades.levelOf("behavior_turns") > 0;
+    if (b === "sentry_slow" || b === "sentry_fast") return this.upgrades.levelOf("behavior_sentry") > 0;
+    return false;
+  }
+
+  canShootManual(): boolean {
+    return !this.autoMove && !this.paused && !this.runOver && this.getCommander() !== null;
+  }
+
+  shootCommanderManual(commander: Soldier): void {
+    if (commander.fireCooldown <= 0) {
+      const cdx = Math.cos(commander.facingAngle);
+      const cdy = Math.sin(commander.facingAngle);
+      this.combat.fire(commander, cdx, cdy);
+      this.onShot(commander, cdx, cdy, commander.x, commander.y);
+      let rate = this.stats.fireRate;
+      if (commander.weapon === "shotgun") rate = this.stats.shotgunFireRate;
+      else if (commander.weapon === "assault_rifle") rate = this.stats.arFireRate;
+      else if (commander.weapon === "rocket_launcher") rate = this.stats.rocketFireRate;
+      else if (commander.weapon === "sniper_rifle") rate = this.stats.sniperFireRate;
+      commander.fireCooldown = 1 / Math.max(0.1, rate);
     }
   }
 
@@ -807,6 +889,113 @@ export class Game {
   /** One fixed simulation step. */
   step(dt: number): void {
     this.runStats.time += dt;
+
+    const commander = this.getCommander();
+
+    // 1. Manual Commander Control
+    if (!this.autoMove && commander) {
+      commander.isManual = true;
+      for (const s of this.soldiers) {
+        if (s !== commander) s.isManual = false;
+      }
+
+      // Movement: Keyboard (WASD/arrows) or Left Virtual Stick
+      const kmv = this.input.getMovementVector();
+      const smv = this.dualStick.move;
+      const mx = smv.active ? smv.x : kmv.x;
+      const my = smv.active ? smv.y : kmv.y;
+      const mlen = Math.hypot(mx, my);
+      if (mlen > 1e-4) {
+        commander.vx = (mx / mlen) * commander.speed;
+        commander.vy = (my / mlen) * commander.speed;
+      } else {
+        commander.vx = 0;
+        commander.vy = 0;
+      }
+
+      // Aiming: Right Virtual Stick or Mouse Reticle
+      if (this.dualStick.aim.active) {
+        commander.facingAngle = this.dualStick.aim.angle;
+      } else if (this.input.mouseInside) {
+        const wx = this.camera.screenToWorldX(this.input.mouseX);
+        const wy = this.camera.screenToWorldY(this.input.mouseY);
+        const adx = wx - commander.x;
+        const ady = wy - commander.y;
+        if (Math.hypot(adx, ady) > 1e-4) {
+          commander.facingAngle = Math.atan2(ady, adx);
+        }
+      }
+
+      // Shooting
+      commander.fireCooldown -= dt;
+      const shouldShoot =
+        this.save.data.settings.alwaysShootWhenAutoMoveOff ||
+        this.input.isMouseDown ||
+        this.dualStick.aim.active;
+      if (shouldShoot && commander.fireCooldown <= 0) {
+        this.shootCommanderManual(commander);
+      }
+
+      // Ensure camera tracks commander
+      this.camera.targetId = commander.id;
+      this.camera.following = true;
+    } else {
+      for (const s of this.soldiers) s.isManual = false;
+    }
+
+    // 2. Formations (Override individual behaviors)
+    if (this.activeFormation !== "none" && commander) {
+      const followers = this.soldiers
+        .filter((s) => s.alive && s !== commander)
+        .sort((a, b) => a.slotIndex - b.slotIndex || a.id - b.id);
+
+      let cdx = Math.cos(commander.facingAngle);
+      let cdy = Math.sin(commander.facingAngle);
+      const cvLen = Math.hypot(commander.vx, commander.vy);
+      if (cvLen > 10) {
+        cdx = commander.vx / cvLen;
+        cdy = commander.vy / cvLen;
+      }
+
+      const spacing = 16;
+      for (let i = 0; i < followers.length; i++) {
+        const f = followers[i];
+        f.isInFormation = true;
+        let tx = 0;
+        let ty = 0;
+        if (this.activeFormation === "line") {
+          tx = commander.x - cdx * spacing * (i + 1);
+          ty = commander.y - cdy * spacing * (i + 1);
+        } else {
+          // Triangle formation (wedge)
+          const row = Math.floor(i / 2) + 1;
+          const side = i % 2 === 0 ? -1 : 1;
+          const backDist = row * spacing;
+          const sideDist = side * row * 14;
+          tx = commander.x - cdx * backDist - cdy * sideDist;
+          ty = commander.y - cdy * backDist + cdx * sideDist;
+        }
+
+        const fdx = tx - f.x;
+        const fdy = ty - f.y;
+        const fdist = Math.hypot(fdx, fdy);
+        if (fdist > 3) {
+          const fsp = Math.min(f.speed * 1.6, Math.max(f.speed, fdist * 3.5));
+          f.vx = (fdx / fdist) * fsp;
+          f.vy = (fdy / fdist) * fsp;
+          f.facingAngle = Math.atan2(f.vy, f.vx);
+        } else {
+          f.vx = commander.vx;
+          f.vy = commander.vy;
+          f.facingAngle = commander.facingAngle;
+        }
+      }
+    } else {
+      for (const s of this.soldiers) s.isInFormation = false;
+    }
+
+    this.dualStick.update();
+
     for (const s of this.soldiers) {
       if (!s.alive) continue;
       s.age += dt;

@@ -1417,3 +1417,162 @@ button {
     height: 40px;
   }
 }
+
+/* ------------------------------------------------------------- Tactical HUD & Controls */
+.hud-tactical-bar {
+  position: absolute;
+  top: 48px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+  z-index: 10;
+}
+.hud-check-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(10, 16, 26, 0.85);
+  border: 1px solid #1c2c3e;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-family: var(--font-small);
+  font-size: var(--f8);
+  color: #eaf6ff;
+  user-select: none;
+}
+.hud-check-label:hover {
+  border-color: var(--cyan);
+}
+.hud-automove {
+  accent-color: #38d6ff;
+  cursor: pointer;
+}
+.hud-formations {
+  display: flex;
+  gap: 6px;
+}
+.hud-form-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  background: rgba(10, 16, 26, 0.85);
+  border: 1px solid #1c2c3e;
+  color: var(--muted);
+  font-family: var(--font-small);
+  font-size: var(--f8);
+  cursor: pointer;
+}
+.hud-form-btn:hover {
+  border-color: #38d6ff;
+  color: #ffffff;
+}
+.hud-form-btn.active {
+  background: #123c55;
+  border-color: #38d6ff;
+  color: #38d6ff;
+  box-shadow: 0 0 8px rgba(56, 214, 255, 0.35);
+}
+
+/* ------------------------------------------------------------- Loadout Behaviors */
+.lc-behaviors {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.lc-bbtn {
+  --fw: var(--px1);
+  height: 42px;
+  padding: 2px 2px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--muted);
+  background: var(--bg-0);
+  font-family: var(--font-small);
+  font-size: var(--f8);
+}
+.lc-bname {
+  font-size: 8px;
+  line-height: 1;
+}
+.lc-bbtn:hover {
+  --fc: #8ee6ff;
+  color: var(--text);
+}
+.lc-bbtn.equipped {
+  --fw: var(--px2);
+  --fc: #ffd84d;
+  background: #2b2510;
+  color: #ffd84d;
+}
+.lc-bbtn.locked {
+  --fc: #1c2733;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ------------------------------------------------------------- Mobile Dual Sticks */
+.dual-sticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+}
+.joystick {
+  position: absolute;
+  bottom: 24px;
+  width: 110px;
+  height: 110px;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+}
+.left-stick {
+  left: 20px;
+}
+.right-stick {
+  right: 20px;
+}
+.joystick-base {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(14, 24, 38, 0.65);
+  border: 2px dashed rgba(56, 214, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.right-stick .joystick-base {
+  border-color: rgba(255, 157, 59, 0.45);
+}
+.joystick-knob {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #38d6ff 0%, #0e2942 80%);
+  border: 2px solid #a8f5ff;
+  box-shadow: 0 0 10px rgba(56, 214, 255, 0.5);
+  pointer-events: none;
+  transition: transform 0.04s ease-out;
+}
+.right-stick .joystick-knob {
+  background: radial-gradient(circle, #ff9d3b 0%, #4a2108 80%);
+  border-color: #ffd88a;
+  box-shadow: 0 0 10px rgba(255, 157, 59, 0.5);
+}
+.joystick-label {
+  position: absolute;
+  bottom: -16px;
+  font-family: var(--font-small);
+  font-size: 8px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
