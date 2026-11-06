@@ -1,3 +1,4 @@
+import { essenceIcon } from "./essenceIcon";
 import type { Game } from "../Game";
 import { SAVE_SLOTS_COUNT } from "../progression/SaveManager";
 import { MainMenuBackground } from "./MainMenuBackground";
@@ -57,6 +58,8 @@ export class MainMenu {
         <div>ACTIVE: <b class="m-active-slot">SLOT 1</b></div>
         <div>BANK ${sprite("gold", { color: UI_COLORS.gold })} <b class="m-bank">0</b></div>
         <div>CRYSTALS ${sprite("crystal", { color: UI_COLORS.crystal })} <b class="m-crystals">0</b></div>
+        <div>GREEN ${sprite("crystal", { color: UI_COLORS.greenCrystal })} <b class="m-green">0</b></div>
+        <div>ESSENCE ${essenceIcon()} <b class="m-essence">0</b></div>
         <div>LIFETIME ${sprite("pixelBits", { color: UI_COLORS.soldier })} <b class="m-life">0</b></div>
       </div>
 
@@ -183,6 +186,14 @@ export class MainMenu {
               <span class="stat-val val-crystal">${summary.crystals.toLocaleString()}</span>
             </div>
             <div class="slot-stat-row">
+              <span class="stat-lbl">${sprite("crystal", { color: UI_COLORS.greenCrystal })} GREEN</span>
+              <span class="stat-val val-crystal">${summary.greenCrystals.toLocaleString()}</span>
+            </div>
+            <div class="slot-stat-row">
+              <span class="stat-lbl">${essenceIcon()} ESSENCE</span>
+              <span class="stat-val val-crystal">${summary.essence.toLocaleString()}</span>
+            </div>
+            <div class="slot-stat-row">
               <span class="stat-lbl">${sprite("depth", { color: UI_COLORS.neutral })} BEST DEPTH</span>
               <span class="stat-val">${summary.bestDepth}m</span>
             </div>
@@ -266,6 +277,8 @@ export class MainMenu {
     this.lifeEl.textContent = this.game.lifetimePixels.toLocaleString();
     if (this.crystalsEl) {
       this.crystalsEl.textContent = this.game.crystals.toLocaleString();
+      (this.mainPanel.querySelector(".m-green") as HTMLElement).textContent = this.game.greenCrystals.toLocaleString();
+      (this.mainPanel.querySelector(".m-essence") as HTMLElement).textContent = this.game.essence.toLocaleString();
     }
   }
 

@@ -17,6 +17,8 @@
 export const UI_COLORS = {
   gold: "#ffd84d",
   crystal: "#ff8c2e",
+  greenCrystal: "#52f296",
+  essence: "#ff7a18",
   soldier: "#38d6ff",
   blight: "#ff4b8b",
   magenta: "#e24bff",

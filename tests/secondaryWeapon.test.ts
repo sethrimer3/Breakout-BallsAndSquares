@@ -56,7 +56,7 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
 
     // Destroy 80 lifetime pixels
     save.data.lifetimePixels = 80;
-    save.data.bank = 1000;
+    save.data.bank = 1000; save.data.crystals = 100_000;
     expect(upg.isUnlocked("grenade_unlock")).toBe(true);
     // Child node still locked because grenade_unlock level is 0
     expect(upg.isUnlocked("grenade_damage")).toBe(false);
@@ -96,7 +96,7 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
 
     expect(categoryForBranch("grenade")).toBe("secondary");
 
-    expect(CATEGORIES.length).toBe(3);
+    expect(CATEGORIES.length).toBe(4);
     const systemsCat = CATEGORIES.find((c) => c.id === "systems")!;
     const primaryCat = CATEGORIES.find((c) => c.id === "primary")!;
     const secondaryCat = CATEGORIES.find((c) => c.id === "secondary")!;

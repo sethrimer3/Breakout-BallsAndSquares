@@ -670,6 +670,15 @@ button {
   justify-content: center;
   gap: 8px;
 }
+.essence-icon {
+  display: inline-block;
+  flex: none;
+  width: calc(14 * var(--px));
+  height: calc(14 * var(--px));
+  vertical-align: middle;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
 .px-check {
   flex: none;
   width: var(--f8);
@@ -1958,4 +1967,45 @@ button {
   font-size: 8px;
   color: var(--muted);
   letter-spacing: 1px;
+}
+
+/* Currency marker on nodes not paid in gold. */
+.node-cur {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  line-height: 0;
+  pointer-events: none;
+}
+.tree-node.round .node-cur {
+  top: 14px;
+  left: 14px;
+}
+.tt-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 10px;
+}
+.tt-price.short {
+  color: var(--bad, #ff5c7c);
+}
+.tt-tier {
+  margin-top: 4px;
+  font-family: var(--font-small);
+  font-size: var(--f8);
+  color: var(--muted);
+}
+.soldier-slot-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+.tree-points-val .wallet-item {
+  margin-left: 12px;
+}
+.lc-tree-btn {
+  align-self: stretch;
+  justify-content: center;
 }

@@ -38,6 +38,8 @@ export class CombatSystem {
   readonly bullets = new BulletPool(BULLET.poolSize);
   readonly grenades = new StickyGrenadePool(GRENADE.poolSize);
   stats: SoldierStats;
+  /** The soldier firing right now, whose own tree shapes the shots they spawn. */
+  private shooter: Soldier | null = null;
 
   constructor(
     private world: PixelWorld,
@@ -77,11 +79,12 @@ export class CombatSystem {
         rate = this.stats.katanaFireRate;
         break;
     }
-    rate *= this.stats.globalFireRateMult;
+    rate *= this.stats.globalFireRateMult * s.mods.fireRateMult;
     const interval = 1 / Math.max(0.05, rate);
     let guard = 0;
     while (s.fireCooldown <= 0 && guard++ < 8) {
       this.fire(s);
+      if (s.mods.twinChance > 0 && this.rng.next() < s.mods.twinChance) this.fire(s);
       s.fireCooldown += interval;
     }
   }
@@ -109,6 +112,7 @@ export class CombatSystem {
     }
     if (dx === 0 && dy === 0) return;
     s.facingAngle = Math.atan2(dy, dx);
+    this.shooter = s;
 
     if (s.weapon === "shotgun") {
       const n = Math.max(1, this.stats.shotgunPellets);
@@ -271,6 +275,7 @@ export class CombatSystem {
         }
       }
     }
+    this.shooter = null;
     const off = s.radius + BULLET.muzzleGap;
     this.events.onShot?.(s, dx, dy, s.x + dx * off, s.y + dy * off);
   }
@@ -296,18 +301,19 @@ export class CombatSystem {
     b.y = y;
     b.dx = dx;
     b.dy = dy;
+    const mods = this.shooter?.mods;
     b.speed = speed * this.stats.globalBulletSpeedMult;
-    b.damage = damage + this.stats.globalDamageBonus;
+    b.damage = damage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0);
     b.life = life;
     b.maxLife = life;
     b.traveled = 0;
     b.pendingAdvance = pendingAdvance;
     b.ownerId = ownerId;
-    b.pierceLeft = pierceLeft;
+    b.pierceLeft = pierceLeft + (explosionRadius > 0 ? 0 : (mods?.pierce ?? 0));
     b.explosionRadius = explosionRadius;
     b.clusterCount = clusterCount;
     b.style = style;
-    b.blightMultiplier = 1;
+    b.blightMultiplier = mods?.blightMult ?? 1;
     b.slashWidth = 0;
     b.slashAngle = 0;
   }
@@ -333,18 +339,19 @@ export class CombatSystem {
     b.y = y;
     b.dx = dx;
     b.dy = dy;
+    const mods = this.shooter?.mods;
     b.speed = speed * this.stats.globalBulletSpeedMult;
-    b.damage = damage + this.stats.globalDamageBonus;
+    b.damage = damage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0);
     b.life = life;
     b.maxLife = life;
     b.traveled = 0;
     b.pendingAdvance = pendingAdvance;
     b.ownerId = ownerId;
-    b.pierceLeft = pierceLeft;
+    b.pierceLeft = pierceLeft + (mods?.pierce ?? 0);
     b.explosionRadius = 0;
     b.clusterCount = 0;
     b.style = 3;
-    b.blightMultiplier = blightMultiplier;
+    b.blightMultiplier = blightMultiplier * (mods?.blightMult ?? 1);
     b.slashWidth = slashWidth;
     b.slashAngle = slashAngle;
   }
@@ -535,7 +542,8 @@ export class CombatSystem {
         const idx = cy * w.width + cx;
         const wasSub = w.health[idx] === 0;
         const isCore = !wasSub && w.coreId[idx] > 0;
-        const dmg = Math.max(1, Math.round(b.damage * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
+        let dmg = Math.max(1, Math.round(b.damage * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
+        if (b.blightMultiplier > 1 && w.isBlightAt(cx, cy)) dmg = Math.round(dmg * b.blightMultiplier);
         const res = w.damage(cx, cy, dmg);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;

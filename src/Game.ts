@@ -1,8 +1,8 @@
-import { BULLET, CAMERA, COLORS, GROWTH, LIGHT, SIM, SOLDIER, TERRAIN, WORLD, zoneForDepth } from "./config";
+import { BULLET, CAMERA, COLORS, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD, zoneForDepth } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
-import { LootKind, LootSystem } from "./entities/LootSystem";
+import { LootKind, lootKindForZone, LootSystem } from "./entities/LootSystem";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, baseSoldierStats, type SecondaryWeaponType, type SoldierStats } from "./entities/Soldier";
 import { MUZZLE_FLASH_MULTIPLIER, SaveManager, type SoldierBehavior } from "./progression/SaveManager";
@@ -189,6 +189,14 @@ export class Game {
     return this.save.data.crystals;
   }
 
+  get greenCrystals(): number {
+    return this.save.data.greenCrystals;
+  }
+
+  get essence(): number {
+    return this.save.data.essence;
+  }
+
   get muzzleFlashMultiplier(): number {
     return MUZZLE_FLASH_MULTIPLIER[this.save.data.settings.muzzleFlash] ?? 1;
   }
@@ -223,11 +231,13 @@ export class Game {
     this.growth.explosiveRadius = this.stats.explosiveBlightRadius;
     for (const s of this.soldiers) {
       if (!s.alive) continue;
+      s.mods = this.upgrades.soldierMods(s.slotIndex);
+      const speed = this.stats.speed * s.mods.speedMult;
       const len = Math.hypot(s.vx, s.vy) || 1;
-      s.vx = (s.vx / len) * this.stats.speed;
-      s.vy = (s.vy / len) * this.stats.speed;
-      s.speed = this.stats.speed;
-      s.maxHealth = this.stats.soldierHealth;
+      s.vx = (s.vx / len) * speed;
+      s.vy = (s.vy / len) * speed;
+      s.speed = speed;
+      s.maxHealth = this.stats.soldierHealth + s.mods.healthBonus;
     }
   }
 
@@ -297,6 +307,8 @@ export class Game {
       this.bankedThisRun = true;
       this.save.data.bank += r.currency;
       this.save.data.crystals += r.crystals;
+      this.save.data.greenCrystals += r.greenCrystals;
+      this.save.data.essence += r.essence;
       this.save.data.lifetimePixels += r.pixelsDestroyed;
       if (r.time > b.time) b.time = r.time;
       if (r.maxDepth > b.depth) b.depth = r.maxDepth;
@@ -520,9 +532,11 @@ export class Game {
     const behavior = this.isBehaviorUnlocked(rawBehavior) ? rawBehavior : "free";
     const rawSecondary = this.save.data.loadouts[slotIdx]?.secondary ?? null;
     const secondary = rawSecondary && this.isSecondaryUnlocked(rawSecondary) ? rawSecondary : null;
-    const s = new Soldier(clampedX, clampedY, ndx, ndy, this.stats.speed, weapon, behavior, slotIdx, secondary);
-    s.maxHealth = this.stats.soldierHealth;
-    s.health = this.stats.soldierHealth;
+    const mods = this.upgrades.soldierMods(slotIdx);
+    const s = new Soldier(clampedX, clampedY, ndx, ndy, this.stats.speed * mods.speedMult, weapon, behavior, slotIdx, secondary);
+    s.mods = mods;
+    s.maxHealth = this.stats.soldierHealth + mods.healthBonus;
+    s.health = s.maxHealth;
     this.soldiers.push(s);
     this.reserves--;
     this.runStats.soldiersDeployed++;
@@ -789,8 +803,8 @@ export class Game {
           const sp = this.rng.range(20, 70);
           this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, 0xd8267a, 4);
         }
-        const lootKind = zoneForDepth(this.world.depthOf(cx, cy)) >= 1 ? LootKind.Crystal : LootKind.Gold;
-        this.loot.spawnDropsForBlock(x, y, this.stats.dropChance * 0.25, this.stats.pickupLifetime, this.rng, lootKind);
+        const subZone = zoneForDepth(this.world.depthOf(cx, cy));
+        this.loot.spawnDropsForBlock(x, y, this.dropChanceAt(subZone, ownerId) * 0.25, this.stats.pickupLifetime, this.rng, lootKindForZone(subZone));
         this.checkSecondaryCharge(ownerId);
       }
       return;
@@ -813,13 +827,11 @@ export class Game {
       const depth = this.world.depthOf(cx, cy);
       if (depth > this.runStats.maxDepth) this.runStats.maxDepth = depth;
       const zone = zoneForDepth(depth);
-      const lootKind = zone >= 1 ? LootKind.Crystal : LootKind.Gold;
-      const dropChance =
-        zone >= 1 ? this.stats.dropChance * (1 + this.stats.crystalDropBonus) : this.stats.dropChance;
+      const lootKind = lootKindForZone(zone);
       this.loot.spawnDropsForBlock(
         ccx,
         ccy,
-        dropChance,
+        this.dropChanceAt(zone, ownerId),
         this.stats.pickupLifetime,
         this.rng,
         lootKind,
@@ -833,6 +845,10 @@ export class Game {
         const coreWy = (destroyedCore.cy + 1) * cs;
         for (let i = 0; i < this.stats.coreLootBurst; i++) {
           this.loot.spawnOne(coreWx, coreWy, this.stats.pickupLifetime, this.rng, lootKind);
+        }
+        const essenceLife = this.stats.pickupLifetime * LOOT.essenceLifetimeMult;
+        for (let i = 0; i < LOOT.coreEssence[destroyedCore.zone]; i++) {
+          this.loot.spawnOne(coreWx, coreWy, essenceLife, this.rng, LootKind.Essence);
         }
         this.particles.spawn(PKind.Burst, coreWx, coreWy, 0, 0, 0.45, 28, 0xff48a4, 1);
         for (let i = 0; i < 36; i++) {
@@ -890,6 +906,18 @@ export class Game {
         6,
       );
     }
+  }
+
+  /** A destroyed block's drop chance: its zone's, then the soldier who broke it. */
+  private dropChanceAt(zone: number, ownerId: number): number {
+    let chance = this.stats.dropChance;
+    if (zone === 1) chance *= 1 + this.stats.crystalDropBonus;
+    else if (zone >= 2) chance *= 1 + this.stats.tier3ResourceBonus;
+    if (ownerId > 0) {
+      const owner = this.soldiers.find((s) => s.id === ownerId);
+      if (owner) chance *= owner.mods.dropMult;
+    }
+    return chance;
   }
 
   private checkSecondaryCharge(ownerId: number): void {
@@ -1105,6 +1133,8 @@ export class Game {
     if (collected > 0) {
       this.runStats.currency += this.loot.collectedGold;
       this.runStats.crystals += this.loot.collectedCrystals;
+      this.runStats.greenCrystals += this.loot.collectedGreenCrystals;
+      this.runStats.essence += this.loot.collectedEssence;
       this.audio.playPickup();
     }
     for (let i = this.flashes.length - 1; i >= 0; i--) {
@@ -1200,6 +1230,9 @@ export class Game {
         time: +r.time.toFixed(2),
         pixels: r.pixelsDestroyed,
         currency: r.currency,
+        crystals: r.crystals,
+        greenCrystals: r.greenCrystals,
+        essence: r.essence,
         maxDepth: r.maxDepth,
         soldiersDeployed: r.soldiersDeployed,
         nearSoldierGrowthPct: +this.growth.nearSoldierPercent(r.time).toFixed(1),

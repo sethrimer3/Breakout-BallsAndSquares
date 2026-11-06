@@ -1,10 +1,21 @@
 import { COLORS, TERRAIN, TERRAIN as T, zoneForDepth } from "../config";
+import { EDGE_PIXELS_PER_SUB, markBlightEdges } from "./blightEdges";
+import { paintPortal } from "./portalNoise";
 import type { CameraSystem } from "../systems/CameraSystem";
 import type { PixelWorld } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
 
 type RGB = readonly [number, number, number];
 type Ramp4 = readonly [RGB, RGB, RGB, RGB];
+
+/** How large the burning dimension's noise reads through a Blight edge. */
+const EDGE_FIRE_RATIO = 0.7;
+/** Steps a second the edge fire redraws at (motion, not camera, drives this). */
+const EDGE_FIRE_FPS = 15;
+/** Below this zoom the edges are so thin the fire paints at half size, then scales up. */
+const EDGE_FIRE_FULL_ZOOM = 1.5;
+/** Edge canvases grow in steps this size, so a moving view doesn't reallocate them. */
+const EDGE_CANVAS_STEP = 256;
 
 function mix(a: RGB, b: RGB, t: number, out: number[]): void {
   out[0] = a[0] + (b[0] - a[0]) * t;
@@ -31,6 +42,18 @@ export class TerrainRenderer {
   private scratch: number[] = [];
   private col = [0, 0, 0];
   rebuiltLastFrame = 0;
+  /** Per chunk: a mask of its Blight edges, made the first time it has any. */
+  private edgeMasks: (HTMLCanvasElement | null)[] = [];
+  private edgeLive: Uint8Array;
+  private edgeBits: Uint8Array;
+  private edgeSolid: Uint8Array;
+  private edgeImage: ImageData;
+  /** Bumped whenever a chunk's mask changes, so the fire knows to repaint. */
+  private edgeVersion = 0;
+  private edgeUnion = document.createElement("canvas");
+  private edgeFire = document.createElement("canvas");
+  private edgeFireLow = document.createElement("canvas");
+  private edgeFireKey = "";
 
   constructor(private world: PixelWorld, chunkSize: number) {
     this.chunks = new TerrainChunks(world, chunkSize);
@@ -43,6 +66,13 @@ export class TerrainRenderer {
       this.canvases.push(c);
     }
     this.image = new ImageData(subChunk, subChunk);
+    const edgeSize = subChunk * EDGE_PIXELS_PER_SUB;
+    this.edgeMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
+    this.edgeLive = new Uint8Array(n);
+    this.edgeBits = new Uint8Array(edgeSize * edgeSize);
+    this.edgeSolid = new Uint8Array((subChunk + 2) * (subChunk + 2));
+    this.edgeImage = new ImageData(edgeSize, edgeSize);
+    this.edgeImage.data.fill(255);
     this.chunks.markAll();
     this.glowCanvas = document.createElement("canvas");
     this.glowCanvas.width = world.width;
@@ -242,6 +272,126 @@ export class TerrainRenderer {
       }
     }
     this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0);
+    this.buildEdgeMask(k, kx, ky);
+  }
+
+  private buildEdgeMask(k: number, kx: number, ky: number): void {
+    const subs = this.chunks.chunkSize * 2;
+    const count = markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid);
+    if (count === 0) {
+      if (this.edgeLive[k]) {
+        this.edgeLive[k] = 0;
+        this.edgeVersion++;
+      }
+      return;
+    }
+    let mask = this.edgeMasks[k];
+    if (!mask) {
+      mask = document.createElement("canvas");
+      mask.width = mask.height = this.edgeImage.width;
+      this.edgeMasks[k] = mask;
+    }
+    const data = this.edgeImage.data;
+    const bits = this.edgeBits;
+    for (let i = 0; i < bits.length; i++) data[i * 4 + 3] = bits[i] * 255;
+    mask.getContext("2d")!.putImageData(this.edgeImage, 0, 0);
+    this.edgeLive[k] = 1;
+    this.edgeVersion++;
+  }
+
+  /**
+   * The burning dimension seen through a thin line round every Blight block,
+   * after TowerDefense's pixel portal contours: fire is painted at the mask's own
+   * pixel size, cut to the edges and scaled up unsmoothed. It is anchored to the
+   * world and emissive, so draw it after the lighting pass. `seconds` is wall clock.
+   */
+  drawBlightEdges(ctx: CanvasRenderingContext2D, cam: CameraSystem, seconds: number): void {
+    const size = this.edgeImage.width;
+    const cols = this.chunks.cols;
+    let kx0 = Infinity;
+    let ky0 = Infinity;
+    let kx1 = -1;
+    let ky1 = -1;
+    this.forEachVisibleChunk(cam, (kx, ky) => {
+      if (!this.edgeLive[ky * cols + kx]) return;
+      if (kx < kx0) kx0 = kx;
+      if (ky < ky0) ky0 = ky;
+      if (kx > kx1) kx1 = kx;
+      if (ky > ky1) ky1 = ky;
+    });
+    if (kx1 < 0) return;
+    const w = (kx1 - kx0 + 1) * size;
+    const h = (ky1 - ky0 + 1) * size;
+    const shrink = cam.zoom < EDGE_FIRE_FULL_ZOOM ? 2 : 1;
+    const key = `${Math.floor(seconds * EDGE_FIRE_FPS)}:${this.edgeVersion}:${kx0}:${ky0}:${kx1}:${ky1}:${shrink}`;
+    if (key !== this.edgeFireKey) {
+      this.edgeFireKey = key;
+      this.paintEdgeFire(kx0, ky0, kx1, ky1, w, h, seconds, shrink);
+    }
+    const smoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      if (!this.edgeLive[ky * cols + kx]) return;
+      ctx.drawImage(this.edgeFire, (kx - kx0) * size, (ky - ky0) * size, size, size, sx, sy, sw, sh);
+    });
+    ctx.imageSmoothingEnabled = smoothing;
+  }
+
+  private paintEdgeFire(
+    kx0: number,
+    ky0: number,
+    kx1: number,
+    ky1: number,
+    w: number,
+    h: number,
+    seconds: number,
+    shrink: number,
+  ): void {
+    const size = this.edgeImage.width;
+    const cols = this.chunks.cols;
+    const union = this.edgeUnion;
+    const fire = this.edgeFire;
+    if (union.width < w || union.height < h) {
+      const cw = Math.max(union.width, Math.ceil(w / EDGE_CANVAS_STEP) * EDGE_CANVAS_STEP);
+      const ch = Math.max(union.height, Math.ceil(h / EDGE_CANVAS_STEP) * EDGE_CANVAS_STEP);
+      union.width = fire.width = cw;
+      union.height = fire.height = ch;
+    }
+    const u = union.getContext("2d")!;
+    u.clearRect(0, 0, union.width, union.height);
+    for (let ky = ky0; ky <= ky1; ky++) {
+      for (let kx = kx0; kx <= kx1; kx++) {
+        const k = ky * cols + kx;
+        if (this.edgeLive[k]) u.drawImage(this.edgeMasks[k]!, (kx - kx0) * size, (ky - ky0) * size);
+      }
+    }
+    const f = fire.getContext("2d")!;
+    f.setTransform(1, 0, 0, 1, 0, 0);
+    f.globalCompositeOperation = "source-over";
+    f.clearRect(0, 0, fire.width, fire.height);
+    // World-anchored: the fire stays put under the camera.
+    const ox = kx0 * size;
+    const oy = ky0 * size;
+    const box = { x: ox, y: oy, w, h };
+    if (shrink > 1) {
+      const low = this.edgeFireLow;
+      const lw = Math.ceil(w / shrink);
+      const lh = Math.ceil(h / shrink);
+      if (low.width < lw) low.width = lw;
+      if (low.height < lh) low.height = lh;
+      const l = low.getContext("2d")!;
+      l.setTransform(1 / shrink, 0, 0, 1 / shrink, -ox / shrink, -oy / shrink);
+      paintPortal(l, box, seconds, EDGE_FIRE_RATIO);
+      f.imageSmoothingEnabled = false;
+      f.drawImage(low, 0, 0, lw, lh, 0, 0, lw * shrink, lh * shrink);
+    } else {
+      f.setTransform(1, 0, 0, 1, -ox, -oy);
+      paintPortal(f, box, seconds, EDGE_FIRE_RATIO);
+      f.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    f.globalCompositeOperation = "destination-in";
+    f.drawImage(union, 0, 0);
+    f.globalCompositeOperation = "source-over";
   }
 
   /**

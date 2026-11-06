@@ -1,5 +1,6 @@
 import { clamp } from "../core/math";
 import type { SecondaryWeaponType, WeaponType } from "../entities/Soldier";
+import { SOLDIER_UPGRADE_DEFS, type SoldierUpgradeLevels } from "./SoldierUpgrades";
 import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
 
 export const SAVE_KEY = "breach.save.v1";
@@ -38,6 +39,8 @@ export interface SoldierLoadout {
   secondary?: SecondaryWeaponType | null;
   behavior: SoldierBehavior;
   equipment: (string | null)[];
+  /** Levels bought on this soldier's own upgrade tree. */
+  upgrades?: SoldierUpgradeLevels;
 }
 
 export const VALID_SECONDARY_WEAPONS: readonly SecondaryWeaponType[] = ["grenade"];
@@ -76,6 +79,10 @@ export interface SaveData {
   version: number;
   bank: number;
   crystals: number;
+  /** Tier 3 green crystals, dropped in Zone 3. */
+  greenCrystals: number;
+  /** Blight Essence, dropped by Blight Cores. */
+  essence: number;
   lifetimePixels: number;
   upgrades: Record<UpgradeId, number>;
   loadouts: SoldierLoadout[];
@@ -104,12 +111,14 @@ export function defaultSaveData(): SaveData {
   for (const d of UPGRADE_DEFS) upgrades[d.id] = 0;
   const loadouts: SoldierLoadout[] = [];
   for (let i = 0; i < MAX_SOLDIER_SLOTS; i++) {
-    loadouts.push({ weapon: "pistol", secondary: null, behavior: "free", equipment: [null, null] });
+    loadouts.push({ weapon: "pistol", secondary: null, behavior: "free", equipment: [null, null], upgrades: {} });
   }
   return {
     version: SAVE_VERSION,
     bank: 0,
     crystals: 0,
+    greenCrystals: 0,
+    essence: 0,
     lifetimePixels: 0,
     upgrades,
     loadouts,
@@ -143,6 +152,8 @@ export function sanitizeSaveData(raw: unknown): SaveData {
 
   def.bank = Math.floor(finiteNonNeg(obj.bank, 0));
   def.crystals = Math.floor(finiteNonNeg(obj.crystals, 0));
+  def.greenCrystals = Math.floor(finiteNonNeg(obj.greenCrystals, 0));
+  def.essence = Math.floor(finiteNonNeg(obj.essence, 0));
   def.lifetimePixels = Math.floor(finiteNonNeg(obj.lifetimePixels, 0));
 
   if (obj.upgrades && typeof obj.upgrades === "object") {
@@ -170,6 +181,16 @@ export function sanitizeSaveData(raw: unknown): SaveData {
           def.loadouts[i].secondary = s as SecondaryWeaponType;
         } else {
           def.loadouts[i].secondary = null;
+        }
+        const levels = item.upgrades;
+        if (levels && typeof levels === "object") {
+          const raw = levels as Record<string, unknown>;
+          const clean: SoldierUpgradeLevels = {};
+          for (const d of SOLDIER_UPGRADE_DEFS) {
+            const lvl = Math.floor(finiteNonNeg(raw[d.id], 0, d.maxLevel));
+            if (lvl > 0) clean[d.id] = lvl;
+          }
+          def.loadouts[i].upgrades = clean;
         }
       }
     }
@@ -248,6 +269,8 @@ export interface SlotSummary {
   exists: boolean;
   bank: number;
   crystals: number;
+  greenCrystals: number;
+  essence: number;
   lifetimePixels: number;
   upgradesCount: number;
   bestDepth: number;
@@ -378,6 +401,8 @@ export class SaveManager {
         exists: false,
         bank: 0,
         crystals: 0,
+        greenCrystals: 0,
+        essence: 0,
         lifetimePixels: 0,
         upgradesCount: 0,
         bestDepth: 0,
@@ -399,6 +424,8 @@ export class SaveManager {
       exists: true,
       bank: data.bank,
       crystals: data.crystals,
+      greenCrystals: data.greenCrystals,
+      essence: data.essence,
       lifetimePixels: data.lifetimePixels,
       upgradesCount,
       bestDepth: data.bests?.depth ?? 0,

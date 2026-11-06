@@ -1,3 +1,4 @@
+import { essenceIcon } from "./essenceIcon";
 import { GROWTH, TERRAIN } from "../config";
 import type { Game } from "../Game";
 import { sprite, UI_COLORS, type SpriteName } from "./pixelArt";
@@ -10,7 +11,7 @@ function fmtTime(t: number): string {
 
 /**
  * Pixel-art DOM HUD:
- * - Top stat bar (Time, Pixels, Gold, Crystals [when unlocked], Bank, Depth, Soldiers)
+ * - Top stat bar (Time, Pixels, Gold, Crystals, Green Crystals & Essence [when unlocked], Bank, Depth, Soldiers)
  * - Bottom-left compact soldier stats
  * - Dramatic bottom-middle Growth Rate meter
  * - Bottom-right `?` button that toggles all help/controls text
@@ -49,6 +50,8 @@ export class HUD {
       ["pixels", "PIXELS", "pixelBits", UI_COLORS.neutral],
       ["currency", "GOLD", "gold", UI_COLORS.gold],
       ["crystals", "CRYS", "crystal", UI_COLORS.crystal],
+      ["greenCrystals", "GREEN", "crystal", UI_COLORS.greenCrystal],
+      ["essence", "ESSENCE", "gold", UI_COLORS.essence],
       ["bank", "BANK", "gold", UI_COLORS.gold],
       ["depth", "DEPTH", "depth", UI_COLORS.neutral],
       ["soldiers", "SOLDIERS", "soldier", UI_COLORS.soldier],
@@ -58,7 +61,7 @@ export class HUD {
       box.className = `hud-item hud-${key}`;
       const l = document.createElement("span");
       l.className = "hud-label";
-      l.innerHTML = `${sprite(icon, { color })} ${label}`;
+      l.innerHTML = key === "essence" ? `${essenceIcon(1)} ${label}` : `${sprite(icon, { color })} ${label}`;
       const v = document.createElement("span");
       v.className = "hud-value";
       box.append(l, v);
@@ -199,7 +202,7 @@ export class HUD {
         <div class="help-touch"><b>${sprite("marker", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Place or clear bounce marker</div>
         <div class="help-touch"><b>${sprite("follow", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Follow farthest soldier, tap again to cycle</div>
         <div class="help-touch"><b>${sprite("pause", { color: UI_COLORS.white, scale: 1 })} BUTTON</b> Pause, restart, upgrades &amp; settings</div>
-        <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}; Zone 2 unlocks glowing orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}. Soldiers must touch them to collect!</div>
+        <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}, Zone 2 orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}, Zone 3 green crystals ${sprite("crystal", { color: UI_COLORS.greenCrystal, scale: 1 })}, and Blight Cores leave Blight Essence ${essenceIcon(1)}. Soldiers must touch them to collect!</div>
         <div class="help-keys"><b>1 / 2</b> Toggle Line / Triangle formation</div>
         <div class="help-keys"><b>F / TAB</b> Follow farthest / Cycle soldiers</div>
         <div class="help-keys"><b>T</b> Toggle marker mode</div>
@@ -236,6 +239,12 @@ export class HUD {
     const showCrystals = totalCrystals > 0 || s.maxDepth >= TERRAIN.zone2Depth || game.bests.depth >= TERRAIN.zone2Depth;
     this.boxes.crystals.classList.toggle("hidden", !showCrystals);
     this.fields.crystals.textContent = `${s.crystals} (${game.crystals})`;
+
+    const showGreen = game.greenCrystals + s.greenCrystals > 0 || s.maxDepth >= TERRAIN.zone3Depth || game.bests.depth >= TERRAIN.zone3Depth;
+    this.boxes.greenCrystals.classList.toggle("hidden", !showGreen);
+    this.fields.greenCrystals.textContent = `${s.greenCrystals} (${game.greenCrystals})`;
+    this.boxes.essence.classList.toggle("hidden", game.essence + s.essence <= 0);
+    this.fields.essence.textContent = `${s.essence} (${game.essence})`;
 
     this.fields.bank.textContent = game.bank.toLocaleString();
     this.fields.depth.textContent = `${s.maxDepth}`;

@@ -107,22 +107,44 @@ export function goldSquareSprite(size: number): HTMLCanvasElement {
   return c;
 }
 
-/** Pre-rendered glowing orange crystal (Zone 2 currency) with baked radial glow. */
-export function orangeCrystalSprite(size: number): HTMLCanvasElement {
+/** A crystal drop's colors: glow stops, then shell, face and highlight. */
+interface CrystalPalette {
+  glow: [string, string, string, string];
+  shell: string;
+  face: string;
+  shine: string;
+}
+
+const ORANGE_CRYSTAL: CrystalPalette = {
+  glow: ["rgba(255, 190, 95, 0.95)", "rgba(255, 115, 25, 0.58)", "rgba(215, 55, 5, 0.18)", "rgba(160, 25, 0, 0)"],
+  shell: "#b83804",
+  face: "#ff7b1c",
+  shine: "#ffe6b0",
+};
+
+const GREEN_CRYSTAL: CrystalPalette = {
+  glow: ["rgba(190, 255, 205, 0.95)", "rgba(50, 225, 130, 0.58)", "rgba(10, 150, 80, 0.18)", "rgba(0, 90, 50, 0)"],
+  shell: "#0c7a45",
+  face: "#34e088",
+  shine: "#dcffe8",
+};
+
+/** Pre-rendered glowing crystal (Zone 2 and Zone 3 currency) with baked radial glow. */
+export function crystalSprite(size: number, palette: CrystalPalette): HTMLCanvasElement {
   const [c, g] = makeCanvas(size);
   const r = size / 2;
   const grad = g.createRadialGradient(r, r, 0, r, r, r);
-  grad.addColorStop(0, "rgba(255, 190, 95, 0.95)");
-  grad.addColorStop(0.28, "rgba(255, 115, 25, 0.58)");
-  grad.addColorStop(0.62, "rgba(215, 55, 5, 0.18)");
-  grad.addColorStop(1, "rgba(160, 25, 0, 0)");
+  grad.addColorStop(0, palette.glow[0]);
+  grad.addColorStop(0.28, palette.glow[1]);
+  grad.addColorStop(0.62, palette.glow[2]);
+  grad.addColorStop(1, palette.glow[3]);
   g.fillStyle = grad;
   g.fillRect(0, 0, size, size);
 
   // Crisp faceted diamond/crystal in the center.
   const hw = Math.round(size * 0.19);
   const hh = Math.round(size * 0.27);
-  g.fillStyle = "#b83804";
+  g.fillStyle = palette.shell;
   g.beginPath();
   g.moveTo(r, r - hh - 1);
   g.lineTo(r + hw + 1, r);
@@ -131,7 +153,7 @@ export function orangeCrystalSprite(size: number): HTMLCanvasElement {
   g.closePath();
   g.fill();
 
-  g.fillStyle = "#ff7b1c";
+  g.fillStyle = palette.face;
   g.beginPath();
   g.moveTo(r, r - hh);
   g.lineTo(r + hw, r);
@@ -141,7 +163,7 @@ export function orangeCrystalSprite(size: number): HTMLCanvasElement {
   g.fill();
 
   // Upper-left bright facet highlight.
-  g.fillStyle = "#ffe6b0";
+  g.fillStyle = palette.shine;
   g.beginPath();
   g.moveTo(r, r - hh + 1.5);
   g.lineTo(r + hw * 0.45, r);
@@ -163,6 +185,7 @@ export interface Sprites {
   crimsonGlow: HTMLCanvasElement;
   goldSquare: HTMLCanvasElement;
   orangeCrystal: HTMLCanvasElement;
+  greenCrystal: HTMLCanvasElement;
   dot: HTMLCanvasElement;
 }
 
@@ -192,7 +215,8 @@ export function createSprites(): Sprites {
       [1, "rgba(120, 0, 60, 0)"],
     ]),
     goldSquare: goldSquareSprite(32),
-    orangeCrystal: orangeCrystalSprite(32),
+    orangeCrystal: crystalSprite(32, ORANGE_CRYSTAL),
+    greenCrystal: crystalSprite(32, GREEN_CRYSTAL),
     dot: radialSprite(16, [
       [0, "rgba(255,255,255,1)"],
       [0.5, "rgba(255,255,255,0.6)"],

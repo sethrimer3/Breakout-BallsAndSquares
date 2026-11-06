@@ -22,7 +22,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
   it("gates Katana unlock and scales upgrades through the UpgradeManager", () => {
     const save = new SaveManager(new MemStorage());
     const upg = new UpgradeManager(save);
-    save.data.bank = 100_000;
+    save.data.bank = 100_000; save.data.crystals = 100_000;
     save.data.lifetimePixels = 500;
 
     // Gated until katana_unlock is purchased

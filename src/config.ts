@@ -361,6 +361,10 @@ export const LOOT = {
   magnetAccel: 540,
   /** Max magnetic pull speed (units/s). */
   magnetMaxSpeed: 380,
+  /** Blight Essence drops erupting from a destroyed Blight Core, by the core's zone. */
+  coreEssence: [3, 5, 8] as const,
+  /** Blight Essence lingers this many times longer than other pickups. */
+  essenceLifetimeMult: 3,
 };
 
 export const COLORS = {

@@ -1,3 +1,4 @@
+import { essenceIcon } from "./essenceIcon";
 import type { Game } from "../Game";
 import { sprite, UI_COLORS } from "./pixelArt";
 
@@ -53,10 +54,21 @@ export class ResultsScreen {
       r.crystals > 0 || g.crystals > 0
         ? row("ORANGE CRYSTALS", `${crystalIcon} ${r.crystals.toLocaleString()}`, `BANK ${crystalIcon} ${g.crystals.toLocaleString()}`)
         : "";
+    const greenIcon = sprite("crystal", { color: UI_COLORS.greenCrystal });
+    const greenRow =
+      r.greenCrystals > 0 || g.greenCrystals > 0
+        ? row("GREEN CRYSTALS", `${greenIcon} ${r.greenCrystals.toLocaleString()}`, `BANK ${greenIcon} ${g.greenCrystals.toLocaleString()}`)
+        : "";
+    const essenceRow =
+      r.essence > 0 || g.essence > 0
+        ? row("BLIGHT ESSENCE", `${essenceIcon()} ${r.essence.toLocaleString()}`, `BANK ${essenceIcon()} ${g.essence.toLocaleString()}`)
+        : "";
     this.body.innerHTML =
       row("PIXELS DESTROYED", r.pixelsDestroyed.toLocaleString(), b.pixels.toLocaleString(), newBests.pixels) +
       row("GOLD COLLECTED", `${goldIcon} ${r.currency.toLocaleString()}`, `BANK ${goldIcon} ${g.bank.toLocaleString()}`) +
       crystalsRow +
+      greenRow +
+      essenceRow +
       row("TIME SURVIVED", fmtTime(r.time), fmtTime(b.time), newBests.time) +
       row("MAX DEPTH REACHED", `${r.maxDepth} cells`, `${b.depth} cells`, newBests.depth) +
       row("SOLDIERS DEPLOYED", `${r.soldiersDeployed}`, `PEAK GROWTH ${g.growth.rate.toFixed(1)}/s`) +

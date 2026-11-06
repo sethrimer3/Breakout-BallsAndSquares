@@ -5,12 +5,21 @@ import type { Soldier } from "./Soldier";
 export const LootKind = {
   Gold: 0,
   Crystal: 1,
+  GreenCrystal: 2,
+  Essence: 3,
 } as const;
 export type LootKind = (typeof LootKind)[keyof typeof LootKind];
 
+/** What a block drops at a zone: gold, then orange crystals, then green crystals. */
+export function lootKindForZone(zone: number): LootKind {
+  if (zone >= 2) return LootKind.GreenCrystal;
+  return zone === 1 ? LootKind.Crystal : LootKind.Gold;
+}
+
 /**
  * High-capacity Struct-of-Arrays (SoA) pool for glowing currency pickups
- * (Zone 1 golden squares, Zone 2+ glowing orange crystals).
+ * (Zone 1 golden squares, Zone 2 orange crystals, Zone 3 green crystals, and
+ * the Blight Essence that Blight Cores leave).
  * Supports thousands of simultaneous pickups with zero per-frame allocations.
  */
 export class LootSystem {
@@ -27,6 +36,8 @@ export class LootSystem {
   /** Per-step collection counters populated by `update()`. */
   collectedGold = 0;
   collectedCrystals = 0;
+  collectedGreenCrystals = 0;
+  collectedEssence = 0;
 
   constructor(cap = LOOT.poolSize) {
     this.cap = cap;
@@ -88,8 +99,9 @@ export class LootSystem {
   /**
    * Step all active pickups: apply drag, magnetically pull toward the nearest
    * living soldier within `magnetRange`, and collect pickups that reach
-   * `LOOT.pickupRadius`. Returns the total number of pickups collected this step
-   * (and populates `collectedGold` / `collectedCrystals`).
+   * `LOOT.pickupRadius`. A soldier's own magnet multiplier widens their range.
+   * Returns the total number of pickups collected this step (and populates the
+   * `collected*` counters).
    */
   update(
     dt: number,
@@ -99,6 +111,8 @@ export class LootSystem {
   ): number {
     this.collectedGold = 0;
     this.collectedCrystals = 0;
+    this.collectedGreenCrystals = 0;
+    this.collectedEssence = 0;
     if (this.count === 0) return 0;
     const damp = Math.exp(-LOOT.drag * dt);
     const magR2 = magnetRange * magnetRange;
@@ -123,7 +137,8 @@ export class LootSystem {
       const k = this.kind[i] as LootKind;
 
       // Find closest living soldier within magnet range.
-      let bestDist2 = magR2;
+      let bestDist2 = Infinity;
+      let bestRange = magnetRange;
       let bestDx = 0;
       let bestDy = 0;
       let pickedUp = false;
@@ -138,8 +153,10 @@ export class LootSystem {
           pickedUp = true;
           break;
         }
-        if (d2 < bestDist2) {
+        const reach = s.mods.magnetMult;
+        if (d2 < bestDist2 && d2 < magR2 * reach * reach) {
           bestDist2 = d2;
+          bestRange = magnetRange * reach;
           bestDx = dx;
           bestDy = dy;
         }
@@ -147,18 +164,17 @@ export class LootSystem {
 
       if (pickedUp) {
         collected++;
-        if (k === LootKind.Crystal) this.collectedCrystals++;
-        else this.collectedGold++;
+        this.tally(k);
         onCollect?.(px, py, k);
         this.removeAt(i);
         continue;
       }
 
-      if (bestDist2 < magR2 && bestDist2 > 1e-6) {
+      if (bestDist2 < Infinity && bestDist2 > 1e-6) {
         const dist = Math.sqrt(bestDist2);
         const inv = 1 / dist;
         // Stronger pull as the pickup gets closer to the soldier.
-        const pull = accel * (1.15 - 0.65 * (dist / magnetRange));
+        const pull = accel * (1.15 - 0.65 * (dist / bestRange));
         vx += bestDx * inv * pull * dt;
         vy += bestDy * inv * pull * dt;
         const sp2 = vx * vx + vy * vy;
@@ -186,8 +202,7 @@ export class LootSystem {
 
       if (pickedUp) {
         collected++;
-        if (k === LootKind.Crystal) this.collectedCrystals++;
-        else this.collectedGold++;
+        this.tally(k);
         onCollect?.(px, py, k);
         this.removeAt(i);
         continue;
@@ -200,6 +215,13 @@ export class LootSystem {
       i++;
     }
     return collected;
+  }
+
+  private tally(kind: LootKind): void {
+    if (kind === LootKind.Crystal) this.collectedCrystals++;
+    else if (kind === LootKind.GreenCrystal) this.collectedGreenCrystals++;
+    else if (kind === LootKind.Essence) this.collectedEssence++;
+    else this.collectedGold++;
   }
 
   private removeAt(i: number): void {
@@ -218,5 +240,7 @@ export class LootSystem {
     this.count = 0;
     this.collectedGold = 0;
     this.collectedCrystals = 0;
+    this.collectedGreenCrystals = 0;
+    this.collectedEssence = 0;
   }
 }

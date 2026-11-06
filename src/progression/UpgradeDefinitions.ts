@@ -22,7 +22,8 @@ export type UpgradeBranch =
   | "rocket_launcher"
   | "sniper_rifle"
   | "katana"
-  | "grenade";
+  | "grenade"
+  | "soldier";
 
 export type UpgradeId =
   // Core Matrix: Upgrades All Soldiers (#38d6ff)
@@ -39,7 +40,7 @@ export type UpgradeId =
   | "behavior_patrol"
   | "behavior_turns"
   | "behavior_sentry"
-  // Resources Matrix: Gold, Tier 2 Crystals & Tier 3 Placeholders
+  // Resources Matrix: Gold, Tier 2 Orange Crystals & Tier 3 Green Crystals
   | "drop_chance"
   | "multi_drop"
   | "magnet_range"
@@ -104,9 +105,17 @@ export type UpgradeId =
   | "grenade_shrapnel"
   | "grenade_blight_mult";
 
-export interface UpgradeDef {
-  id: UpgradeId;
-  branch: UpgradeBranch;
+/** The four things upgrades are bought with. */
+export type Currency = "gold" | "crystals" | "greenCrystals" | "essence";
+
+export interface Price {
+  currency: Currency;
+  amount: number;
+}
+
+/** One node on an upgrade tree, whichever tree it belongs to. */
+export interface TreeNodeDef<Id extends string = string> {
+  id: Id;
   name: string;
   shortDesc: string;
   /** Category color accent (hex). */
@@ -118,10 +127,14 @@ export interface UpgradeDef {
    */
   grid: { col: number; row: number };
   /** Visual connector parent (null = connects to the central core node). */
-  parent: UpgradeId | null;
+  parent: Id | null;
   maxLevel: number;
+  /** What the node's main price is paid in (gold when unset). */
+  currency?: Currency;
   baseCost: number;
   costMultiplier: number;
+  /** Blight Essence on top of the main price at level 0; rises by half of this each level. */
+  essenceCost?: number;
   /** Lifetime pixels destroyed required to unlock (0 = unlocked from start). */
   unlockLifetimePixels: number;
   /** Compute the display value at `level` (for tooltips like `100% > 110%`). */
@@ -130,15 +143,28 @@ export interface UpgradeDef {
   formatValue(v: number): string;
   /** Format the per-level delta. */
   formatDelta(): string;
-  /** Apply `level` to the mutable `SoldierStats`. */
-  apply(stats: SoldierStats, level: number): void;
   /** Pixel sprite for the node icon (add new art to `SPRITES` in ui/pixelArt.ts). */
   icon: SpriteName;
 }
 
-/** Exponential upgrade cost (spec §9). */
-export function upgradeCost(def: UpgradeDef, currentLevel: number): number {
+export interface UpgradeDef extends TreeNodeDef<UpgradeId> {
+  branch: UpgradeBranch;
+  /** Apply `level` to the mutable `SoldierStats`. */
+  apply(stats: SoldierStats, level: number): void;
+}
+
+/** Exponential upgrade cost (spec §9), in the node's main currency. */
+export function upgradeCost(def: TreeNodeDef, currentLevel: number): number {
   return Math.ceil(def.baseCost * Math.pow(def.costMultiplier, currentLevel));
+}
+
+/** Everything the next level of `def` costs. */
+export function upgradePrices(def: TreeNodeDef, currentLevel: number): Price[] {
+  const prices: Price[] = [{ currency: def.currency ?? "gold", amount: upgradeCost(def, currentLevel) }];
+  if (def.essenceCost) {
+    prices.push({ currency: "essence", amount: Math.ceil(def.essenceCost * (1 + 0.5 * currentLevel)) });
+  }
+  return prices;
 }
 
 export const UPGRADE_DEFS: readonly UpgradeDef[] = [
@@ -375,7 +401,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
 
   // =========================================================================
-  // 2) RESOURCES TAB: GOLD, TIER 2 CRYSTALS & TIER 3 PLACEHOLDERS
+  // 2) RESOURCES TAB: GOLD, TIER 2 ORANGE CRYSTALS & TIER 3 GREEN CRYSTALS
   // =========================================================================
   {
     id: "drop_chance",
@@ -461,7 +487,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "tier2_crystal_yield",
     branch: "resources",
     name: "Crystal Harvester [T2]",
-    shortDesc: "[Tier 2 Resource] +15% Zone 2 Orange Crystal yield (Placeholder)",
+    shortDesc: "+15% Zone 2 Orange Crystal drop chance",
     color: "#ff8c2e",
     grid: { col: 1, row: 0 },
     parent: null,
@@ -481,7 +507,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "tier2_crystal_refinery",
     branch: "resources",
     name: "Crystal Refinery [T2]",
-    shortDesc: "[Tier 2 Resource] +20% Orange Crystal refinement purity (Placeholder)",
+    shortDesc: "+20% Zone 2 Orange Crystal drop chance",
     color: "#ff8c2e",
     grid: { col: 1, row: -1 },
     parent: "tier2_crystal_yield",
@@ -500,8 +526,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   {
     id: "tier3_dark_matter",
     branch: "resources",
-    name: "Xenotime Siphon [T3]",
-    shortDesc: "[Tier 3 Resource] +20% Zone 3 Deep-Core Xenotime extraction (Placeholder)",
+    name: "Green Crystal Siphon [T3]",
+    shortDesc: "+20% Zone 3 Green Crystal drop chance",
     color: "#52f296",
     grid: { col: 2, row: 0 },
     parent: "tier2_crystal_yield",
@@ -521,7 +547,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "tier3_quantum_extractor",
     branch: "resources",
     name: "Quantum Extractor [T3]",
-    shortDesc: "[Tier 3 Resource] +25% Deep-Lab Exotic Matter synthesis (Placeholder)",
+    shortDesc: "+25% Zone 3 Green Crystal drop chance",
     color: "#52f296",
     grid: { col: 2, row: 1 },
     parent: "tier3_dark_matter",
@@ -814,7 +840,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "fire_rate",
     maxLevel: 10,
-    baseCost: 60,
+    currency: "crystals",
+    baseCost: 20,
     costMultiplier: 1.7,
     unlockLifetimePixels: 40,
     valueAt: (lvl) => lvl * 5,
@@ -858,7 +885,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: -1, row: 0 },
     parent: "shotgun_unlock",
     maxLevel: 8,
-    baseCost: 30,
+    currency: "crystals",
+    baseCost: 10,
     costMultiplier: 1.6,
     unlockLifetimePixels: 30,
     valueAt: (lvl) => SHOTGUN.pellets + lvl,
@@ -939,7 +967,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: 1 },
     parent: "shotgun_choke",
     maxLevel: 6,
-    baseCost: 28,
+    currency: "crystals",
+    baseCost: 10,
     costMultiplier: 1.55,
     unlockLifetimePixels: 30,
     valueAt: (lvl) => Math.round((1 + 0.18 * lvl) * 100),
@@ -983,7 +1012,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: -1 },
     parent: "ar_unlock",
     maxLevel: 5,
-    baseCost: 45,
+    currency: "crystals",
+    baseCost: 15,
     costMultiplier: 1.75,
     unlockLifetimePixels: 60,
     valueAt: (lvl) => ASSAULT_RIFLE.pierce + lvl,
@@ -1088,7 +1118,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: -1, row: 0 },
     parent: "rocket_unlock",
     maxLevel: 6,
-    baseCost: 50,
+    currency: "crystals",
+    baseCost: 16,
     costMultiplier: 1.68,
     unlockLifetimePixels: 100,
     valueAt: (lvl) => +(ROCKET_LAUNCHER.blastRadiusCells + 0.4 * lvl).toFixed(1),
@@ -1149,7 +1180,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "rocket_unlock",
     maxLevel: 4,
-    baseCost: 90,
+    currency: "crystals",
+    baseCost: 30,
     costMultiplier: 1.9,
     unlockLifetimePixels: 120,
     valueAt: (lvl) => lvl,
@@ -1213,7 +1245,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: -1 },
     parent: "sniper_unlock",
     maxLevel: 6,
-    baseCost: 45,
+    currency: "crystals",
+    baseCost: 15,
     costMultiplier: 1.68,
     unlockLifetimePixels: 80,
     valueAt: (lvl) => SNIPER_RIFLE.pierce + lvl,
@@ -1254,7 +1287,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "sniper_unlock",
     maxLevel: 8,
-    baseCost: 40,
+    currency: "crystals",
+    baseCost: 14,
     costMultiplier: 1.62,
     unlockLifetimePixels: 80,
     valueAt: (lvl) => Math.min(100, lvl * 10),
@@ -1318,7 +1352,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: -1 },
     parent: "katana_unlock",
     maxLevel: 6,
-    baseCost: 40,
+    currency: "crystals",
+    baseCost: 14,
     costMultiplier: 1.65,
     unlockLifetimePixels: 80,
     valueAt: (lvl) => +(KATANA.blightMultiplier + 0.5 * lvl).toFixed(1),
@@ -1338,7 +1373,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "katana_unlock",
     maxLevel: 6,
-    baseCost: 42,
+    currency: "crystals",
+    baseCost: 14,
     costMultiplier: 1.66,
     unlockLifetimePixels: 80,
     valueAt: (lvl) => KATANA.pierce + lvl,
@@ -1379,7 +1415,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: 1 },
     parent: "katana_damage",
     maxLevel: 6,
-    baseCost: 38,
+    currency: "crystals",
+    baseCost: 13,
     costMultiplier: 1.62,
     unlockLifetimePixels: 80,
     valueAt: (lvl) => KATANA.slashWidth + 3 * lvl,
@@ -1423,7 +1460,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: -1 },
     parent: "grenade_unlock",
     maxLevel: 6,
-    baseCost: 45,
+    currency: "crystals",
+    baseCost: 15,
     costMultiplier: 1.6,
     unlockLifetimePixels: 80,
     valueAt: (lvl) => Math.max(30, GRENADE.blocksRequired - 8 * lvl),
@@ -1443,7 +1481,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: 0 },
     parent: "grenade_unlock",
     maxLevel: 6,
-    baseCost: 50,
+    currency: "crystals",
+    baseCost: 16,
     costMultiplier: 1.65,
     unlockLifetimePixels: 80,
     valueAt: (lvl) => GRENADE.damage + 3 * lvl,
@@ -1463,7 +1502,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: -1, row: 0 },
     parent: "grenade_unlock",
     maxLevel: 6,
-    baseCost: 48,
+    currency: "crystals",
+    baseCost: 16,
     costMultiplier: 1.62,
     unlockLifetimePixels: 80,
     valueAt: (lvl) => +(GRENADE.blastRadiusCells + 0.4 * lvl).toFixed(1),
@@ -1483,7 +1523,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "grenade_unlock",
     maxLevel: 4,
-    baseCost: 75,
+    currency: "crystals",
+    baseCost: 25,
     costMultiplier: 1.7,
     unlockLifetimePixels: 80,
     valueAt: (lvl) => 2 * lvl,
@@ -1503,7 +1544,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: 1 },
     parent: "grenade_damage",
     maxLevel: 4,
-    baseCost: 55,
+    currency: "crystals",
+    baseCost: 18,
     costMultiplier: 1.65,
     unlockLifetimePixels: 80,
     valueAt: (lvl) => +(GRENADE.blightMultiplier + 0.75 * lvl).toFixed(2),

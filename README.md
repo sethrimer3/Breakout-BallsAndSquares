@@ -83,6 +83,19 @@ Every destroyed pixel awards **1 ◆ currency** and increments lifetime pixels d
 | **Multishot** | `+5%` chance to fire twin `±8°` side rounds | 10 | 60 | `1.70×` | Destroy **40** lifetime pixels |
 | **Additional Soldier** | `+1` deployable soldier per run (up to 8) | 7 | 100 | `2.00×` | Destroy **100** lifetime pixels |
 
+### Currencies
+
+| Currency | Dropped by | Spent on |
+|---|---|---|
+| **Gold** (Tier 1) | Blocks in Zone 1 | Most Matrix nodes, weapon unlocks, Tier 1 soldier nodes |
+| **Orange Crystals** (Tier 2) | Blocks in Zone 2 | Secondary weapon upgrades, special weapon upgrades (pierce, blast radius, cluster, crit, multishot, pellets, range, slash arc, Blight multipliers), Tier 2 soldier nodes |
+| **Green Crystals** (Tier 3) | Blocks in Zone 3 | Tier 3 soldier nodes |
+| **Blight Essence** | Blight Cores (3 / 5 / 8 by zone), lingering three times longer than other pickups | Every soldier node, on top of its tier's currency |
+
+### Soldier Trees
+
+Every soldier has their own upgrade tree (**Soldier Trees** in the Matrix, or **Upgrade Tree** on a Loadout card), stored on their loadout slot. Four arms run gold → orange → green, each node opening the next: damage → pierce → twin fire; fire rate → Blight Hunter → Overdrive; speed → Scavenger → Deep Harvest; HP → Bulwark → Aegis. Essence costs `2 / 6 / 15` at the first level of each tier and rise by half of that per level. The definitions live in [`src/progression/SoldierUpgrades.ts`](src/progression/SoldierUpgrades.ts).
+
 All gameplay, physics, growth, lighting, and upgrade constants live in [`src/config.ts`](src/config.ts) and [`src/progression/UpgradeDefinitions.ts`](src/progression/UpgradeDefinitions.ts) for easy tuning.
 
 ---

@@ -1,3 +1,5 @@
+import { LootKind } from "../entities/LootSystem";
+import { ESSENCE_FPS, ESSENCE_SIZE, essenceFrame, essencePixels, paintPixels } from "./blightEssence";
 import { ART_PIXEL, BULLET, COLORS, GROWTH, SOLDIER } from "../config";
 import type { Bullet } from "../entities/Bullet";
 import { PKind } from "../entities/ParticleSystem";
@@ -12,6 +14,10 @@ function hexColor(c: number): string {
 }
 
 export class Renderer {
+  private motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  /** The one living frame every Blight Essence drop shares. */
+  private essenceCanvas = document.createElement("canvas");
+  private essenceShown = -1;
   private ctx: CanvasRenderingContext2D;
   private dpr = 1;
   private sprites: Sprites;
@@ -72,6 +78,9 @@ export class Renderer {
     //    scene + additive air-scatter cone so shadows behind walls & soldiers pop.
     this.lightRenderer.renderLighting(ctx, game, this.dpr);
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
+    const wallClockMs = performance.now();
+    const still = this.motion.matches;
+    game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);
     // Soldiers are drawn after lighting so the pixel-art sprite keeps its full
     // palette instead of being darkened by the lightmap.
     this.drawSoldiers();
@@ -88,6 +97,9 @@ export class Renderer {
     // drawn before tracers/sparks so those stay crisp on top.
     const fiery = game.fieryMuzzleFlash;
     if (fiery) this.fieryFlash.render(ctx, game);
+
+    // Blight Essence is black, so it can't go in the additive pass below.
+    this.drawEssence(wallClockMs, still);
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -123,6 +135,7 @@ export class Renderer {
     const halfH = vh * 0.5;
     const goldSprite = this.sprites.goldSquare;
     const crystalSprite = this.sprites.orangeCrystal;
+    const greenSprite = this.sprites.greenCrystal;
     const sz = Math.max(6, 5.2 * zoom);
     const half = sz * 0.5;
     const xs = loot.x;
@@ -133,6 +146,7 @@ export class Renderer {
     ctx.globalAlpha = 1;
     let lastAlpha = 1;
     for (let i = 0; i < n; i++) {
+      if (kinds[i] === LootKind.Essence) continue;
       const sx = (xs[i] - camX) * zoom + halfW;
       if (sx < -sz || sx > vw + sz) continue;
       const sy = (ys[i] - camY) * zoom + halfH;
@@ -143,10 +157,38 @@ export class Renderer {
         ctx.globalAlpha = a;
         lastAlpha = a;
       }
-      const sprite = kinds[i] === 1 ? crystalSprite : goldSprite;
+      const sprite = kinds[i] === LootKind.Crystal ? crystalSprite : kinds[i] === LootKind.GreenCrystal ? greenSprite : goldSprite;
       ctx.drawImage(sprite, sx - half, sy - half, sz, sz);
     }
     if (lastAlpha !== 1) ctx.globalAlpha = 1;
+  }
+
+  /** Blight Essence drops: the living glob, on whole screen pixels so it stays crisp. */
+  private drawEssence(nowMs: number, still: boolean): void {
+    const { ctx, game } = this;
+    const loot = game.loot;
+    const frame = essenceFrame(nowMs, still);
+    let painted = false;
+    const cam = game.camera;
+    const scale = Math.max(1, Math.round(cam.zoom * 0.75));
+    const sz = ESSENCE_SIZE * scale;
+    const smoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    for (let i = 0; i < loot.count; i++) {
+      if (loot.kind[i] !== LootKind.Essence) continue;
+      const sx = Math.round(cam.worldToScreenX(loot.x[i]) - sz / 2);
+      const sy = Math.round(cam.worldToScreenY(loot.y[i]) - sz / 2);
+      if (sx < -sz || sy < -sz || sx > cam.viewW || sy > cam.viewH) continue;
+      if (!painted && frame !== this.essenceShown) {
+        paintPixels(this.essenceCanvas, essencePixels(frame / ESSENCE_FPS));
+        this.essenceShown = frame;
+      }
+      painted = true;
+      ctx.globalAlpha = Math.min(1, Math.max(0, loot.life[i]));
+      ctx.drawImage(this.essenceCanvas, sx, sy, sz, sz);
+    }
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = smoothing;
   }
 
   private drawCasings(): void {

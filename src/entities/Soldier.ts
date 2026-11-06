@@ -10,6 +10,7 @@ import {
   SOLDIER,
 } from "../config";
 import type { SoldierBehavior } from "../progression/SaveManager";
+import { baseSoldierMods, type SoldierMods } from "../progression/SoldierUpgrades";
 
 export type WeaponType =
   | "pistol"
@@ -181,6 +182,8 @@ export class Soldier {
   secondaryBlocksBroken = 0;
   behavior: SoldierBehavior;
   slotIndex: number;
+  /** This soldier's own upgrade tree, on top of the squad's shared stats. */
+  mods: SoldierMods = baseSoldierMods();
   radius = SOLDIER.collisionRadius;
   alive = true;
   health = 0;

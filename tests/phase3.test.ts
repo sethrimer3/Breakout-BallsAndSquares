@@ -50,7 +50,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
   it("gates Multishot at 40 lifetime pixels and Additional Soldier at 100", () => {
     const save = new SaveManager(new MemStorage());
     const upg = new UpgradeManager(save);
-    save.data.bank = 10_000;
+    save.data.bank = 10_000; save.data.crystals = 10_000;
 
     expect(upg.isUnlocked("ball_speed")).toBe(true);
     expect(upg.isUnlocked("fire_rate")).toBe(true);
@@ -75,7 +75,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     const upg = new UpgradeManager(save);
-    save.data.bank = 1_000_000;
+    save.data.bank = 1_000_000; save.data.crystals = 1_000_000;
     save.data.lifetimePixels = 500;
 
     const c0 = upg.costOf("ball_speed");
@@ -174,7 +174,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     const upg = new UpgradeManager(save);
-    save.data.bank = 100_000;
+    save.data.bank = 100_000; save.data.crystals = 100_000;
     save.data.lifetimePixels = 500;
 
     // Unlock Assault Rifle and max out AP Pierce (5 levels => pierce = 5).
@@ -285,7 +285,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     const upg = new UpgradeManager(save);
-    save.data.bank = 500_000;
+    save.data.bank = 500_000; save.data.crystals = 500_000;
     save.data.lifetimePixels = 1000;
 
     expect(upg.buy("core_fire_rate")).toBe(true);
