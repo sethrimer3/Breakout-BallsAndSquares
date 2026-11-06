@@ -127,6 +127,16 @@ export class UpgradeTree {
   private viewEl: HTMLDivElement;
   private fitBtn: HTMLButtonElement;
   private suppressClick = false;
+  /** Shell + the box that reserves its scaled size, so small screens see the whole matrix. */
+  private shellEl: HTMLDivElement;
+  private fitBoxEl: HTMLDivElement;
+  /** On-screen px per shell px (1 on desktop, < 1 when shrunk to fit a phone). */
+  private uiScale = 1;
+  /** Pointer type of the last press on a node: touch taps select before they buy. */
+  private nodePressType = "mouse";
+  /** Second finger on the stage: pinch zooms the tree a step at a time. */
+  private stagePointers = new Map<number, { x: number; y: number }>();
+  private pinchStartDist = 0;
   private raf = 0;
   private lastFrame = 0;
 
@@ -134,7 +144,7 @@ export class UpgradeTree {
     this.root = document.createElement("div");
     this.root.className = "overlay tree-overlay hidden";
     this.root.innerHTML = `
-      <div class="tree-shell">
+      <div class="tree-fit-box"><div class="tree-shell">
         <button class="tree-close" title="Close (Esc)">${sprite("close", { color: UI_COLORS.magenta })}</button>
         <div class="tree-header">
           <div class="tree-title">UPGRADE MATRIX</div>
@@ -178,9 +188,14 @@ export class UpgradeTree {
             <button class="btn btn-primary" data-act="primary">DEPLOY NEW RUN <span class="kbd">SPACE</span></button>
           </div>
         </div>
-      </div>
+      </div></div>
     `;
 
+    this.shellEl = this.root.querySelector(".tree-shell") as HTMLDivElement;
+    this.fitBoxEl = this.root.querySelector(".tree-fit-box") as HTMLDivElement;
+    window.addEventListener("resize", () => {
+      if (this.visible) this.fitToScreen();
+    });
     this.stageEl = this.root.querySelector(".tree-stage") as HTMLDivElement;
     this.loadoutWrap = this.root.querySelector(".loadout-stage") as HTMLDivElement;
     this.linksEl = this.root.querySelector(".tree-links") as HTMLCanvasElement;
@@ -330,11 +345,21 @@ export class UpgradeTree {
         <span class="node-lvl"></span>
         <span class="node-pip">${sprite("plus", { color: def.color, scale: 1 })}</span>
       `;
-      btn.addEventListener("mouseenter", () => this.showTooltip(def));
-      btn.addEventListener("mouseleave", () => this.hideTooltip());
+      btn.addEventListener("pointerenter", (e) => {
+        if (e.pointerType === "mouse") this.showTooltip(def);
+      });
+      btn.addEventListener("pointerleave", (e) => {
+        if (e.pointerType === "mouse") this.hideTooltip();
+      });
       btn.addEventListener("click", () => {
-        if (this.suppressClick) this.suppressClick = false;
-        else this.onNodeClick(def);
+        if (this.suppressClick) {
+          this.suppressClick = false;
+        } else if (this.nodePressType !== "mouse" && this.hoveredId !== def.id) {
+          // No hover on touch: the first tap shows the details, the second buys.
+          this.showTooltip(def);
+        } else {
+          this.onNodeClick(def);
+        }
       });
       this.attachDrag(btn, def.id);
       this.nodesWrap.append(btn);
@@ -357,6 +382,7 @@ export class UpgradeTree {
     el.style.touchAction = "none";
     el.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
+      this.nodePressType = e.pointerType || "mouse";
       const b = this.bodies.get(id)!;
       this.suppressClick = false;
       this.drag = {
@@ -373,8 +399,8 @@ export class UpgradeTree {
     el.addEventListener("pointermove", (e) => {
       const d = this.drag;
       if (!d || d.id !== id || d.pointerId !== e.pointerId) return;
-      const dx = e.clientX - d.startX;
-      const dy = e.clientY - d.startY;
+      const dx = (e.clientX - d.startX) / this.uiScale;
+      const dy = (e.clientY - d.startY) / this.uiScale;
       if (!d.moved) {
         if (Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
         d.moved = true;
@@ -403,7 +429,20 @@ export class UpgradeTree {
     const stage = this.stageEl;
     stage.addEventListener("pointerdown", (e) => {
       if (e.button !== 0) return;
+      if (e.pointerType !== "mouse") {
+        this.stagePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+        if (this.stagePointers.size === 2) {
+          const [a, b] = [...this.stagePointers.values()];
+          this.pinchStartDist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+          this.panDrag = null;
+          this.drag = null;
+          this.hideTooltip();
+          return;
+        }
+      }
       if ((e.target as HTMLElement).closest(".tree-node, .tree-core, .tree-fit")) return;
+      // Tapping empty stage on a touch screen dismisses the selected node's details.
+      if (e.pointerType !== "mouse") this.hideTooltip();
       this.panDrag = {
         pointerId: e.pointerId,
         startX: e.clientX,
@@ -415,13 +454,23 @@ export class UpgradeTree {
       stage.classList.add("panning");
     });
     stage.addEventListener("pointermove", (e) => {
+      const tracked = this.stagePointers.get(e.pointerId);
+      if (tracked) {
+        tracked.x = e.clientX;
+        tracked.y = e.clientY;
+        if (this.stagePointers.size >= 2) {
+          this.pinchStep();
+          return;
+        }
+      }
       const p = this.panDrag;
       if (!p || p.pointerId !== e.pointerId) return;
-      const x = p.viewX + e.clientX - p.startX;
-      const y = p.viewY + e.clientY - p.startY;
+      const x = p.viewX + (e.clientX - p.startX) / this.uiScale;
+      const y = p.viewY + (e.clientY - p.startY) / this.uiScale;
       this.setView(clampView({ x, y, s: this.view.s }, this.bounds), true);
     });
     const release = (e: PointerEvent): void => {
+      this.stagePointers.delete(e.pointerId);
       if (this.panDrag?.pointerId !== e.pointerId) return;
       this.panDrag = null;
       stage.classList.remove("panning");
@@ -434,13 +483,48 @@ export class UpgradeTree {
         e.preventDefault();
         if (e.deltaY === 0) return;
         const rect = stage.getBoundingClientRect();
-        const next = zoomAt(this.view, this.bounds, -Math.sign(e.deltaY), e.clientX - rect.left, e.clientY - rect.top);
+        const next = zoomAt(
+          this.view,
+          this.bounds,
+          -Math.sign(e.deltaY),
+          (e.clientX - rect.left) / this.uiScale,
+          (e.clientY - rect.top) / this.uiScale,
+        );
         this.hideTooltip();
         this.setView(next, true);
       },
       { passive: false },
     );
     this.fitBtn.addEventListener("click", () => this.setView(fitView(this.bounds), false));
+  }
+
+  /** Two-finger pinch: one zoom step each time the spread changes by a quarter. */
+  private pinchStep(): void {
+    const [a, b] = [...this.stagePointers.values()];
+    const dist = Math.max(1, Math.hypot(a.x - b.x, a.y - b.y));
+    const ratio = dist / this.pinchStartDist;
+    if (ratio < 1.25 && ratio > 0.8) return;
+    const rect = this.stageEl.getBoundingClientRect();
+    const px = ((a.x + b.x) / 2 - rect.left) / this.uiScale;
+    const py = ((a.y + b.y) / 2 - rect.top) / this.uiScale;
+    this.setView(zoomAt(this.view, this.bounds, ratio > 1 ? 1 : -1, px, py), true);
+    this.pinchStartDist = dist;
+  }
+
+  /** Shrink the whole matrix (never enlarge) so it fits small screens like phones. */
+  private fitToScreen(): void {
+    this.shellEl.style.transform = "";
+    this.fitBoxEl.style.width = "";
+    this.fitBoxEl.style.height = "";
+    const w = this.shellEl.offsetWidth;
+    const h = this.shellEl.offsetHeight;
+    const pad = 16;
+    const s = Math.min(1, (window.innerWidth - pad) / w, (window.innerHeight - pad) / h);
+    this.uiScale = s;
+    if (s >= 1) return;
+    this.shellEl.style.transform = `scale(${s})`;
+    this.fitBoxEl.style.width = `${Math.floor(w * s)}px`;
+    this.fitBoxEl.style.height = `${Math.floor(h * s)}px`;
   }
 
   /** `steered`: the player moved the view away from the fit, so offer FIT. */
@@ -828,6 +912,7 @@ export class UpgradeTree {
     this.activateBranch(true);
     this.refresh();
     this.root.classList.remove("hidden");
+    this.fitToScreen();
     if (!this.raf) {
       this.lastFrame = 0;
       this.raf = requestAnimationFrame(this.frame);

@@ -125,6 +125,7 @@ export class Game {
       onPrimaryClick: (sx, sy) => this.tryLaunch(sx, sy),
       onWheel: (sx, sy, dy) =>
         this.camera.zoomAt(sx, sy, dy < 0 ? CAMERA.wheelStep : 1 / CAMERA.wheelStep),
+      onPinch: (sx, sy, factor) => this.camera.zoomAt(sx, sy, factor),
       onPan: (dx, dy) => this.camera.panBy(dx, dy),
       onKey: (code) => this.onKey(code),
     });

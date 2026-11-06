@@ -42,6 +42,19 @@ npm run preview
 | **`Esc`** | Open/close the pause menu (or close overlays) |
 | **`` ` `` (Backtick)** | Toggle the developer / telemetry debug overlay (`1×`/`4×` speed, light quality, log export) |
 
+### Touch (phones & tablets)
+
+| Input | Action |
+|---|---|
+| **Tap** (arena) | Aim and launch a reserve soldier (hold a finger still to preview the aim line) |
+| **One-finger drag** | Pan the camera |
+| **Two-finger pinch** | Zoom the camera (also zooms the Upgrade Tree) |
+| **Pause button** (left HUD) | Open the pause menu: resume, restart, upgrades, main menu, settings |
+| **Follow button** (left HUD) | Resume auto-follow; tap again to cycle through soldiers |
+| **Upgrade Tree node** | First tap shows its details, second tap buys it |
+
+The layout scales down to fit small screens; the Upgrade Tree is easiest to read in landscape.
+
 ---
 
 ## Core Mechanics
