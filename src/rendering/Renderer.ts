@@ -7,6 +7,7 @@ import { PKind } from "../entities/ParticleSystem";
 import type { Game } from "../Game";
 import { hasLineOfSight } from "../systems/PhysicsSystem";
 import { FieryFlashRenderer } from "./FieryFlashRenderer";
+import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
 import { createSprites, type Sprites } from "./sprites";
 
@@ -24,6 +25,7 @@ export class Renderer {
   private sprites: Sprites;
   private lightRenderer: LightRenderer;
   private fieryFlash: FieryFlashRenderer;
+  private fogRenderer: FogRenderer;
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -33,6 +35,7 @@ export class Renderer {
     this.sprites = createSprites();
     this.lightRenderer = new LightRenderer(this.sprites);
     this.fieryFlash = new FieryFlashRenderer(this.lightRenderer);
+    this.fogRenderer = new FogRenderer(game.fog);
   }
 
   resize(): void {
@@ -82,18 +85,10 @@ export class Renderer {
     const wallClockMs = performance.now();
     const still = this.motion.matches;
     game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);
-    // Soldiers are drawn after lighting so the pixel-art sprite keeps its full
-    // palette instead of being darkened by the lightmap.
-    this.drawSoldiers();
-    this.drawGrenades();
-    this.drawTurrets();
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
     this.drawCellFlashes();
-
-    this.drawAimIndicator();
-    this.drawMarker();
 
     // Fiery mode: soft flames via a blurred low-res light buffer (screen blend),
     // drawn before tracers/sparks so those stay crisp on top.
@@ -113,6 +108,16 @@ export class Renderer {
     this.drawBullets();
     this.drawAdditiveParticles();
     ctx.restore();
+
+    // 4) Fog of war over the whole world; aim and marker stay readable on top.
+    this.fogRenderer.draw(ctx, cam);
+    // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
+    // its full palette even when it outruns the light creeping after it.
+    this.drawSoldiers();
+    this.drawGrenades();
+    this.drawTurrets();
+    this.drawAimIndicator();
+    this.drawMarker();
 
     this.lightRenderer.renderVignette(ctx, w, h);
   }

@@ -43,6 +43,7 @@ export type UpgradeId =
   | "behavior_turns"
   | "behavior_sentry"
   | "auto_ability"
+  | "cartography_uplink"
   // Resources Matrix: Gold, Tier 2 Orange Crystals & Tier 3 Green Crystals
   | "drop_chance"
   | "multi_drop"
@@ -428,6 +429,27 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.autoAbility = lvl > 0;
     },
     icon: "gear",
+  },
+  {
+    // Fog of war: lives here until the research-base tree lands, then move it there.
+    id: "cartography_uplink",
+    branch: "core",
+    name: "Cartography Uplink",
+    shortDesc: "Explored areas stay mapped: darkness no longer creeps back into places your squad has seen",
+    color: "#38d6ff",
+    grid: { col: 2, row: 1 },
+    parent: "behavior_turns",
+    maxLevel: 1,
+    baseCost: 120,
+    costMultiplier: 1,
+    unlockLifetimePixels: 50,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "MAPPED" : "FADES"),
+    formatDelta: () => "UNLOCK",
+    apply: (s, lvl) => {
+      s.permanentMapping = lvl > 0;
+    },
+    icon: "mapGrid",
   },
 
   // =========================================================================

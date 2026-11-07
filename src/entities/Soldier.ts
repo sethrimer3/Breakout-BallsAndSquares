@@ -90,6 +90,8 @@ export interface SoldierStats {
   turretTurnSpeed: number;
   /** Autonomous secondary ability activation unlocked via Core upgrade */
   autoAbility: boolean;
+  /** Explored areas stay mapped instead of fading back into darkness (Cartography Uplink). */
+  permanentMapping: boolean;
   // Money / Loot / Resources stats
   dropChance: number;
   magnetRange: number;
@@ -169,6 +171,7 @@ export function baseSoldierStats(): SoldierStats {
     turretFireRate: TURRET.baseFireRate,
     turretTurnSpeed: TURRET.baseTurnSpeed,
     autoAbility: false,
+    permanentMapping: false,
     dropChance: LOOT.baseDropChance,
     magnetRange: LOOT.baseMagnetRange,
     pickupLifetime: LOOT.baseLifetime,
