@@ -138,9 +138,10 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
     // Verify rooms overrun with dark pink blight and Blight Cores exist across the generated lab.
     expect(w.blightCores.length).toBeGreaterThanOrEqual(3);
     const overrunRooms = w.labLayout!.rooms.filter((r) => r.overrun);
-    expect(overrunRooms.length).toBe(w.blightCores.length);
+    const roomCores = w.blightCores.filter((c) => c.size === 2);
+    expect(overrunRooms.length).toBe(roomCores.length);
 
-    const core = w.blightCores[0];
+    const core = roomCores[0];
     expect(core.alive).toBe(true);
     expect(core.cells.length).toBe(4);
     // Core cells have bonus health above standard zone fill.
@@ -227,7 +228,7 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
       w.health[idx] = 10;
       w.coreId[idx] = 1;
     }
-    const core1 = { id: 1, roomId: 1, zone: 0 as const, cx: 10, cy: 10, cells: core1Cells, alive: true };
+    const core1 = { id: 1, roomId: 1, zone: 0 as const, cx: 10, cy: 10, cells: core1Cells, alive: true, size: 2 as const };
 
     // Core 2 at (13, 10), 2x2 cells -> 1 cell gap from core 1 (cell 12 is between 11 and 13)
     const core2Cells = [13 + 10 * 30, 14 + 10 * 30, 13 + 11 * 30, 14 + 11 * 30];
@@ -235,7 +236,7 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
       w.health[idx] = 10;
       w.coreId[idx] = 2;
     }
-    const core2 = { id: 2, roomId: 1, zone: 0 as const, cx: 13, cy: 10, cells: core2Cells, alive: true };
+    const core2 = { id: 2, roomId: 1, zone: 0 as const, cx: 13, cy: 10, cells: core2Cells, alive: true, size: 2 as const };
 
     w.blightCores = [core1, core2];
 
@@ -317,7 +318,6 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
 
     const overrunRoom = w.labLayout!.rooms.find((r) => r.overrun)!;
     expect(overrunRoom).toBeDefined();
-    expect(overrunRoom.filled).toBe(false);
 
     // Non-core cells inside the room are empty space
     let emptyCells = 0;

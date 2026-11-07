@@ -1,7 +1,8 @@
-import { BULLET, CAMERA, COLORS, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD, zoneForDepth } from "./config";
+import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD, zoneForDepth } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
+import { SentrySystem } from "./entities/Sentry";
 import { LootKind, lootKindForZone, LootSystem } from "./entities/LootSystem";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, baseSoldierStats, type SecondaryWeaponType, type SoldierStats } from "./entities/Soldier";
@@ -23,9 +24,11 @@ import { MainMenu } from "./ui/MainMenu";
 import { PauseMenu } from "./ui/PauseMenu";
 import { ResultsScreen } from "./ui/ResultsScreen";
 import { UpgradeTree } from "./ui/UpgradeTree";
+import { DoorSystem } from "./world/DoorSystem";
+import { GlassSystem } from "./world/GlassSystem";
 import { GrowthSystem } from "./world/GrowthSystem";
 import { FogOfWar, type SightSource } from "./world/FogOfWar";
-import { PixelWorld } from "./world/PixelWorld";
+import { PixelWorld, SUB } from "./world/PixelWorld";
 import { generateWorld } from "./world/WorldGenerator";
 
 export type Flash = MuzzleLight;
@@ -55,6 +58,9 @@ export class Game {
   readonly growth: GrowthSystem;
   readonly lighting: LightingSystem;
   readonly fog: FogOfWar;
+  readonly glass: GlassSystem;
+  readonly doors: DoorSystem;
+  readonly sentries: SentrySystem;
   private sightSources: SightSource[] = [];
   readonly camera: CameraSystem;
   readonly terrain: TerrainRenderer;
@@ -155,6 +161,9 @@ export class Game {
     });
     this.lighting = new LightingSystem(this.world);
     this.fog = new FogOfWar(this.world);
+    this.glass = new GlassSystem(this.world, { onShatter: (cx, cy) => this.onGlassShatter(cx, cy) });
+    this.doors = new DoorSystem(this.world, { onOpen: () => this.audio.playDoorOpen() });
+    this.sentries = new SentrySystem(this.world, () => this.audio.playSentryWake());
     this.camera = new CameraSystem(this.world);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.camera.following = this.camera.defaultFollow;
@@ -162,6 +171,7 @@ export class Game {
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
     this.terrain.rebuildAll();
     this.resetFog();
+    this.resetFacility();
     this.renderer = new Renderer(canvas, this);
     this.autoMove = this.save.data.settings.autoMove;
     this.dualStick = new DualStick(uiRoot, this);
@@ -240,6 +250,7 @@ export class Game {
   applyUpgrades(): void {
     this.stats = this.upgrades.getSoldierStats();
     this.fog.permanent = this.stats.permanentMapping;
+    this.applyFacilityStats();
     this.combat.stats = this.stats;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
     this.growth.startRate = this.stats.blightStartRate;
@@ -278,6 +289,7 @@ export class Game {
     this.growth.reset();
     this.stats = this.upgrades.getSoldierStats();
     this.resetFog();
+    this.resetFacility();
     this.combat.stats = this.stats;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
     this.growth.startRate = this.stats.blightStartRate;
@@ -832,12 +844,15 @@ export class Game {
       this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.08, 0.2), 1, sub ? 0xff6ab8 : 0xffc070, 8);
     }
     if (sub) {
-      // A 50% pink core-blight pixel: pink debris, quarter-cell loot odds, no normal terrain stats.
+      // A 50% sub-pixel (pink core blight or rubble): debris, quarter-cell loot odds, no normal terrain stats.
       if (destroyed) {
+        const ss = this.world.subCellSize;
+        const si = Math.floor(y / ss) * this.world.subWidth + Math.floor(x / ss);
+        const rubble = this.world.subKind[si] === SUB.rubble;
         for (let i = 0; i < 3; i++) {
           const a = Math.atan2(ny, nx) + this.rng.range(-1.3, 1.3);
           const sp = this.rng.range(20, 70);
-          this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, 0xd8267a, 4);
+          this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, rubble ? 0x6a625a : 0xd8267a, 4);
         }
         const subZone = zoneForDepth(this.world.depthOf(cx, cy));
         this.loot.spawnDropsForBlock(x, y, this.dropChanceAt(subZone, ownerId) * 0.25, this.stats.pickupLifetime, this.rng, lootKindForZone(subZone));
@@ -874,16 +889,22 @@ export class Game {
       );
       const destroyedCore = this.world.checkCoreDestroyedAt(cx, cy);
       if (destroyedCore) {
-        this.growth.reduceBlightTimer(this.runStats.time, this.stats.coreTimeReduction);
+        const small = destroyedCore.size === 1;
+        this.growth.reduceBlightTimer(
+          this.runStats.time,
+          this.stats.coreTimeReduction * (small ? FACILITY.smallCoreTimeMult : 1),
+        );
         this.growthRate = this.growth.rate;
-        // 2×2 core: its center is the shared corner of its four cells.
-        const coreWx = (destroyedCore.cx + 1) * cs;
-        const coreWy = (destroyedCore.cy + 1) * cs;
-        for (let i = 0; i < this.stats.coreLootBurst; i++) {
+        // Center of the core: the shared corner of a 2×2 core, the middle of a 1×1 generator.
+        const coreWx = (destroyedCore.cx + destroyedCore.size / 2) * cs;
+        const coreWy = (destroyedCore.cy + destroyedCore.size / 2) * cs;
+        const burst = small ? Math.ceil(this.stats.coreLootBurst / 2) : this.stats.coreLootBurst;
+        for (let i = 0; i < burst; i++) {
           this.loot.spawnOne(coreWx, coreWy, this.stats.pickupLifetime, this.rng, lootKind);
         }
         const essenceLife = this.stats.pickupLifetime * LOOT.essenceLifetimeMult;
-        for (let i = 0; i < LOOT.coreEssence[destroyedCore.zone]; i++) {
+        const essence = small ? Math.ceil(LOOT.coreEssence[destroyedCore.zone] / 3) : LOOT.coreEssence[destroyedCore.zone];
+        for (let i = 0; i < essence; i++) {
           this.loot.spawnOne(coreWx, coreWy, essenceLife, this.rng, LootKind.Essence);
         }
         this.particles.spawn(PKind.Burst, coreWx, coreWy, 0, 0, 0.45, 28, 0xff48a4, 1);
@@ -1091,6 +1112,36 @@ export class Game {
     this.onExplosion(wx, wy, radiusCells * cs);
   }
 
+  /** Fresh doors, glass and dormant sentries for a newly generated facility. */
+  private resetFacility(): void {
+    this.glass.reset();
+    this.doors.reset();
+    this.sentries.reset();
+    this.applyFacilityStats();
+  }
+
+  /** Keycards and sentry upgrades from the research-base tree. */
+  private applyFacilityStats(): void {
+    this.world.keycardTier = this.stats.keycardTier;
+    this.sentries.enabled = this.stats.sentryUplink;
+    this.sentries.damage = this.stats.sentryDamage + this.stats.globalDamageBonus;
+    this.sentries.fireRate = this.stats.sentryFireRate;
+  }
+
+  /** A pane burst in a glass chain: glittering shards, no loot. */
+  private onGlassShatter(cx: number, cy: number): void {
+    this.audio.playGlassShatter();
+    const cs = this.world.cellSize;
+    const x = (cx + 0.5) * cs;
+    const y = (cy + 0.5) * cs;
+    for (let i = 0; i < 4; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(30, 110);
+      this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.15, 0.35), 1, i % 2 ? 0xbfefff : 0x7fd4e8, 6);
+    }
+    this.cellFlashes.push({ cx, cy, life: TERRAIN.hitFlashTime * 2, maxLife: TERRAIN.hitFlashTime * 2, destroyed: true });
+  }
+
   /** One fixed simulation step. */
   /** Back to a dark map, with the spawn room already lit so the iris opens on it. */
   private resetFog(): void {
@@ -1122,6 +1173,13 @@ export class Game {
       }
       for (const t of this.combat.turrets.items) {
         if (!t.active) continue;
+        const e = take();
+        e.x = t.x;
+        e.y = t.y;
+        e.radiusCells = FOG.turretSightCells;
+      }
+      for (const t of this.sentries.sentries) {
+        if (!t.awake) continue;
         const e = take();
         e.x = t.x;
         e.y = t.y;
@@ -1250,6 +1308,9 @@ export class Game {
     this.combat.updateBullets(dt);
     this.combat.updateGrenades(dt);
     this.combat.updateTurrets(dt);
+    this.glass.update(dt);
+    this.doors.update(dt);
+    this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
     this.updateFog(dt);
     this.growth.update(dt, this.runStats.time, this.soldiers);
     this.growthRate = this.growth.rate;

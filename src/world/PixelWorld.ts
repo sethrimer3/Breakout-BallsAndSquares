@@ -1,4 +1,4 @@
-import { GROWTH, maxHealthForDistance, TERRAIN, wallHealthForZone } from "../config";
+import { FACILITY, GROWTH, maxHealthForDistance, TERRAIN, wallHealthForZone } from "../config";
 import type { SolidQuery } from "../core/gridRaycast";
 import type { LabLayout } from "./WorldGenerator";
 
@@ -12,6 +12,47 @@ export interface BlightCore {
   /** Indices of the 4 normal cells (or fewer if clipped) belonging to this core. */
   cells: number[];
   alive: boolean;
+  /** Edge length in cells: 2 for a room's Blight Core, 1 for a small generator in a glass tank. */
+  size: 1 | 2;
+}
+
+/** Special block materials (`world.mat`). */
+export const MAT = {
+  none: 0,
+  /** See-through containment glass; one break shatters every orthogonally touching pane. */
+  glass: 1,
+  /** Blast door; opens when shot by a squad holding its tier's keycard. */
+  door: 2,
+} as const;
+
+/** Kinds of 50% sub-pixels (`world.subKind`). */
+export const SUB = {
+  blight: 0,
+  rubble: 1,
+} as const;
+
+export interface Door {
+  id: number;
+  /** Keycard tier that opens it (1..3, the zone of the room it seals + 1). */
+  tier: 1 | 2 | 3;
+  cells: number[];
+  open: boolean;
+  /** Inclusive cell bounds. */
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/** Where a dormant sentry turret sits, in world units, and the room it guards (inclusive cells). */
+export interface SentrySpot {
+  x: number;
+  y: number;
+  zone: 0 | 1 | 2;
+  rx0: number;
+  ry0: number;
+  rx1: number;
+  ry1: number;
 }
 
 export type CellChangeKind = "damaged" | "destroyed" | "grown" | "set";
@@ -67,6 +108,12 @@ export class PixelWorld implements SolidQuery {
   readonly coreId: Uint8Array;
   /** Per-cell Blight flag (`1` = block generated/replicated by Blight or overrun with Blight). */
   readonly blight: Uint8Array;
+  /** Per-cell special material (`MAT`). */
+  readonly mat: Uint8Array;
+  /** Per-cell door id (`0` = none, `id >= 1` = `doors[id - 1]`). */
+  readonly doorId: Uint16Array;
+  /** Per-subcell kind (`SUB`): pink blight or collapsed rubble. */
+  readonly subKind: Uint8Array;
 
   /**
    * 50%-smaller sub-pixel grid (4 subcells fit inside 1 normal cell).
@@ -79,6 +126,17 @@ export class PixelWorld implements SolidQuery {
   blightCores: BlightCore[] = [];
   /** Procedurally generated lab rooms & corridors from the most recent `generateWorld` call. */
   labLayout: LabLayout | null = null;
+  /** Blast doors between rooms and hallways. */
+  doors: Door[] = [];
+  /** Dormant sentry turret positions from generation. */
+  sentrySpots: SentrySpot[] = [];
+  /** Highest keycard tier the squad holds (0 = none). */
+  keycardTier = 0;
+  /**
+   * Called when a closed door cell is hit. Return true when the hit opens the
+   * door instead of damaging it (see DoorSystem).
+   */
+  onDoorHit: ((door: Door) => boolean) | null = null;
 
   /** Fine-gridSolidQuery view for `gridRaycast` at `subCellSize` resolution. */
   readonly subSolidQuery: SolidQuery;
@@ -106,6 +164,9 @@ export class PixelWorld implements SolidQuery {
     this.decor = new Uint8Array(dims.width * dims.height);
     this.coreId = new Uint8Array(dims.width * dims.height);
     this.blight = new Uint8Array(dims.width * dims.height);
+    this.mat = new Uint8Array(dims.width * dims.height);
+    this.doorId = new Uint16Array(dims.width * dims.height);
+    this.subKind = new Uint8Array(dims.width * 2 * dims.height * 2);
     this.subHealth = new Uint16Array(this.subWidth * this.subHeight);
     this.subTint = new Uint8Array(this.subWidth * this.subHeight);
     this.subSolidQuery = {
@@ -191,6 +252,15 @@ export class PixelWorld implements SolidQuery {
     const dist = this.distanceOf(cx, cy);
     if (this.inBounds(cx, cy)) {
       const i = cy * this.width + cx;
+      const m = this.mat[i];
+      if (m === MAT.door) {
+        const door = this.doors[this.doorId[i] - 1];
+        const tier = door ? door.tier : 1;
+        return wallHealthForZone((tier - 1) as 0 | 1 | 2, dist);
+      }
+      if (m === MAT.glass) {
+        return Math.max(1, Math.ceil(maxHealthForDistance(dist) * FACILITY.glassHealthMult));
+      }
       const w = this.wall[i];
       if (w > 0) {
         const z = Math.min(2, Math.max(0, w - 1)) as 0 | 1 | 2;
@@ -206,6 +276,9 @@ export class PixelWorld implements SolidQuery {
   /** Max health for a 50% pink blight sub-pixel at `(sx, sy)`. */
   maxSubHealthAt(sx: number, sy: number): number {
     const dist = this.distanceOf(sx >> 1, sy >> 1);
+    if (this.subInBounds(sx, sy) && this.subKind[sy * this.subWidth + sx] === SUB.rubble) {
+      return maxHealthForDistance(dist);
+    }
     return Math.max(1, Math.ceil(maxHealthForDistance(dist) * 0.5));
   }
 
@@ -219,6 +292,9 @@ export class PixelWorld implements SolidQuery {
     this.health[idx] = hp;
     if (kind === "grown") {
       this.blight[idx] = 1;
+      // Blight replaces whatever material was here.
+      this.mat[idx] = MAT.none;
+      this.doorId[idx] = 0;
     } else if (hp === 0) {
       this.blight[idx] = 0;
     }
@@ -240,7 +316,9 @@ export class PixelWorld implements SolidQuery {
    */
   setSubCell(sx: number, sy: number, hp: number, kind: CellChangeKind = "grown", silent = false): void {
     if (!this.subInBounds(sx, sy)) return;
-    this.subHealth[sy * this.subWidth + sx] = hp;
+    const si = sy * this.subWidth + sx;
+    this.subHealth[si] = hp;
+    if (kind === "grown") this.subKind[si] = SUB.blight;
     if (!silent) this.emit(sx >> 1, sy >> 1, kind);
   }
 
@@ -261,12 +339,17 @@ export class PixelWorld implements SolidQuery {
     const sw = this.subWidth;
     const row0 = sy0 * sw + sx0;
     const row1 = row0 + sw;
-    return (
-      this.subHealth[row0] > 0 ||
-      this.subHealth[row0 + 1] > 0 ||
-      this.subHealth[row1] > 0 ||
-      this.subHealth[row1 + 1] > 0
-    );
+    return this.isPinkSub(row0) || this.isPinkSub(row0 + 1) || this.isPinkSub(row1) || this.isPinkSub(row1 + 1);
+  }
+
+  /** True if subcell index `si` holds a pink blight sub-pixel (not rubble). */
+  isPinkSub(si: number): boolean {
+    return this.subHealth[si] > 0 && this.subKind[si] === SUB.blight;
+  }
+
+  /** True if subcell index `si` holds a rubble sub-pixel. */
+  isRubbleSub(si: number): boolean {
+    return this.subHealth[si] > 0 && this.subKind[si] === SUB.rubble;
   }
 
   /**
@@ -281,7 +364,7 @@ export class PixelWorld implements SolidQuery {
     if (this.health[i] > 0) {
       return this.isBlightAt(cx, cy);
     }
-    return this.subHealth[sy * this.subWidth + sx] > 0;
+    return this.isPinkSub(sy * this.subWidth + sx);
   }
 
   /**
@@ -305,6 +388,13 @@ export class PixelWorld implements SolidQuery {
         }
       }
       return bestRes;
+    }
+    if (this.mat[i] === MAT.door && this.onDoorHit) {
+      const door = this.doors[this.doorId[i] - 1];
+      if (door && !door.open && this.onDoorHit(door)) {
+        this.emit(cx, cy, "damaged");
+        return 1;
+      }
     }
     const next = Math.max(0, hp - amount);
     this.health[i] = next;

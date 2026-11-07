@@ -1,8 +1,8 @@
-import { TERRAIN, zoneForDepth } from "../config";
+import { FACILITY, TERRAIN, zoneForDepth } from "../config";
 import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
 import { decorateLab } from "./LabDetails";
-import type { PixelWorld } from "./PixelWorld";
+import { MAT, SUB, type PixelWorld } from "./PixelWorld";
 
 export interface LabRoom {
   id: number;
@@ -18,8 +18,6 @@ export interface LabRoom {
   overrun?: boolean;
   /** 1-based Blight Core id if `overrun` is true. */
   coreId?: number;
-  /** True if this room interior is full of pixels rather than empty space. */
-  filled?: boolean;
 }
 
 export interface LabCorridorSegment {
@@ -35,8 +33,8 @@ export interface LabCorridorSegment {
   width: number;
   /** Wall outline thickness in cells (1..3). */
   wallThickness: number;
-  /** True if this hallway interior is full of pixels rather than empty space. */
-  filled?: boolean;
+  /** True if this hallway has collapsed and is choked with half-size rubble. */
+  rubble?: boolean;
 }
 
 export interface LabLayout {
@@ -86,6 +84,9 @@ export function generateWorld(world: PixelWorld, seed: number): void {
   world.blight.fill(0);
   world.subHealth.fill(0);
   world.subTint.fill(0);
+  world.subKind.fill(0);
+  world.mat.fill(0);
+  world.doorId.fill(0);
 
   // Build the procedural lab layout (for worlds large enough to host zones).
   const layout = buildLabLayout(world, seed);
@@ -131,52 +132,20 @@ export function generateWorld(world: PixelWorld, seed: number): void {
     }
   }
 
-  // Carve empty corridors (about 50% chance a hallway is empty space rather than full of pixels).
-  for (const seg of layout.corridors) {
-    if (seg.filled) continue;
-    const x0 = Math.max(0, seg.x0);
-    const y0 = Math.max(0, seg.y0);
-    const x1 = Math.min(width - 1, seg.x1);
-    const y1 = Math.min(height - 1, seg.y1);
-    for (let y = y0; y <= y1; y++) {
-      const row = y * width;
-      for (let x = x0; x <= x1; x++) {
-        const i = row + x;
-        if (world.coreId[i] > 0) continue;
-        if (wall[i] === 0) {
-          health[i] = 0;
-          world.blight[i] = 0;
-        }
-      }
-    }
-  }
-
-  // Carve empty rooms (blight generator rooms are ALWAYS empty; other rooms have ~50% chance to be full of pixels).
-  // Also refills interiors of rooms marked `filled: true` that empty corridors may have clipped into.
+  // Rooms and hallways are empty space: only doors, glass tanks and generators stay solid.
+  const roomMask = new Uint8Array(width * height);
   for (const room of layout.rooms) {
-    const x0 = Math.max(0, room.x);
-    const y0 = Math.max(0, room.y);
-    const x1 = Math.min(width - 1, room.x + room.size - 1);
-    const y1 = Math.min(height - 1, room.y + room.size - 1);
-    const isFilled = room.filled ?? false;
-
-    for (let y = y0; y <= y1; y++) {
-      const row = y * width;
-      for (let x = x0; x <= x1; x++) {
-        const i = row + x;
-        // Blight Core cells must always remain solid so the core is alive and can generate blight!
-        if (world.coreId[i] > 0) continue;
-        if (wall[i] === 0) {
-          if (isFilled) {
-            health[i] = world.maxHealthAt(x, y);
-          } else {
-            health[i] = 0;
-            world.blight[i] = 0;
-          }
-        }
-      }
-    }
+    forRect(world, room.x, room.y, room.x + room.size - 1, room.y + room.size - 1, (i) => {
+      roomMask[i] = 1;
+    });
   }
+  const carve = (i: number): void => {
+    if (wall[i] !== 0 || world.mat[i] !== MAT.none || world.coreId[i] > 0) return;
+    health[i] = 0;
+    world.blight[i] = 0;
+  };
+  for (const seg of layout.corridors) forRect(world, seg.x0, seg.y0, seg.x1, seg.y1, carve);
+  for (const room of layout.rooms) forRect(world, room.x, room.y, room.x + room.size - 1, room.y + room.size - 1, carve);
 
   // Ensure Blight Cores are always solid living cells with full core health
   for (const core of world.blightCores) {
@@ -195,7 +164,42 @@ export function generateWorld(world: PixelWorld, seed: number): void {
       wall[i] = 0;
       health[i] = 0;
       world.blight[i] = 0;
+      world.mat[i] = MAT.none;
+      roomMask[i] = 1;
     }
+  }
+
+  // Collapsed hallways: half-size rubble in many colors, outside rooms and doors.
+  for (const seg of layout.corridors) {
+    if (!seg.rubble) continue;
+    forRect(world, seg.x0, seg.y0, seg.x1, seg.y1, (i) => {
+      if (roomMask[i] || health[i] > 0 || wall[i] !== 0 || world.mat[i] !== MAT.none) return;
+      const cx = i % width;
+      const cy = (i - cx) / width;
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < 2; dx++) {
+          const sx = cx * 2 + dx;
+          const sy = cy * 2 + dy;
+          if (hash2(sx, sy, seed + 313) > FACILITY.rubbleDensity) continue;
+          const si = sy * world.subWidth + sx;
+          world.subKind[si] = SUB.rubble;
+          world.subTint[si] = Math.floor(hash2(sx, sy, seed + 919) * 256);
+          world.subHealth[si] = world.maxSubHealthAt(sx, sy);
+        }
+      }
+    });
+  }
+}
+
+/** Call `fn` with the index of every in-bounds cell of an inclusive rectangle. */
+function forRect(world: PixelWorld, x0: number, y0: number, x1: number, y1: number, fn: (i: number) => void): void {
+  const cx0 = Math.max(0, x0);
+  const cy0 = Math.max(0, y0);
+  const cx1 = Math.min(world.width - 1, x1);
+  const cy1 = Math.min(world.height - 1, y1);
+  for (let y = cy0; y <= cy1; y++) {
+    const row = y * world.width;
+    for (let x = cx0; x <= cx1; x++) fn(row + x);
   }
 }
 
@@ -526,7 +530,7 @@ function connectPointsL(
 ): void {
   const width = 3 + rng.int(3); // 3..5
   const wallThickness = 1 + rng.int(3); // 1..3
-  const filled = rng.next() < 0.5; // ~50% chance a hallway is full of pixels rather than empty space
+  const rubble = rng.next() < FACILITY.rubbleCorridorChance;
   const halfLo = Math.floor((width - 1) / 2);
   const halfHi = width - 1 - halfLo;
 
@@ -543,14 +547,14 @@ function connectPointsL(
       const x1 = Math.max(ax, bx) + halfHi;
       const y0 = ay - halfLo;
       const y1 = ay + halfHi;
-      corridors.push({ zone, axis: "h", x0, y0, x1, y1, width, wallThickness, filled });
+      corridors.push({ zone, axis: "h", x0, y0, x1, y1, width, wallThickness, rubble });
     }
     if (ay !== by) {
       const x0 = bx - halfLo;
       const x1 = bx + halfHi;
       const y0 = Math.min(ay, by) - halfLo;
       const y1 = Math.max(ay, by) + halfHi;
-      corridors.push({ zone, axis: "v", x0, y0, x1, y1, width, wallThickness, filled });
+      corridors.push({ zone, axis: "v", x0, y0, x1, y1, width, wallThickness, rubble });
     }
   } else {
     if (ay !== by) {
@@ -558,14 +562,14 @@ function connectPointsL(
       const x1 = ax + halfHi;
       const y0 = Math.min(ay, by) - halfLo;
       const y1 = Math.max(ay, by) + halfHi;
-      corridors.push({ zone, axis: "v", x0, y0, x1, y1, width, wallThickness, filled });
+      corridors.push({ zone, axis: "v", x0, y0, x1, y1, width, wallThickness, rubble });
     }
     if (ax !== bx) {
       const x0 = Math.min(ax, bx) - halfLo;
       const x1 = Math.max(ax, bx) + halfHi;
       const y0 = by - halfLo;
       const y1 = by + halfHi;
-      corridors.push({ zone, axis: "h", x0, y0, x1, y1, width, wallThickness, filled });
+      corridors.push({ zone, axis: "h", x0, y0, x1, y1, width, wallThickness, rubble });
     }
   }
 }

@@ -320,6 +320,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
       cy: 5,
       cells: [cellIdx],
       alive: true,
+      size: 1,
     });
 
     const combat = new CombatSystem(w, new Rng(99), st);

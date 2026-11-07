@@ -1,16 +1,18 @@
+import { FACILITY } from "../config";
 import { valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
-import type { PixelWorld } from "./PixelWorld";
+import { MAT, type PixelWorld } from "./PixelWorld";
 import type { LabCorridorSegment, LabLayout, LabRoom } from "./WorldGenerator";
 
 /**
  * Facility set dressing painted over the lab maze: tiled floors, blast doors,
- * hazard stripes, room furnishings and a few breached containment rooms.
+ * hazard stripes, glass specimen tanks and a few breached containment rooms.
  *
- * Details are cosmetic. They live in `world.decor`, leave cell health alone
- * and never empty a cell, so soldiers, currency and blight play the same. The
- * one structural change is a small breach in a wall, which only adds routes.
- * Blight regrowth clears a cell's detail (see GrowthSystem).
+ * Most details are cosmetic and live in `world.decor`. Structural pieces are
+ * the blast doors and glass specimen tanks (`world.mat`), the small blight
+ * generators inside those tanks, dormant sentry spots, and a small breach in
+ * some walls, which only adds routes. Blight regrowth clears a cell's detail
+ * (see GrowthSystem).
  */
 
 /** Values of `world.decor`, indexing `COLORS.labDecor` and `labDecorMix`. */
@@ -41,36 +43,16 @@ export const DECOR = {
 
 /** Floor tile size, in cells. */
 const TILE = 4;
-/** Empty floor kept between a room's walls and its furnishings. */
-const FURNITURE_MARGIN = 2;
-const FURNITURE_GAP = 2;
+/** Empty floor kept between a room's walls and its glass tanks. */
+const TANK_MARGIN = 3;
+/** Gap between two rows of tanks. */
+const TANK_ROW_GAP = 3;
+/** coreId is a Uint8Array, so ids stop at 255. */
+const MAX_CORES = 255;
 /** Longer wall openings are corridors running alongside the room, not doors. */
 const MAX_DOOR_WIDTH = 6;
 const BREACHED_ROOM_CHANCE = 0.2;
 const BREACH_WIDTH = 5;
-
-/** Furnishing stamps: `.` leaves the floor showing. */
-const STAMP_CELLS: Record<string, number> = {
-  F: DECOR.frame,
-  G: DECOR.glass,
-  W: DECOR.fluid,
-  L: DECOR.led,
-  P: DECOR.panel,
-  B: DECOR.bench,
-  N: DECOR.linen,
-};
-
-export const ROOM_STAMPS: Record<string, readonly string[]> = {
-  /** Specimen tanks. */
-  tanks: [".FF.", "FGGF", "FWWF", "FWWF", "FFFF"],
-  /** Server racks. */
-  servers: ["PPP", "PLP", "PPP", "PLP", "PPP", "PLP"],
-  /** Lab benches with equipment. */
-  benches: ["BBBBBB", "BPBBLB", "BBBBBB"],
-  /** Staff bunks. */
-  bunks: ["NNN", "PPP", "PPP", "PPP", "PPP", "PPP"],
-};
-const STAMP_NAMES = Object.keys(ROOM_STAMPS);
 
 /** Cell `along` a room's side and `out` cells past its interior (-1 = inside). */
 type SideCell = (along: number, out: number) => { x: number; y: number };
@@ -113,31 +95,76 @@ function paintRoomFloor(world: PixelWorld, r: LabRoom): void {
   }
 }
 
-/** Repeat a stamp in rows across the room, centered, clear of the walls. */
-function furnishRoom(world: PixelWorld, r: LabRoom, stamp: readonly string[]): void {
-  const w = stamp[0].length;
-  const h = stamp.length;
-  const usable = r.size - FURNITURE_MARGIN * 2;
-  const cols = Math.floor((usable + FURNITURE_GAP) / (w + FURNITURE_GAP));
-  const rows = Math.floor((usable + FURNITURE_GAP) / (h + FURNITURE_GAP));
-  const startX = r.x + Math.floor((r.size - (cols * (w + FURNITURE_GAP) - FURNITURE_GAP)) / 2);
-  const startY = r.y + Math.floor((r.size - (rows * (h + FURNITURE_GAP) - FURNITURE_GAP)) / 2);
+/**
+ * A row (or two) of 3×3 glass specimen tanks, each holding a small dormant
+ * blight generator. Tanks either share their glass walls, so one break shatters
+ * the whole row, or stand a cell apart.
+ */
+function placeTanks(world: PixelWorld, r: LabRoom, rng: Rng): void {
+  const shared = rng.next() < FACILITY.tankSharedWallChance;
+  const stride = shared ? 2 : 4;
+  const usable = r.size - TANK_MARGIN * 2;
+  const nMax = shared ? Math.floor((usable - 1) / 2) : Math.floor((usable + 1) / 4);
+  if (nMax < 1) return;
+  const n = Math.max(1, Math.min(4, nMax) - rng.int(2));
+  const width = shared ? n * 2 + 1 : n * 4 - 1;
+  const rows = usable >= 3 * 2 + TANK_ROW_GAP ? 1 + rng.int(2) : 1;
+  const height = rows * 3 + (rows - 1) * TANK_ROW_GAP;
+  const ox = r.x + Math.floor((r.size - width) / 2);
+  const oy = r.y + Math.floor((r.size - height) / 2);
   for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const ox = startX + col * (w + FURNITURE_GAP);
-      const oy = startY + row * (h + FURNITURE_GAP);
-      for (let y = 0; y < h; y++) {
-        for (let x = 0; x < w; x++) {
-          const cell = STAMP_CELLS[stamp[y][x]];
-          if (cell !== undefined) setDecor(world, ox + x, oy + y, cell);
+    const ty = oy + row * (3 + TANK_ROW_GAP);
+    for (let k = 0; k < n; k++) {
+      const tx = ox + k * stride;
+      for (let y = 0; y < 3; y++) {
+        for (let x = 0; x < 3; x++) {
+          if (x === 1 && y === 1) continue;
+          const cx = tx + x;
+          const cy = ty + y;
+          if (!world.inBounds(cx, cy)) continue;
+          const i = cy * world.width + cx;
+          world.mat[i] = MAT.glass;
+          world.decor[i] = DECOR.glass;
         }
       }
+      placeSmallGenerator(world, r, tx + 1, ty + 1);
     }
   }
 }
 
-/** Blast doors, jamb lights and hazard stripes at every corridor opening. */
+/** A 1×1 blight generator: a lab experiment that idles until its glass breaks. */
+function placeSmallGenerator(world: PixelWorld, r: LabRoom, cx: number, cy: number): void {
+  if (!world.inBounds(cx, cy) || world.blightCores.length >= MAX_CORES) return;
+  const idx = cy * world.width + cx;
+  const cid = world.blightCores.length + 1;
+  world.wall[idx] = 0;
+  world.mat[idx] = MAT.none;
+  world.coreId[idx] = cid;
+  world.blight[idx] = 1;
+  world.decor[idx] = DECOR.blightCoreHeart;
+  world.blightCores.push({ id: cid, roomId: r.id, zone: r.zone, cx, cy, cells: [idx], alive: true, size: 1 });
+}
+
+/** A dormant sentry turret tucked into one corner of the room. */
+function placeSentry(world: PixelWorld, r: LabRoom, rng: Rng): void {
+  const corner = rng.int(4);
+  const cx = corner % 2 === 0 ? r.x + 1 : r.x + r.size - 2;
+  const cy = corner < 2 ? r.y + 1 : r.y + r.size - 2;
+  const cs = world.cellSize;
+  world.sentrySpots.push({
+    x: (cx + 0.5) * cs,
+    y: (cy + 0.5) * cs,
+    zone: r.zone,
+    rx0: r.x,
+    ry0: r.y,
+    rx1: r.x + r.size - 1,
+    ry1: r.y + r.size - 1,
+  });
+}
+
+/** Two-cell-thick blast doors, jamb lights and hazard stripes at every corridor opening. */
 function paintDoors(world: PixelWorld, r: LabRoom): void {
+  const tier = (r.zone + 1) as 1 | 2 | 3;
   for (const cell of roomSides(r)) {
     let along = 0;
     while (along < r.size) {
@@ -156,15 +183,33 @@ function paintDoors(world: PixelWorld, r: LabRoom): void {
       if (to - from + 1 > MAX_DOOR_WIDTH) continue;
 
       const mid = Math.floor((from + to) / 2);
+      const cells: number[] = [];
+      let x0 = Infinity;
+      let y0 = Infinity;
+      let x1 = -Infinity;
+      let y1 = -Infinity;
       for (let a = from; a <= to; a++) {
         const inside = cell(a, -1);
         const stripe = (inside.x + inside.y) % 4 < 2 ? DECOR.hazardYellow : DECOR.hazardBlack;
         setDecor(world, inside.x, inside.y, stripe);
-        for (let out = 0; out < r.wallThickness; out++) {
+        for (let out = 0; out < 2; out++) {
           const p = cell(a, out);
-          if (wallAt(world, p.x, p.y) !== 0) continue;
+          if (!world.inBounds(p.x, p.y) || wallAt(world, p.x, p.y) !== 0) continue;
+          const i = p.y * world.width + p.x;
+          if (world.mat[i] !== MAT.none || world.coreId[i] > 0) continue;
+          world.mat[i] = MAT.door;
           setDecor(world, p.x, p.y, a === mid ? DECOR.doorSeam : DECOR.door);
+          cells.push(i);
+          x0 = Math.min(x0, p.x);
+          y0 = Math.min(y0, p.y);
+          x1 = Math.max(x1, p.x);
+          y1 = Math.max(y1, p.y);
         }
+      }
+      if (cells.length > 0) {
+        const id = world.doors.length + 1;
+        for (const i of cells) world.doorId[i] = id;
+        world.doors.push({ id, tier, cells, open: false, x0, y0, x1, y1 });
       }
       for (const a of [from - 1, to + 1]) {
         const jamb = cell(a, 0);
@@ -252,6 +297,7 @@ function overrunRoomWithBlight(world: PixelWorld, r: LabRoom, seed: number): voi
     cy: rcy,
     cells,
     alive: true,
+    size: 2,
   });
 }
 
@@ -261,6 +307,8 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
   const rng = new Rng((seed ^ 0x2f6e2b1d) >>> 0 || 1);
   world.coreId.fill(0);
   world.blightCores = [];
+  world.doors = [];
+  world.sentrySpots = [];
 
   for (const seg of layout.corridors) paintCorridor(world, seg);
 
@@ -283,14 +331,12 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
   for (const room of layout.rooms) {
     if (overrunIds.has(room.id)) {
       room.overrun = true;
-      room.filled = false; // Rooms that blight generators are in are always empty so generators can fill them
       overrunRoomWithBlight(world, room, seed);
     } else {
-      room.filled = rng.next() < 0.5; // ~50% chance a room is full of pixels rather than empty space
       paintRoomFloor(world, room);
-      const stamp = STAMP_NAMES[rng.int(STAMP_NAMES.length)];
-      furnishRoom(world, room, ROOM_STAMPS[stamp]);
+      if (rng.next() < FACILITY.tankRoomChance) placeTanks(world, room, rng);
     }
+    if (rng.next() < FACILITY.sentryRoomChance) placeSentry(world, room, rng);
   }
   for (const room of layout.rooms) paintDoors(world, room);
   for (const room of layout.rooms) {

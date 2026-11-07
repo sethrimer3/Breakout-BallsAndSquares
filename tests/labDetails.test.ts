@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { COLORS, WORLD } from "../src/config";
 import { Rng } from "../src/core/Rng";
 import { GrowthSystem } from "../src/world/GrowthSystem";
-import { DECOR, ROOM_STAMPS } from "../src/world/LabDetails";
+import { DECOR } from "../src/world/LabDetails";
+import { MAT, SUB } from "../src/world/PixelWorld";
 import { PixelWorld } from "../src/world/PixelWorld";
 import { generateWorld } from "../src/world/WorldGenerator";
 
@@ -43,7 +44,7 @@ function floodFromStart(w: PixelWorld): Uint8Array {
 }
 
 describe("lab details", () => {
-  it("keeps solid cells at max health and carves empty rooms and hallways with ~50% fill", () => {
+  it("keeps solid cells at max health and carves every room and hallway empty", () => {
     for (const seed of SEEDS) {
       const w = world(seed);
       // Spawn room is empty
@@ -66,7 +67,6 @@ describe("lab details", () => {
       const overrunRooms = w.labLayout!.rooms.filter((r) => r.overrun);
       expect(overrunRooms.length).toBeGreaterThan(0);
       for (const r of overrunRooms) {
-        expect(r.filled).toBe(false);
         for (let ry = r.y; ry < r.y + r.size; ry++) {
           for (let rx = r.x; rx < r.x + r.size; rx++) {
             const idx = ry * w.width + rx;
@@ -78,19 +78,21 @@ describe("lab details", () => {
           }
         }
       }
-      // Non-overrun rooms have ~50% chance to be full of pixels
-      const normalRooms = w.labLayout!.rooms.filter((r) => !r.overrun);
-      const filledNormalRooms = normalRooms.filter((r) => r.filled).length;
-      const roomRatio = filledNormalRooms / normalRooms.length;
-      expect(roomRatio).toBeGreaterThan(0.2);
-      expect(roomRatio).toBeLessThan(0.8);
-
-      // Hallways have ~50% chance to be full of pixels
+      // Every room is empty apart from glass tanks and their small generators.
+      for (const r of w.labLayout!.rooms) {
+        for (let ry = r.y; ry < r.y + r.size; ry++) {
+          for (let rx = r.x; rx < r.x + r.size; rx++) {
+            const idx = ry * w.width + rx;
+            if (w.coreId[idx] > 0 || w.mat[idx] !== MAT.none) continue;
+            expect(w.health[idx]).toBe(0);
+          }
+        }
+      }
+      // Some hallways have collapsed into rubble, the rest are open.
       const corridors = w.labLayout!.corridors;
-      const filledCorridors = corridors.filter((c) => c.filled).length;
-      const corridorRatio = filledCorridors / corridors.length;
-      expect(corridorRatio).toBeGreaterThan(0.2);
-      expect(corridorRatio).toBeLessThan(0.8);
+      const rubbleRatio = corridors.filter((c) => c.rubble).length / corridors.length;
+      expect(rubbleRatio).toBeGreaterThan(0.05);
+      expect(rubbleRatio).toBeLessThan(0.6);
     }
   });
 
@@ -100,7 +102,7 @@ describe("lab details", () => {
     expect(a.decor).not.toEqual(world(202).decor);
   });
 
-  it("gives every seed doors, hazard stripes, tiled floors and furnishings", () => {
+  it("gives every seed doors, hazard stripes, tiled floors and glass tanks", () => {
     for (const seed of SEEDS) {
       const w = world(seed);
       for (const d of [DECOR.door, DECOR.doorSeam, DECOR.doorLight, DECOR.hazardYellow, DECOR.hazardBlack]) {
@@ -108,7 +110,7 @@ describe("lab details", () => {
       }
       expect(countDecor(w, DECOR.floorLine)).toBeGreaterThan(0);
       expect(countDecor(w, DECOR.guideLine)).toBeGreaterThan(0);
-      expect(countDecor(w, DECOR.frame) + countDecor(w, DECOR.panel) + countDecor(w, DECOR.bench)).toBeGreaterThan(0);
+      expect(countDecor(w, DECOR.glass)).toBeGreaterThan(0);
     }
   });
 
@@ -146,12 +148,42 @@ describe("lab details", () => {
     expect(scorched).toBeGreaterThan(0);
   });
 
-  it("uses furnishing stamps that fit the smallest room", () => {
-    for (const stamp of Object.values(ROOM_STAMPS)) {
-      for (const row of stamp) expect(row.length).toBe(stamp[0].length);
-      expect(stamp[0].length).toBeLessThanOrEqual(10 - 4);
-      expect(stamp.length).toBeLessThanOrEqual(10 - 4);
+  it("seals rooms behind two-cell-thick tiered doors made of wall-grade material", () => {
+    for (const seed of SEEDS) {
+      const w = world(seed);
+      expect(w.doors.length).toBeGreaterThan(10);
+      for (const d of w.doors) {
+        const thick = Math.min(d.x1 - d.x0, d.y1 - d.y0) + 1;
+        expect(thick).toBeLessThanOrEqual(2);
+        for (const i of d.cells) {
+          expect(w.mat[i]).toBe(MAT.door);
+          expect(w.doorId[i]).toBe(d.id);
+          expect(w.health[i]).toBeGreaterThanOrEqual(25);
+        }
+      }
+      // Zone 1 rooms need the Tier 1 keycard.
+      expect(w.doors.some((d) => d.tier === 1)).toBe(true);
     }
+  });
+
+  it("puts a small dormant generator inside every glass tank and lays rubble in collapsed hallways", () => {
+    let small = 0;
+    let rubble = 0;
+    for (const seed of SEEDS) {
+      const w = world(seed);
+      for (const c of w.blightCores) {
+        if (c.size !== 1) continue;
+        small++;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          expect(w.mat[(c.cy + dy) * w.width + c.cx + dx]).toBe(MAT.glass);
+        }
+      }
+      for (let si = 0; si < w.subHealth.length; si++) {
+        if (w.subHealth[si] > 0 && w.subKind[si] === SUB.rubble) rubble++;
+      }
+    }
+    expect(small).toBeGreaterThan(0);
+    expect(rubble).toBeGreaterThan(0);
   });
 
   it("lines rooms up on the facility lattice", () => {
@@ -208,7 +240,7 @@ describe("lab details", () => {
     const w = world(101);
     let target = -1;
     for (let i = 0; i < w.decor.length && target < 0; i++) {
-      if (w.decor[i] === DECOR.frame) target = i;
+      if (w.decor[i] === DECOR.doorLight) target = i;
     }
     const cx = target % w.width;
     const cy = Math.floor(target / w.width);

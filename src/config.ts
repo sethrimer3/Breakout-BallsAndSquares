@@ -71,13 +71,55 @@ export function maxHealthForDistance(distance: number): number {
 export function wallHealthForZone(zone: 0 | 1 | 2, distance: number): number {
   const baseHp = maxHealthForDistance(distance);
   if (zone === 0) {
-    return Math.min(TERRAIN.maxHealthCap, Math.max(10, baseHp * 2));
+    // Tier 2 material, toughened so corridors beat tunnelling until the squad is strong.
+    return Math.min(TERRAIN.maxHealthCap, Math.max(FACILITY.zone1WallHealth, baseHp * 2));
   }
   if (zone === 1) {
     return Math.min(TERRAIN.maxHealthCap, Math.max(100, baseHp * 2));
   }
   return Math.min(TERRAIN.maxHealthCap, Math.max(300, baseHp + 50));
 }
+
+/** Research-base structures: doors, glass containment tanks, rubble and sentries. */
+export const FACILITY = {
+  /** Minimum health of a Zone 1 wall (Tier 2 material). */
+  zone1WallHealth: 25,
+  /** Seconds between neighbouring glass blocks shattering in a chain. */
+  glassChainDelay: 0.05,
+  /** Glass health as a share of the zone's normal block health. */
+  glassHealthMult: 0.5,
+  /** Seconds between door cells sliding open, from the middle outward. */
+  doorOpenStep: 0.03,
+  /** Chance a normal room holds a row of glass specimen tanks. */
+  tankRoomChance: 0.45,
+  /** Chance a row of tanks shares its glass walls (so one break shatters the row). */
+  tankSharedWallChance: 0.6,
+  /** Chance a hallway is choked with collapsed rubble. */
+  rubbleCorridorChance: 0.3,
+  /** Share of a rubble hallway's sub-pixels that are filled. */
+  rubbleDensity: 0.88,
+  /** Chance a room holds a dormant sentry turret. */
+  sentryRoomChance: 0.4,
+  /** Blight generation rate of a small (1×1) generator relative to a full Blight Core. */
+  smallCoreRateMult: 0.5,
+  /** Blight timer reduction of a small generator relative to a full Blight Core. */
+  smallCoreTimeMult: 0.5,
+  /** Sentry targeting range, in cells. */
+  sentryRangeCells: 16,
+  sentryDamage: 2,
+  sentryFireRate: 2.5,
+  sentryTurnSpeed: Math.PI * 1.2,
+  /** Exposed-edge glow per terrain tier (RGB): 1 blue, 2 red, 3 burnt orange, 4 reinforced violet. */
+  tierGlow: [
+    [0, 0, 0],
+    [48, 120, 255],
+    [255, 36, 36],
+    [214, 92, 18],
+    [168, 112, 255],
+  ] as const,
+  /** Overall strength of the tier glow (0..1). */
+  tierGlowAlpha: 0.6,
+};
 
 /** Size of one pixel-art pixel (soldier sprites, bullets) in world units. */
 export const ART_PIXEL = 1;
@@ -510,6 +552,21 @@ export const COLORS = {
     [175, 28, 96], // blight core outer shell
     [255, 90, 180], // blight core pulsing heart
   ] as const,
+  /** Collapsed rubble sub-pixel colors (RGB): concrete, ash, rust, sand, slate, char. */
+  rubble: [
+    [128, 124, 116],
+    [88, 86, 86],
+    [146, 86, 54],
+    [168, 148, 110],
+    [98, 110, 128],
+    [58, 52, 48],
+  ] as const,
+  /** Containment glass (RGB) and how opaque it is (0..255). */
+  glass: [120, 190, 210] as const,
+  glassAlpha: 92,
+  /** Blast door: dark core and lighter rim. */
+  doorCore: "#232a35",
+  doorRim: "#8d9bb0",
   /** Tint applied to damaged cells. */
   damage: [120, 70, 52] as const,
   soldierCore: "#1b2a3a",

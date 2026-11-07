@@ -1,4 +1,4 @@
-import { GROWTH, growthRateAt } from "../config";
+import { FACILITY, GROWTH, growthRateAt } from "../config";
 import type { Rng } from "../core/Rng";
 import type { Soldier } from "../entities/Soldier";
 import { cellOverlapsCircle, circleIsClear } from "../systems/PhysicsSystem";
@@ -209,7 +209,7 @@ export class GrowthSystem {
         this.coreAcc[i] = 0;
         continue;
       }
-      this.coreAcc[i] += this.rate * dt;
+      this.coreAcc[i] += this.rate * dt * (cores[i].size === 1 ? FACILITY.smallCoreRateMult : 1);
       if (this.coreAcc[i] >= 1) anyDue = true;
     }
     // Nothing to place this step: keep last step's exposure telemetry.
@@ -258,7 +258,7 @@ export class GrowthSystem {
   /** True if subcell `(sx, sy)` is part of a living Blight Core or has pink sub-blight (`subHealth > 0`). */
   private isPinkOrCoreSubcell(sx: number, sy: number): boolean {
     const w = this.world;
-    if (w.subHealth[sy * w.subWidth + sx] > 0) return true;
+    if (w.isPinkSub(sy * w.subWidth + sx)) return true;
     const cx = sx >> 1;
     const cy = sy >> 1;
     const idx = cy * w.width + cx;

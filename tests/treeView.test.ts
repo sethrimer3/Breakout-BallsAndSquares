@@ -18,6 +18,7 @@ const BRANCHES: UpgradeBranch[] = [
   "core",
   "resources",
   "blight",
+  "facility",
   "pistol",
   "shotgun",
   "assault_rifle",

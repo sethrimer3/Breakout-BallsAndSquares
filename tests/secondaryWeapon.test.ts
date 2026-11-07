@@ -105,7 +105,8 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
     const primaryCat = CATEGORIES.find((c) => c.id === "primary")!;
     const secondaryCat = CATEGORIES.find((c) => c.id === "secondary")!;
 
-    expect(systemsCat.branches).toEqual(["core", "resources", "blight"]);
+    expect(systemsCat.branches).toEqual(["core", "resources", "blight", "facility"]);
+    expect(categoryForBranch("facility")).toBe("systems");
     expect(primaryCat.branches).toEqual([
       "pistol",
       "shotgun",

@@ -1,5 +1,6 @@
 import {
   ASSAULT_RIFLE,
+  FACILITY,
   GRENADE,
   GROWTH,
   KATANA,
@@ -25,6 +26,7 @@ export type UpgradeBranch =
   | "katana"
   | "grenade"
   | "turret"
+  | "facility"
   | "soldier";
 
 export type UpgradeId =
@@ -43,7 +45,6 @@ export type UpgradeId =
   | "behavior_turns"
   | "behavior_sentry"
   | "auto_ability"
-  | "cartography_uplink"
   // Resources Matrix: Gold, Tier 2 Orange Crystals & Tier 3 Green Crystals
   | "drop_chance"
   | "multi_drop"
@@ -113,7 +114,14 @@ export type UpgradeId =
   | "turret_damage"
   | "turret_fire_rate"
   | "turret_turn_speed"
-  | "turret_quantity";
+  | "turret_quantity"
+  // Research Base Tree: keycards, facility systems & mapping
+  | "keycard_t1"
+  | "keycard_t2"
+  | "keycard_t3"
+  | "sentry_uplink"
+  | "sentry_calibration"
+  | "cartography_uplink";
 
 /** The four things upgrades are bought with. */
 export type Currency = "gold" | "crystals" | "greenCrystals" | "essence";
@@ -429,27 +437,6 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.autoAbility = lvl > 0;
     },
     icon: "gear",
-  },
-  {
-    // Fog of war: lives here until the research-base tree lands, then move it there.
-    id: "cartography_uplink",
-    branch: "core",
-    name: "Cartography Uplink",
-    shortDesc: "Explored areas stay mapped: darkness no longer creeps back into places your squad has seen",
-    color: "#38d6ff",
-    grid: { col: 2, row: 1 },
-    parent: "behavior_turns",
-    maxLevel: 1,
-    baseCost: 120,
-    costMultiplier: 1,
-    unlockLifetimePixels: 50,
-    valueAt: (lvl) => lvl,
-    formatValue: (v) => (v > 0 ? "MAPPED" : "FADES"),
-    formatDelta: () => "UNLOCK",
-    apply: (s, lvl) => {
-      s.permanentMapping = lvl > 0;
-    },
-    icon: "mapGrid",
   },
 
   // =========================================================================
@@ -1718,6 +1705,137 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.turretCount = 2 + lvl;
     },
     icon: "cluster",
+  },
+
+  // =========================================================================
+  // 11) RESEARCH BASE TREE: KEYCARDS & FACILITY SYSTEMS (#7fb2ff)
+  // Grid: keycards along the top row, sentries on the left, mapping on the
+  // right. Free cells for new facility upgrades: (2,0), (-1,1), (0,1), (1,1), (-2,1), (-1,-1).
+  // =========================================================================
+  {
+    id: "keycard_t1",
+    branch: "facility",
+    name: "Tier 1 Keycard",
+    shortDesc: "Tier 1 (blue) doors slide open when shot instead of having to be broken down",
+    color: "#3078ff",
+    grid: { col: 0, row: -1 },
+    parent: null,
+    maxLevel: 1,
+    baseCost: 60,
+    costMultiplier: 1,
+    unlockLifetimePixels: 0,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "GRANTED" : "DENIED"),
+    formatDelta: () => "ACCESS",
+    apply: (s, lvl) => {
+      if (lvl > 0) s.keycardTier = Math.max(s.keycardTier, 1);
+    },
+    icon: "keycard",
+  },
+  {
+    id: "keycard_t2",
+    branch: "facility",
+    name: "Tier 2 Keycard",
+    shortDesc: "Tier 2 (red) doors in the second zone slide open when shot",
+    color: "#ff2a2a",
+    grid: { col: 1, row: -1 },
+    parent: "keycard_t1",
+    maxLevel: 1,
+    currency: "crystals",
+    baseCost: 45,
+    costMultiplier: 1,
+    unlockLifetimePixels: 150,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "GRANTED" : "DENIED"),
+    formatDelta: () => "ACCESS",
+    apply: (s, lvl) => {
+      if (lvl > 0) s.keycardTier = Math.max(s.keycardTier, 2);
+    },
+    icon: "keycard",
+  },
+  {
+    id: "keycard_t3",
+    branch: "facility",
+    name: "Tier 3 Keycard",
+    shortDesc: "Tier 3 (burnt orange) doors in the deepest zone slide open when shot",
+    color: "#d65c12",
+    grid: { col: 2, row: -1 },
+    parent: "keycard_t2",
+    maxLevel: 1,
+    currency: "greenCrystals",
+    essenceCost: 6,
+    baseCost: 40,
+    costMultiplier: 1,
+    unlockLifetimePixels: 400,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "GRANTED" : "DENIED"),
+    formatDelta: () => "ACCESS",
+    apply: (s, lvl) => {
+      if (lvl > 0) s.keycardTier = Math.max(s.keycardTier, 3);
+    },
+    icon: "keycard",
+  },
+  {
+    id: "sentry_uplink",
+    branch: "facility",
+    name: "Sentry Uplink",
+    shortDesc: "Wakes the dormant sentry turrets: each one boots when a soldier enters its room and shoots nearby Blight",
+    color: "#38d6ff",
+    grid: { col: -1, row: 0 },
+    parent: null,
+    maxLevel: 1,
+    baseCost: 140,
+    costMultiplier: 1,
+    unlockLifetimePixels: 60,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "ONLINE" : "DORMANT"),
+    formatDelta: () => "WAKE",
+    apply: (s, lvl) => {
+      s.sentryUplink = lvl > 0;
+    },
+    icon: "turret",
+  },
+  {
+    id: "sentry_calibration",
+    branch: "facility",
+    name: "Sentry Calibration",
+    shortDesc: "+1 sentry damage and +15% sentry fire rate per level",
+    color: "#ff9d3b",
+    grid: { col: -2, row: 0 },
+    parent: "sentry_uplink",
+    maxLevel: 5,
+    currency: "crystals",
+    baseCost: 20,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 60,
+    valueAt: (lvl) => FACILITY.sentryDamage + lvl,
+    formatValue: (v) => `${v} DMG`,
+    formatDelta: () => "+1 DMG, +15% RATE",
+    apply: (s, lvl) => {
+      s.sentryDamage = FACILITY.sentryDamage + lvl;
+      s.sentryFireRate = FACILITY.sentryFireRate * (1 + 0.15 * lvl);
+    },
+    icon: "fireRate",
+  },
+  {
+    id: "cartography_uplink",
+    branch: "facility",
+    name: "Cartography Uplink",
+    shortDesc: "Explored areas stay mapped: darkness no longer creeps back into places your squad has seen",
+    color: "#38d6ff",
+    grid: { col: 1, row: 0 },
+    parent: null,
+    maxLevel: 1,
+    baseCost: 120,
+    costMultiplier: 1,
+    unlockLifetimePixels: 50,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "MAPPED" : "FADES"),
+    formatDelta: () => "UNLOCK",
+    apply: (s, lvl) => {
+      s.permanentMapping = lvl > 0;
+    },
+    icon: "mapGrid",
   },
 ];
 

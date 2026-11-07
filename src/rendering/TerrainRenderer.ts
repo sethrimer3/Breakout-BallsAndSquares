@@ -1,8 +1,8 @@
-import { COLORS, TERRAIN, TERRAIN as T, zoneForDepth } from "../config";
+import { COLORS, FACILITY, TERRAIN, TERRAIN as T, zoneForDepth } from "../config";
 import { EDGE_PIXELS_PER_SUB, markBlightEdges } from "./blightEdges";
 import { paintPortal } from "./portalNoise";
 import type { CameraSystem } from "../systems/CameraSystem";
-import type { PixelWorld } from "../world/PixelWorld";
+import { MAT, SUB, type PixelWorld } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
 
 type RGB = readonly [number, number, number];
@@ -16,6 +16,11 @@ const EDGE_FIRE_FPS = 15;
 const EDGE_FIRE_FULL_ZOOM = 1.5;
 /** Edge canvases grow in steps this size, so a moving view doesn't reallocate them. */
 const EDGE_CANVAS_STEP = 256;
+/** Tier glow canvases hold this many pixels per cell edge. */
+const GLOW_RES = 4;
+/** Glow alpha (0..255) by pixel step from a block's exposed face: inside, then outside. */
+const GLOW_IN = [210, 80] as const;
+const GLOW_OUT = [90, 26] as const;
 
 function mix(a: RGB, b: RGB, t: number, out: number[]): void {
   out[0] = a[0] + (b[0] - a[0]) * t;
@@ -54,6 +59,10 @@ export class TerrainRenderer {
   private edgeFire = document.createElement("canvas");
   private edgeFireLow = document.createElement("canvas");
   private edgeFireKey = "";
+  /** Per chunk: soft tier-colored glow on exposed block faces, made the first time it has any. */
+  private glowCanvases: (HTMLCanvasElement | null)[] = [];
+  private glowLive: Uint8Array;
+  private glowImage: ImageData;
 
   constructor(private world: PixelWorld, chunkSize: number) {
     this.chunks = new TerrainChunks(world, chunkSize);
@@ -73,6 +82,9 @@ export class TerrainRenderer {
     this.edgeSolid = new Uint8Array((subChunk + 2) * (subChunk + 2));
     this.edgeImage = new ImageData(edgeSize, edgeSize);
     this.edgeImage.data.fill(255);
+    this.glowCanvases = new Array<HTMLCanvasElement | null>(n).fill(null);
+    this.glowLive = new Uint8Array(n);
+    this.glowImage = new ImageData(chunkSize * GLOW_RES, chunkSize * GLOW_RES);
     this.chunks.markAll();
     this.glowCanvas = document.createElement("canvas");
     this.glowCanvas.width = world.width;
@@ -163,7 +175,16 @@ export class TerrainRenderer {
                 data[p + 3] = 0;
               } else {
                 const subT = world.subTint[si] / 255;
-                sampleRamp(COLORS.pinkBlight, subT, col);
+                if (world.subKind[si] === SUB.rubble) {
+                  const pal = COLORS.rubble;
+                  const c = pal[world.subTint[si] % pal.length];
+                  const v = 0.82 + (world.subTint[si] >> 3) / 32 * 0.36;
+                  col[0] = c[0] * v;
+                  col[1] = c[1] * v;
+                  col[2] = c[2] * v;
+                } else {
+                  sampleRamp(COLORS.pinkBlight, subT, col);
+                }
                 const maxSubHp = world.maxSubHealthAt(sx, sy);
                 if (subHp < maxSubHp) {
                   const d = 1 - subHp / maxSubHp;
@@ -190,6 +211,31 @@ export class TerrainRenderer {
                 data[p + 2] = Math.min(255, col[2] * sm + sadd * 1.2);
                 data[p + 3] = 255;
               }
+            }
+          }
+          continue;
+        }
+        const material = world.mat[i];
+        if (material === MAT.glass) {
+          // See-through containment glass, brighter along faces that touch the air.
+          const g = COLORS.glass;
+          const edge =
+            (cy > 0 && health[i - W] === 0) ||
+            (cx > 0 && health[i - 1] === 0) ||
+            (cy < world.height - 1 && health[i + W] === 0) ||
+            (cx < W - 1 && health[i + 1] === 0);
+          const maxHpG = world.maxHealthAt(cx, cy);
+          const crack = hp < maxHpG ? 1 - hp / maxHpG : 0;
+          const a = Math.min(255, COLORS.glassAlpha + (edge ? 50 : 0) + crack * 90);
+          for (let dy = 0; dy < 2; dy++) {
+            for (let dx = 0; dx < 2; dx++) {
+              const p = ((ly * 2 + dy) * subCs + (lx * 2 + dx)) * 4;
+              // A diagonal glint across each pane.
+              const glint = (dx + dy + cx + cy) % 3 === 0 ? 30 : 0;
+              data[p] = Math.min(255, g[0] + glint);
+              data[p + 1] = Math.min(255, g[1] + glint);
+              data[p + 2] = Math.min(255, g[2] + glint);
+              data[p + 3] = a;
             }
           }
           continue;
@@ -273,6 +319,119 @@ export class TerrainRenderer {
     }
     this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0);
     this.buildEdgeMask(k, kx, ky);
+    this.buildTierGlow(k, kx, ky);
+  }
+
+  /**
+   * Terrain tier of a solid cell for the exposed-edge glow (0 = no glow):
+   * 1..3 for zone fill, wall material one tier up (4 = reinforced), doors by
+   * the keycard tier that opens them. Glass, Blight and rubble don't glow.
+   */
+  tierAt(cx: number, cy: number): number {
+    const w = this.world;
+    const i = cy * w.width + cx;
+    if (w.health[i] === 0) return 0;
+    const m = w.mat[i];
+    if (m === MAT.glass) return 0;
+    if (m === MAT.door) return w.doors[w.doorId[i] - 1]?.tier ?? 0;
+    if (w.coreId[i] > 0 || w.blight[i] > 0) return 0;
+    const wm = w.wall[i];
+    if (wm > 0) return wm + 1;
+    // Matches the color ramp's dithered zone boundary.
+    const dither = (w.tint[i] / 255 - 0.5) * 3;
+    return zoneForDepth(w.depthOf(cx, cy) + dither) + 1;
+  }
+
+  private buildTierGlow(k: number, kx: number, ky: number): void {
+    const w = this.world;
+    const cs = this.chunks.chunkSize;
+    const size = cs * GLOW_RES;
+    const data = this.glowImage.data;
+    data.fill(0);
+    let any = false;
+    const open = (x: number, y: number): boolean => w.inBounds(x, y) && !w.anySolidInCell(x, y);
+    const put = (px: number, py: number, tier: number, a: number): void => {
+      if (px < 0 || py < 0 || px >= size || py >= size) return;
+      const p = (py * size + px) * 4;
+      if (data[p + 3] >= a) return;
+      const c = FACILITY.tierGlow[tier];
+      data[p] = c[0];
+      data[p + 1] = c[1];
+      data[p + 2] = c[2];
+      data[p + 3] = a;
+      any = true;
+    };
+    // Paint a band `steps` deep along one face of cell (lx, ly), stepping inward from the face.
+    const band = (lx: number, ly: number, dir: number, tier: number, alphas: readonly number[], inward: boolean): void => {
+      const bx = lx * GLOW_RES;
+      const by = ly * GLOW_RES;
+      for (let s = 0; s < alphas.length; s++) {
+        const d = inward ? s : GLOW_RES - 1 - s;
+        for (let a = 0; a < GLOW_RES; a++) {
+          // dir: 0 = face up, 1 = right, 2 = down, 3 = left.
+          if (dir === 0) put(bx + a, by + d, tier, alphas[s]);
+          else if (dir === 2) put(bx + a, by + GLOW_RES - 1 - d, tier, alphas[s]);
+          else if (dir === 3) put(bx + d, by + a, tier, alphas[s]);
+          else put(bx + GLOW_RES - 1 - d, by + a, tier, alphas[s]);
+        }
+      }
+    };
+    const DX = [0, 1, 0, -1];
+    const DY = [-1, 0, 1, 0];
+    for (let ly = 0; ly < cs; ly++) {
+      const cy = ky * cs + ly;
+      if (cy >= w.height) break;
+      for (let lx = 0; lx < cs; lx++) {
+        const cx = kx * cs + lx;
+        if (cx >= w.width) break;
+        const tier = this.tierAt(cx, cy);
+        if (tier > 0) {
+          for (let d = 0; d < 4; d++) {
+            if (open(cx + DX[d], cy + DY[d])) band(lx, ly, d, tier, GLOW_IN, true);
+          }
+        } else if (open(cx, cy)) {
+          // A faint halo spills into the air in front of each glowing face.
+          for (let d = 0; d < 4; d++) {
+            const nx = cx + DX[d];
+            const ny = cy + DY[d];
+            if (!w.inBounds(nx, ny)) continue;
+            const nt = this.tierAt(nx, ny);
+            // Face of this empty cell that touches the neighbor: same direction `d`, painted from that side.
+            if (nt > 0) band(lx, ly, d, nt, GLOW_OUT, true);
+          }
+        }
+      }
+    }
+    if (!any) {
+      this.glowLive[k] = 0;
+      return;
+    }
+    let canvas = this.glowCanvases[k];
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.width = canvas.height = size;
+      this.glowCanvases[k] = canvas;
+    }
+    canvas.getContext("2d")!.putImageData(this.glowImage, 0, 0);
+    this.glowLive[k] = 1;
+  }
+
+  /**
+   * Soft tier-colored glow along every exposed block face: blue Tier 1, red
+   * Tier 2, burnt orange Tier 3. Cached per chunk and drawn smoothed and
+   * additive after the lighting pass, so it costs one draw per visible chunk.
+   */
+  drawTierGlow(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number): void {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = FACILITY.tierGlowAlpha * (0.9 + 0.1 * Math.sin(time * 1.3));
+    ctx.imageSmoothingEnabled = true;
+    const cols = this.chunks.cols;
+    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      const k = ky * cols + kx;
+      if (this.glowLive[k]) ctx.drawImage(this.glowCanvases[k]!, sx, sy, sw, sh);
+    });
+    ctx.restore();
   }
 
   private buildEdgeMask(k: number, kx: number, ky: number): void {
