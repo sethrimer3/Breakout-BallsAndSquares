@@ -1,4 +1,4 @@
-import { BULLET, CAMERA, COLORS, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD, zoneForDepth } from "./config";
+import { BULLET, CAMERA, COLORS, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD, zoneForDepth } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
@@ -24,6 +24,7 @@ import { PauseMenu } from "./ui/PauseMenu";
 import { ResultsScreen } from "./ui/ResultsScreen";
 import { UpgradeTree } from "./ui/UpgradeTree";
 import { GrowthSystem } from "./world/GrowthSystem";
+import { FogOfWar, type SightSource } from "./world/FogOfWar";
 import { PixelWorld } from "./world/PixelWorld";
 import { generateWorld } from "./world/WorldGenerator";
 
@@ -53,6 +54,8 @@ export class Game {
   readonly combat: CombatSystem;
   readonly growth: GrowthSystem;
   readonly lighting: LightingSystem;
+  readonly fog: FogOfWar;
+  private sightSources: SightSource[] = [];
   readonly camera: CameraSystem;
   readonly terrain: TerrainRenderer;
   readonly renderer: Renderer;
@@ -151,12 +154,14 @@ export class Game {
       onBlightExplode: (cx, cy, rad, dmg) => this.onBlightExplode(cx, cy, rad, dmg),
     });
     this.lighting = new LightingSystem(this.world);
+    this.fog = new FogOfWar(this.world);
     this.camera = new CameraSystem(this.world);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.camera.following = this.camera.defaultFollow;
     generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
     this.terrain.rebuildAll();
+    this.resetFog();
     this.renderer = new Renderer(canvas, this);
     this.autoMove = this.save.data.settings.autoMove;
     this.dualStick = new DualStick(uiRoot, this);
@@ -234,6 +239,7 @@ export class Game {
 
   applyUpgrades(): void {
     this.stats = this.upgrades.getSoldierStats();
+    this.fog.permanent = this.stats.permanentMapping;
     this.combat.stats = this.stats;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
     this.growth.startRate = this.stats.blightStartRate;
@@ -271,6 +277,7 @@ export class Game {
     }
     this.growth.reset();
     this.stats = this.upgrades.getSoldierStats();
+    this.resetFog();
     this.combat.stats = this.stats;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
     this.growth.startRate = this.stats.blightStartRate;
@@ -1085,6 +1092,46 @@ export class Game {
   }
 
   /** One fixed simulation step. */
+  /** Back to a dark map, with the spawn room already lit so the iris opens on it. */
+  private resetFog(): void {
+    this.fog.reset(this.rng.int(1 << 30));
+    this.fog.permanent = this.stats.permanentMapping;
+    for (let i = 0; i < 40; i++) this.updateFog(0.1, true);
+  }
+
+  /** Feed this frame's eyes (soldiers, turrets, the spawn room) into the fog. */
+  private updateFog(dt: number, roomOnly = false): void {
+    const src = this.sightSources;
+    let n = 0;
+    const take = (): SightSource => {
+      if (n === src.length) src.push({ x: 0, y: 0, radiusCells: 0 });
+      return src[n++];
+    };
+    const w = this.world;
+    const room = take();
+    room.x = w.roomCenterX;
+    room.y = w.roomCenterY;
+    room.radiusCells = w.roomSize * 0.5 + 2;
+    if (!roomOnly) {
+      for (const s of this.soldiers) {
+        if (!s.alive) continue;
+        const e = take();
+        e.x = s.x;
+        e.y = s.y;
+        e.radiusCells = FOG.soldierSightCells;
+      }
+      for (const t of this.combat.turrets.items) {
+        if (!t.active) continue;
+        const e = take();
+        e.x = t.x;
+        e.y = t.y;
+        e.radiusCells = FOG.turretSightCells;
+      }
+    }
+    src.length = n;
+    this.fog.update(dt, src);
+  }
+
   step(dt: number): void {
     this.runStats.time += dt;
 
@@ -1203,6 +1250,7 @@ export class Game {
     this.combat.updateBullets(dt);
     this.combat.updateGrenades(dt);
     this.combat.updateTurrets(dt);
+    this.updateFog(dt);
     this.growth.update(dt, this.runStats.time, this.soldiers);
     this.growthRate = this.growth.rate;
     this.runStats.recordSampleIfDue(this.growthRate);

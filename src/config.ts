@@ -390,6 +390,34 @@ export const LOOT = {
   essenceLifetimeMult: 3,
 };
 
+/**
+ * Fog of war: the map starts dark, each soldier sees a radius around itself,
+ * and unseen areas slowly go stale and dark again. Light creeps outward from
+ * soldiers like receding ooze instead of snapping to a radius.
+ */
+export const FOG = {
+  /** Fog tile edge, in terrain cells (2 = 16 world units). */
+  tileCells: 2,
+  /** Soldier sight radius, in cells. Walls block sight. */
+  soldierSightCells: 13,
+  /** Autoturret sight radius, in cells. */
+  turretSightCells: 7,
+  /** Rays cast per soldier when tracing sight. */
+  sightRays: 72,
+  /** How fast light floods into newly seen tiles (per second, x neighbor light). */
+  revealRate: 1.5,
+  /** Seconds an unseen tile stays fresh before darkness starts creeping back. */
+  staleDelay: 4,
+  /** How fast darkness creeps back into stale tiles (per second, before neighbor scaling). */
+  staleRate: 0.07,
+  /** Brightness explored tiles settle at once mapping is permanent (0..1). */
+  mappedLevel: 0.42,
+  /** Brightness above which a tile counts as explored. */
+  exploredThreshold: 0.55,
+  /** Fog color (near-black, a touch of navy). */
+  color: [3, 4, 8] as const,
+};
+
 export const COLORS = {
   background: "#05070d",
   backgroundGlow: "#0b1020",
