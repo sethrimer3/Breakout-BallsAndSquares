@@ -149,6 +149,8 @@ export class Game {
       onSoldierRescued: (s, fromCx, fromCy, toCx, toCy, hpCost) =>
         this.onSoldierRescued(s, fromCx, fromCy, toCx, toCy, hpCost),
       onBlightExplode: (cx, cy, rad, dmg) => this.onBlightExplode(cx, cy, rad, dmg),
+      onDecay: (sx, sy) => this.onBlightDecay(sx, sy),
+      onOverdrive: (on) => this.onOverdrive(on),
     });
     this.lighting = new LightingSystem(this.world);
     this.fog = new FogOfWar(this.world);
@@ -160,6 +162,8 @@ export class Game {
     this.camera.following = this.camera.defaultFollow;
     generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
+    this.terrain.dormantAt = (si) => this.growth.colonies.isDormantSub(si);
+    this.growth.colonies.onVisualChange = (sx, sy) => this.terrain.chunks.markCell(sx >> 1, sy >> 1);
     this.terrain.rebuildAll();
     this.resetFog();
     this.resetFacility();
@@ -245,6 +249,7 @@ export class Game {
     this.growth.startRate = this.stats.blightStartRate;
     this.growth.rateMultiplier = this.stats.blightRateMultiplier;
     this.growth.weakenChance = this.stats.blightWeakenChance;
+    this.growth.decayRate = this.stats.blightNecrosisRate;
     this.growth.explosiveChance = this.stats.explosiveBlightChance;
     this.growth.explosiveDamage = this.stats.explosiveBlightDamage;
     this.growth.explosiveRadius = this.stats.explosiveBlightRadius;
@@ -271,11 +276,10 @@ export class Game {
     this.pauseMenu.hide();
     this.resultsScreen.hide();
     this.upgradeTree.hide();
-    if (this.runStats.time > 0) {
-      generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
-      this.terrain.rebuildAll();
-    }
+    const regen = this.runStats.time > 0;
+    if (regen) generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
     this.growth.reset();
+    if (regen) this.terrain.rebuildAll();
     this.stats = this.upgrades.getSoldierStats();
     this.resetFog();
     this.resetFacility();
@@ -284,6 +288,7 @@ export class Game {
     this.growth.startRate = this.stats.blightStartRate;
     this.growth.rateMultiplier = this.stats.blightRateMultiplier;
     this.growth.weakenChance = this.stats.blightWeakenChance;
+    this.growth.decayRate = this.stats.blightNecrosisRate;
     this.growth.explosiveChance = this.stats.explosiveBlightChance;
     this.growth.explosiveDamage = this.stats.explosiveBlightDamage;
     this.growth.explosiveRadius = this.stats.explosiveBlightRadius;
@@ -1075,6 +1080,22 @@ export class Game {
     }
 
     this.onExplosion(wx, wy, radiusCells * cs);
+  }
+
+  /** A dormant pixel crumbled to Necrosis Protocol: a puff of dark dust. */
+  private onBlightDecay(sx: number, sy: number): void {
+    if (this.rng.next() > 0.35) return;
+    const ss = this.world.subCellSize;
+    const x = (sx + 0.5) * ss;
+    const y = (sy + 0.5) * ss;
+    this.particles.spawn(PKind.Debris, x, y, this.rng.range(-12, 12), this.rng.range(-18, 4), this.rng.range(0.4, 0.8), 1, 0x3a2a4a, 4);
+  }
+
+  /** The Blight hit overdrive (walls start replicating) or was beaten back below it. */
+  private onOverdrive(on: boolean): void {
+    if (!on) return;
+    this.audio.playOverdrive();
+    this.addScreenShake(6);
   }
 
   /** Fresh doors, glass and dormant sentries for a newly generated facility. */

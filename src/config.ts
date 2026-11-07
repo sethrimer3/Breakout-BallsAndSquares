@@ -352,7 +352,26 @@ export const GROWTH = {
   coreKillTimeReduction: 12,
   /** Health bonus added to a Blight Core cell relative to normal cell health at its distance. */
   coreHealthBonus: 4,
+  /**
+   * Generator rate (sub-pixels / second) at which the Blight goes into OVERDRIVE.
+   * Only in overdrive do the facility's walls themselves replicate as Blight.
+   */
+  overdriveRate: 70,
+  /** Wall replication rate (copy events / second) the moment overdrive begins. */
+  overdriveWallBase: 1.5,
+  /** Exponential base per second of overdrive for wall replication. */
+  overdriveExpBase: 1.07,
+  /** Seconds between checks for colonies a cut split in two (dormancy shows within this). */
+  splitCheckSeconds: 0.1,
+  /** Max decayed pixels per colony per physics step. */
+  maxDecayPerStep: 6,
 };
+
+/** Wall replication rate after `overdriveSeconds` of overdrive. */
+export function overdriveWallRate(overdriveSeconds: number): number {
+  if (overdriveSeconds <= 0) return 0;
+  return Math.min(GROWTH.maxRate, GROWTH.overdriveWallBase + Math.pow(GROWTH.overdriveExpBase, overdriveSeconds) - 1);
+}
 
 /** Growth rate (copy events / second) at `runTime` seconds into the run (spec §7). */
 export function growthRateAt(runTime: number, startRate = GROWTH.baseRate): number {

@@ -121,7 +121,9 @@ export type UpgradeId =
   | "keycard_t3"
   | "sentry_uplink"
   | "sentry_calibration"
-  | "cartography_uplink";
+  | "cartography_uplink"
+  // Blight research: dormant colonies decay
+  | "necrosis_protocol";
 
 /** The four things upgrades are bought with. */
 export type Currency = "gold" | "crystals" | "greenCrystals" | "essence";
@@ -683,6 +685,26 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     formatDelta: () => "+10%",
     apply: (s, lvl) => {
       s.blightWeakenChance = Math.min(0.8, lvl * 0.1);
+    },
+    icon: "blightCrack",
+  },
+  {
+    id: "necrosis_protocol",
+    branch: "blight",
+    name: "Necrosis Protocol",
+    shortDesc: "Blight cut off from every living generator slowly darkens, crumbles and vanishes (faster per level)",
+    color: "#b07cff",
+    grid: { col: -3, row: 0 },
+    parent: "blight_weaken",
+    maxLevel: 5,
+    baseCost: 60,
+    costMultiplier: 1.8,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => necrosisRate(lvl),
+    formatValue: (v) => (v > 0 ? `${v.toFixed(1)}/s DECAY` : "OFF"),
+    formatDelta: () => "+DECAY",
+    apply: (s, lvl) => {
+      s.blightNecrosisRate = necrosisRate(lvl);
     },
     icon: "blightCrack",
   },
@@ -1842,3 +1864,8 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
 export const UPGRADE_BY_ID: Record<UpgradeId, UpgradeDef> = Object.fromEntries(
   UPGRADE_DEFS.map((d) => [d.id, d]),
 ) as Record<UpgradeId, UpgradeDef>;
+
+/** Decay events per second per dormant colony front at Necrosis Protocol level `lvl`. */
+export function necrosisRate(lvl: number): number {
+  return lvl <= 0 ? 0 : +(0.6 + 0.6 * (lvl - 1)).toFixed(1);
+}

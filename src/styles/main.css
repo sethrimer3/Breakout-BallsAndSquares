@@ -257,6 +257,7 @@ button {
 .gm-track {
   --fw: var(--px1);
   --fc: var(--line);
+  position: relative;
   height: 12px;
   background: var(--bg-2);
   overflow: hidden;
@@ -285,6 +286,63 @@ button {
 .growth-meter.stage-overdrive {
   --gm: #ff55ff;
   animation: meterShake 0.2s steps(1) infinite;
+}
+
+/* Overdrive: the bar starts over and refills under a crackling surge. */
+.gm-surge {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(115deg, transparent 0 6px, rgba(255, 255, 255, 0.85) 6px 8px, transparent 8px 16px),
+    linear-gradient(90deg, #ff2bd6, #ffffff 50%, #ff2bd6);
+  background-size: 32px 100%, 200% 100%;
+  mix-blend-mode: screen;
+  opacity: 0.75;
+  animation: surgeScroll 0.45s steps(8) infinite, surgeFlicker 0.18s steps(1) infinite;
+}
+.growth-meter.stage-overdrive .gm-track {
+  box-shadow: 0 0 10px #ff2bd6, 0 0 2px #ffffff;
+}
+.growth-meter.stage-overdrive .gm-surge::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  right: -2px;
+  width: 4px;
+  background: #ffffff;
+  box-shadow: 0 0 8px 3px #ff55ff;
+}
+.growth-meter.od-burst .gm-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  pointer-events: none;
+  animation: surgeBurst 0.7s ease-out forwards;
+}
+
+@keyframes surgeScroll {
+  to {
+    background-position: 32px 0, -200% 0;
+  }
+}
+
+@keyframes surgeFlicker {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes surgeBurst {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes meterPulse {

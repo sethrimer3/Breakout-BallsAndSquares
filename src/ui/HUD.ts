@@ -25,6 +25,9 @@ export class HUD {
   private launchCountEl: HTMLSpanElement;
   private growthMeterEl: HTMLDivElement;
   private growthFillEl: HTMLDivElement;
+  /** Animated overlay riding on the fill while in overdrive. */
+  private growthSurgeEl: HTMLDivElement;
+  private wasOverdrive = false;
   private growthRateEl: HTMLSpanElement;
   private growthStageEl: HTMLSpanElement;
   private helpBtn: HTMLButtonElement;
@@ -153,9 +156,11 @@ export class HUD {
       </div>
       <div class="gm-track">
         <div class="gm-fill"></div>
+        <div class="gm-surge"></div>
       </div>
     `;
     this.growthFillEl = this.growthMeterEl.querySelector(".gm-fill") as HTMLDivElement;
+    this.growthSurgeEl = this.growthMeterEl.querySelector(".gm-surge") as HTMLDivElement;
     this.growthRateEl = this.growthMeterEl.querySelector(".gm-rate") as HTMLSpanElement;
     this.growthStageEl = this.growthMeterEl.querySelector(".gm-stage") as HTMLSpanElement;
 
@@ -242,22 +247,25 @@ export class HUD {
     this.fields.depth.textContent = `${s.maxDepth}`;
     this.fields.soldiers.textContent = `${alive} / +${game.reserves}`;
 
-    // Dramatic Growth Rate meter update.
+    // Dramatic Growth Rate meter update. It fills toward OVERDRIVE, then empties
+    // and refills with the walls' own replication rate under a surge effect.
     const rate = game.growthRate;
     const graceRem = game.growth.graceRemaining(s.time);
-    const norm =
-      rate <= 0
-        ? 0
-        : Math.min(
-            1,
-            Math.log(1 + rate * 1.8) / Math.log(1 + GROWTH.maxRate * 1.8),
-          );
+    const overdrive = game.growth.overdrive;
+    const logNorm = (v: number, max: number): number =>
+      v <= 0 ? 0 : Math.min(1, Math.log(1 + v * 1.8) / Math.log(1 + max * 1.8));
+    const norm = overdrive ? logNorm(game.growth.wallRate, GROWTH.maxRate) : logNorm(rate, GROWTH.overdriveRate);
     const pct = (norm * 100).toFixed(1);
     this.growthFillEl.style.width = `${pct}%`;
+    this.growthSurgeEl.style.width = overdrive ? `${pct}%` : "0%";
 
     let stageClass = "stage-dormant";
     let stageLabel = "DORMANT";
-    if (rate <= 0) {
+    if (overdrive) {
+      stageClass = "stage-overdrive";
+      stageLabel = "OVERDRIVE!!!";
+      this.growthRateEl.textContent = `WALLS ${game.growth.wallRate.toFixed(1)} /S`;
+    } else if (rate <= 0) {
       stageClass = "stage-dormant";
       stageLabel = graceRem > 0 ? `GRACE ${graceRem.toFixed(0)}S` : "DORMANT";
       this.growthRateEl.textContent = `0.0 /S`;
@@ -269,16 +277,18 @@ export class HUD {
       stageClass = "stage-surging";
       stageLabel = "SURGING!";
       this.growthRateEl.textContent = `${rate.toFixed(1)} /S`;
-    } else if (rate < 70) {
+    } else {
       stageClass = "stage-critical";
       stageLabel = "CRITICAL!!";
       this.growthRateEl.textContent = `${rate.toFixed(1)} /S`;
-    } else {
-      stageClass = "stage-overdrive";
-      stageLabel = "OVERDRIVE!!!";
-      this.growthRateEl.textContent = `${rate.toFixed(0)} /S`;
     }
-    this.growthMeterEl.className = `growth-meter ${stageClass}`;
+    if (overdrive && !this.wasOverdrive) {
+      // Restart the burst animation each time overdrive begins.
+      this.growthMeterEl.classList.remove("od-burst");
+      void this.growthMeterEl.offsetWidth;
+    }
+    this.wasOverdrive = overdrive;
+    this.growthMeterEl.className = `growth-meter ${stageClass}${overdrive ? " od-burst" : ""}`;
     this.growthStageEl.textContent = stageLabel;
 
     // Reserve launch button on the right side.
