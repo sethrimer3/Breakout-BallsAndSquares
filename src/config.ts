@@ -311,8 +311,6 @@ export const CAMERA = {
   wheelStep: 1.15,
   /** Follow smoothing (higher = snappier), per second. */
   followSharpness: 5,
-  /** Auto-follow switches target only if another soldier is this many cells farther out. */
-  switchHysteresisCells: 4,
 };
 
 export const SIM = {
