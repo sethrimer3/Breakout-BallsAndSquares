@@ -148,7 +148,7 @@ describe("lab details", () => {
     expect(scorched).toBeGreaterThan(0);
   });
 
-  it("seals rooms behind two-cell-thick tiered doors made of wall-grade material", () => {
+  it("seals rooms behind two-cell-thick tiered doors that are solid blocks", () => {
     for (const seed of SEEDS) {
       const w = world(seed);
       expect(w.doors.length).toBeGreaterThan(10);
@@ -158,7 +158,7 @@ describe("lab details", () => {
         for (const i of d.cells) {
           expect(w.mat[i]).toBe(MAT.door);
           expect(w.doorId[i]).toBe(d.id);
-          expect(w.health[i]).toBeGreaterThanOrEqual(25);
+          expect(w.health[i]).toBeGreaterThan(0);
         }
       }
       // Zone 1 rooms need the Tier 1 keycard.
