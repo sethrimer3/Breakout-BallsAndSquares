@@ -108,6 +108,8 @@ export class Game {
   /** Extra sim-time multiplier driven by the death sequence (1 = normal speed). */
   private deathTimeScale = 1;
   private deathClosing = false;
+  /** Current screen-shake amplitude in CSS pixels; decays in real time. */
+  private shakeAmp = 0;
   showChunkBorders = false;
   debug = new URLSearchParams(location.search).has("debug") || import.meta.env.DEV;
   debugInfo = { fps: 0, frameMs: 0, simMs: 0, lightMs: 0 };
@@ -304,6 +306,8 @@ export class Game {
     this.camera.reset();
     this.camera.setViewport(this.canvas.clientWidth, this.canvas.clientHeight);
     this.cancelDeathSequence();
+    this.shakeAmp = 0;
+    this.canvas.style.transform = "";
     this.transition.reveal(DEATH_SEQ.revealSeconds);
     this.hud.update(this, performance.now(), true);
   }
@@ -898,6 +902,7 @@ export class Game {
 
   private onExplosion(x: number, y: number, radiusWorld: number): void {
     this.audio.playDestroy();
+    this.shakeForExplosion(x, y, radiusWorld);
     const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
     const lit = this.flashLitPool.pop() ?? makeLitCells();
     this.flashes.push({
@@ -1300,7 +1305,41 @@ export class Game {
     this.deathSeqT = 0;
     this.deathTimeScale = 1;
     this.deathClosing = false;
+    this.addScreenShake(DEATH_SEQ.shakeAmplitude);
     this.hud.update(this, performance.now(), true);
+  }
+
+  /** Kick the screen shake to at least `amp` CSS pixels (stronger kicks win). */
+  addScreenShake(amp: number): void {
+    if (amp > this.shakeAmp) this.shakeAmp = Math.min(SHAKE.maxAmplitude, amp);
+  }
+
+  /** Larger blasts (rockets, grenades, explosive blight) shake the screen; small pops do not. */
+  private shakeForExplosion(x: number, y: number, radiusWorld: number): void {
+    const radCells = radiusWorld / this.world.cellSize;
+    if (radCells < SHAKE.minBlastCells) return;
+    // Fade out for blasts away from the view so off-screen explosions barely register.
+    const cam = this.camera;
+    const dx = Math.abs(cam.worldToScreenX(x) - cam.viewW / 2) - cam.viewW / 2;
+    const dy = Math.abs(cam.worldToScreenY(y) - cam.viewH / 2) - cam.viewH / 2;
+    const outside = Math.max(0, dx, dy);
+    const falloff = Math.max(0, 1 - outside / SHAKE.offscreenFalloffPx);
+    if (falloff <= 0) return;
+    this.addScreenShake(SHAKE.perBlastCell * radCells * falloff);
+  }
+
+  /** Apply and decay the screen shake on the game canvas (the UI stays put). */
+  private updateScreenShake(real: number): void {
+    if (this.shakeAmp <= 0) return;
+    this.shakeAmp = Math.max(0, this.shakeAmp - real * SHAKE.decayPerSecond * Math.max(1, this.shakeAmp));
+    if (this.shakeAmp < 0.35) {
+      this.shakeAmp = 0;
+      this.canvas.style.transform = "";
+      return;
+    }
+    const ox = Math.round((Math.random() * 2 - 1) * this.shakeAmp);
+    const oy = Math.round((Math.random() * 2 - 1) * this.shakeAmp);
+    this.canvas.style.transform = `translate(${ox}px, ${oy}px)`;
   }
 
   private updateDeathSequence(real: number): void {
@@ -1308,16 +1347,6 @@ export class Game {
     this.deathSeqT += real;
     const t = this.deathSeqT;
     const D = DEATH_SEQ;
-    // Small decaying shake applied to the game canvas (UI stays put).
-    if (t < D.shakeSeconds) {
-      const k = 1 - t / D.shakeSeconds;
-      const amp = D.shakeAmplitude * k * k;
-      const ox = Math.round((Math.random() * 2 - 1) * amp);
-      const oy = Math.round((Math.random() * 2 - 1) * amp);
-      this.canvas.style.transform = `translate(${ox}px, ${oy}px)`;
-    } else if (this.canvas.style.transform) {
-      this.canvas.style.transform = "";
-    }
     // Ease sim time down to a full stop.
     const p = Math.min(1, t / D.slowSeconds);
     this.deathTimeScale = (1 - p) * (1 - p);
@@ -1344,7 +1373,6 @@ export class Game {
     this.deathSeqT = -1;
     this.deathTimeScale = 1;
     this.deathClosing = false;
-    this.canvas.style.transform = "";
   }
 
   private finishRun(): void {
@@ -1394,6 +1422,7 @@ export class Game {
       }
     }
     this.updateDeathSequence(real);
+    this.updateScreenShake(real);
     this.transition.update(real);
     const t1 = performance.now();
     this.updateFlashPolygons();
@@ -1420,9 +1449,21 @@ export class Game {
   }
 }
 
+/** Screen shake tuning (CSS pixels / real seconds). */
+const SHAKE = {
+  /** Blasts smaller than this (cluster mini-bombs, tiny blight pops) don't shake. */
+  minBlastCells: 2,
+  /** Amplitude per cell of blast radius: rocket (2.5) ≈ 2px, grenade (2.8) ≈ 2.2px. */
+  perBlastCell: 0.8,
+  maxAmplitude: 6,
+  /** Linear decay rate, scaled by amplitude so kicks settle in ~0.3-0.45s. */
+  decayPerSecond: 6,
+  /** Distance beyond the screen edge at which a blast no longer shakes. */
+  offscreenFalloffPx: 240,
+};
+
 /** Timings (real seconds) for the last-soldier death sequence and level intro. */
 const DEATH_SEQ = {
-  shakeSeconds: 0.4,
   shakeAmplitude: 5,
   slowSeconds: 1.3,
   holdSeconds: 0.25,
