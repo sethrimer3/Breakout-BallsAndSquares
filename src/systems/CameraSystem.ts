@@ -79,6 +79,13 @@ export class CameraSystem {
     this.manualTarget = false;
   }
 
+  /** Follow exactly this soldier (e.g. the manually controlled commander), never auto-switching away. */
+  lockOn(id: number): void {
+    this.targetId = id;
+    this.manualTarget = true;
+    this.following = true;
+  }
+
   /** Tab: cycle the follow target through living soldiers. */
   cycleTarget(soldiers: readonly Soldier[]): void {
     const alive = soldiers.filter((s) => s.alive);

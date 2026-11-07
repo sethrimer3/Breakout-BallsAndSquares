@@ -662,8 +662,7 @@ export class Game {
     } else {
       const cmdr = this.getCommander();
       if (cmdr) {
-        this.camera.targetId = cmdr.id;
-        this.camera.following = true;
+        this.camera.lockOn(cmdr.id);
       }
     }
   }
@@ -1206,8 +1205,7 @@ export class Game {
       }
 
       // Ensure camera tracks commander
-      this.camera.targetId = commander.id;
-      this.camera.following = true;
+      this.camera.lockOn(commander.id);
     } else {
       for (const s of this.soldiers) s.isManual = false;
     }
