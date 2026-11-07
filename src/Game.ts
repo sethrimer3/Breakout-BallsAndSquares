@@ -8,6 +8,7 @@ import { Soldier, baseSoldierStats, type SecondaryWeaponType, type SoldierStats 
 import { MUZZLE_FLASH_MULTIPLIER, SaveManager, type SoldierBehavior } from "./progression/SaveManager";
 import { UpgradeManager } from "./progression/UpgradeManager";
 import { Renderer } from "./rendering/Renderer";
+import { ScreenTransition } from "./rendering/ScreenTransition";
 import { TerrainRenderer } from "./rendering/TerrainRenderer";
 import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
@@ -97,6 +98,18 @@ export class Game {
   private bankedThisRun = false;
   onUpgradePurchased?: () => void;
   timeScale = 1;
+  /** Full-screen iris used for level intro and run-end transitions. */
+  readonly transition = new ScreenTransition();
+  /**
+   * Last-soldier death sequence (real seconds since it started), or -1 when not running.
+   * Shakes the screen, slows sim time to a stop, then closes the iris before results show.
+   */
+  private deathSeqT = -1;
+  /** Extra sim-time multiplier driven by the death sequence (1 = normal speed). */
+  private deathTimeScale = 1;
+  private deathClosing = false;
+  /** Current screen-shake amplitude in CSS pixels; decays in real time. */
+  private shakeAmp = 0;
   showChunkBorders = false;
   debug = new URLSearchParams(location.search).has("debug") || import.meta.env.DEV;
   debugInfo = { fps: 0, frameMs: 0, simMs: 0, lightMs: 0 };
@@ -292,6 +305,10 @@ export class Game {
     this.markerMode = false;
     this.camera.reset();
     this.camera.setViewport(this.canvas.clientWidth, this.canvas.clientHeight);
+    this.cancelDeathSequence();
+    this.shakeAmp = 0;
+    this.canvas.style.transform = "";
+    this.transition.reveal(DEATH_SEQ.revealSeconds);
     this.hud.update(this, performance.now(), true);
   }
 
@@ -340,6 +357,7 @@ export class Game {
   }
 
   openUpgrades(): void {
+    this.abortDeathSequence();
     this.aimState.active = false;
     this.aimState.isDragging = false;
     this.pauseMenu.hide();
@@ -358,6 +376,7 @@ export class Game {
   }
 
   openMainMenu(): void {
+    this.abortDeathSequence();
     this.aimState.active = false;
     this.aimState.isDragging = false;
     this.bankCurrentRun();
@@ -883,6 +902,7 @@ export class Game {
 
   private onExplosion(x: number, y: number, radiusWorld: number): void {
     this.audio.playDestroy();
+    this.shakeForExplosion(x, y, radiusWorld);
     const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
     const lit = this.flashLitPool.pop() ?? makeLitCells();
     this.flashes.push({
@@ -1273,9 +1293,89 @@ export class Game {
     }
   }
 
+  /**
+   * Run is lost: play the death sequence (shake, slow time to a stop, close the iris), then
+   * show the results screen with the iris opening from the centre.
+   */
   endRun(): void {
     if (this.runOver) return;
     this.runOver = true;
+    this.aimState.active = false;
+    this.aimState.isDragging = false;
+    this.deathSeqT = 0;
+    this.deathTimeScale = 1;
+    this.deathClosing = false;
+    this.addScreenShake(DEATH_SEQ.shakeAmplitude);
+    this.hud.update(this, performance.now(), true);
+  }
+
+  /** Kick the screen shake to at least `amp` CSS pixels (stronger kicks win). */
+  addScreenShake(amp: number): void {
+    if (amp > this.shakeAmp) this.shakeAmp = Math.min(SHAKE.maxAmplitude, amp);
+  }
+
+  /** Larger blasts (rockets, grenades, explosive blight) shake the screen; small pops do not. */
+  private shakeForExplosion(x: number, y: number, radiusWorld: number): void {
+    const radCells = radiusWorld / this.world.cellSize;
+    if (radCells < SHAKE.minBlastCells) return;
+    // Fade out for blasts away from the view so off-screen explosions barely register.
+    const cam = this.camera;
+    const dx = Math.abs(cam.worldToScreenX(x) - cam.viewW / 2) - cam.viewW / 2;
+    const dy = Math.abs(cam.worldToScreenY(y) - cam.viewH / 2) - cam.viewH / 2;
+    const outside = Math.max(0, dx, dy);
+    const falloff = Math.max(0, 1 - outside / SHAKE.offscreenFalloffPx);
+    if (falloff <= 0) return;
+    this.addScreenShake(SHAKE.perBlastCell * radCells * falloff);
+  }
+
+  /** Apply and decay the screen shake on the game canvas (the UI stays put). */
+  private updateScreenShake(real: number): void {
+    if (this.shakeAmp <= 0) return;
+    this.shakeAmp = Math.max(0, this.shakeAmp - real * SHAKE.decayPerSecond * Math.max(1, this.shakeAmp));
+    if (this.shakeAmp < 0.35) {
+      this.shakeAmp = 0;
+      this.canvas.style.transform = "";
+      return;
+    }
+    const ox = Math.round((Math.random() * 2 - 1) * this.shakeAmp);
+    const oy = Math.round((Math.random() * 2 - 1) * this.shakeAmp);
+    this.canvas.style.transform = `translate(${ox}px, ${oy}px)`;
+  }
+
+  private updateDeathSequence(real: number): void {
+    if (this.deathSeqT < 0) return;
+    this.deathSeqT += real;
+    const t = this.deathSeqT;
+    const D = DEATH_SEQ;
+    // Ease sim time down to a full stop.
+    const p = Math.min(1, t / D.slowSeconds);
+    this.deathTimeScale = (1 - p) * (1 - p);
+    if (!this.deathClosing && t >= D.slowSeconds + D.holdSeconds) {
+      this.deathClosing = true;
+      this.transition.close(D.closeSeconds, () => {
+        if (this.deathSeqT < 0) return; // cancelled (e.g. restarted mid-close)
+        this.cancelDeathSequence();
+        this.finishRun();
+        this.transition.reveal(D.revealSeconds);
+      });
+    }
+  }
+
+  /** Leaving the run mid-sequence (menu/upgrades): stop it and open the iris if it was closing. */
+  private abortDeathSequence(): void {
+    if (this.deathSeqT < 0) return;
+    const wasClosing = this.deathClosing;
+    this.cancelDeathSequence();
+    if (wasClosing) this.transition.reveal(DEATH_SEQ.revealSeconds);
+  }
+
+  private cancelDeathSequence(): void {
+    this.deathSeqT = -1;
+    this.deathTimeScale = 1;
+    this.deathClosing = false;
+  }
+
+  private finishRun(): void {
     this.paused = true;
     const newBests = this.bankCurrentRun();
     this.resultsScreen.show(newBests);
@@ -1308,7 +1408,7 @@ export class Game {
     this.last = now;
     const t0 = performance.now();
     if (!this.paused) {
-      this.acc += real * this.timeScale;
+      this.acc += real * this.timeScale * this.deathTimeScale;
       const maxSteps = SIM.maxStepsPerFrame * Math.max(1, this.timeScale);
       let steps = 0;
       while (this.acc >= SIM.dt && steps < maxSteps) {
@@ -1321,6 +1421,9 @@ export class Game {
         this.camera.update(real, this.soldiers);
       }
     }
+    this.updateDeathSequence(real);
+    this.updateScreenShake(real);
+    this.transition.update(real);
     const t1 = performance.now();
     this.updateFlashPolygons();
     this.terrain.update();
@@ -1345,6 +1448,28 @@ export class Game {
     requestAnimationFrame(this.frame);
   }
 }
+
+/** Screen shake tuning (CSS pixels / real seconds). */
+const SHAKE = {
+  /** Blasts smaller than this (cluster mini-bombs, tiny blight pops) don't shake. */
+  minBlastCells: 2,
+  /** Amplitude per cell of blast radius: rocket (2.5) ≈ 2px, grenade (2.8) ≈ 2.2px. */
+  perBlastCell: 0.8,
+  maxAmplitude: 6,
+  /** Linear decay rate, scaled by amplitude so kicks settle in ~0.3-0.45s. */
+  decayPerSecond: 6,
+  /** Distance beyond the screen edge at which a blast no longer shakes. */
+  offscreenFalloffPx: 240,
+};
+
+/** Timings (real seconds) for the last-soldier death sequence and level intro. */
+const DEATH_SEQ = {
+  shakeAmplitude: 5,
+  slowSeconds: 1.3,
+  holdSeconds: 0.25,
+  closeSeconds: 0.75,
+  revealSeconds: 0.9,
+};
 
 // Re-export for convenience in renderers.
 export { BULLET, COLORS, GROWTH };
