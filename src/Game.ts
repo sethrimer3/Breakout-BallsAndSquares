@@ -8,6 +8,7 @@ import { Soldier, baseSoldierStats, type SecondaryWeaponType, type SoldierStats 
 import { MUZZLE_FLASH_MULTIPLIER, SaveManager, type SoldierBehavior } from "./progression/SaveManager";
 import { UpgradeManager } from "./progression/UpgradeManager";
 import { Renderer } from "./rendering/Renderer";
+import { ScreenTransition } from "./rendering/ScreenTransition";
 import { TerrainRenderer } from "./rendering/TerrainRenderer";
 import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
@@ -97,6 +98,16 @@ export class Game {
   private bankedThisRun = false;
   onUpgradePurchased?: () => void;
   timeScale = 1;
+  /** Full-screen iris used for level intro and run-end transitions. */
+  readonly transition = new ScreenTransition();
+  /**
+   * Last-soldier death sequence (real seconds since it started), or -1 when not running.
+   * Shakes the screen, slows sim time to a stop, then closes the iris before results show.
+   */
+  private deathSeqT = -1;
+  /** Extra sim-time multiplier driven by the death sequence (1 = normal speed). */
+  private deathTimeScale = 1;
+  private deathClosing = false;
   showChunkBorders = false;
   debug = new URLSearchParams(location.search).has("debug") || import.meta.env.DEV;
   debugInfo = { fps: 0, frameMs: 0, simMs: 0, lightMs: 0 };
@@ -292,6 +303,8 @@ export class Game {
     this.markerMode = false;
     this.camera.reset();
     this.camera.setViewport(this.canvas.clientWidth, this.canvas.clientHeight);
+    this.cancelDeathSequence();
+    this.transition.reveal(DEATH_SEQ.revealSeconds);
     this.hud.update(this, performance.now(), true);
   }
 
@@ -340,6 +353,7 @@ export class Game {
   }
 
   openUpgrades(): void {
+    this.abortDeathSequence();
     this.aimState.active = false;
     this.aimState.isDragging = false;
     this.pauseMenu.hide();
@@ -358,6 +372,7 @@ export class Game {
   }
 
   openMainMenu(): void {
+    this.abortDeathSequence();
     this.aimState.active = false;
     this.aimState.isDragging = false;
     this.bankCurrentRun();
@@ -1273,9 +1288,66 @@ export class Game {
     }
   }
 
+  /**
+   * Run is lost: play the death sequence (shake, slow time to a stop, close the iris), then
+   * show the results screen with the iris opening from the centre.
+   */
   endRun(): void {
     if (this.runOver) return;
     this.runOver = true;
+    this.aimState.active = false;
+    this.aimState.isDragging = false;
+    this.deathSeqT = 0;
+    this.deathTimeScale = 1;
+    this.deathClosing = false;
+    this.hud.update(this, performance.now(), true);
+  }
+
+  private updateDeathSequence(real: number): void {
+    if (this.deathSeqT < 0) return;
+    this.deathSeqT += real;
+    const t = this.deathSeqT;
+    const D = DEATH_SEQ;
+    // Small decaying shake applied to the game canvas (UI stays put).
+    if (t < D.shakeSeconds) {
+      const k = 1 - t / D.shakeSeconds;
+      const amp = D.shakeAmplitude * k * k;
+      const ox = Math.round((Math.random() * 2 - 1) * amp);
+      const oy = Math.round((Math.random() * 2 - 1) * amp);
+      this.canvas.style.transform = `translate(${ox}px, ${oy}px)`;
+    } else if (this.canvas.style.transform) {
+      this.canvas.style.transform = "";
+    }
+    // Ease sim time down to a full stop.
+    const p = Math.min(1, t / D.slowSeconds);
+    this.deathTimeScale = (1 - p) * (1 - p);
+    if (!this.deathClosing && t >= D.slowSeconds + D.holdSeconds) {
+      this.deathClosing = true;
+      this.transition.close(D.closeSeconds, () => {
+        if (this.deathSeqT < 0) return; // cancelled (e.g. restarted mid-close)
+        this.cancelDeathSequence();
+        this.finishRun();
+        this.transition.reveal(D.revealSeconds);
+      });
+    }
+  }
+
+  /** Leaving the run mid-sequence (menu/upgrades): stop it and open the iris if it was closing. */
+  private abortDeathSequence(): void {
+    if (this.deathSeqT < 0) return;
+    const wasClosing = this.deathClosing;
+    this.cancelDeathSequence();
+    if (wasClosing) this.transition.reveal(DEATH_SEQ.revealSeconds);
+  }
+
+  private cancelDeathSequence(): void {
+    this.deathSeqT = -1;
+    this.deathTimeScale = 1;
+    this.deathClosing = false;
+    this.canvas.style.transform = "";
+  }
+
+  private finishRun(): void {
     this.paused = true;
     const newBests = this.bankCurrentRun();
     this.resultsScreen.show(newBests);
@@ -1308,7 +1380,7 @@ export class Game {
     this.last = now;
     const t0 = performance.now();
     if (!this.paused) {
-      this.acc += real * this.timeScale;
+      this.acc += real * this.timeScale * this.deathTimeScale;
       const maxSteps = SIM.maxStepsPerFrame * Math.max(1, this.timeScale);
       let steps = 0;
       while (this.acc >= SIM.dt && steps < maxSteps) {
@@ -1321,6 +1393,8 @@ export class Game {
         this.camera.update(real, this.soldiers);
       }
     }
+    this.updateDeathSequence(real);
+    this.transition.update(real);
     const t1 = performance.now();
     this.updateFlashPolygons();
     this.terrain.update();
@@ -1345,6 +1419,16 @@ export class Game {
     requestAnimationFrame(this.frame);
   }
 }
+
+/** Timings (real seconds) for the last-soldier death sequence and level intro. */
+const DEATH_SEQ = {
+  shakeSeconds: 0.4,
+  shakeAmplitude: 5,
+  slowSeconds: 1.3,
+  holdSeconds: 0.25,
+  closeSeconds: 0.75,
+  revealSeconds: 0.9,
+};
 
 // Re-export for convenience in renderers.
 export { BULLET, COLORS, GROWTH };
