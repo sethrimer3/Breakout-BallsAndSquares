@@ -373,3 +373,34 @@ describe("Soldier Placement & Slingshot Aim Mechanics", () => {
     });
   });
 });
+
+describe("Deploy clearance", () => {
+  it("nudges a soldier dropped inside a wall to a spot at least 1px clear of terrain", async () => {
+    const { findClearDeployPoint, circleIsClear } = await import("../src/systems/PhysicsSystem");
+    const world = new PixelWorld({ width: 32, height: 32, cellSize: 8, roomSize: 6 });
+    // Solid block filling x in [0, 10) cells; open space to the right.
+    for (let y = 0; y < world.height; y++) {
+      for (let x = 0; x < 10; x++) world.health[y * world.width + x] = 50;
+    }
+    const r = SOLDIER.collisionRadius;
+    const p = findClearDeployPoint(world, 9.5 * 8, 100, r, 1)!;
+    expect(p).not.toBeNull();
+    expect(circleIsClear(world, p.x, p.y, r + 1)).toBe(true);
+    expect(p.x - r).toBeGreaterThanOrEqual(80 + 1);
+    // And it stays close to where the player clicked.
+    expect(Math.hypot(p.x - 9.5 * 8, p.y - 100)).toBeLessThan(16);
+  });
+
+  it("keeps an already clear click exactly where it was", async () => {
+    const { findClearDeployPoint } = await import("../src/systems/PhysicsSystem");
+    const world = new PixelWorld({ width: 32, height: 32, cellSize: 8, roomSize: 6 });
+    expect(findClearDeployPoint(world, 120, 130, SOLDIER.collisionRadius, 1)).toEqual({ x: 120, y: 130 });
+  });
+
+  it("refuses when nothing nearby is open", async () => {
+    const { findClearDeployPoint } = await import("../src/systems/PhysicsSystem");
+    const world = new PixelWorld({ width: 32, height: 32, cellSize: 8, roomSize: 6 });
+    world.health.fill(50);
+    expect(findClearDeployPoint(world, 120, 130, SOLDIER.collisionRadius, 1, 4)).toBeNull();
+  });
+});

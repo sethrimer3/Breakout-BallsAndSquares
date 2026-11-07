@@ -5,7 +5,6 @@ import type { Bullet } from "../entities/Bullet";
 import type { Soldier } from "../entities/Soldier";
 import { PKind } from "../entities/ParticleSystem";
 import type { Game } from "../Game";
-import { hasLineOfSight } from "../systems/PhysicsSystem";
 import { FieryFlashRenderer } from "./FieryFlashRenderer";
 import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
@@ -118,7 +117,7 @@ export class Renderer {
     this.drawAdditiveParticles();
     ctx.restore();
 
-    // 4) Fog of war over the whole world; aim and marker stay readable on top.
+    // 4) Fog of war over the whole world; the aim indicator stays readable on top.
     this.fogRenderer.draw(ctx, cam);
     // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
     // its full palette even when it outruns the light creeping after it.
@@ -126,7 +125,6 @@ export class Renderer {
     this.drawGrenades();
     this.drawTurrets();
     this.drawAimIndicator();
-    this.drawMarker();
 
     this.lightRenderer.renderVignette(ctx, w, h);
   }
@@ -401,12 +399,17 @@ export class Renderer {
         ctx.fillStyle = "#ffd84d";
         ctx.strokeStyle = "#fffbe0";
         ctx.lineWidth = 1;
-        const cy = sy - br - (s.maxHealth > 0 ? 9 : 5);
+        // Commander chevron orbits the soldier, pointing where it aims
+        // (the player's aim under manual control, its heading otherwise).
+        const a = s.facingAngle;
+        const orbit = SOLDIER.ringRadius * cam.zoom + 5;
+        ctx.translate(sx + Math.cos(a) * orbit, sy + Math.sin(a) * orbit);
+        ctx.rotate(a + Math.PI / 2);
         ctx.beginPath();
-        ctx.moveTo(sx - 3.5, cy);
-        ctx.lineTo(sx, cy - 3.5);
-        ctx.lineTo(sx + 3.5, cy);
-        ctx.lineTo(sx, cy - 1.5);
+        ctx.moveTo(-3.5, 1.75);
+        ctx.lineTo(0, -1.75);
+        ctx.lineTo(3.5, 1.75);
+        ctx.lineTo(0, 0.25);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
@@ -966,130 +969,8 @@ export class Renderer {
         ctx.lineTo(sx, sy + 10);
         ctx.stroke();
         ctx.restore();
-      } else {
-        // Hovering with mouse when soldiers are deployed: show marker placement preview reticle
-        ctx.save();
-        ctx.strokeStyle = "rgba(0, 240, 255, 0.45)";
-        ctx.lineWidth = 1.5;
-        const r = 8;
-        // Diamond
-        ctx.beginPath();
-        ctx.moveTo(sx, sy - r);
-        ctx.lineTo(sx + r, sy);
-        ctx.lineTo(sx, sy + r);
-        ctx.lineTo(sx - r, sy);
-        ctx.closePath();
-        ctx.stroke();
-
-        // Crosshair ticks
-        ctx.beginPath();
-        ctx.moveTo(sx - r - 4, sy);
-        ctx.lineTo(sx - r + 1, sy);
-        ctx.moveTo(sx + r - 1, sy);
-        ctx.lineTo(sx + r + 4, sy);
-        ctx.moveTo(sx, sy - r - 4);
-        ctx.lineTo(sx, sy - r + 1);
-        ctx.moveTo(sx, sy + r - 1);
-        ctx.lineTo(sx, sy + r + 4);
-        ctx.stroke();
-
-        // Center dot
-        ctx.fillStyle = "rgba(0, 240, 255, 0.75)";
-        ctx.beginPath();
-        ctx.arc(sx, sy, 2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
       }
     }
-  }
-
-  private drawMarker(): void {
-    const { ctx, game } = this;
-    const marker = game.marker;
-    const cam = game.camera;
-
-    if (!marker) return;
-
-    const mx = cam.worldToScreenX(marker.x);
-    const my = cam.worldToScreenY(marker.y);
-
-    // Sight lines from soldiers to marker
-    ctx.save();
-    for (const s of game.soldiers) {
-      if (!s.alive) continue;
-      if (hasLineOfSight(game.world, s.x, s.y, marker.x, marker.y)) {
-        const sx = cam.worldToScreenX(s.x);
-        const sy = cam.worldToScreenY(s.y);
-        ctx.strokeStyle = "rgba(0, 229, 255, 0.4)";
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        ctx.moveTo(sx, sy);
-        ctx.lineTo(mx, my);
-        ctx.stroke();
-      }
-    }
-    ctx.restore();
-
-    // Check if on-screen
-    const w = cam.viewW;
-    const h = cam.viewH;
-    if (mx < -50 || mx > w + 50 || my < -50 || my > h + 50) return;
-
-    const t = (performance.now() - marker.placedAt) / 1000;
-    const zoom = cam.zoom;
-
-    ctx.save();
-    // Expanding radar pulse ring
-    const pulsePhase = (t * 1.5) % 1;
-    const pulseR = (6 + pulsePhase * 22) * zoom;
-    const pulseAlpha = (1 - pulsePhase) * 0.7;
-    ctx.strokeStyle = `rgba(0, 240, 255, ${pulseAlpha})`;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(mx, my, pulseR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Rotating tactical diamond
-    const rot = t * 1.2;
-    const dr = 10 * zoom;
-    ctx.strokeStyle = "#00e5ff";
-    ctx.lineWidth = 2;
-    ctx.shadowColor = "#00e5ff";
-    ctx.shadowBlur = 8;
-    ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
-      const a = rot + (i * Math.PI) / 2;
-      const px = mx + Math.cos(a) * dr;
-      const py = my + Math.sin(a) * dr;
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
-    }
-    ctx.closePath();
-    ctx.stroke();
-
-    // Center core
-    ctx.fillStyle = "#ffffff";
-    ctx.beginPath();
-    ctx.arc(mx, my, 3 * zoom, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Crosshair ticks
-    const tr = 15 * zoom;
-    ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(mx - tr, my);
-    ctx.lineTo(mx - tr + 4 * zoom, my);
-    ctx.moveTo(mx + tr - 4 * zoom, my);
-    ctx.lineTo(mx + tr, my);
-    ctx.moveTo(mx, my - tr);
-    ctx.lineTo(mx, my - tr + 4 * zoom);
-    ctx.moveTo(mx, my + tr - 4 * zoom);
-    ctx.lineTo(mx, my + tr);
-    ctx.stroke();
-
-    ctx.restore();
   }
 
   /** Draw equippable secondary sticky grenades (both flying and stuck to walls). */

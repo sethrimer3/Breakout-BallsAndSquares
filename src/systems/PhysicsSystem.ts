@@ -67,6 +67,44 @@ export function findSpawnPoint(world: PixelWorld, r: number): { x: number; y: nu
   return best;
 }
 
+/**
+ * Nearest point to `(x, y)` where a soldier of radius `r` sits at least `gap`
+ * pixels clear of every wall, block, sub-pixel and the world edge. Searches out
+ * to `maxCells` cells on a half-cell grid; null if nothing nearby is open.
+ */
+export function findClearDeployPoint(
+  world: PixelWorld,
+  x: number,
+  y: number,
+  r: number,
+  gap = 1,
+  maxCells = 12,
+): { x: number; y: number } | null {
+  const rr = r + gap;
+  if (circleIsClear(world, x, y, rr)) return { x, y };
+  const step = world.subCellSize;
+  const n = Math.ceil((maxCells * world.cellSize) / step);
+  let best: { x: number; y: number } | null = null;
+  let bestD = Infinity;
+  for (let ring = 1; ring <= n; ring++) {
+    // Every point on this ring is at least `ring * step` away; stop once
+    // nothing closer than the best hit can remain.
+    if (best && ring * step > Math.sqrt(bestD)) break;
+    for (let j = -ring; j <= ring; j++) {
+      for (let k = -ring; k <= ring; k++) {
+        if (Math.abs(j) !== ring && Math.abs(k) !== ring) continue;
+        const px = x + j * step;
+        const py = y + k * step;
+        const d = (px - x) ** 2 + (py - y) ** 2;
+        if (d >= bestD || !circleIsClear(world, px, py, rr)) continue;
+        bestD = d;
+        best = { x: px, y: py };
+      }
+    }
+  }
+  return best;
+}
+
 /** True if an axis-aligned cell overlaps a circle. */
 export function cellOverlapsCircle(
   cellSize: number,
@@ -280,7 +318,6 @@ export interface PhysicsStats {
 
 export class PhysicsSystem {
   readonly stats: PhysicsStats = { relocations: 0, stuckEvents: 0 };
-  marker: { x: number; y: number } | null = null;
 
   constructor(
     private world: PixelWorld,
@@ -350,93 +387,66 @@ export class PhysicsSystem {
       return true;
     }
 
-    // If a tactical marker is active and within line of sight, bounce directly toward it!
-    let redirected = false;
-    if (this.marker && hasLineOfSight(this.world, s.x, s.y, this.marker.x, this.marker.y)) {
-      const toMx = this.marker.x - s.x;
-      const toMy = this.marker.y - s.y;
-      const dist = Math.hypot(toMx, toMy);
-      if (dist > 1e-4) {
-        let tdx = toMx / dist;
-        let tdy = toMy / dist;
-        // Keep velocity pointing away from or along the wall face to prevent re-entering collision
-        const dotN = tdx * nx + tdy * ny;
-        if (dotN <= 0.05) {
-          tdx += (0.05 - dotN) * nx;
-          tdy += (0.05 - dotN) * ny;
-          const tlen = Math.hypot(tdx, tdy) || 1;
-          tdx /= tlen;
-          tdy /= tlen;
-        }
-        s.vx = tdx * s.speed;
-        s.vy = tdy * s.speed;
-        s.facingAngle = Math.atan2(s.vy, s.vx);
-        redirected = true;
-      }
-    }
-
-    if (!redirected) {
-      if (s.behavior === "orthogonal") {
-        if (Math.abs(nx) > Math.abs(ny)) {
-          s.vx = -s.vx;
-          s.vy = 0;
-          if (Math.abs(s.vx) < 1e-4) s.vx = nx > 0 ? s.speed : -s.speed;
-        } else {
-          s.vy = -s.vy;
-          s.vx = 0;
-          if (Math.abs(s.vy) < 1e-4) s.vy = ny > 0 ? s.speed : -s.speed;
-        }
-        s.facingAngle = Math.atan2(s.vy, s.vx);
-      } else if (s.behavior === "vertical") {
-        s.vx = 0;
-        s.vy = -s.vy;
-        if (Math.abs(s.vy) < 1e-4) s.vy = ny >= 0 ? s.speed : -s.speed;
-        s.facingAngle = Math.atan2(s.vy, 0);
-      } else if (s.behavior === "horizontal") {
-        s.vy = 0;
+    if (s.behavior === "orthogonal") {
+      if (Math.abs(nx) > Math.abs(ny)) {
         s.vx = -s.vx;
-        if (Math.abs(s.vx) < 1e-4) s.vx = nx >= 0 ? s.speed : -s.speed;
-        s.facingAngle = Math.atan2(0, s.vx);
-      } else if (s.behavior === "turn_left") {
-        let nvx = s.vy;
-        let nvy = -s.vx;
-        if (nvx * nx + nvy * ny <= 0.05) {
-          nvx = s.vx - 2 * vn * nx;
-          nvy = s.vy - 2 * vn * ny;
-        }
-        const nlen = Math.hypot(nvx, nvy) || 1;
-        s.vx = (nvx / nlen) * s.speed;
-        s.vy = (nvy / nlen) * s.speed;
-        s.facingAngle = Math.atan2(s.vy, s.vx);
-      } else if (s.behavior === "turn_right") {
-        let nvx = -s.vy;
-        let nvy = s.vx;
-        if (nvx * nx + nvy * ny <= 0.05) {
-          nvx = s.vx - 2 * vn * nx;
-          nvy = s.vy - 2 * vn * ny;
-        }
-        const nlen = Math.hypot(nvx, nvy) || 1;
-        s.vx = (nvx / nlen) * s.speed;
-        s.vy = (nvy / nlen) * s.speed;
-        s.facingAngle = Math.atan2(s.vy, s.vx);
+        s.vy = 0;
+        if (Math.abs(s.vx) < 1e-4) s.vx = nx > 0 ? s.speed : -s.speed;
       } else {
-        let vx = s.vx - 2 * vn * nx;
-        let vy = s.vy - 2 * vn * ny;
-        // Small random jitter to break axis-locked loops; keep it pointing away from the wall.
-        const a = this.rng.range(-SOLDIER.bounceJitterDeg, SOLDIER.bounceJitterDeg) * DEG;
-        const ca = Math.cos(a);
-        const sa = Math.sin(a);
-        const jx = vx * ca - vy * sa;
-        const jy = vx * sa + vy * ca;
-        if (jx * nx + jy * ny > 0) {
-          vx = jx;
-          vy = jy;
-        }
-        const vlen = Math.hypot(vx, vy) || 1;
-        s.vx = (vx / vlen) * s.speed;
-        s.vy = (vy / vlen) * s.speed;
-        s.facingAngle = Math.atan2(s.vy, s.vx);
+        s.vy = -s.vy;
+        s.vx = 0;
+        if (Math.abs(s.vy) < 1e-4) s.vy = ny > 0 ? s.speed : -s.speed;
       }
+      s.facingAngle = Math.atan2(s.vy, s.vx);
+    } else if (s.behavior === "vertical") {
+      s.vx = 0;
+      s.vy = -s.vy;
+      if (Math.abs(s.vy) < 1e-4) s.vy = ny >= 0 ? s.speed : -s.speed;
+      s.facingAngle = Math.atan2(s.vy, 0);
+    } else if (s.behavior === "horizontal") {
+      s.vy = 0;
+      s.vx = -s.vx;
+      if (Math.abs(s.vx) < 1e-4) s.vx = nx >= 0 ? s.speed : -s.speed;
+      s.facingAngle = Math.atan2(0, s.vx);
+    } else if (s.behavior === "turn_left") {
+      let nvx = s.vy;
+      let nvy = -s.vx;
+      if (nvx * nx + nvy * ny <= 0.05) {
+        nvx = s.vx - 2 * vn * nx;
+        nvy = s.vy - 2 * vn * ny;
+      }
+      const nlen = Math.hypot(nvx, nvy) || 1;
+      s.vx = (nvx / nlen) * s.speed;
+      s.vy = (nvy / nlen) * s.speed;
+      s.facingAngle = Math.atan2(s.vy, s.vx);
+    } else if (s.behavior === "turn_right") {
+      let nvx = -s.vy;
+      let nvy = s.vx;
+      if (nvx * nx + nvy * ny <= 0.05) {
+        nvx = s.vx - 2 * vn * nx;
+        nvy = s.vy - 2 * vn * ny;
+      }
+      const nlen = Math.hypot(nvx, nvy) || 1;
+      s.vx = (nvx / nlen) * s.speed;
+      s.vy = (nvy / nlen) * s.speed;
+      s.facingAngle = Math.atan2(s.vy, s.vx);
+    } else {
+      let vx = s.vx - 2 * vn * nx;
+      let vy = s.vy - 2 * vn * ny;
+      // Small random jitter to break axis-locked loops; keep it pointing away from the wall.
+      const a = this.rng.range(-SOLDIER.bounceJitterDeg, SOLDIER.bounceJitterDeg) * DEG;
+      const ca = Math.cos(a);
+      const sa = Math.sin(a);
+      const jx = vx * ca - vy * sa;
+      const jy = vx * sa + vy * ca;
+      if (jx * nx + jy * ny > 0) {
+        vx = jx;
+        vy = jy;
+      }
+      const vlen = Math.hypot(vx, vy) || 1;
+      s.vx = (vx / vlen) * s.speed;
+      s.vy = (vy / vlen) * s.speed;
+      s.facingAngle = Math.atan2(s.vy, s.vx);
     }
     return true;
   }

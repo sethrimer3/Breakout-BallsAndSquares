@@ -42,7 +42,7 @@ function setupMockWindow() {
   return { mockWindow, mockCanvas, windowListeners, canvasListeners };
 }
 
-describe("Tactical Marker Mechanics", () => {
+describe("Line of sight, bouncing and click dispatch", () => {
   describe("Line of Sight (hasLineOfSight)", () => {
     it("returns true across clear empty space", () => {
       const world = new PixelWorld({ width: 32, height: 32, cellSize: 8, roomSize: 10 });
@@ -94,73 +94,8 @@ describe("Tactical Marker Mechanics", () => {
     });
   });
 
-  describe("Soldier Bouncing toward Marker", () => {
-    it("bounces directly toward marker when marker is in sight", () => {
-      const world = new PixelWorld({ width: 32, height: 32, cellSize: 8, roomSize: 10 });
-      const rng = new Rng(1);
-      const phys = new PhysicsSystem(world, rng);
-
-      // Place a wall on the left: cx=0, all cy are solid
-      for (let y = 0; y < world.height; y++) {
-        world.health[y * world.width + 0] = 100;
-      }
-
-      // Marker placed out in the room at (100, 120)
-      const marker = { x: 100, y: 120 };
-      phys.marker = marker;
-
-      // Soldier moving left towards the wall at x=8
-      const speed = 120;
-      const s = new Soldier(10, 50, -1, 0, speed);
-
-      // Overlap with wall on the left (wall is at x < 8)
-      // Collision resolution pushes soldier to x=8 + radius, contacts wall with normal nx=1, ny=0
-      s.x = 8 + s.radius - 0.5; // overlapping slightly
-      const bounced = phys.resolve(s);
-      expect(bounced).toBe(true);
-
-      // Expected direction directly towards (100, 120)
-      const toMx = marker.x - s.x;
-      const toMy = marker.y - s.y;
-      const dist = Math.hypot(toMx, toMy);
-      const expectedVx = (toMx / dist) * speed;
-      const expectedVy = (toMy / dist) * speed;
-
-      expect(s.vx).toBeCloseTo(expectedVx, 2);
-      expect(s.vy).toBeCloseTo(expectedVy, 2);
-      expect(Math.hypot(s.vx, s.vy)).toBeCloseTo(speed, 2);
-    });
-
-    it("bounces normally with reflection when marker is blocked by an obstacle", () => {
-      const world = new PixelWorld({ width: 32, height: 32, cellSize: 8, roomSize: 10 });
-      const rng = new Rng(1);
-      const phys = new PhysicsSystem(world, rng);
-
-      // Wall on the left: cx=0
-      for (let y = 0; y < world.height; y++) {
-        world.health[y * world.width + 0] = 100;
-      }
-      // Obstacle wall at cx=5 (world x = 40..48)
-      for (let y = 0; y < world.height; y++) {
-        world.health[y * world.width + 5] = 100;
-      }
-
-      // Marker is behind the obstacle wall at x=100
-      phys.marker = { x: 100, y: 50 };
-
-      // Soldier hits wall on left at (10, 50) moving left
-      const speed = 120;
-      const s = new Soldier(8 + SOLDIER.collisionRadius - 0.5, 50, -1, 0, speed);
-      const bounced = phys.resolve(s);
-      expect(bounced).toBe(true);
-
-      // Since obstacle blocks line of sight to marker, reflection reflects vx to positive
-      // (with slight jitter), NOT aiming at the marker through the wall
-      expect(s.vx).toBeGreaterThan(0);
-      expect(Math.hypot(s.vx, s.vy)).toBeCloseTo(speed, 2);
-    });
-
-    it("bounces normally when no marker is set", () => {
+  describe("Soldier bouncing", () => {
+    it("reflects off a wall at full speed", () => {
       const world = new PixelWorld({ width: 32, height: 32, cellSize: 8, roomSize: 10 });
       const rng = new Rng(42);
       const phys = new PhysicsSystem(world, rng);
@@ -169,7 +104,6 @@ describe("Tactical Marker Mechanics", () => {
       for (let y = 0; y < world.height; y++) {
         world.health[y * world.width + 0] = 100;
       }
-      phys.marker = null;
 
       const speed = 100;
       const s = new Soldier(8 + SOLDIER.collisionRadius - 0.5, 50, -1, 0, speed);
@@ -180,7 +114,7 @@ describe("Tactical Marker Mechanics", () => {
     });
   });
 
-  describe("Input and Game marker placement", () => {
+  describe("Input click dispatch", () => {
     it("dispatches onPrimaryClick when canPlace is false and no drag occurred", () => {
       const { mockCanvas } = setupMockWindow();
       let clickPos: { sx: number; sy: number } | null = null;

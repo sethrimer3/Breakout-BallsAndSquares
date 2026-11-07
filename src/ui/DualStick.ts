@@ -61,14 +61,14 @@ export class DualStick {
     parent.append(this.root);
   }
 
+  /**
+   * True only when touch is the primary input (phones, tablets). Desktops and
+   * touchscreen laptops report a fine, hovering primary pointer and use WASD +
+   * mouse instead, so they never see the sticks.
+   */
   private isTouchDevice(): boolean {
-    return (
-      (typeof window !== "undefined" &&
-        (window.matchMedia("(pointer: coarse)").matches ||
-          navigator.maxTouchPoints > 0 ||
-          "ontouchstart" in window)) ??
-      false
-    );
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
+    return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
   }
 
   private bindEvents(): void {
