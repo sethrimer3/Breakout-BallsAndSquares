@@ -12,6 +12,7 @@ export class AudioSystem {
   private lastImpactAt = 0;
   private lastDestroyAt = 0;
   private lastPickupAt = 0;
+  private lastGlassAt = 0;
 
   constructor(private save: SaveManager) {}
 
@@ -222,5 +223,87 @@ export class AudioSystem {
     osc.connect(g).connect(ctx.destination);
     osc.start(t);
     osc.stop(t + 0.13);
+  }
+
+  /** Short pneumatic hiss with a soft mechanical clunk as a blast door slides open. */
+  playDoorOpen(): void {
+    const ctx = this.ensure();
+    if (!ctx || !this.noiseBuf) return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.setValueAtTime(900, t);
+    filter.frequency.exponentialRampToValueAtTime(2400, t + 0.18);
+    filter.Q.value = 0.9;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(this.vol(0.001), t);
+    gain.gain.exponentialRampToValueAtTime(this.vol(0.12), t + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.start(t);
+    src.stop(t + 0.23);
+
+    const osc = ctx.createOscillator();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(140, t);
+    osc.frequency.exponentialRampToValueAtTime(70, t + 0.08);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(this.vol(0.06), t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    osc.connect(og).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.1);
+  }
+
+  /** Bright tinkle of a glass pane bursting (throttled, so a chain sounds like a cascade). */
+  playGlassShatter(): void {
+    const now = performance.now();
+    if (now - this.lastGlassAt < 30) return;
+    this.lastGlassAt = now;
+    const ctx = this.ensure();
+    if (!ctx || !this.noiseBuf) return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "highpass";
+    filter.frequency.setValueAtTime(3800 + Math.random() * 1600, t);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(this.vol(0.1), t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.start(t);
+    src.stop(t + 0.1);
+
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(2600 + Math.random() * 1400, t);
+    const og = ctx.createGain();
+    og.gain.setValueAtTime(this.vol(0.04), t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.connect(og).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.13);
+  }
+
+  /** Rising two-step chirp as a dormant sentry boots up. */
+  playSentryWake(): void {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    [440, 880].forEach((freq, idx) => {
+      const start = t + idx * 0.07;
+      const osc = ctx.createOscillator();
+      osc.type = "square";
+      osc.frequency.setValueAtTime(freq, start);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(this.vol(0.05), start);
+      g.gain.exponentialRampToValueAtTime(0.001, start + 0.06);
+      osc.connect(g).connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.07);
+    });
   }
 }

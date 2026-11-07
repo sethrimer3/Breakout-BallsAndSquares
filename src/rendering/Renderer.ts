@@ -11,6 +11,12 @@ import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
 import { createSprites, type Sprites } from "./sprites";
 
+/** Door core lightened toward the rim as it takes damage. */
+function doorCoreDamaged(d: number): string {
+  const l = Math.round(35 + d * 70);
+  return `rgb(${l}, ${l + 6}, ${l + 16})`;
+}
+
 function hexColor(c: number): string {
   return `#${c.toString(16).padStart(6, "0")}`;
 }
@@ -65,6 +71,7 @@ export class Renderer {
     ctx.drawImage(this.sprites.soldierGlow, rcx - rRad, rcy - rRad, rRad * 2, rRad * 2);
 
     game.terrain.draw(ctx, cam, game.showChunkBorders);
+    this.drawDoors();
 
     // Subtle starting-room frame so the spawn zone stays recognizable.
     const cs = game.world.cellSize;
@@ -82,6 +89,8 @@ export class Renderer {
     //    scene + additive air-scatter cone so shadows behind walls & soldiers pop.
     this.lightRenderer.renderLighting(ctx, game, this.dpr);
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
+    game.terrain.drawTierGlow(ctx, cam, game.runStats.time);
+    this.drawSentries();
     const wallClockMs = performance.now();
     const still = this.motion.matches;
     game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);
@@ -233,16 +242,88 @@ export class Renderer {
     for (let i = 0; i < cores.length; i++) {
       const c = cores[i];
       if (!c.alive) continue;
-      const wx = (c.cx + 1) * cs;
-      const wy = (c.cy + 1) * cs;
+      const wx = (c.cx + c.size / 2) * cs;
+      const wy = (c.cy + c.size / 2) * cs;
       const sx = cam.worldToScreenX(wx);
       const sy = cam.worldToScreenY(wy);
-      const rad = cs * 3.8 * cam.zoom * (0.9 + 0.15 * pulse);
+      const rad = cs * (c.size === 1 ? 1.6 : 3.8) * cam.zoom * (0.9 + 0.15 * pulse);
       if (sx + rad < 0 || sy + rad < 0 || sx - rad > cam.viewW || sy - rad > cam.viewH) continue;
       ctx.globalAlpha = 0.42 * pulse;
       ctx.drawImage(this.sprites.crimsonGlow, sx - rad, sy - rad, rad * 2, rad * 2);
     }
     ctx.globalAlpha = 1;
+  }
+
+  /**
+   * Blast doors: every door pixel is a dark core inside a thin lighter rim
+   * (outer 10%), so doors read apart from the walls around them.
+   */
+  private drawDoors(): void {
+    const { ctx, game } = this;
+    const w = game.world;
+    if (w.doors.length === 0) return;
+    const cam = game.camera;
+    const cs = w.cellSize;
+    const sz = cs * cam.zoom;
+    const x0 = cam.screenToWorldX(0) / cs - 1;
+    const y0 = cam.screenToWorldY(0) / cs - 1;
+    const x1 = cam.screenToWorldX(cam.viewW) / cs + 1;
+    const y1 = cam.screenToWorldY(cam.viewH) / cs + 1;
+    const rim = Math.max(1, sz * 0.1);
+    for (const d of w.doors) {
+      if (d.x1 < x0 || d.y1 < y0 || d.x0 > x1 || d.y0 > y1) continue;
+      for (const i of d.cells) {
+        const hp = w.health[i];
+        if (hp === 0) continue;
+        const cx = i % w.width;
+        const cy = (i - cx) / w.width;
+        const sx = Math.round(cam.worldToScreenX(cx * cs));
+        const sy = Math.round(cam.worldToScreenY(cy * cs));
+        const ex = Math.round(cam.worldToScreenX((cx + 1) * cs));
+        const ey = Math.round(cam.worldToScreenY((cy + 1) * cs));
+        ctx.fillStyle = COLORS.doorRim;
+        ctx.fillRect(sx, sy, ex - sx, ey - sy);
+        const maxHp = w.maxHealthAt(cx, cy);
+        ctx.fillStyle = hp < maxHp ? doorCoreDamaged(1 - hp / maxHp) : COLORS.doorCore;
+        ctx.fillRect(sx + rim, sy + rim, ex - sx - rim * 2, ey - sy - rim * 2);
+      }
+    }
+  }
+
+  /** Research-base sentries: dark and slumped while dormant, red-eyed once awake. */
+  private drawSentries(): void {
+    const { ctx, game } = this;
+    const cam = game.camera;
+    const z = cam.zoom;
+    for (const t of game.sentries.sentries) {
+      const sx = cam.worldToScreenX(t.x);
+      const sy = cam.worldToScreenY(t.y);
+      if (sx < -40 || sy < -40 || sx > cam.viewW + 40 || sy > cam.viewH + 40) continue;
+      const baseR = Math.max(2.5, 3.6 * z);
+      // Boot flicker for the first moment after waking.
+      const live = t.awake && (t.wakeAge > 0.5 || Math.floor(t.wakeAge * 20) % 2 === 0);
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.fillStyle = "#151b24";
+      ctx.fillRect(-baseR, -baseR, baseR * 2, baseR * 2);
+      ctx.strokeStyle = live ? "#5d7590" : "#2c3644";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(-baseR + 0.5, -baseR + 0.5, baseR * 2 - 1, baseR * 2 - 1);
+      ctx.rotate(t.angle);
+      const barrelLen = Math.max(4, 6 * z);
+      const barrelW = Math.max(1, 1.4 * z);
+      ctx.fillStyle = live ? "#6c859e" : "#2f3a48";
+      ctx.fillRect(0, -barrelW / 2, barrelLen, barrelW);
+      ctx.fillStyle = live ? "#2c3b4d" : "#1c242f";
+      ctx.beginPath();
+      ctx.arc(0, 0, baseR * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = live ? (t.hasTarget ? "#ff4040" : "#ff9a3b") : "#3a2a2a";
+      ctx.beginPath();
+      ctx.arc(baseR * 0.3, 0, Math.max(0.8, 1.1 * z), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   private drawGrowthPulses(): void {

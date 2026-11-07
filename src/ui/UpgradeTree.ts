@@ -89,10 +89,10 @@ export interface CategoryInfo {
 export const CATEGORIES: readonly CategoryInfo[] = [
   {
     id: "systems",
-    name: "CORE / MONEY / BLIGHT",
+    name: "CORE / MONEY / BLIGHT / BASE",
     icon: "soldier",
     color: UI_COLORS.soldier,
-    branches: ["core", "resources", "blight"],
+    branches: ["core", "resources", "blight", "facility"],
   },
   {
     id: "primary",
@@ -138,7 +138,7 @@ interface TreeSource {
 }
 
 export function categoryForBranch(b: UpgradeBranch): UpgradeCategory {
-  if (b === "core" || b === "resources" || b === "blight") return "systems";
+  if (b === "core" || b === "resources" || b === "blight" || b === "facility") return "systems";
   if (b === "grenade" || b === "turret") return "secondary";
   if (b === "soldier") return "soldiers";
   return "primary";
@@ -156,6 +156,7 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   katana: { icon: "katana", color: "#38d6ff" },
   grenade: { icon: "grenade", color: "#ff9d3b" },
   turret: { icon: "turret", color: "#38d6ff" },
+  facility: { icon: "keycard", color: "#7fb2ff" },
   soldier: { icon: "soldier", color: UI_COLORS.soldier },
 };
 
@@ -248,7 +249,7 @@ export class UpgradeTree {
             <div class="tree-categories">
               <button class="tree-cat-btn active expanded" data-cat="systems">
                 ${sprite("soldier", { color: UI_COLORS.soldier, scale: 1 })}
-                <span class="tree-cat-name">CORE / MONEY / BLIGHT</span>
+                <span class="tree-cat-name">CORE / MONEY / BLIGHT / BASE</span>
                 <span class="cat-caret">▼</span>
               </button>
               <button class="tree-cat-btn" data-cat="primary">
@@ -272,6 +273,7 @@ export class UpgradeTree {
                 <button class="tree-tab active" data-tab="core">${tabHtml("core", "CORE")}</button>
                 <button class="tree-tab" data-tab="resources">${tabHtml("resources", "RESOURCES")}</button>
                 <button class="tree-tab" data-tab="blight">${tabHtml("blight", "BLIGHT")}</button>
+                <button class="tree-tab" data-tab="facility">${tabHtml("facility", "RESEARCH BASE")}</button>
               </div>
               <div class="tree-cat-panel hidden" data-cat="primary">
                 <button class="tree-tab" data-tab="pistol">${tabHtml("pistol", "PISTOL")}</button>
@@ -531,6 +533,8 @@ export class UpgradeTree {
         this.subEl.textContent = "RESOURCE EXTRACTION — GOLD DROPS, TIER 2 ORANGE & TIER 3 GREEN CRYSTALS";
       } else if (tab === "blight") {
         this.subEl.textContent = "BLIGHT CONTAINMENT — REPLICATION DAMPENING & BLIGHT CORE PURGES";
+      } else if (tab === "facility") {
+        this.subEl.textContent = "RESEARCH BASE SYSTEMS — KEYCARD ACCESS, DORMANT SENTRIES & FACILITY MAPPING";
       } else if (tab === "pistol") {
         this.subEl.textContent = "SIDEARM WEAPON TREE — STANDARD ISSUE (UNLOCKED)";
       } else if (tab === "shotgun") {
@@ -971,12 +975,16 @@ export class UpgradeTree {
         (branch === "grenade" && def.id !== "grenade_unlock" && u.levelOf("grenade_unlock") === 0) ||
         (branch === "turret" && def.id !== "turret_unlock" && u.levelOf("turret_unlock") === 0);
       const rem = Math.max(0, def.unlockLifetimePixels - this.game.lifetimePixels);
+      const needParent =
+        branch === "facility" && def.parent !== null && u.levelOf(def.parent) === 0 ? treeDef(def.parent).name : "";
       const lockMsg =
         rem > 0
           ? `LOCKED — Destroy ${def.unlockLifetimePixels} lifetime pixels (${rem} more)`
           : needCenter
             ? `LOCKED — Unlock this weapon at the center node first`
-            : `LOCKED`;
+            : needParent
+              ? `LOCKED — Buy ${needParent} first`
+              : `LOCKED`;
       bodyHtml = `
         <div class="tt-desc">${def.shortDesc}</div>
         <div class="tt-lock">${lockMsg}</div>

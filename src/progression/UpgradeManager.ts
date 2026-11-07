@@ -73,6 +73,8 @@ export class UpgradeManager {
     if (def.branch === "turret" && def.id !== "turret_unlock") {
       if (this.levelOf("turret_unlock") === 0) return false;
     }
+    // Research-base upgrades build on each other: buy the parent first.
+    if (def.branch === "facility" && def.parent && this.levelOf(def.parent) === 0) return false;
     return true;
   }
 

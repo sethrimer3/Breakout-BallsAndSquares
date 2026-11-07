@@ -1,4 +1,5 @@
 import {
+  FACILITY,
   ASSAULT_RIFLE,
   GRENADE,
   GROWTH,
@@ -92,6 +93,12 @@ export interface SoldierStats {
   autoAbility: boolean;
   /** Explored areas stay mapped instead of fading back into darkness (Cartography Uplink). */
   permanentMapping: boolean;
+  /** Highest research-base keycard held (0 = none): doors of this tier or lower open when shot. */
+  keycardTier: number;
+  /** Dormant room sentries wake when a soldier enters their room. */
+  sentryUplink: boolean;
+  sentryDamage: number;
+  sentryFireRate: number;
   // Money / Loot / Resources stats
   dropChance: number;
   magnetRange: number;
@@ -172,6 +179,10 @@ export function baseSoldierStats(): SoldierStats {
     turretTurnSpeed: TURRET.baseTurnSpeed,
     autoAbility: false,
     permanentMapping: false,
+    keycardTier: 0,
+    sentryUplink: false,
+    sentryDamage: FACILITY.sentryDamage,
+    sentryFireRate: FACILITY.sentryFireRate,
     dropChance: LOOT.baseDropChance,
     magnetRange: LOOT.baseMagnetRange,
     pickupLifetime: LOOT.baseLifetime,

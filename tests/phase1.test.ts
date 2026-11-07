@@ -85,7 +85,8 @@ describe("Phase 1 — world & generation", () => {
             } else {
               expect(w1.health[i]).toBe(0);
             }
-          } else if (room.filled) {
+          } else if (w1.coreId[i] > 0 || w1.mat[i] !== 0) {
+            // Glass specimen tanks and their small generators stay solid.
             expect(w1.health[i]).toBeGreaterThan(0);
           } else {
             expect(w1.health[i]).toBe(0);
