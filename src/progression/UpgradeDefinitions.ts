@@ -1716,7 +1716,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "keycard_t1",
     branch: "facility",
     name: "Tier 1 Keycard",
-    shortDesc: "Tier 1 (blue) doors slide open when shot instead of having to be broken down",
+    shortDesc: "Tier 1 (blue) doors slide open with a single shot instead of having to be broken down",
     color: "#3078ff",
     grid: { col: 0, row: -1 },
     parent: null,

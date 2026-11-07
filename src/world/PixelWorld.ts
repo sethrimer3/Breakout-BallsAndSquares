@@ -1,4 +1,4 @@
-import { FACILITY, GROWTH, maxHealthForDistance, TERRAIN, wallHealthForZone } from "../config";
+import { blockHealthForTier, FACILITY, GROWTH, maxHealthForDistance, TERRAIN, wallHealthForZone } from "../config";
 import type { SolidQuery } from "../core/gridRaycast";
 import type { LabLayout } from "./WorldGenerator";
 
@@ -255,8 +255,8 @@ export class PixelWorld implements SolidQuery {
       const m = this.mat[i];
       if (m === MAT.door) {
         const door = this.doors[this.doorId[i] - 1];
-        const tier = door ? door.tier : 1;
-        return wallHealthForZone((tier - 1) as 0 | 1 | 2, dist);
+        // Doors break like ordinary blocks of their tier; a keycard just opens them in one hit.
+        return blockHealthForTier(door ? door.tier : 1, dist);
       }
       if (m === MAT.glass) {
         return Math.max(1, Math.ceil(maxHealthForDistance(dist) * FACILITY.glassHealthMult));

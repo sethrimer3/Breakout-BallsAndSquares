@@ -8,7 +8,7 @@ export interface DoorEvents {
 /**
  * Blast doors. A shot on a closed door whose tier the squad holds a keycard
  * for slides it open from the middle outward instead of damaging it. Without
- * the keycard a door is just very tough wall-grade material.
+ * the keycard a door breaks like an ordinary block of its tier.
  */
 export class DoorSystem {
   private pendingCell: number[] = [];

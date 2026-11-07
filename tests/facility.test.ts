@@ -133,3 +133,23 @@ describe("research base facility", () => {
     expect(upg.getSoldierStats().keycardTier).toBe(2);
   });
 });
+
+describe("door toughness", () => {
+  it("doors have the health of an ordinary block of their tier, not wall health", async () => {
+    const { blockHealthForTier } = await import("../src/config");
+    const w = new PixelWorld(WORLD);
+    generateWorld(w, 303);
+    for (const tier of [1, 2, 3] as const) {
+      const d = w.doors.find((x) => x.tier === tier)!;
+      expect(d).toBeDefined();
+      const i = d.cells[0];
+      const cx = i % w.width;
+      const cy = (i - cx) / w.width;
+      const hp = w.maxHealthAt(cx, cy);
+      expect(hp).toBe(blockHealthForTier(tier, w.distanceOf(cx, cy)));
+      if (tier === 1) expect(hp).toBeLessThanOrEqual(5);
+      if (tier === 2) expect(hp).toBeGreaterThanOrEqual(10);
+      if (tier === 3) expect(hp).toBeGreaterThanOrEqual(100);
+    }
+  });
+});

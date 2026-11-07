@@ -64,6 +64,18 @@ export function maxHealthForDistance(distance: number): number {
 }
 
 /**
+ * Health of an ordinary block of `tier` (1 = blue zone 1 .. 3 = burnt orange
+ * zone 3) at `distance`: the normal distance curve held inside that tier's
+ * band (1-5, 10-50, 100+), so a tier keeps its toughness wherever it sits.
+ */
+export function blockHealthForTier(tier: 1 | 2 | 3, distance: number): number {
+  const hp = maxHealthForDistance(distance);
+  if (tier === 1) return Math.min(5, Math.max(1, hp));
+  if (tier === 2) return Math.min(50, Math.max(10, hp));
+  return Math.min(TERRAIN.maxHealthCap, Math.max(100, hp));
+}
+
+/**
  * Health of a lab wall cell in `zone` (0, 1, 2).
  * Zone 0 walls use Zone 1's material; Zone 1 walls use Zone 2's material;
  * Zone 2 (last zone) walls use reinforced wall material.
