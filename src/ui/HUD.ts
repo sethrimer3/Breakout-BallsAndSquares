@@ -32,7 +32,6 @@ export class HUD {
   private helpStatusEl: HTMLDivElement;
   private touchBar: HTMLDivElement;
   private followBtn: HTMLButtonElement;
-  private markerBtn: HTMLButtonElement;
   private tacticalBar: HTMLDivElement;
   private autoMoveCheck: HTMLInputElement;
   private lineBtn: HTMLButtonElement;
@@ -100,19 +99,7 @@ export class HUD {
       else cam.resumeAuto();
       this.update(this.game, performance.now(), true);
     });
-    this.markerBtn = document.createElement("button");
-    this.markerBtn.className = "hud-touch-btn";
-    this.markerBtn.title = "Target Marker (tap to place/clear)";
-    this.markerBtn.innerHTML = sprite("marker", { color: UI_COLORS.soldier, scale: 3 });
-    this.markerBtn.addEventListener("click", () => {
-      if (this.game.marker) {
-        this.game.clearMarker();
-      } else {
-        this.game.toggleMarkerMode();
-      }
-      this.update(this.game, performance.now(), true);
-    });
-    this.touchBar.append(pauseBtn, this.followBtn, this.markerBtn);
+    this.touchBar.append(pauseBtn, this.followBtn);
 
     this.tacticalBar = document.createElement("div");
     this.tacticalBar.className = "hud-tactical-bar";
@@ -192,24 +179,21 @@ export class HUD {
       <div class="help-list">
         <div class="help-mouse"><b>WASD / ARROWS</b> Move commander (when Auto Move is OFF)</div>
         <div class="help-mouse"><b>MOUSE + CLICK</b> Aim &amp; shoot (or enable "Always shoot" in Settings)</div>
-        <div class="help-mouse"><b>CLICK</b> Place soldier (in reserve) or bounce marker (during play)</div>
-        <div class="help-mouse"><b>RIGHT CLICK</b> Place bounce marker anytime (soldiers in sight bounce toward it)</div>
+        <div class="help-mouse"><b>CLICK</b> Place soldier (in reserve)</div>
         <div class="help-mouse"><b>PRESS &amp; DRAG</b> Pull back to aim arrow; release to launch</div>
         <div class="help-mouse"><b>RIGHT DRAG / WHEEL</b> Pan camera around &amp; zoom in/out</div>
         <div class="help-mouse"><b>G / TAP ABILITY</b> Activate ready secondary ability (Sticky Grenade)</div>
-        <div class="help-mouse"><b>ESC</b> Clear marker / Pause menu</div>
+        <div class="help-mouse"><b>ESC</b> Pause menu</div>
         <div class="help-touch"><b>DUAL STICKS</b> Left stick to move, right stick to aim &amp; fire (Auto Move OFF)</div>
         <div class="help-touch"><b>TAP ABILITY BUTTON</b> Activate ready secondary ability (bottom of screen)</div>
-        <div class="help-touch"><b>TAP</b> Place soldier (in reserve) or bounce marker (during play)</div>
+        <div class="help-touch"><b>TAP</b> Place soldier (in reserve)</div>
         <div class="help-touch"><b>DRAG &amp; RELEASE</b> Pull back to aim arrow; release to launch</div>
         <div class="help-touch"><b>TWO-FINGER PINCH/DRAG</b> Pan camera around &amp; zoom in/out</div>
-        <div class="help-touch"><b>${sprite("marker", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Place or clear bounce marker</div>
         <div class="help-touch"><b>${sprite("follow", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Follow farthest soldier, tap again to cycle</div>
         <div class="help-touch"><b>${sprite("pause", { color: UI_COLORS.white, scale: 1 })} BUTTON</b> Pause, restart, upgrades &amp; settings</div>
         <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}, Zone 2 orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}, Zone 3 green crystals ${sprite("crystal", { color: UI_COLORS.greenCrystal, scale: 1 })}, and Blight Cores leave Blight Essence ${essenceIcon(1)}. Soldiers must touch them to collect!</div>
         <div class="help-keys"><b>1 / 2</b> Toggle Line / Triangle formation</div>
         <div class="help-keys"><b>F / TAB</b> Follow farthest / Cycle soldiers</div>
-        <div class="help-keys"><b>T</b> Toggle marker mode</div>
         <div class="help-keys"><b>U</b> Open Upgrade Matrix</div>
         <div class="help-keys"><b>SPACE / ESC</b> Pause / Menu (&amp; Settings ${sprite("gear", { color: UI_COLORS.soldier, scale: 1 })})</div>
         <div class="help-keys"><b>R</b> Quick restart run</div>
@@ -306,7 +290,6 @@ export class HUD {
     }
 
     this.followBtn.classList.toggle("active", game.camera.following);
-    this.markerBtn.classList.toggle("active", Boolean(game.marker || game.markerMode));
 
     this.autoMoveCheck.checked = game.autoMove;
     const hasLine = game.upgrades.levelOf("formation_line") > 0;
@@ -405,12 +388,10 @@ export class HUD {
         status = cmdr
           ? `MANUAL COMMANDER #${cmdr.slotIndex + 1} ACTIVE — WASD to move, aim & click to shoot`
           : "MANUAL CONTROL — All soldiers defeated";
-      } else if (game.marker) status = "Marker active — soldiers in sight bounce toward it (Esc to clear)";
-      else if (game.markerMode) status = "Marker mode active — click anywhere to place marker (T to cancel)";
-      else if (game.reserves > 0 && game.canDeploy)
+      } else if (game.reserves > 0 && game.canDeploy)
         status = `Click / tap to place (random dir) or drag to aim (${game.reserves} in reserve)`;
       else if (game.reserves > 0) status = "Cannot deploy";
-      else status = "Soldiers autonomous — click / tap to place bounce marker!";
+      else status = "Soldiers autonomous";
       this.helpStatusEl.textContent = status;
     }
   }

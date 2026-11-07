@@ -15,7 +15,7 @@ import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { Input } from "./systems/Input";
 import { LightingSystem, makeLitCells, type LitCells, type MuzzleLight } from "./systems/LightingSystem";
-import { PhysicsSystem, findSpawnPoint } from "./systems/PhysicsSystem";
+import { PhysicsSystem, findClearDeployPoint, findSpawnPoint } from "./systems/PhysicsSystem";
 import { RunStats } from "./systems/RunStats";
 import { HUD } from "./ui/HUD";
 import { DebugOverlay } from "./ui/DebugOverlay";
@@ -32,13 +32,6 @@ import { PixelWorld, SUB } from "./world/PixelWorld";
 import { generateWorld } from "./world/WorldGenerator";
 
 export type Flash = MuzzleLight;
-
-/** Tactical marker for directing bouncing soldiers. */
-export interface Marker {
-  x: number;
-  y: number;
-  placedAt: number;
-}
 
 /** Brief highlight on a terrain cell (hit or destroy). */
 export interface CellFlash {
@@ -87,8 +80,6 @@ export class Game {
   soldiers: Soldier[] = [];
   flashes: Flash[] = [];
   cellFlashes: CellFlash[] = [];
-  marker: Marker | null = null;
-  markerMode = false;
   reserves = 0;
   canDeploy = true;
   growthRate = 0;
@@ -196,8 +187,6 @@ export class Game {
       onAimRelease: (startSx, startSy, endSx, endSy) =>
         this.onAimRelease(startSx, startSy, endSx, endSy),
       onAimCancel: () => this.onAimCancel(),
-      onPrimaryClick: (sx, sy) => this.onPrimaryClick(sx, sy),
-      onSecondaryClick: (sx, sy) => this.onPrimaryClick(sx, sy),
       onWheel: (sx, sy, dy) =>
         this.camera.zoomAt(sx, sy, dy < 0 ? CAMERA.wheelStep : 1 / CAMERA.wheelStep),
       onPinch: (sx, sy, factor) => this.camera.zoomAt(sx, sy, factor),
@@ -320,8 +309,6 @@ export class Game {
     this.bankedThisRun = false;
     this.aimState.active = false;
     this.aimState.isDragging = false;
-    this.clearMarker();
-    this.markerMode = false;
     this.camera.reset();
     this.camera.setViewport(this.canvas.clientWidth, this.canvas.clientHeight);
     this.cancelDeathSequence();
@@ -445,12 +432,8 @@ export class Game {
         break;
       case "Escape":
         if (this.aimState.active) this.onAimCancel();
-        else if (this.marker) this.clearMarker();
         else if (this.resultsScreen.visible) this.startRun();
         else this.togglePauseMenu();
-        break;
-      case "KeyT":
-        this.toggleMarkerMode();
         break;
       case "Digit1":
         this.toggleFormation("line");
@@ -481,7 +464,7 @@ export class Game {
   }
 
   canPlaceSoldier(): boolean {
-    return !this.paused && !this.runOver && this.reserves > 0 && !this.markerMode;
+    return !this.paused && !this.runOver && this.reserves > 0;
   }
 
   onAimStart(sx: number, sy: number): void {
@@ -553,8 +536,18 @@ export class Game {
     const minY = r;
     const maxX = this.world.width * cs - r;
     const maxY = this.world.height * cs - r;
-    const clampedX = Math.max(minX, Math.min(maxX, wx));
-    const clampedY = Math.max(minY, Math.min(maxY, wy));
+    // Never drop a soldier inside terrain: nudge it to the nearest spot with at
+    // least a pixel of clearance from every wall, or keep it in reserve.
+    const spot = findClearDeployPoint(
+      this.world,
+      Math.max(minX, Math.min(maxX, wx)),
+      Math.max(minY, Math.min(maxY, wy)),
+      r,
+      SOLDIER.deployClearance,
+    );
+    if (!spot) return null;
+    const clampedX = spot.x;
+    const clampedY = spot.y;
 
     const len = Math.hypot(dx, dy);
     let ndx = dx;
@@ -622,44 +615,6 @@ export class Game {
     this.deploySoldier(wx, wy, dir.dx, dir.dy);
   }
 
-  onPrimaryClick(sx: number, sy: number): void {
-    if (this.paused || this.runOver) return;
-    const wx = this.camera.screenToWorldX(sx);
-    const wy = this.camera.screenToWorldY(sy);
-    this.setMarker(wx, wy);
-  }
-
-  setMarker(wx: number, wy: number): void {
-    if (this.paused || this.runOver) return;
-    const cs = this.world.cellSize;
-    const minX = cs;
-    const minY = cs;
-    const maxX = this.world.width * cs - cs;
-    const maxY = this.world.height * cs - cs;
-    const clampedX = Math.max(minX, Math.min(maxX, wx));
-    const clampedY = Math.max(minY, Math.min(maxY, wy));
-    this.marker = { x: clampedX, y: clampedY, placedAt: performance.now() };
-    this.physics.marker = this.marker;
-    this.audio.playMarkerPing();
-    for (let i = 0; i < 14; i++) {
-      const a = this.rng.range(0, Math.PI * 2);
-      const sp = this.rng.range(30, 90);
-      this.particles.spawn(PKind.Spark, clampedX, clampedY, Math.cos(a) * sp, Math.sin(a) * sp, 0.35, 1.5, 0x00ffff, 4);
-    }
-    this.hud.update(this, performance.now(), true);
-  }
-
-  clearMarker(): void {
-    this.marker = null;
-    this.physics.marker = null;
-    this.hud.update(this, performance.now(), true);
-  }
-
-  toggleMarkerMode(): void {
-    this.markerMode = !this.markerMode;
-    this.hud.update(this, performance.now(), true);
-  }
-
   isWeaponUnlocked(w: Soldier["weapon"]): boolean {
     switch (w) {
       case "pistol":
@@ -693,7 +648,18 @@ export class Game {
     this.autoMove = enabled;
     this.save.data.settings.autoMove = enabled;
     this.save.save();
-    if (!enabled) {
+    if (enabled) {
+      // Hand the commander back to the autonomous bounce in a fresh random direction
+      // (it may have been standing still or crawling along a wall under manual control).
+      const cmdr = this.getCommander();
+      if (cmdr) {
+        cmdr.isManual = false;
+        const a = this.rng.range(0, Math.PI * 2);
+        cmdr.vx = Math.cos(a) * cmdr.speed;
+        cmdr.vy = Math.sin(a) * cmdr.speed;
+        cmdr.facingAngle = a;
+      }
+    } else {
       const cmdr = this.getCommander();
       if (cmdr) {
         this.camera.targetId = cmdr.id;

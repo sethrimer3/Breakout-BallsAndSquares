@@ -127,6 +127,8 @@ export const ART_PIXEL = 1;
 export const SOLDIER = {
   /** Collision radius. Must be < cellSize / 2 so soldiers fit one-cell tunnels. */
   collisionRadius: 3.2,
+  /** Minimum gap (px) between a freshly deployed soldier and any terrain. */
+  deployClearance: 1,
   /** Visual body radius (purely cosmetic), in world units = pixel-art pixels. */
   renderRadius: 4.5,
   /** Outer radius of the one-pixel ring drawn around each soldier sphere. */
