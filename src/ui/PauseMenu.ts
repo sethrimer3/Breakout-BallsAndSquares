@@ -111,7 +111,7 @@ export class PauseMenu {
         <div class="set-row">
           <div class="set-info">
             <div class="set-label">CAMERA AUTO-FOLLOW</div>
-            <div class="set-desc">Off by default so you pan manually; press F anytime to follow farthest soldier</div>
+            <div class="set-desc">Off by default so you pan manually; press F anytime to follow soldier #1, Tab to cycle</div>
           </div>
           <button class="btn set-toggle ${set.autoFollowCamera ? "btn-primary" : ""}" data-set="autofollow">
             ${set.autoFollowCamera ? "ON" : "OFF"}

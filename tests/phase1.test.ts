@@ -289,32 +289,39 @@ describe("Phase 1 — soldier physics (Rev 2 & Rev 3)", () => {
 });
 
 describe("Phase 1 — camera manual-first & single-target follow (Rev 3)", () => {
-  it("stays stationary by default, and follows the farthest soldier with hysteresis when enabled (F) or cycled (Tab)", () => {
+  it("stays stationary by default, follows soldier #1 (F) without chasing the farthest, and Tab cycles in numerical order", () => {
     const w = new PixelWorld(WORLD);
     generateWorld(w, 1);
     const cam = new CameraSystem(w);
     cam.setViewport(800, 600);
     expect(cam.following).toBe(false);
-    const a = new Soldier(w.roomCenterX, w.roomCenterY, 1, 0, 100);
-    const b = new Soldier(w.roomCenterX + 10 * 8, w.roomCenterY, 1, 0, 100);
-    cam.update(0.1, [a, b]);
+    const s1 = new Soldier(w.roomCenterX, w.roomCenterY, 1, 0, 100, "pistol", "free", 0);
+    const s2 = new Soldier(w.roomCenterX + 10 * 8, w.roomCenterY, 1, 0, 100, "pistol", "free", 1);
+    const s3 = new Soldier(w.roomCenterX - 5 * 8, w.roomCenterY, 1, 0, 100, "pistol", "free", 2);
+    const all = [s3, s2, s1];
+    cam.update(0.1, all);
     expect(cam.x).toBe(w.roomCenterX);
 
-    // Enable auto-follow (F):
+    // F: follow soldier #1, even though #2 is far out.
     cam.resumeAuto();
-    cam.update(0.1, [a, b]);
-    expect(cam.targetId).toBe(b.id);
-    // Moving `a` only 2 cells beyond `b` should NOT switch (hysteresis = 4).
-    a.x = w.roomCenterX + 12 * 8;
-    cam.update(0.1, [a, b]);
-    expect(cam.targetId).toBe(b.id);
-    // 5 cells beyond switches.
-    a.x = w.roomCenterX + 15 * 8;
-    cam.update(0.1, [a, b]);
-    expect(cam.targetId).toBe(a.id);
-    // Tab cycles manually.
-    cam.cycleTarget([a, b]);
-    expect(cam.targetId).toBe(b.id);
-    expect(cam.manualTarget).toBe(true);
+    cam.update(0.1, all);
+    expect(cam.targetId).toBe(s1.id);
+    s2.x = w.roomCenterX + 60 * 8;
+    cam.update(0.1, all);
+    expect(cam.targetId).toBe(s1.id);
+
+    // Tab: #1 -> #2 -> #3 -> #1.
+    cam.cycleTarget(all);
+    expect(cam.targetId).toBe(s2.id);
+    cam.cycleTarget(all);
+    expect(cam.targetId).toBe(s3.id);
+    cam.cycleTarget(all);
+    expect(cam.targetId).toBe(s1.id);
+
+    // Followed soldier dies: fall back to the lowest-numbered survivor.
+    cam.cycleTarget(all);
+    s2.alive = false;
+    cam.update(0.1, all);
+    expect(cam.targetId).toBe(s1.id);
   });
 });

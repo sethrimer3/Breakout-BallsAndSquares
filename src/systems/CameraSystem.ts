@@ -5,8 +5,9 @@ import type { PixelWorld } from "../world/PixelWorld";
 
 /**
  * Camera with cursor-anchored zoom, drag panning and single-target follow.
- * Auto mode follows the soldier farthest from spawn (with hysteresis);
- * Tab switches to manual cycling; F returns to auto follow.
+ * Following sticks to one soldier and never jumps to another on its own; it
+ * only moves on when that soldier dies (to the lowest-numbered survivor).
+ * Tab cycles through soldiers in numerical (deploy-slot) order; F resumes follow.
  */
 export class CameraSystem {
   x: number;
@@ -73,22 +74,22 @@ export class CameraSystem {
     this.clampToWorld();
   }
 
-  /** F: resume automatic follow of the farthest soldier. */
+  /** F: resume following (the current soldier, or soldier #1 if none). */
   resumeAuto(): void {
     this.following = true;
     this.manualTarget = false;
   }
 
-  /** Follow exactly this soldier (e.g. the manually controlled commander), never auto-switching away. */
+  /** Follow exactly this soldier (e.g. the manually controlled commander). */
   lockOn(id: number): void {
     this.targetId = id;
     this.manualTarget = true;
     this.following = true;
   }
 
-  /** Tab: cycle the follow target through living soldiers. */
+  /** Tab: follow the next living soldier in numerical (deploy-slot) order, wrapping around. */
   cycleTarget(soldiers: readonly Soldier[]): void {
-    const alive = soldiers.filter((s) => s.alive);
+    const alive = byNumber(soldiers);
     if (alive.length === 0) return;
     const idx = alive.findIndex((s) => s.id === this.targetId);
     const next = alive[(idx + 1) % alive.length];
@@ -97,32 +98,10 @@ export class CameraSystem {
     this.following = true;
   }
 
-  private distOf(s: Soldier): number {
-    const cs = this.world.cellSize;
-    return this.world.distanceOf(Math.floor(s.x / cs), Math.floor(s.y / cs));
-  }
-
+  /** Keep the current soldier while it lives; otherwise the lowest-numbered survivor. */
   private chooseTarget(soldiers: readonly Soldier[]): Soldier | null {
-    let current: Soldier | null = null;
-    let farthest: Soldier | null = null;
-    let farD = -1;
-    for (const s of soldiers) {
-      if (!s.alive) continue;
-      if (s.id === this.targetId) current = s;
-      const d = this.distOf(s);
-      if (d > farD) {
-        farD = d;
-        farthest = s;
-      }
-    }
-    if (this.manualTarget) {
-      if (current) return current;
-      this.manualTarget = false;
-    }
-    if (current && farthest && farthest !== current) {
-      if (farD - this.distOf(current) < CAMERA.switchHysteresisCells) return current;
-    }
-    return farthest;
+    const alive = byNumber(soldiers);
+    return alive.find((s) => s.id === this.targetId) ?? alive[0] ?? null;
   }
 
   update(dt: number, soldiers: readonly Soldier[]): void {
@@ -154,4 +133,9 @@ export class CameraSystem {
     this.x = halfW * 2 >= ww ? ww / 2 : clamp(this.x, halfW, ww - halfW);
     this.y = halfH * 2 >= wh ? wh / 2 : clamp(this.y, halfH, wh - halfH);
   }
+}
+
+/** Living soldiers sorted by soldier number (deploy slot), then spawn order. */
+function byNumber(soldiers: readonly Soldier[]): Soldier[] {
+  return soldiers.filter((s) => s.alive).sort((a, b) => a.slotIndex - b.slotIndex || a.id - b.id);
 }

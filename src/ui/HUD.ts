@@ -91,7 +91,7 @@ export class HUD {
     pauseBtn.addEventListener("click", () => this.game.togglePauseMenu(true));
     this.followBtn = document.createElement("button");
     this.followBtn.className = "hud-touch-btn";
-    this.followBtn.title = "Follow soldiers (tap again to cycle)";
+    this.followBtn.title = "Follow soldiers (tap again to cycle in order)";
     this.followBtn.innerHTML = sprite("follow", { color: UI_COLORS.soldier, scale: 3 });
     this.followBtn.addEventListener("click", () => {
       const cam = this.game.camera;
@@ -189,11 +189,11 @@ export class HUD {
         <div class="help-touch"><b>TAP</b> Place soldier (in reserve)</div>
         <div class="help-touch"><b>DRAG &amp; RELEASE</b> Pull back to aim arrow; release to launch</div>
         <div class="help-touch"><b>TWO-FINGER PINCH/DRAG</b> Pan camera around &amp; zoom in/out</div>
-        <div class="help-touch"><b>${sprite("follow", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Follow farthest soldier, tap again to cycle</div>
+        <div class="help-touch"><b>${sprite("follow", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Follow soldier #1, tap again to cycle in order</div>
         <div class="help-touch"><b>${sprite("pause", { color: UI_COLORS.white, scale: 1 })} BUTTON</b> Pause, restart, upgrades &amp; settings</div>
         <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}, Zone 2 orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}, Zone 3 green crystals ${sprite("crystal", { color: UI_COLORS.greenCrystal, scale: 1 })}, and Blight Cores leave Blight Essence ${essenceIcon(1)}. Soldiers must touch them to collect!</div>
         <div class="help-keys"><b>1 / 2</b> Toggle Line / Triangle formation</div>
-        <div class="help-keys"><b>F / TAB</b> Follow farthest / Cycle soldiers</div>
+        <div class="help-keys"><b>F / TAB</b> Follow / Cycle soldiers in order (#1, #2, ...)</div>
         <div class="help-keys"><b>U</b> Open Upgrade Matrix</div>
         <div class="help-keys"><b>SPACE / ESC</b> Pause / Menu (&amp; Settings ${sprite("gear", { color: UI_COLORS.soldier, scale: 1 })})</div>
         <div class="help-keys"><b>R</b> Quick restart run</div>
