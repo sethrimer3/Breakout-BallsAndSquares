@@ -6,6 +6,8 @@ export interface SightQuery {
   readonly height: number;
   readonly cellSize: number;
   solidAt(cx: number, cy: number): boolean;
+  /** Half-size grid opacity (half-size blocks block sight too), when the terrain has one. */
+  subSolidAt?(sx: number, sy: number): boolean;
 }
 
 /** Something that sees: a soldier, a turret, or the spawn room. */
@@ -171,6 +173,7 @@ export class FogOfWar {
     this.grow(stx - pad, sty - pad, stx + pad, sty + pad);
     const step = 0.5;
     const steps = Math.ceil(r / step);
+    const sub = world.subSolidAt;
     for (let k = 0; k < rays; k++) {
       const a = (k / rays) * Math.PI * 2;
       const dx = Math.cos(a) * step;
@@ -189,7 +192,7 @@ export class FogOfWar {
           seenStamp[ti] = stamp;
           lastTile = ti;
         }
-        if (world.solidAt(cx, cy)) break;
+        if (sub ? sub.call(world, Math.floor(px * 2), Math.floor(py * 2)) : world.solidAt(cx, cy)) break;
       }
     }
   }
