@@ -10,6 +10,7 @@ import {
   SNIPER_RIFLE,
   SOLDIER,
   TURRET,
+  FOG,
 } from "../config";
 import type { SoldierStats } from "../entities/Soldier";
 import type { SpriteName } from "../ui/pixelArt";
@@ -122,6 +123,7 @@ export type UpgradeId =
   | "sentry_uplink"
   | "sentry_calibration"
   | "cartography_uplink"
+  | "recon_optics"
   // Blight research: dormant colonies decay
   | "necrosis_protocol";
 
@@ -1732,7 +1734,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   // =========================================================================
   // 11) RESEARCH BASE TREE: KEYCARDS & FACILITY SYSTEMS (#7fb2ff)
   // Grid: keycards along the top row, sentries on the left, mapping on the
-  // right. Free cells for new facility upgrades: (2,0), (-1,1), (0,1), (1,1), (-2,1), (-1,-1).
+  // right. Free cells for new facility upgrades: (3,0), (2,1), (-1,1), (0,1), (1,1), (-2,1), (-1,-1).
   // =========================================================================
   {
     id: "keycard_t1",
@@ -1858,6 +1860,27 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.permanentMapping = lvl > 0;
     },
     icon: "mapGrid",
+  },
+  {
+    id: "recon_optics",
+    branch: "facility",
+    name: "Recon Optics",
+    shortDesc: `Soldiers see farther in the fog of war: +${FOG.sightPerLevel} cells of sight radius per level`,
+    color: "#7fffd4",
+    grid: { col: 2, row: 0 },
+    parent: "cartography_uplink",
+    maxLevel: 5,
+    currency: "crystals",
+    baseCost: 15,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 50,
+    valueAt: (lvl) => FOG.soldierSightCells + FOG.sightPerLevel * lvl,
+    formatValue: (v) => `${v} CELLS`,
+    formatDelta: () => `+${FOG.sightPerLevel} SIGHT`,
+    apply: (s, lvl) => {
+      s.sightCells = FOG.soldierSightCells + FOG.sightPerLevel * lvl;
+    },
+    icon: "range",
   },
 ];
 

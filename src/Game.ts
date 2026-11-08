@@ -1222,7 +1222,7 @@ export class Game {
         const e = take();
         e.x = s.x;
         e.y = s.y;
-        e.radiusCells = FOG.soldierSightCells;
+        e.radiusCells = this.stats.sightCells;
       }
       for (const t of this.combat.turrets.items) {
         if (!t.active) continue;
