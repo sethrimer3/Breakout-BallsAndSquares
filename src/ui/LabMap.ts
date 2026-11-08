@@ -179,6 +179,26 @@ export class LabMap {
       drawSectorThumb(this.scratch, s, discovered, conquered);
       g.drawImage(this.scratch, 0, 0, THUMB_SIZE, THUMB_SIZE);
     }
+    // Explored ground fades in hard steps into unexplored neighbors, so the
+    // edge of what the squad has seen reads as darkness, not as a grid line.
+    if (discovered) {
+      const n = SECTORS_PER_SIDE;
+      const col = s % n;
+      const row = (s - col) / n;
+      const hidden = (c: number, r: number): boolean =>
+        c >= 0 && r >= 0 && c < n && r < n && !this.game.labProgress.discovered.has(r * n + c);
+      const sides = [hidden(col, row - 1), hidden(col + 1, row), hidden(col, row + 1), hidden(col - 1, row)];
+      const step = 6;
+      const alphas = [0.6, 0.38, 0.18];
+      for (let k = 0; k < alphas.length; k++) {
+        g.fillStyle = `rgba(7, 8, 11, ${alphas[k]})`;
+        const o = k * step;
+        if (sides[0]) g.fillRect(0, o, THUMB_SIZE, step);
+        if (sides[1]) g.fillRect(THUMB_SIZE - o - step, 0, step, THUMB_SIZE);
+        if (sides[2]) g.fillRect(0, THUMB_SIZE - o - step, THUMB_SIZE, step);
+        if (sides[3]) g.fillRect(o, 0, step, THUMB_SIZE);
+      }
+    }
     // A deploy beacon where the squad would land.
     const frame = labFrame(this.game.world);
     if (s === this.selected && frame && this.game.canDeployInto(s)) {

@@ -1,16 +1,17 @@
 import { COLORS } from "../config";
 import { SECTOR_CELLS, SECTORS_PER_SIDE, sectorBounds, sectorRing, zoneForSectorRing, type LabFrame } from "../world/labMap";
 import { LIGHT_KIND, type PixelWorld, type RoomLight } from "../world/PixelWorld";
-import { MATERIAL_BASE, TEX, materialShade } from "./materials";
+import { hash2, valueNoise } from "../core/math";
+import { MATERIAL_BASE, TEX } from "./materials";
 import type { TerrainRenderer } from "./TerrainRenderer";
 
 /** Edge of a sector picture in pixels: the terrain's own texels, one per quarter cell. */
 export const THUMB_SIZE = SECTOR_CELLS * TEX;
 
 /** Dim warm ambient the lab map shows rooms under; lights add on top. */
-const AMBIENT = "rgb(78, 72, 66)";
+const AMBIENT = "rgb(52, 48, 44)";
 /** How much the lit picture is brightened afterward, so matte walls read at map size. */
-const EXPOSURE = 1.9;
+const EXPOSURE = 2.1;
 
 type LightLook = { rgb: string; radius: number; alpha: number };
 
@@ -114,8 +115,8 @@ function expose(g: CanvasRenderingContext2D): void {
 const uncharted = new Map<number, HTMLCanvasElement>();
 
 /**
- * An unexplored sector: only its tier's bare material, very dark, as if seen
- * through a survey hatch. Tells the player what tier waits there, nothing more.
+ * An unexplored sector: dark rock tinted by its tier's material. Tells the
+ * player what tier waits there, nothing more.
  */
 export function renderUncharted(sector: number): HTMLCanvasElement {
   const hit = uncharted.get(sector);
@@ -131,9 +132,9 @@ export function renderUncharted(sector: number): HTMLCanvasElement {
     for (let x = 0; x < THUMB_SIZE; x++) {
       const gx = col * THUMB_SIZE + x;
       const gy = row * THUMB_SIZE + y;
-      // Diagonal survey hatching every 12 texels.
-      const hatch = (gx + gy) % 12 === 0 ? 1.35 : 1;
-      const m = materialShade(tier, gx, gy) * 0.7 * hatch;
+      // Plain, very dark rock in the tier's hue: no block joints, so the
+      // unexplored lab reads as one mass rather than a grid.
+      const m = 0.3 + valueNoise(gx, gy, 24, 7) * 0.12 + hash2(gx, gy, 9) * 0.04;
       const i = (y * THUMB_SIZE + x) * 4;
       img.data[i] = base[0] * m;
       img.data[i + 1] = base[1] * m;
