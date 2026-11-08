@@ -4,6 +4,7 @@ import { paintPortal } from "./portalNoise";
 import type { CameraSystem } from "../systems/CameraSystem";
 import { hash2 } from "../core/math";
 import { DECOR } from "../world/LabDetails";
+import { MATERIAL_BASE, TEX, TIER_PAINT, materialShade } from "./materials";
 import { LIGHT_KIND, MAT, SUB, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
 
@@ -20,11 +21,6 @@ const EDGE_FIRE_FULL_ZOOM = 1.5;
 const FROZEN_FIRE_TIME = 7.25;
 /** Edge canvases grow in steps this size, so a moving view doesn't reallocate them. */
 const EDGE_CANVAS_STEP = 256;
-/** Tier glow canvases hold this many pixels per cell edge. */
-const GLOW_RES = 4;
-/** Glow alpha (0..255) by pixel step from a block's exposed face: inside, then outside. */
-const GLOW_IN = [210, 80] as const;
-const GLOW_OUT = [90, 26] as const;
 
 /** A soft round light falloff in one color, for drawing scaled into the lightmap. */
 function radialSprite(c: RGB): HTMLCanvasElement {
@@ -130,13 +126,9 @@ export class TerrainRenderer {
   private dormantFireKey = "";
   /** True for a half-size subcell index whose colony has no living generator. */
   dormantAt: ((si: number) => boolean) | null = null;
-  /** Per chunk: soft tier-colored glow on exposed block faces, made the first time it has any. */
-  private glowCanvases: (HTMLCanvasElement | null)[] = [];
-  private glowLive: Uint8Array;
-  private glowImage: ImageData;
   /** Subcell indices of every blinking status light and pulsing machine core. */
   private lights = new Int32Array(0);
-  /** Two pixels per world cell: the lab's floors, under the terrain. */
+  /** `TEX` texels per world cell: the lab's floors, under the terrain. */
   private floorCanvas: HTMLCanvasElement;
   /** Soft round light sprites (white and Blight pink) for the room lights. */
   private panelGlow: HTMLCanvasElement;
@@ -150,11 +142,11 @@ export class TerrainRenderer {
     const subChunk = chunkSize * 2;
     for (let i = 0; i < n; i++) {
       const c = document.createElement("canvas");
-      c.width = subChunk;
-      c.height = subChunk;
+      c.width = chunkSize * TEX;
+      c.height = chunkSize * TEX;
       this.canvases.push(c);
     }
-    this.image = new ImageData(subChunk, subChunk);
+    this.image = new ImageData(chunkSize * TEX, chunkSize * TEX);
     const edgeSize = subChunk * EDGE_PIXELS_PER_SUB;
     this.edgeMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
     this.edgeLive = new Uint8Array(n);
@@ -164,16 +156,13 @@ export class TerrainRenderer {
     this.edgeSolid = new Uint8Array((subChunk + 2) * (subChunk + 2));
     this.edgeImage = new ImageData(edgeSize, edgeSize);
     this.edgeImage.data.fill(255);
-    this.glowCanvases = new Array<HTMLCanvasElement | null>(n).fill(null);
-    this.glowLive = new Uint8Array(n);
-    this.glowImage = new ImageData(chunkSize * GLOW_RES, chunkSize * GLOW_RES);
     this.chunks.markAll();
     this.glowCanvas = document.createElement("canvas");
     this.glowCanvas.width = world.width;
     this.glowCanvas.height = world.height;
     this.floorCanvas = document.createElement("canvas");
-    this.floorCanvas.width = world.width * 2;
-    this.floorCanvas.height = world.height * 2;
+    this.floorCanvas.width = world.width * TEX;
+    this.floorCanvas.height = world.height * TEX;
     this.panelGlow = radialSprite([255, 255, 255]);
     this.blightGlow = radialSprite([255, 70, 160]);
     // Broken or overgrown machinery goes dark.
@@ -181,6 +170,8 @@ export class TerrainRenderer {
       if (kind === "destroyed" || kind === "grown") {
         this.glowCanvas.getContext("2d")!.clearRect(cx, cy, 1, 1);
       }
+      // Walls coming down (or Blight filling in) move the floor's contact shadows.
+      if (kind !== "damaged") this.paintFloor(cx - 1, cy - 1, cx + 1, cy + 1);
     });
   }
 
@@ -194,46 +185,87 @@ export class TerrainRenderer {
     this.collectLights();
   }
 
-  /**
-   * Paint the lab floors: tile seams one half-cell wide, a little grain per
-   * pixel, light panels and cracks. Empty cells with no decor stay clear, so the
-   * cavity background shows through dug-out rock.
-   */
+  /** Paint every lab floor. */
   private buildFloor(): void {
+    this.paintFloor(0, 0, this.world.width - 1, this.world.height - 1);
+  }
+
+  /**
+   * Paint the lab floors in cells (x0..x1, y0..y1): matte tiles four cells
+   * across with thin dark grout, each tile a slightly different shade, fine
+   * grain, and a soft contact shadow where the floor meets a standing wall.
+   * Empty cells with no decor stay clear, so the cavity background shows
+   * through dug-out rock.
+   */
+  private paintFloor(x0: number, y0: number, x1: number, y1: number): void {
     const w = this.world;
-    const W2 = w.width * 2;
+    x0 = Math.max(0, x0);
+    y0 = Math.max(0, y0);
+    x1 = Math.min(w.width - 1, x1);
+    y1 = Math.min(w.height - 1, y1);
+    if (x1 < x0 || y1 < y0) return;
     const g = this.floorCanvas.getContext("2d")!;
-    const image = g.createImageData(W2, w.height * 2);
+    const iw = (x1 - x0 + 1) * TEX;
+    const image = g.createImageData(iw, (y1 - y0 + 1) * TEX);
     const data = image.data;
     const pal = COLORS.labDecor;
-    for (let cy = 0; cy < w.height; cy++) {
-      for (let cx = 0; cx < w.width; cx++) {
-        const d = w.decor[cy * w.width + cx];
+    const W = w.width;
+    const solid = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < W && y < w.height && w.health[y * W + x] > 0;
+    for (let cy = y0; cy <= y1; cy++) {
+      for (let cx = x0; cx <= x1; cx++) {
+        const d = w.decor[cy * W + cx];
         if (d === 0) continue;
-        for (let k = 0; k < 4; k++) {
-          const dx = k & 1;
-          const dy = k >> 1;
+        const tiled = d === DECOR.cleanSeam || d === DECOR.floorLine;
+        const tileTone = 0.93 + hash2(cx >> 2, cy >> 2, 303) * 0.14;
+        // Walls standing next to this cell, for the contact shadow.
+        const nU = solid(cx, cy - 1);
+        const nD = solid(cx, cy + 1);
+        const nL = solid(cx - 1, cy);
+        const nR = solid(cx + 1, cy);
+        const nUL = solid(cx - 1, cy - 1);
+        const nUR = solid(cx + 1, cy - 1);
+        const nDL = solid(cx - 1, cy + 1);
+        const nDR = solid(cx + 1, cy + 1);
+        for (let k = 0; k < TEX * TEX; k++) {
+          const tx = k % TEX;
+          const ty = (k - tx) / TEX;
+          const gx = cx * TEX + tx;
+          const gy = cy * TEX + ty;
           let c: RGB = pal[d];
-          // Seams run along the top and left half of the tile's first row and column.
-          if (d === DECOR.cleanSeam || d === DECOR.floorLine) {
-            const seam = (cx % 4 === 0 && dx === 0) || (cy % 4 === 0 && dy === 0);
-            if (!seam) c = pal[d === DECOR.cleanSeam ? DECOR.cleanFloor : DECOR.floor];
+          let v = 1;
+          if (tiled) {
+            // One-texel grout along the top and left edge of each 4-cell tile.
+            const seam = (cx % 4 === 0 && tx === 0) || (cy % 4 === 0 && ty === 0);
+            if (!seam) {
+              c = pal[d === DECOR.cleanSeam ? DECOR.cleanFloor : DECOR.floor];
+              v = tileTone;
+            }
           } else if (d === DECOR.grime || d === DECOR.blightStain) {
             // Grime and stains soak in unevenly, speckled over the old floor.
-            if (hash2(cx * 2 + dx, cy * 2 + dy, 131) < 0.3) c = pal[DECOR.floor];
+            if (hash2(gx, gy, 131) < 0.3) c = pal[DECOR.floor];
           }
-          const px = cx * 2 + dx;
-          const py = cy * 2 + dy;
-          const grain = 0.95 + hash2(px, py, 77) * 0.1;
-          const p = (py * W2 + px) * 4;
-          data[p] = Math.min(255, c[0] * grain);
-          data[p + 1] = Math.min(255, c[1] * grain);
-          data[p + 2] = Math.min(255, c[2] * grain);
+          v *= 0.94 + hash2(gx, gy, 77) * 0.12;
+          // Contact shadow: darkest against the wall, fading over half a cell.
+          let ao = 1;
+          const near = (dist: number): number => (dist === 0 ? 0.5 : dist === 1 ? 0.72 : 0.9);
+          if (nU && ty < 3) ao = Math.min(ao, near(ty));
+          if (nD && ty > 0) ao = Math.min(ao, near(TEX - 1 - ty));
+          if (nL && tx < 3) ao = Math.min(ao, near(tx));
+          if (nR && tx > 0) ao = Math.min(ao, near(TEX - 1 - tx));
+          if (nUL && tx + ty < 2) ao = Math.min(ao, near(tx + ty));
+          if (nUR && TEX - 1 - tx + ty < 2) ao = Math.min(ao, near(TEX - 1 - tx + ty));
+          if (nDL && tx + TEX - 1 - ty < 2) ao = Math.min(ao, near(tx + TEX - 1 - ty));
+          if (nDR && 2 * (TEX - 1) - tx - ty < 2) ao = Math.min(ao, near(2 * (TEX - 1) - tx - ty));
+          v *= ao;
+          const p = (((cy - y0) * TEX + ty) * iw + (cx - x0) * TEX + tx) * 4;
+          data[p] = Math.min(255, c[0] * v);
+          data[p + 1] = Math.min(255, c[1] * v);
+          data[p + 2] = Math.min(255, c[2] * v);
           data[p + 3] = 255;
         }
       }
     }
-    g.putImageData(image, 0, 0);
+    g.putImageData(image, x0 * TEX, y0 * TEX);
   }
 
   /** Draw the lab floors. Call before `draw`, in the albedo pass. */
@@ -241,7 +273,7 @@ export class TerrainRenderer {
     const cs = this.chunks.chunkSize;
     ctx.imageSmoothingEnabled = false;
     this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
-      ctx.drawImage(this.floorCanvas, kx * cs * 2, ky * cs * 2, cs * 2, cs * 2, sx, sy, sw, sh);
+      ctx.drawImage(this.floorCanvas, kx * cs * TEX, ky * cs * TEX, cs * TEX, cs * TEX, sx, sy, sw, sh);
     });
   }
 
@@ -290,7 +322,7 @@ export class TerrainRenderer {
       const rh = (l.cy1 - l.cy0 + 1) * cs * z;
       if (l.kind === LIGHT_KIND.wash) {
         g.globalAlpha = FACILITY.washStrength;
-        g.fillStyle = "rgb(150, 170, 190)";
+        g.fillStyle = "rgb(176, 164, 140)";
         g.fillRect(rx, ry, rw, rh);
         continue;
       }
@@ -460,7 +492,7 @@ export class TerrainRenderer {
   private buildChunk(k: number): void {
     const { world } = this;
     const cs = this.chunks.chunkSize;
-    const subCs = cs * 2;
+    const texCs = cs * TEX;
     const kx = k % this.chunks.cols;
     const ky = Math.floor(k / this.chunks.cols);
     const data = this.image.data;
@@ -469,221 +501,227 @@ export class TerrainRenderer {
     const tint = world.tint;
     const col = this.col;
     const maxCap = T.maxHealthCap;
+    const put = (tx: number, ty: number, r: number, g: number, b: number, a: number): void => {
+      const p = (ty * texCs + tx) * 4;
+      data[p] = r < 0 ? 0 : r > 255 ? 255 : r;
+      data[p + 1] = g < 0 ? 0 : g > 255 ? 255 : g;
+      data[p + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
+      data[p + 3] = a;
+    };
     for (let ly = 0; ly < cs; ly++) {
       const cy = ky * cs + ly;
       for (let lx = 0; lx < cs; lx++) {
         const cx = kx * cs + lx;
+        const tx0 = lx * TEX;
+        const ty0 = ly * TEX;
         if (cx >= W || cy >= world.height) {
-          for (let dy = 0; dy < 2; dy++) {
-            for (let dx = 0; dx < 2; dx++) {
-              const p = ((ly * 2 + dy) * subCs + (lx * 2 + dx)) * 4;
-              data[p + 3] = 0;
-            }
-          }
+          for (let t = 0; t < TEX * TEX; t++) put(tx0 + (t % TEX), ty0 + Math.floor(t / TEX), 0, 0, 0, 0);
           continue;
         }
         const i = cy * W + cx;
         const hp = health[i];
         if (hp === 0) {
-          // Check 4 sub-pixels in this cell (pink core blight)
+          // Half-size pixels (Blight, rubble, lab equipment): 2×2 texels each.
           for (let dy = 0; dy < 2; dy++) {
             for (let dx = 0; dx < 2; dx++) {
-              const slx = lx * 2 + dx;
-              const sly = ly * 2 + dy;
-              const p = (sly * subCs + slx) * 4;
               const sx = cx * 2 + dx;
               const sy = cy * 2 + dy;
               const si = sy * world.subWidth + sx;
               const subHp = world.subHealth[si];
+              const bx = tx0 + dx * 2;
+              const by = ty0 + dy * 2;
               if (subHp === 0) {
-                data[p] = 0;
-                data[p + 1] = 0;
-                data[p + 2] = 0;
-                data[p + 3] = 0;
-              } else {
-                const subT = world.subTint[si] / 255;
-                const sk = world.subKind[si];
-                if (sk === SUB.rubble) {
-                  const pal = COLORS.rubble;
-                  const c = pal[world.subTint[si] % pal.length];
-                  const v = 0.82 + (world.subTint[si] >> 3) / 32 * 0.36;
-                  col[0] = c[0] * v;
-                  col[1] = c[1] * v;
-                  col[2] = c[2] * v;
-                } else if (sk === SUB.metal || sk === SUB.pipe) {
-                  sampleRamp(sk === SUB.metal ? COLORS.labMetal : COLORS.labPipe, 0.3 + subT * 0.4, col);
-                } else if (sk === SUB.led) {
-                  // Unlit lamp housing; the blinking light is drawn on top each frame.
-                  const c = COLORS.labLed[world.subTint[si] >> 6];
-                  col[0] = 24 + c[0] * 0.22;
-                  col[1] = 24 + c[1] * 0.22;
-                  col[2] = 28 + c[2] * 0.22;
-                } else if (sk === SUB.core) {
-                  const c = COLORS.labCore[world.subTint[si] >> 6];
-                  col[0] = c[0] * 0.6;
-                  col[1] = c[1] * 0.6;
-                  col[2] = c[2] * 0.6;
-                } else if (sk === SUB.wreck) {
-                  sampleRamp(COLORS.labWreck, subT, col);
-                } else if (sk === SUB.screen) {
-                  const c = COLORS.labScreen[(world.subTint[si] >> 6) & 3];
-                  // Scanline flicker baked per pixel; brighter on even rows.
-                  const v = (sy & 1) === 0 ? 0.95 : 0.7;
-                  col[0] = c[0] * v;
-                  col[1] = c[1] * v;
-                  col[2] = c[2] * v;
-                } else {
-                  sampleRamp(COLORS.pinkBlight, subT, col);
+                put(bx, by, 0, 0, 0, 0);
+                put(bx + 1, by, 0, 0, 0, 0);
+                put(bx, by + 1, 0, 0, 0, 0);
+                put(bx + 1, by + 1, 0, 0, 0, 0);
+                continue;
+              }
+              this.subColor(si, sx, sy, subHp, col);
+              const subUp = sy > 0 && !world.subSolidAt(sx, sy - 1);
+              const subLeft = sx > 0 && !world.subSolidAt(sx - 1, sy);
+              const subDown = sy < world.subHeight - 1 && !world.subSolidAt(sx, sy + 1);
+              const subRight = sx < world.subWidth - 1 && !world.subSolidAt(sx + 1, sy);
+              const sk = world.subKind[si];
+              const flat = sk === SUB.screen || sk === SUB.led || sk === SUB.core;
+              for (let oy = 0; oy < 2; oy++) {
+                for (let ox = 0; ox < 2; ox++) {
+                  let m = flat ? 1 : 0.92 + hash2(sx * 2 + ox, sy * 2 + oy, 5) * 0.16;
+                  let add = 0;
+                  // A lit lip on the faces toward the upper left, a shadow on the others.
+                  if ((subUp && oy === 0) || (subLeft && ox === 0)) {
+                    m *= 1.4;
+                    add = 8;
+                  } else if ((subDown && oy === 1) || (subRight && ox === 1)) {
+                    m *= 0.7;
+                  }
+                  put(bx + ox, by + oy, col[0] * m + add, col[1] * m + add, col[2] * m + add, 255);
                 }
-                const maxSubHp = world.maxSubHealthAt(sx, sy);
-                if (this.dormantAt?.(si)) {
-                  // Dormant: drained to a bruised violet, and decay darkens it further.
-                  const rot = subHp < maxSubHp ? 1 - subHp / maxSubHp : 0;
-                  const lum = (col[0] + col[1] + col[2]) / 3;
-                  const k = 0.5 - rot * 0.3;
-                  col[0] = (lum * 0.55 + col[0] * 0.45) * k;
-                  col[1] = (lum * 0.55 + col[1] * 0.45) * k * 0.85;
-                  col[2] = (lum * 0.55 + col[2] * 0.45) * k * 1.1;
-                } else if (subHp < maxSubHp) {
-                  const d = 1 - subHp / maxSubHp;
-                  const lighten = d * 0.55;
-                  col[0] += (255 - col[0]) * lighten;
-                  col[1] += (255 - col[1]) * lighten;
-                  col[2] += (255 - col[2]) * lighten;
-                }
-                const subUp = sy > 0 && !world.subSolidAt(sx, sy - 1);
-                const subLeft = sx > 0 && !world.subSolidAt(sx - 1, sy);
-                const subDown = sy < world.subHeight - 1 && !world.subSolidAt(sx, sy + 1);
-                const subRight = sx < world.subWidth - 1 && !world.subSolidAt(sx + 1, sy);
-                let sm = 1;
-                let sadd = 0;
-                if (subUp || subLeft) {
-                  sm = 1.35;
-                  sadd = 10;
-                } else if (subDown || subRight) {
-                  sm = 1.15;
-                  sadd = 4;
-                }
-                data[p] = Math.min(255, col[0] * sm + sadd);
-                data[p + 1] = Math.min(255, col[1] * sm + sadd);
-                data[p + 2] = Math.min(255, col[2] * sm + sadd * 1.2);
-                data[p + 3] = 255;
               }
             }
           }
           continue;
         }
         const material = world.mat[i];
-        if (material === MAT.glass) {
-          // See-through containment glass, brighter along faces that touch the air.
-          const g = COLORS.glass;
-          const edge =
-            (cy > 0 && health[i - W] === 0) ||
-            (cx > 0 && health[i - 1] === 0) ||
-            (cy < world.height - 1 && health[i + W] === 0) ||
-            (cx < W - 1 && health[i + 1] === 0);
-          const maxHpG = world.maxHealthAt(cx, cy);
-          const crack = hp < maxHpG ? 1 - hp / maxHpG : 0;
-          const a = Math.min(255, COLORS.glassAlpha + (edge ? 50 : 0) + crack * 90);
-          for (let dy = 0; dy < 2; dy++) {
-            for (let dx = 0; dx < 2; dx++) {
-              const p = ((ly * 2 + dy) * subCs + (lx * 2 + dx)) * 4;
-              // A diagonal glint across each pane.
-              const glint = (dx + dy + cx + cy) % 3 === 0 ? 30 : 0;
-              data[p] = Math.min(255, g[0] + glint);
-              data[p + 1] = Math.min(255, g[1] + glint);
-              data[p + 2] = Math.min(255, g[2] + glint);
-              data[p + 3] = a;
-            }
-          }
-          continue;
-        }
-        const t = tint[i] / 255;
-        const depth = world.depthOf(cx, cy);
-        const wMat = world.wall[i];
-        let ramp: Ramp4;
-        if (wMat === 1) {
-          ramp = COLORS.zone2;
-        } else if (wMat === 2) {
-          ramp = COLORS.zone3;
-        } else if (wMat === 3) {
-          ramp = COLORS.reinforcedWall;
-        } else {
-          // Organic 2-cell transition dither at zone boundaries based on tint.
-          const dither = (t - 0.5) * 3;
-          const z = zoneForDepth(depth + dither);
-          ramp = z === 0 ? COLORS.zone1 : z === 1 ? COLORS.zone2 : COLORS.zone3;
-        }
-        sampleRamp(ramp, t, col);
-
-        // Lab set dressing, with a touch of the cell's grain so it isn't flat.
-        const detail = world.decor[i];
-        if (detail > 0) {
-          const dc = COLORS.labDecor[detail];
-          const dm = COLORS.labDecorMix[detail];
-          const grain = 0.94 + t * 0.12;
-          col[0] += (dc[0] * grain - col[0]) * dm;
-          col[1] += (dc[1] * grain - col[1]) * dm;
-          col[2] += (dc[2] * grain - col[2]) * dm;
-        }
-
-        const maxHp = world.maxHealthAt(cx, cy);
-        // Deeper bands darken slightly for depth perception while preserving zone palette.
-        const band = (maxHp - 1) / Math.max(1, maxCap - 1);
-        if (band > 0) {
-          const shade = 1 - band * 0.18;
-          col[0] *= shade;
-          col[1] *= shade;
-          col[2] *= shade;
-        }
-
-        // Damage indicator: lighter shade of cell color proportional to relative damage percent.
-        if (hp < maxHp) {
-          const d = 1 - hp / maxHp;
-          const lighten = d * 0.55;
-          col[0] += (255 - col[0]) * lighten;
-          col[1] += (255 - col[1]) * lighten;
-          col[2] += (255 - col[2]) * lighten;
-        }
-
-        // Edge highlights where terrain faces open space.
         const up = cy > 0 && health[i - W] === 0;
         const left = cx > 0 && health[i - 1] === 0;
         const down = cy < world.height - 1 && health[i + W] === 0;
         const right = cx < W - 1 && health[i + 1] === 0;
-        let m = 1;
-        let add = 0;
-        if (up || left) {
-          m = 1.6;
-          add = 8;
-        } else if (down || right) {
-          m = 1.3;
-          add = 3;
+        if (material === MAT.glass) {
+          // See-through containment glass, brighter along faces that touch the air.
+          const g = COLORS.glass;
+          const edge = up || left || down || right;
+          const maxHpG = world.maxHealthAt(cx, cy);
+          const crack = hp < maxHpG ? 1 - hp / maxHpG : 0;
+          const a = Math.min(255, COLORS.glassAlpha + (edge ? 40 : 0) + crack * 90);
+          for (let t = 0; t < TEX * TEX; t++) {
+            const ox = t % TEX;
+            const oy = (t - ox) / TEX;
+            // A thin diagonal glint across each pane.
+            const glint = (cx * TEX + ox + cy * TEX + oy) % 6 === 0 ? 26 : 0;
+            put(tx0 + ox, ty0 + oy, g[0] + glint, g[1] + glint, g[2] + glint, a);
+          }
+          continue;
         }
-        const rVal = Math.min(255, col[0] * m + add);
-        const gVal = Math.min(255, col[1] * m + add);
-        const bVal = Math.min(255, col[2] * m + add * 1.3);
-
-        for (let dy = 0; dy < 2; dy++) {
-          for (let dx = 0; dx < 2; dx++) {
-            const p = ((ly * 2 + dy) * subCs + (lx * 2 + dx)) * 4;
-            data[p] = rVal;
-            data[p + 1] = gVal;
-            data[p + 2] = bVal;
-            data[p + 3] = 255;
+        const t = tint[i] / 255;
+        const tier = this.materialTier(cx, cy);
+        const base = MATERIAL_BASE[tier];
+        const tone = 0.88 + t * 0.24;
+        const detail = world.decor[i];
+        const dc = COLORS.labDecor[detail];
+        const dm = detail > 0 ? COLORS.labDecorMix[detail] : 0;
+        const dGrain = 0.94 + t * 0.12;
+        const maxHp = world.maxHealthAt(cx, cy);
+        // Deeper bands darken slightly for depth perception.
+        const band = (maxHp - 1) / Math.max(1, maxCap - 1);
+        const shade = band > 0 ? 1 - band * 0.18 : 1;
+        const dmg = hp < maxHp ? (1 - hp / maxHp) * 0.5 : 0;
+        // Structural walls and doors carry a band of matte tier paint on their open faces.
+        const painted = (world.wall[i] > 0 || material === MAT.door) && world.blight[i] === 0 && world.coreId[i] === 0;
+        const paintTier = painted ? this.tierAt(cx, cy) : 0;
+        const paint = TIER_PAINT[paintTier];
+        for (let oy = 0; oy < TEX; oy++) {
+          for (let ox = 0; ox < TEX; ox++) {
+            const gx = cx * TEX + ox;
+            const gy = cy * TEX + oy;
+            const s = materialShade(tier, gx, gy) * tone;
+            col[0] = base[0] * s;
+            col[1] = base[1] * s;
+            col[2] = base[2] * s;
+            if (dm > 0) {
+              const g = dGrain * (0.95 + hash2(gx, gy, 9) * 0.1);
+              col[0] += (dc[0] * g - col[0]) * dm;
+              col[1] += (dc[1] * g - col[1]) * dm;
+              col[2] += (dc[2] * g - col[2]) * dm;
+            }
+            // Paint sits one texel in from an open face, worn through in places.
+            if (
+              paintTier > 0 &&
+              ((up && oy === 1) || (left && ox === 1) || (down && oy === TEX - 2) || (right && ox === TEX - 2)) &&
+              hash2(gx, gy, 77) > 0.2
+            ) {
+              const pg = 0.9 + hash2(gx, gy, 78) * 0.16;
+              col[0] = paint[0] * pg;
+              col[1] = paint[1] * pg;
+              col[2] = paint[2] * pg;
+            }
+            col[0] *= shade;
+            col[1] *= shade;
+            col[2] *= shade;
+            if (dmg > 0) {
+              // Damage scuffs the surface toward pale dust.
+              col[0] += (150 - col[0]) * dmg;
+              col[1] += (140 - col[1]) * dmg;
+              col[2] += (128 - col[2]) * dmg;
+            }
+            // Matte relief: a pale lip on faces toward the upper left, shadow on the rest.
+            let m = 1;
+            let add = 0;
+            if ((up && oy === 0) || (left && ox === 0)) {
+              m = 1.7;
+              add = 22;
+            } else if ((down && oy === TEX - 1) || (right && ox === TEX - 1)) {
+              m = 0.62;
+            }
+            put(tx0 + ox, ty0 + oy, col[0] * m + add, col[1] * m + add, col[2] * m + add, 255);
           }
         }
       }
     }
     this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0);
     this.buildEdgeMask(k, kx, ky);
-    this.buildTierGlow(k, kx, ky);
+  }
+
+  /** Albedo of a live half-size pixel, before relief shading. */
+  private subColor(si: number, sx: number, sy: number, subHp: number, col: number[]): void {
+    const world = this.world;
+    const subT = world.subTint[si] / 255;
+    const sk = world.subKind[si];
+    if (sk === SUB.rubble) {
+      const pal = COLORS.rubble;
+      const c = pal[world.subTint[si] % pal.length];
+      const v = 0.82 + ((world.subTint[si] >> 3) / 32) * 0.36;
+      col[0] = c[0] * v;
+      col[1] = c[1] * v;
+      col[2] = c[2] * v;
+    } else if (sk === SUB.metal || sk === SUB.pipe) {
+      sampleRamp(sk === SUB.metal ? COLORS.labMetal : COLORS.labPipe, 0.3 + subT * 0.4, col);
+    } else if (sk === SUB.led) {
+      // Unlit lamp housing; the blinking light is drawn on top each frame.
+      const c = COLORS.labLed[world.subTint[si] >> 6];
+      col[0] = 24 + c[0] * 0.22;
+      col[1] = 24 + c[1] * 0.22;
+      col[2] = 28 + c[2] * 0.22;
+    } else if (sk === SUB.core) {
+      const c = COLORS.labCore[world.subTint[si] >> 6];
+      col[0] = c[0] * 0.6;
+      col[1] = c[1] * 0.6;
+      col[2] = c[2] * 0.6;
+    } else if (sk === SUB.wreck) {
+      sampleRamp(COLORS.labWreck, subT, col);
+    } else if (sk === SUB.screen) {
+      const c = COLORS.labScreen[(world.subTint[si] >> 6) & 3];
+      // Scanline flicker baked per pixel; brighter on even rows.
+      const v = (sy & 1) === 0 ? 0.95 : 0.7;
+      col[0] = c[0] * v;
+      col[1] = c[1] * v;
+      col[2] = c[2] * v;
+    } else {
+      sampleRamp(COLORS.pinkBlight, subT, col);
+    }
+    const maxSubHp = world.maxSubHealthAt(sx, sy);
+    if (this.dormantAt?.(si)) {
+      // Dormant: drained to a bruised violet, and decay darkens it further.
+      const rot = subHp < maxSubHp ? 1 - subHp / maxSubHp : 0;
+      const lum = (col[0] + col[1] + col[2]) / 3;
+      const k = 0.5 - rot * 0.3;
+      col[0] = (lum * 0.55 + col[0] * 0.45) * k;
+      col[1] = (lum * 0.55 + col[1] * 0.45) * k * 0.85;
+      col[2] = (lum * 0.55 + col[2] * 0.45) * k * 1.1;
+    } else if (subHp < maxSubHp) {
+      const d = 1 - subHp / maxSubHp;
+      const lighten = d * 0.55;
+      col[0] += (255 - col[0]) * lighten;
+      col[1] += (255 - col[1]) * lighten;
+      col[2] += (255 - col[2]) * lighten;
+    }
+  }
+
+  /** Material tier of a solid cell (1..4): zone fill by depth, walls one tier up, doors by keycard. */
+  private materialTier(cx: number, cy: number): number {
+    const w = this.world;
+    const i = cy * w.width + cx;
+    if (w.mat[i] === MAT.door) return w.doors[w.doorId[i] - 1]?.tier ?? 1;
+    const wm = w.wall[i];
+    if (wm > 0) return wm + 1;
+    const dither = (w.tint[i] / 255 - 0.5) * 3;
+    return zoneForDepth(w.depthOf(cx, cy) + dither) + 1;
   }
 
   /**
-   * Terrain tier of a solid cell for the exposed-edge glow (0 = no glow):
+   * Terrain tier of a solid cell for its matte paint band (0 = unpainted):
    * 1..3 for zone fill, wall material one tier up (4 = reinforced), doors by
-   * the keycard tier that opens them. Glass, Blight and rubble don't glow.
+   * the keycard tier that opens them. Glass, Blight and rubble have none.
    */
   tierAt(cx: number, cy: number): number {
     const w = this.world;
@@ -698,98 +736,6 @@ export class TerrainRenderer {
     // Matches the color ramp's dithered zone boundary.
     const dither = (w.tint[i] / 255 - 0.5) * 3;
     return zoneForDepth(w.depthOf(cx, cy) + dither) + 1;
-  }
-
-  private buildTierGlow(k: number, kx: number, ky: number): void {
-    const w = this.world;
-    const cs = this.chunks.chunkSize;
-    const size = cs * GLOW_RES;
-    const data = this.glowImage.data;
-    data.fill(0);
-    let any = false;
-    const open = (x: number, y: number): boolean => w.inBounds(x, y) && !w.anySolidInCell(x, y);
-    const put = (px: number, py: number, tier: number, a: number): void => {
-      if (px < 0 || py < 0 || px >= size || py >= size) return;
-      const p = (py * size + px) * 4;
-      if (data[p + 3] >= a) return;
-      const c = FACILITY.tierGlow[tier];
-      data[p] = c[0];
-      data[p + 1] = c[1];
-      data[p + 2] = c[2];
-      data[p + 3] = a;
-      any = true;
-    };
-    // Paint a band `steps` deep along one face of cell (lx, ly), stepping inward from the face.
-    const band = (lx: number, ly: number, dir: number, tier: number, alphas: readonly number[], inward: boolean): void => {
-      const bx = lx * GLOW_RES;
-      const by = ly * GLOW_RES;
-      for (let s = 0; s < alphas.length; s++) {
-        const d = inward ? s : GLOW_RES - 1 - s;
-        for (let a = 0; a < GLOW_RES; a++) {
-          // dir: 0 = face up, 1 = right, 2 = down, 3 = left.
-          if (dir === 0) put(bx + a, by + d, tier, alphas[s]);
-          else if (dir === 2) put(bx + a, by + GLOW_RES - 1 - d, tier, alphas[s]);
-          else if (dir === 3) put(bx + d, by + a, tier, alphas[s]);
-          else put(bx + GLOW_RES - 1 - d, by + a, tier, alphas[s]);
-        }
-      }
-    };
-    const DX = [0, 1, 0, -1];
-    const DY = [-1, 0, 1, 0];
-    for (let ly = 0; ly < cs; ly++) {
-      const cy = ky * cs + ly;
-      if (cy >= w.height) break;
-      for (let lx = 0; lx < cs; lx++) {
-        const cx = kx * cs + lx;
-        if (cx >= w.width) break;
-        const tier = this.tierAt(cx, cy);
-        if (tier > 0) {
-          for (let d = 0; d < 4; d++) {
-            if (open(cx + DX[d], cy + DY[d])) band(lx, ly, d, tier, GLOW_IN, true);
-          }
-        } else if (open(cx, cy)) {
-          // A faint halo spills into the air in front of each glowing face.
-          for (let d = 0; d < 4; d++) {
-            const nx = cx + DX[d];
-            const ny = cy + DY[d];
-            if (!w.inBounds(nx, ny)) continue;
-            const nt = this.tierAt(nx, ny);
-            // Face of this empty cell that touches the neighbor: same direction `d`, painted from that side.
-            if (nt > 0) band(lx, ly, d, nt, GLOW_OUT, true);
-          }
-        }
-      }
-    }
-    if (!any) {
-      this.glowLive[k] = 0;
-      return;
-    }
-    let canvas = this.glowCanvases[k];
-    if (!canvas) {
-      canvas = document.createElement("canvas");
-      canvas.width = canvas.height = size;
-      this.glowCanvases[k] = canvas;
-    }
-    canvas.getContext("2d")!.putImageData(this.glowImage, 0, 0);
-    this.glowLive[k] = 1;
-  }
-
-  /**
-   * Soft tier-colored glow along every exposed block face: blue Tier 1, red
-   * Tier 2, burnt orange Tier 3. Cached per chunk and drawn smoothed and
-   * additive after the lighting pass, so it costs one draw per visible chunk.
-   */
-  drawTierGlow(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number): void {
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = FACILITY.tierGlowAlpha * (0.9 + 0.1 * Math.sin(time * 1.3));
-    ctx.imageSmoothingEnabled = true;
-    const cols = this.chunks.cols;
-    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
-      const k = ky * cols + kx;
-      if (this.glowLive[k]) ctx.drawImage(this.glowCanvases[k]!, sx, sy, sw, sh);
-    });
-    ctx.restore();
   }
 
   private buildEdgeMask(k: number, kx: number, ky: number): void {

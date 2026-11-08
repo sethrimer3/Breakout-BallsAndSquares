@@ -147,7 +147,7 @@ export const FACILITY = {
   pristineBelow: 0.34,
   decayedAbove: 0.62,
   /** Lightmap brightness of the even wash over pristine rooms and halls (0..1). */
-  washStrength: 0.22,
+  washStrength: 0.13,
   /** Radius (cells) of the pool of light under each ceiling panel. */
   panelRadiusCells: 6,
   /** Lightmap strength of the pink glow a living Blight Core throws over its room. */
@@ -176,16 +176,6 @@ export const FACILITY = {
   sentryDamage: 2,
   sentryFireRate: 2.5,
   sentryTurnSpeed: Math.PI * 1.2,
-  /** Exposed-edge glow per terrain tier (RGB): 1 blue, 2 red, 3 burnt orange, 4 reinforced violet. */
-  tierGlow: [
-    [0, 0, 0],
-    [48, 120, 255],
-    [255, 36, 36],
-    [214, 92, 18],
-    [168, 112, 255],
-  ] as const,
-  /** Overall strength of the tier glow (0..1). */
-  tierGlowAlpha: 0.6,
 };
 
 /** Biological Blight enemies: flowers, worms and escaped tank specimens. */
@@ -517,7 +507,7 @@ export const LIGHT = {
   /** Max simultaneous shadow-casting flashes; older/excess flashes fall back to cheap glow. */
   maxShadowLights: 20,
   /** Ambient darkness RGB multiplied over the scene (low = dark atmosphere). */
-  ambientRgb: [46, 52, 74] as const,
+  ambientRgb: [50, 46, 46] as const,
   /** Faint ambient self-glow radius around each soldier (world units). */
   soldierLightRadius: 34,
   /** Soldier self-glow strength. */
@@ -608,7 +598,9 @@ export const FOG = {
 };
 
 export const COLORS = {
-  background: "#05070d",
+  background: "#060505",
+  /** Bare slab of the spawn room. */
+  spawnFloor: "#2c2a28",
   backgroundGlow: "#0b1020",
   /** Terrain base palette (RGB) for Zone 1: muted dark greys, blues, browns. */
   terrainA: [30, 32, 38] as const, // muted dark grey
@@ -650,16 +642,16 @@ export const COLORS = {
   /** Lab detail colors, indexed by `DECOR` in world/LabDetails.ts. */
   labDecor: [
     [0, 0, 0], // none
-    [58, 68, 78], // floor: sterile steel
-    [78, 90, 102], // floor tile line
-    [70, 150, 160], // corridor guide line
+    [60, 58, 55], // floor: dusty matte concrete tile
+    [34, 32, 30], // floor tile grout
+    [96, 84, 50], // corridor guide line: faded ochre paint
     [120, 30, 70], // blight stain
-    [96, 104, 116], // blast door
+    [70, 68, 66], // blast door
     [30, 34, 42], // door seam
-    [90, 230, 150], // door jamb light
-    [190, 150, 40], // hazard yellow
+    [44, 84, 64], // door jamb light
+    [138, 108, 38], // hazard yellow (matte, worn)
     [24, 24, 28], // hazard black
-    [104, 114, 128], // equipment frame
+    [84, 82, 80], // equipment frame
     [120, 200, 210], // tank glass
     [50, 170, 130], // specimen fluid
     [120, 255, 170], // status LED
@@ -671,15 +663,15 @@ export const COLORS = {
     [138, 24, 78], // dark pink blight vein / tendril
     [185, 28, 98], // blight core outer shell
     [255, 72, 164], // blight core pulsing heart
-    [178, 186, 194], // pristine floor: clean pale tile
-    [128, 136, 148], // pristine tile seam
+    [112, 108, 100], // pristine floor: aged bone tile
+    [70, 66, 62], // pristine tile grout
     [236, 246, 255], // light panel (lit)
     [58, 62, 68], // dead light panel
     [40, 38, 34], // grime
     [14, 12, 12], // floor crack
-    [214, 228, 238], // pristine wall trim
-    [204, 210, 218], // pristine wall panel
-    [150, 158, 170], // pristine wall panel seam
+    [136, 132, 122], // pristine wall trim
+    [112, 108, 100], // pristine wall panel
+    [74, 70, 66], // pristine wall panel seam
     [40, 36, 34], // grimy, stained wall
     [104, 24, 62], // Blight-flecked wall
     [18, 18, 22], // missing floor tile
@@ -694,12 +686,12 @@ export const COLORS = {
     [0, 0, 0], // none
     [0, 0, 0], // floor
     [7, 9, 12], // floor tile line
-    [14, 42, 48], // corridor guide line
+    [0, 0, 0], // corridor guide line (paint, no glow)
     [44, 8, 26], // blight stain
     [0, 0, 0], // blast door
     [0, 0, 0], // door seam
-    [50, 170, 100], // door jamb light
-    [70, 52, 10], // hazard yellow
+    [6, 22, 14], // door jamb light
+    [0, 0, 0], // hazard yellow (paint, no glow)
     [0, 0, 0], // hazard black
     [0, 0, 0], // equipment frame
     [40, 90, 100], // tank glass
@@ -709,8 +701,8 @@ export const COLORS = {
     [0, 0, 0], // bench top
     [0, 0, 0], // bunk linen
     [0, 0, 0], // scorched breach
-    [52, 8, 30], // dark pink blight overrun floor
-    [110, 18, 64], // dark pink blight vein / tendril
+    [34, 5, 20], // dark pink blight overrun floor
+    [72, 12, 42], // dark pink blight vein / tendril
     [175, 28, 96], // blight core outer shell
     [255, 90, 180], // blight core pulsing heart
     [0, 0, 0], // pristine floor
@@ -737,10 +729,10 @@ export const COLORS = {
   ] as const,
   /** Half-size lab equipment ramps (dark to light): machine casing, pipes, and screen colors. */
   labMetal: [
-    [58, 66, 82],
-    [92, 104, 124],
-    [130, 144, 164],
-    [176, 188, 204],
+    [50, 50, 52],
+    [76, 74, 74],
+    [104, 100, 96],
+    [138, 132, 124],
   ] as const,
   labPipe: [
     [70, 46, 34],
@@ -779,8 +771,8 @@ export const COLORS = {
   glass: [120, 190, 210] as const,
   glassAlpha: 92,
   /** Blast door: dark core and lighter rim. */
-  doorCore: "#232a35",
-  doorRim: "#8d9bb0",
+  doorCore: "#1c1a19",
+  doorRim: "#55514c",
   /** Tint applied to damaged cells. */
   damage: [120, 70, 52] as const,
   soldierCore: "#1b2a3a",

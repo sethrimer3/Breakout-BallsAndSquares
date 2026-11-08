@@ -10,6 +10,7 @@ import { CreatureRenderer } from "./CreatureRenderer";
 import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
 import { createSprites, type Sprites } from "./sprites";
+import { TIER_PAINT } from "./materials";
 
 /** Door core lightened toward the rim as it takes damage. */
 function doorCoreDamaged(d: number): string {
@@ -66,10 +67,15 @@ export class Renderer {
     //    and debris/smoke.
     ctx.fillStyle = COLORS.background;
     ctx.fillRect(0, 0, w, h);
-    const rcx = cam.worldToScreenX(game.world.roomCenterX);
-    const rcy = cam.worldToScreenY(game.world.roomCenterY);
-    const rRad = 88 * cam.zoom;
-    ctx.drawImage(this.sprites.soldierGlow, rcx - rRad, rcy - rRad, rRad * 2, rRad * 2);
+    // The spawn room's bare concrete slab.
+    {
+      const cs = game.world.cellSize;
+      const sx = cam.worldToScreenX(game.world.roomX0 * cs);
+      const sy = cam.worldToScreenY(game.world.roomY0 * cs);
+      const sw = game.world.roomSize * cs * cam.zoom;
+      ctx.fillStyle = COLORS.spawnFloor;
+      ctx.fillRect(sx, sy, sw, sw);
+    }
 
     game.terrain.drawFloor(ctx, cam);
     game.terrain.draw(ctx, cam, game.showChunkBorders);
@@ -80,7 +86,7 @@ export class Renderer {
     const rx0 = cam.worldToScreenX(game.world.roomX0 * cs);
     const ry0 = cam.worldToScreenY(game.world.roomY0 * cs);
     const rw = game.world.roomSize * cs * cam.zoom;
-    ctx.strokeStyle = "rgba(110, 200, 240, 0.16)";
+    ctx.strokeStyle = "rgba(150, 140, 120, 0.14)";
     ctx.lineWidth = 1;
     ctx.strokeRect(rx0 + 0.5, ry0 + 0.5, rw - 1, rw - 1);
 
@@ -92,7 +98,6 @@ export class Renderer {
     this.lightRenderer.renderLighting(ctx, game, this.dpr);
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
     game.terrain.drawPanels(ctx, cam, performance.now() / 1000);
-    game.terrain.drawTierGlow(ctx, cam, game.runStats.time);
     game.terrain.drawLabLights(ctx, cam, performance.now() / 1000, this.motion.matches);
     this.drawSentries();
     this.creatureRenderer.draw(ctx, cam, game.creatures, this.motion.matches ? 0 : performance.now() / 1000);
@@ -290,6 +295,12 @@ export class Renderer {
         const maxHp = w.maxHealthAt(cx, cy);
         ctx.fillStyle = hp < maxHp ? doorCoreDamaged(1 - hp / maxHp) : COLORS.doorCore;
         ctx.fillRect(sx + rim, sy + rim, ex - sx - rim * 2, ey - sy - rim * 2);
+        // Checkered bands of matte paint in the keycard's color mark the door's tier.
+        if (((cx + cy) & 1) === 0 && hp === maxHp) {
+          const c = TIER_PAINT[d.tier] ?? TIER_PAINT[1];
+          ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+          ctx.fillRect(sx + rim * 2, sy + rim * 2, ex - sx - rim * 4, ey - sy - rim * 4);
+        }
       }
     }
   }
