@@ -1649,6 +1649,7 @@ button {
   text-align: center;
   pointer-events: none;
   z-index: 30;
+  overflow-wrap: anywhere;
 }
 .tt-title {
   color: var(--tt-color, var(--cyan));
@@ -1660,11 +1661,19 @@ button {
   color: var(--muted);
 }
 .tt-compare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
   margin-top: 6px;
   font-size: var(--f24);
-  line-height: 1;
+  line-height: 1.2;
   color: #ffffff;
-  white-space: nowrap;
+}
+.tt-value {
+  min-width: 0;
+  max-width: 100%;
 }
 .tt-delta,
 .tt-desc {

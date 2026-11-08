@@ -450,19 +450,19 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "drop_chance",
     branch: "resources",
     name: "Gold Drop Chance",
-    shortDesc: "+10% chance for broken pixels to drop currency",
+    shortDesc: "+5 percentage points to currency drop chance per level",
     color: "#ffd84d",
     grid: { col: -1, row: 0 },
     parent: null,
     maxLevel: 8,
     baseCost: 8,
-    costMultiplier: 1.48,
+    costMultiplier: 1.65,
     unlockLifetimePixels: 0,
-    valueAt: (lvl) => Math.round((LOOT.baseDropChance + 0.1 * lvl) * 100),
+    valueAt: (lvl) => Math.round((LOOT.baseDropChance + 0.05 * lvl) * 100),
     formatValue: (v) => `${v}%`,
-    formatDelta: () => "+10%",
+    formatDelta: () => "+5 pp",
     apply: (s, lvl) => {
-      s.dropChance = LOOT.baseDropChance + 0.1 * lvl;
+      s.dropChance = LOOT.baseDropChance + 0.05 * lvl;
     },
     icon: "goldDrop",
   },
@@ -470,19 +470,21 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "multi_drop",
     branch: "resources",
     name: "Multi-Drop",
-    shortDesc: "+25% drop yield per level — drops 2 or more currency items!",
+    shortDesc: "+8% currency yield per level (levels add); can produce extra drops",
     color: "#ffd84d",
     grid: { col: -2, row: 0 },
     parent: "drop_chance",
     maxLevel: 12,
-    baseCost: 28,
-    costMultiplier: 1.55,
+    baseCost: 35,
+    costMultiplier: 1.7,
     unlockLifetimePixels: 30,
-    valueAt: (lvl) => +(1 + 0.25 * lvl).toFixed(2),
+    valueAt: (lvl) => +(1 + 0.08 * lvl).toFixed(2),
     formatValue: (v) => `${v.toFixed(2)}× DROPS`,
-    formatDelta: () => "+0.25 DROPS",
+    formatDelta: () => "+8% YIELD",
     apply: (s, lvl) => {
-      s.dropChance += 0.25 * lvl;
+      // Scale the drop-chance branch rather than adding guaranteed drops.
+      // Levels add to this multiplier; they do not compound with each other.
+      s.dropChance *= 1 + 0.08 * lvl;
     },
     icon: "goldStack",
   },
@@ -530,7 +532,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "tier2_crystal_yield",
     branch: "resources",
     name: "Crystal Harvester [T2]",
-    shortDesc: "+15% Zone 2 Orange Crystal drop chance",
+    shortDesc: "+8% Zone 2 Orange Crystal yield per level",
     color: "#ff8c2e",
     grid: { col: 1, row: 0 },
     parent: null,
@@ -538,11 +540,11 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     baseCost: 40,
     costMultiplier: 1.6,
     unlockLifetimePixels: 50,
-    valueAt: (lvl) => Math.round((1 + 0.15 * lvl) * 100),
+    valueAt: (lvl) => Math.round((1 + 0.08 * lvl) * 100),
     formatValue: (v) => `${v}% T2`,
-    formatDelta: () => "+15% T2",
+    formatDelta: () => "+8% T2",
     apply: (s, lvl) => {
-      s.crystalDropBonus = 0.15 * lvl;
+      s.crystalDropBonus = 0.08 * lvl;
     },
     icon: "goldDrop",
   },
@@ -550,7 +552,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "tier2_crystal_refinery",
     branch: "resources",
     name: "Crystal Refinery [T2]",
-    shortDesc: "+20% Zone 2 Orange Crystal drop chance",
+    shortDesc: "+10% Zone 2 Orange Crystal yield per level",
     color: "#ff8c2e",
     grid: { col: 1, row: -1 },
     parent: "tier2_crystal_yield",
@@ -558,11 +560,11 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     baseCost: 75,
     costMultiplier: 1.75,
     unlockLifetimePixels: 100,
-    valueAt: (lvl) => lvl * 20,
+    valueAt: (lvl) => lvl * 10,
     formatValue: (v) => `+${v}% T2`,
-    formatDelta: () => "+20% T2",
+    formatDelta: () => "+10% T2",
     apply: (s, lvl) => {
-      s.crystalDropBonus += 0.2 * lvl;
+      s.crystalDropBonus += 0.1 * lvl;
     },
     icon: "goldStack",
   },
@@ -570,7 +572,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "tier3_dark_matter",
     branch: "resources",
     name: "Green Crystal Siphon [T3]",
-    shortDesc: "+20% Zone 3 Green Crystal drop chance",
+    shortDesc: "+10% Zone 3 Green Crystal yield per level",
     color: "#52f296",
     grid: { col: 2, row: 0 },
     parent: "tier2_crystal_yield",
@@ -578,11 +580,11 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     baseCost: 150,
     costMultiplier: 1.85,
     unlockLifetimePixels: 200,
-    valueAt: (lvl) => Math.round((1 + 0.2 * lvl) * 100),
+    valueAt: (lvl) => Math.round((1 + 0.1 * lvl) * 100),
     formatValue: (v) => `${v}% T3`,
-    formatDelta: () => "+20% T3",
+    formatDelta: () => "+10% T3",
     apply: (s, lvl) => {
-      s.tier3ResourceBonus = 0.2 * lvl;
+      s.tier3ResourceBonus = 0.1 * lvl;
     },
     icon: "cluster",
   },
@@ -590,7 +592,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "tier3_quantum_extractor",
     branch: "resources",
     name: "Quantum Extractor [T3]",
-    shortDesc: "+25% Zone 3 Green Crystal drop chance",
+    shortDesc: "+12% Zone 3 Green Crystal yield per level",
     color: "#52f296",
     grid: { col: 2, row: 1 },
     parent: "tier3_dark_matter",
@@ -598,11 +600,11 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     baseCost: 220,
     costMultiplier: 1.95,
     unlockLifetimePixels: 300,
-    valueAt: (lvl) => lvl * 25,
+    valueAt: (lvl) => lvl * 12,
     formatValue: (v) => `+${v}% T3`,
-    formatDelta: () => "+25% T3",
+    formatDelta: () => "+12% T3",
     apply: (s, lvl) => {
-      s.tier3ResourceBonus += 0.25 * lvl;
+      s.tier3ResourceBonus += 0.12 * lvl;
     },
     icon: "blast",
   },

@@ -1004,12 +1004,12 @@ export class UpgradeTree {
       `;
     } else if (maxed) {
       bodyHtml = `
-        <div class="tt-compare">${curVal} <span class="tt-max-tag">MAX</span></div>
+        <div class="tt-compare"><span class="tt-value">${curVal}</span> <span class="tt-max-tag">MAX</span></div>
         <div class="tt-delta">${def.shortDesc}</div>
       `;
     } else {
       bodyHtml = `
-        <div class="tt-compare">${curVal} ${sprite("chevron", { color: "#7e9bb8" })} ${nextVal}</div>
+        <div class="tt-compare"><span class="tt-value">${curVal}</span> ${sprite("chevron", { color: "#7e9bb8" })} <span class="tt-value">${nextVal}</span></div>
         <div class="tt-delta">${def.formatDelta()} (${def.shortDesc})</div>
         <div class="tt-cost ${canBuy ? "affordable" : "expensive"}">${this.priceHtml(u.pricesOf(def.id))}</div>
       `;

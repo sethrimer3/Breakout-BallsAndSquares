@@ -72,7 +72,7 @@ The layout scales down to fit small screens; the Upgrade Tree is easiest to read
 
 ## Permanent Upgrade Tree
 
-Every destroyed pixel awards **1 ◆ currency** and increments lifetime pixels destroyed. Progress is saved automatically in `localStorage` under `breach.save.v1` with schema validation and corruption recovery.
+Destroyed blocks roll currency pickups that must be collected, and increment lifetime pixels destroyed. Progress is saved automatically in `localStorage` under `breach.save.v1` with schema validation and corruption recovery.
 
 | Upgrade | Effect / Level | Max Level | Base Cost | Cost Multiplier | Unlock Condition |
 |---|---|---|---|---|---|
@@ -102,6 +102,8 @@ All gameplay, physics, growth, lighting, and upgrade constants live in [`src/con
 
 ## Balancing Notes
 
+- **Resource pacing:** Starting drops are `0.4` per block with a `48`-unit pickup attraction radius. Gold Drop Chance adds **5 percentage points** per level (8 levels; starts at 8 gold, costs scale by `1.65×`). Multi-Drop multiplies that yield by `1 + 0.08 × level` (12 levels; starts at 35 gold, costs scale by `1.7×`). At both caps this gives `1.568` drops per block, or **3.92×** starting income for equal excavation, versus the previous **20×** spread. Individual resource purchases increase expected yield by at most 12.5%; later levels take progressively more blocks to repay. Combat, squad size, and collection efficiency still affect actual run income.
+- **Deeper-zone resources:** T2 Harvester/Refinery add `8%`/`10%` yield per level; T3 Siphon/Extractor add `10%`/`12%`. Bonuses within each zone add before multiplying the shared drop yield. Existing saves retain purchased levels and balances; the revised effects apply on stat refresh or the next run.
 - **Tunnel Clearance vs. Visual Presence:** Splitting `SOLDIER.collisionRadius` (`3.2` units) from `SOLDIER.renderRadius` (`4.5` units) allows a single-damage soldier to bore into 1-cell tunnels immediately on Run 1 without getting wedged on seam corners, while seam-aware contact normals prevent false corner bounces along straight corridors.
 - **First-Run Pacing:** With `fireRate = 2.5/s`, `graceSeconds = 12`, and `baseRate = 0.35 * 1.055^elapsed`, an un-upgraded soldier typically survives `45–75 s` and excavates `45–90` pixels—enough to purchase 2–3 early upgrades on the first attempt and unlock **Multishot** within 1–2 runs.
 - **Growth Telemetry:** The `GrowthSystem` tracks the rolling percentage of replication events occurring within 12 cells of active soldiers (visible in the backtick debug panel and exported via **Copy Log**). Because uniform frontier selection naturally concentrates around the freshly carved tunnels near spawn during early/mid runs, `GROWTH.localBias` defaults to `0` (pure uniform frontier pick) and can be raised in `src/config.ts` if tighter late-game pressure is desired.

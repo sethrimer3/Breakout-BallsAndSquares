@@ -28,16 +28,11 @@ export class TerrainChunks {
     }
   }
 
-  /** Mark the chunk containing a cell, plus neighbors' chunks (edge highlights depend on neighbors). */
+  /** Edge masks read all eight neighbors, including across diagonal chunk boundaries. */
   markCell(cx: number, cy: number): void {
-    this.markChunkAt(cx, cy);
-    const cs = this.chunkSize;
-    const lx = cx % cs;
-    const ly = cy % cs;
-    if (lx === 0) this.markChunkAt(cx - 1, cy);
-    else if (lx === cs - 1) this.markChunkAt(cx + 1, cy);
-    if (ly === 0) this.markChunkAt(cx, cy - 1);
-    else if (ly === cs - 1) this.markChunkAt(cx, cy + 1);
+    for (let y = cy - 1; y <= cy + 1; y++) {
+      for (let x = cx - 1; x <= cx + 1; x++) this.markChunkAt(x, y);
+    }
   }
 
   private markChunkAt(cx: number, cy: number): void {

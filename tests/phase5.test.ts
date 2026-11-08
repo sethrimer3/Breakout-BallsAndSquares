@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { LIGHT, LOOT, SIM, SOLDIER, WORLD } from "../src/config";
+import { LIGHT, LOOT, SIM, SOLDIER, WORLD, zoneForDepth } from "../src/config";
 import { Rng } from "../src/core/Rng";
 import { CasingSystem } from "../src/entities/CasingSystem";
-import { LootSystem } from "../src/entities/LootSystem";
+import { LootSystem, lootKindForZone } from "../src/entities/LootSystem";
 import { PKind, ParticleSystem } from "../src/entities/ParticleSystem";
 import { Soldier } from "../src/entities/Soldier";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
@@ -31,6 +31,9 @@ function simulateRun(
 ): {
   time: number;
   pixels: number;
+  gold: number;
+  crystals: number;
+  greenCrystals: number;
   maxDepth: number;
   nearPct: number;
   crossoverFrac: number;
@@ -47,8 +50,11 @@ function simulateRun(
       if (r === 2) {
         runStats.pixelsDestroyed++;
         const cs = w.cellSize;
-        loot.spawnDropsForBlock((cx + 0.5) * cs, (cy + 0.5) * cs, stats.dropChance, stats.pickupLifetime, rng);
         const d = w.depthOf(cx, cy);
+        const zone = zoneForDepth(d);
+        const bonus = zone === 1 ? stats.crystalDropBonus : zone >= 2 ? stats.tier3ResourceBonus : 0;
+        loot.spawnDropsForBlock((cx + 0.5) * cs, (cy + 0.5) * cs,
+          stats.dropChance * (1 + bonus), stats.pickupLifetime, rng, lootKindForZone(zone));
         if (d > runStats.maxDepth) runStats.maxDepth = d;
       }
     },
@@ -82,7 +88,10 @@ function simulateRun(
     }
     combat.updateBullets(SIM.dt);
     growth.update(SIM.dt, runStats.time, soldiers);
-    runStats.currency += loot.update(SIM.dt, soldiers, stats.magnetRange);
+    loot.update(SIM.dt, soldiers, stats.magnetRange);
+    runStats.currency += loot.collectedGold;
+    runStats.crystals += loot.collectedCrystals;
+    runStats.greenCrystals += loot.collectedGreenCrystals;
     runStats.recordSampleIfDue(growth.rate);
 
     const alive = soldiers.some((s) => s.alive);
@@ -101,6 +110,9 @@ function simulateRun(
   return {
     time: runStats.time,
     pixels: runStats.pixelsDestroyed,
+    gold: runStats.currency,
+    crystals: runStats.crystals,
+    greenCrystals: runStats.greenCrystals,
     maxDepth: runStats.maxDepth,
     nearPct: growth.nearSoldierPercent(runStats.time),
     crossoverFrac: crossTime / Math.max(1, runStats.time),
@@ -119,7 +131,9 @@ describe("Phase 5 — Multi-run progression & balancing verification (Rev 2)", (
 
     // Simulate 7 more runs, banking currency and buying the cheapest available upgrade each run.
     let bestPixels = first.pixels;
-    save.data.bank += first.pixels;
+    save.data.bank += first.gold;
+    save.data.crystals += first.crystals;
+    save.data.greenCrystals += first.greenCrystals;
     save.data.lifetimePixels += first.pixels;
 
     for (let r = 2; r <= 8; r++) {
@@ -131,7 +145,9 @@ describe("Phase 5 — Multi-run progression & balancing verification (Rev 2)", (
         upg.buy(candidates[0].id);
       }
       const res = simulateRun(100 + r * 17, upg);
-      save.data.bank += res.pixels;
+      save.data.bank += res.gold;
+      save.data.crystals += res.crystals;
+      save.data.greenCrystals += res.greenCrystals;
       save.data.lifetimePixels += res.pixels;
       if (res.pixels > bestPixels) bestPixels = res.pixels;
     }
@@ -221,13 +237,13 @@ describe("Phase 5 — 8-soldier stress benchmark & high-speed stability", () => 
     const loot = new LootSystem(8192);
     const rng = new Rng(123);
 
-    // 1/5 base drop chance -> ~20% over 1000 trials.
+    // 40% base drop chance over 1000 trials.
     let dropped = 0;
     for (let i = 0; i < 1000; i++) {
       dropped += loot.spawnDropsForBlock(100, 100, LOOT.baseDropChance, 5, rng);
     }
-    expect(dropped).toBeGreaterThan(150);
-    expect(dropped).toBeLessThan(250);
+    expect(dropped).toBeGreaterThan(350);
+    expect(dropped).toBeLessThan(450);
     loot.clear();
 
     // Multi-drop (e.g. dropChance = 2.5 -> 2 or 3 drops per block).
