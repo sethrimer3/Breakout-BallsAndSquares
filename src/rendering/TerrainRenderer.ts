@@ -36,6 +36,34 @@ function sampleRamp(ramp: Ramp4, t: number, out: number[]): void {
   else mix(ramp[2], ramp[3], (t - 2 / 3) * 3, out);
 }
 
+/** Cheap integer hash to 0..1, for activity-light flicker. */
+function hash01(n: number): number {
+  n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d);
+  n = Math.imul(n ^ (n >>> 12), 0x297a2d39);
+  return ((n ^ (n >>> 15)) >>> 0) / 4294967296;
+}
+
+/** Brightness (0..1) of a status light with rhythm `r` (0..63) at `time`. */
+function ledLevel(r: number, time: number): number {
+  const rate = 0.5 + (r & 7) * 0.22;
+  const phase = (r >> 3) / 8;
+  const f = (time * rate + phase) % 1;
+  switch (r % 4) {
+    case 0:
+      // Slow steady blink.
+      return f < 0.5 ? 1 : 0;
+    case 1:
+      // Disk/network activity: random flicker.
+      return hash01(Math.floor(time * 9) * 64 + r) > 0.45 ? 1 : 0.1;
+    case 2:
+      // Mostly on, with a short blip off.
+      return f < 0.88 ? 0.9 : 0;
+    default:
+      // Heartbeat double blink.
+      return f < 0.1 || (f > 0.2 && f < 0.3) ? 1 : 0.05;
+  }
+}
+
 /**
  * Renders terrain via cached 1-pixel-per-cell chunk canvases scaled up with
  * nearest-neighbor sampling, so terrain stays crisp at any zoom.
@@ -74,6 +102,8 @@ export class TerrainRenderer {
   private glowCanvases: (HTMLCanvasElement | null)[] = [];
   private glowLive: Uint8Array;
   private glowImage: ImageData;
+  /** Subcell indices of every blinking status light and pulsing machine core. */
+  private lights = new Int32Array(0);
 
   constructor(private world: PixelWorld, chunkSize: number) {
     this.chunks = new TerrainChunks(world, chunkSize);
@@ -116,6 +146,65 @@ export class TerrainRenderer {
     this.chunks.take(Infinity, this.scratch);
     for (const k of this.scratch) this.buildChunk(k);
     this.buildGlow();
+    this.collectLights();
+  }
+
+  private collectLights(): void {
+    const { subKind, subHealth } = this.world;
+    const found: number[] = [];
+    for (let si = 0; si < subKind.length; si++) {
+      const k = subKind[si];
+      if (subHealth[si] > 0 && (k === SUB.led || k === SUB.core)) found.push(si);
+    }
+    this.lights = Int32Array.from(found);
+  }
+
+  /**
+   * Blinking status lights and pulsing machine cores, drawn additively after the
+   * lighting pass so they shine in the dark. `still` (reduced motion) holds them steady.
+   */
+  drawLabLights(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number, still: boolean): void {
+    const w = this.world;
+    const lights = this.lights;
+    if (lights.length === 0) return;
+    const ss = w.subCellSize;
+    const sw = w.subWidth;
+    const x0 = Math.floor(cam.screenToWorldX(0) / ss) - 2;
+    const y0 = Math.floor(cam.screenToWorldY(0) / ss) - 2;
+    const x1 = Math.ceil(cam.screenToWorldX(cam.viewW) / ss) + 2;
+    const y1 = Math.ceil(cam.screenToWorldY(cam.viewH) / ss) + 2;
+    const px = ss * cam.zoom;
+    const t = still ? 0 : time;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let n = 0; n < lights.length; n++) {
+      const si = lights[n];
+      const sx = si % sw;
+      const sy = (si - sx) / sw;
+      if (sx < x0 || sx > x1 || sy < y0 || sy > y1 || w.subHealth[si] === 0) continue;
+      const k = w.subKind[si];
+      const tint = w.subTint[si];
+      const r = tint & 63;
+      let level: number;
+      let c: RGB;
+      if (k === SUB.led) {
+        c = COLORS.labLed[tint >> 6];
+        level = still ? 0.8 : ledLevel(r, t);
+      } else if (k === SUB.core) {
+        c = COLORS.labCore[tint >> 6];
+        level = still ? 0.7 : 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * (1.2 + (r & 7) * 0.15) + (sx + sy) * 0.45 + (r >> 3)));
+      } else continue;
+      if (level <= 0.02) continue;
+      const lx = cam.worldToScreenX(sx * ss);
+      const ly = cam.worldToScreenY(sy * ss);
+      ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      // Soft halo, then the lit pixel itself.
+      ctx.globalAlpha = level * (k === SUB.core ? 0.16 : 0.12);
+      ctx.fillRect(lx - px, ly - px, px * 3, px * 3);
+      ctx.globalAlpha = level;
+      ctx.fillRect(lx, ly, px, px);
+    }
+    ctx.restore();
   }
 
   private buildGlow(): void {
@@ -127,7 +216,7 @@ export class TerrainRenderer {
         // Half-size screens and status LEDs cast a soft monitor glow over their cell.
         const sc = this.screenIn(i);
         if (sc >= 0) {
-          const c = COLORS.labScreen[sc];
+          const c = sc < 4 ? COLORS.labScreen[sc] : COLORS.labCore[sc - 4];
           const p = i * 4;
           image.data[p] = c[0] * 0.4;
           image.data[p + 1] = c[1] * 0.4;
@@ -147,7 +236,7 @@ export class TerrainRenderer {
     g.putImageData(image, 0, 0);
   }
 
-  /** Screen color index of the first live screen sub-pixel in cell `i`, or -1. */
+  /** Screen color index of the first live screen sub-pixel in cell `i` (4+ for a machine core), or -1. */
   private screenIn(i: number): number {
     const w = this.world;
     const cx = i % w.width;
@@ -155,6 +244,7 @@ export class TerrainRenderer {
     for (let k = 0; k < 4; k++) {
       const si = (cy * 2 + (k >> 1)) * w.subWidth + cx * 2 + (k & 1);
       if (w.subHealth[si] > 0 && w.subKind[si] === SUB.screen) return (w.subTint[si] >> 6) & 3;
+      if (w.subHealth[si] > 0 && w.subKind[si] === SUB.core) return 4 + ((w.subTint[si] >> 6) & 3);
     }
     return -1;
   }
@@ -223,6 +313,19 @@ export class TerrainRenderer {
                   col[2] = c[2] * v;
                 } else if (sk === SUB.metal || sk === SUB.pipe) {
                   sampleRamp(sk === SUB.metal ? COLORS.labMetal : COLORS.labPipe, 0.3 + subT * 0.4, col);
+                } else if (sk === SUB.led) {
+                  // Unlit lamp housing; the blinking light is drawn on top each frame.
+                  const c = COLORS.labLed[world.subTint[si] >> 6];
+                  col[0] = 24 + c[0] * 0.22;
+                  col[1] = 24 + c[1] * 0.22;
+                  col[2] = 28 + c[2] * 0.22;
+                } else if (sk === SUB.core) {
+                  const c = COLORS.labCore[world.subTint[si] >> 6];
+                  col[0] = c[0] * 0.6;
+                  col[1] = c[1] * 0.6;
+                  col[2] = c[2] * 0.6;
+                } else if (sk === SUB.wreck) {
+                  sampleRamp(COLORS.labWreck, subT, col);
                 } else if (sk === SUB.screen) {
                   const c = COLORS.labScreen[(world.subTint[si] >> 6) & 3];
                   // Scanline flicker baked per pixel; brighter on even rows.

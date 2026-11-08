@@ -33,9 +33,20 @@ export const SUB = {
   metal: 2,
   /** Lab equipment: pipework and vents. */
   pipe: 3,
-  /** Lab equipment: screens and status LEDs. */
+  /** Lab equipment: screens. */
   screen: 4,
+  /** Lab equipment: a tiny blinking status light (tint bits 6-7 = color, 0-5 = rhythm). */
+  led: 5,
+  /** Mystery machine: a slowly pulsing energy core (tint bits 6-7 = color). */
+  core: 6,
+  /** Smashed, scorched equipment casing in overrun rooms. */
+  wreck: 7,
 } as const;
+
+/** True for a half-size decor kind (lab equipment), which breaks more easily than rubble or blight. */
+export function isDecorSub(kind: number): boolean {
+  return kind >= SUB.metal;
+}
 
 export interface Door {
   id: number;
@@ -289,15 +300,15 @@ export class PixelWorld implements SolidQuery {
     return maxHealthForDistance(dist);
   }
 
-  /** Max health for a 50% pink blight sub-pixel at `(sx, sy)`. */
+  /**
+   * Max health for a half-size sub-pixel at `(sx, sy)`: about a quarter of a
+   * full-size block there, and half that again for lab decor.
+   */
   maxSubHealthAt(sx: number, sy: number): number {
     const dist = this.distanceOf(sx >> 1, sy >> 1);
-    if (this.subInBounds(sx, sy)) {
-      const k = this.subKind[sy * this.subWidth + sx];
-      if (k === SUB.rubble) return maxHealthForDistance(dist);
-      if (k !== SUB.blight) return Math.max(1, Math.ceil(maxHealthForDistance(dist) * FACILITY.equipmentHealthMult));
-    }
-    return Math.max(1, Math.ceil(maxHealthForDistance(dist) * 0.5));
+    let mult = FACILITY.subHealthMult;
+    if (this.subInBounds(sx, sy) && isDecorSub(this.subKind[sy * this.subWidth + sx])) mult *= FACILITY.decorHealthMult;
+    return Math.max(1, Math.round(maxHealthForDistance(dist) * mult));
   }
 
   /**

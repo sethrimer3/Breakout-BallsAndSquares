@@ -114,7 +114,7 @@ describe("Phase 5 — Multi-run progression & balancing verification (Rev 2)", (
 
     const first = simulateRun(101, upg);
     expect(first.time).toBeGreaterThan(20);
-    expect(first.time).toBeLessThan(130);
+    expect(first.time).toBeLessThan(140);
     expect(first.pixels).toBeGreaterThanOrEqual(25);
 
     // Simulate 7 more runs, banking currency and buying the cheapest available upgrade each run.

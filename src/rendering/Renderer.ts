@@ -91,6 +91,7 @@ export class Renderer {
     this.lightRenderer.renderLighting(ctx, game, this.dpr);
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
     game.terrain.drawTierGlow(ctx, cam, game.runStats.time);
+    game.terrain.drawLabLights(ctx, cam, performance.now() / 1000, this.motion.matches);
     this.drawSentries();
     this.creatureRenderer.draw(ctx, cam, game.creatures, this.motion.matches ? 0 : performance.now() / 1000);
     const wallClockMs = performance.now();

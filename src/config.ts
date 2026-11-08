@@ -111,11 +111,28 @@ export const FACILITY = {
   /** Share of a rubble hallway's sub-pixels that are filled. */
   rubbleDensity: 0.88,
   /** Chance each wall of a lab room gets half-size equipment (consoles, racks, pipes, machines). */
-  equipmentSideChance: 0.55,
+  equipmentSideChance: 0.8,
   /** Chance a clear hallway carries a pipe run along one side. */
   corridorPipeChance: 0.35,
-  /** Equipment health as a share of the zone's normal block health. */
-  equipmentHealthMult: 0.75,
+  /** Half-size pixel health as a share of a full-size block's health at the same spot. */
+  subHealthMult: 0.25,
+  /**
+   * Extra multiplier for half-size decor (consoles, computers, machines) on top of
+   * `subHealthMult`, so set dressing breaks before rubble, walls and structure.
+   */
+  decorHealthMult: 0.5,
+  /** Chance a lab room gets free-standing machines, workstations and benches. */
+  machineRoomChance: 0.85,
+  /** Most free-standing pieces tried per room (fewer fit in small or crowded rooms). */
+  machinesPerRoom: 5,
+  /** Chance a lab room is a server farm: rows of blinking racks instead of machines. */
+  serverRoomChance: 0.18,
+  /** Chance a clear hallway gets wall terminals, junction boxes and emergency beacons. */
+  corridorFixtureChance: 0.6,
+  /** Loose scraps of smashed equipment scattered over an overrun room's floor, per cell of room edge. */
+  overrunDebrisPerCell: 1.2,
+  /** Chance each wall piece in an overrun room survives as smashed wreckage. */
+  wreckSideChance: 0.7,
   /** Chance a room holds a dormant sentry turret. */
   sentryRoomChance: 0.4,
   /** Blight generation rate of a small (1×1) generator relative to a full Blight Core. */
@@ -671,6 +688,27 @@ export const COLORS = {
     [110, 255, 160],
     [255, 190, 70],
     [255, 90, 110],
+  ] as const,
+  /** Blinking status lights (lit colors): green, amber, red, cyan. */
+  labLed: [
+    [120, 255, 150],
+    [255, 200, 70],
+    [255, 70, 80],
+    [90, 220, 255],
+  ] as const,
+  /** Pulsing cores of the mystery machines: violet, teal, sickly green, magenta. */
+  labCore: [
+    [176, 110, 255],
+    [70, 240, 210],
+    [190, 255, 90],
+    [255, 90, 210],
+  ] as const,
+  /** Smashed, scorched equipment casing in overrun rooms (dark to light). */
+  labWreck: [
+    [26, 24, 30],
+    [46, 44, 52],
+    [70, 64, 70],
+    [96, 84, 82],
   ] as const,
   /** Containment glass (RGB) and how opaque it is (0..255). */
   glass: [120, 190, 210] as const,
