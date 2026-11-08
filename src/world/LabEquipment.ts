@@ -4,10 +4,13 @@ import { MAT, SUB, type PixelWorld } from "./PixelWorld";
 import type { LabLayout, LabRoom } from "./WorldGenerator";
 
 /**
- * Half-size destructible lab equipment: consoles, server racks, pipe runs and
- * bulky machines along room walls, and pipes down some hallways. Built from
- * half-size pixels so it reads as fine machinery while room centers stay open.
- * Runs after rooms and corridors are carved (it only fills empty cells).
+ * Half-size destructible lab equipment: consoles, computers, server racks and
+ * mainframes with blinking status lights, pipe runs, bulky machines and wall
+ * apparatus along room walls, free-standing mystery machines with pulsing cores
+ * in some rooms, smashed wreckage in overrun rooms, and pipes down some
+ * hallways. Built from half-size pixels so it reads as fine machinery while room
+ * centers stay mostly open. Runs after rooms and corridors are carved (it only
+ * fills empty cells).
  */
 
 /** Room-interior offset (in cells) from each wall, per side: top, right, bottom, left. */
@@ -16,11 +19,18 @@ type Side = 0 | 1 | 2 | 3;
 export function placeLabEquipment(world: PixelWorld, layout: LabLayout): void {
   const rng = new Rng((layout.seed ^ 0x51e7c0de) >>> 0 || 1);
   for (const room of layout.rooms) {
-    if (room.overrun || inStartRoom(world, room)) continue;
+    if (inStartRoom(world, room)) continue;
+    // Overrun rooms keep only smashed remains of what used to stand there.
+    const wreck = !!room.overrun;
+    const sideChance = wreck ? FACILITY.wreckSideChance : FACILITY.equipmentSideChance;
     for (let side = 0 as Side; side < 4; side = (side + 1) as Side) {
-      if (rng.next() > FACILITY.equipmentSideChance) continue;
-      const pieces = 1 + rng.int(2);
-      for (let p = 0; p < pieces; p++) placePiece(world, room, side, rng);
+      if (rng.next() > sideChance) continue;
+      const pieces = wreck ? 1 + rng.int(2) : 2 + rng.int(3);
+      for (let p = 0; p < pieces; p++) retry(() => placePiece(world, room, side, rng, wreck));
+    }
+    if (rng.next() < FACILITY.machineRoomChance) {
+      const count = wreck ? 1 + rng.int(2) : 2 + rng.int(FACILITY.machinesPerRoom - 1);
+      for (let m = 0; m < count; m++) retry(() => placeMachine(world, room, rng, wreck));
     }
   }
   // Corridor segments run into rooms; hallway pipes stop at the room's edge.
@@ -50,6 +60,13 @@ export function placeLabEquipment(world: PixelWorld, layout: LabLayout): void {
   }
 }
 
+/** Spots tried for each piece before giving up (crowded walls reject most spots). */
+const PLACE_TRIES = 4;
+
+function retry(place: () => boolean): void {
+  for (let t = 0; t < PLACE_TRIES && !place(); t++);
+}
+
 function inStartRoom(world: PixelWorld, r: LabRoom): boolean {
   return r.x <= world.roomX1 && r.x + r.size - 1 >= world.roomX0 && r.y <= world.roomY1 && r.y + r.size - 1 >= world.roomY0;
 }
@@ -65,43 +82,172 @@ function subAt(r: LabRoom, side: Side, along: number, depth: number): { sx: numb
   return { sx: x0 + depth, sy: y0 + along };
 }
 
-function placePiece(world: PixelWorld, r: LabRoom, side: Side, rng: Rng): void {
+/** Pieces that stand against a wall. */
+const WALL_PIECES = 7;
+
+function placePiece(world: PixelWorld, r: LabRoom, side: Side, rng: Rng, wreck: boolean): boolean {
   const n = r.size * 2;
-  const kind = rng.int(4);
+  const kind = rng.int(WALL_PIECES);
   // Lengths and depths in subcells.
-  const len = kind === 0 ? 4 + rng.int(5) : kind === 1 ? 2 + rng.int(2) : kind === 2 ? 8 + rng.int(9) : 4 + rng.int(3);
-  const depth = kind === 0 ? 2 : kind === 1 ? 2 : kind === 2 ? 1 : 3 + rng.int(2);
+  const [len, depth] =
+    kind === 0 ? [4 + rng.int(5), 2]
+    : kind === 1 ? [2 + rng.int(2), 2]
+    : kind === 2 ? [8 + rng.int(9), 1]
+    : kind === 3 ? [4 + rng.int(3), 3 + rng.int(2)]
+    : kind === 4 ? [5 + rng.int(3), 3]
+    : kind === 5 ? [6 + rng.int(6), 2]
+    : [5 + rng.int(2), 3];
   // Keep clear of the corners and the room's door thresholds.
   const start = 3 + rng.int(Math.max(1, n - len - 6));
-  if (start + len > n - 3) return;
+  if (start + len > n - 3) return false;
   for (let a = start - 1; a <= start + len; a++) {
     for (let d = 0; d <= depth; d++) {
       const { sx, sy } = subAt(r, side, a, d);
-      if (!free(world, sx, sy)) return;
+      if (!free(world, sx, sy)) return false;
     }
   }
   const tint = rng.int(256);
+  const coreColor = rng.int(4);
+  const last = len - 1;
   for (let a = start; a < start + len; a++) {
     for (let d = 0; d < depth; d++) {
       const { sx, sy } = subAt(r, side, a, d);
       const i = a - start;
+      const front = d === depth - 1;
       let k: number = SUB.metal;
       if (kind === 0) {
         // Console: metal back against the wall, a strip of screens facing the room.
-        k = d === depth - 1 && i > 0 && i < len - 1 ? SUB.screen : SUB.metal;
+        k = front && i > 0 && i < last ? SUB.screen : SUB.metal;
       } else if (kind === 1) {
         // Server rack: blinking LEDs dotted down a metal cabinet.
-        k = (i + d) % 2 === 0 ? SUB.screen : SUB.metal;
+        k = (i + d) % 2 === 0 ? SUB.led : SUB.metal;
       } else if (kind === 2) {
         // Pipe run with valve collars.
         k = i % 5 === 0 ? SUB.metal : SUB.pipe;
-      } else {
+      } else if (kind === 3) {
         // Machine block with a vent grille on its face.
-        k = d === depth - 1 && i % 2 === 1 ? SUB.pipe : SUB.metal;
+        k = front && i % 2 === 1 ? SUB.pipe : SUB.metal;
+      } else if (kind === 4) {
+        // Computer: tower and monitor on the back row, keyboard lights in front.
+        if (d === 0) k = i === 0 || i === last ? SUB.metal : SUB.screen;
+        else if (d === 1) k = i === 0 ? SUB.led : SUB.metal;
+        else k = i % 2 === 1 && i < last ? SUB.led : SUB.metal;
+      } else if (kind === 5) {
+        // Mainframe bank: rows of blinkenlights, a reel slot every third column.
+        k = front && i % 3 !== 0 ? SUB.led : SUB.metal;
+      } else {
+        // Wall apparatus: pipes feeding a glowing chamber, a status light beside it.
+        if (d === 0) k = SUB.pipe;
+        else if (d === 1) k = i > 0 && i < last ? SUB.core : SUB.metal;
+        else k = i === 1 ? SUB.led : SUB.metal;
       }
-      putSub(world, sx, sy, k, (tint + i * 37 + d * 11) & 255);
+      let t = (tint + i * 37 + d * 11) & 255;
+      if (k === SUB.led) t = ledTint(rng);
+      else if (k === SUB.core) t = (coreColor << 6) | rng.int(64);
+      putPart(world, sx, sy, k, t, rng, wreck);
     }
   }
+  return true;
+}
+
+/**
+ * Free-standing mystery machines, drawn in subcells:
+ * M casing, P pipe, S screen, L status light, C pulsing core, `.` empty.
+ */
+const MACHINES: readonly (readonly string[])[] = [
+  // Resonator: an energy mote suspended in an open ring.
+  ["..MMM..", ".M...M.", "M..C..M", "M.CCC.M", "M..C..M", ".M...M.", "..MLM.."],
+  // Reactor drum with a hot core.
+  ["PMMMMP", "MSLLSM", "MLCCLM", "MLCCLM", "MSLLSM", "PMMMMP"],
+  // Antenna pylon with a glowing tip.
+  [".C.", "MCM", ".P.", ".P.", "MLM", "MMM"],
+  // Specimen analyzer: a lit sample chamber under a readout.
+  ["MSSSM", "MCCCM", "MCCCM", "MLMLM"],
+  // Monolith with glowing glyphs.
+  ["MMM", "MCM", "MMM", "MCM", "MLM"],
+  // Centrifuge: four sample arms around a hub.
+  [".P.P.", "PMCMP", ".CLC.", "PMCMP", ".P.P."],
+  // Cryo pod: a frosted capsule with something glowing inside.
+  [".MMM.", "MSCSM", "MCCCM", "MSCSM", ".MLM."],
+  // Workstation island: back-to-back desks, each with a monitor and a lit tower.
+  ["MSSMMSSM", "MLMMMMLM", "MMLMMLMM", "MSSMMSSM"],
+  // Computer desk with two monitors.
+  ["MSSMSSM", "MMLMMLM"],
+  // Chemistry bench: glowing flasks on a long worktop.
+  [".C.C.C.", "MMMMMMM", "P.....P"],
+  // Tesla pair: two coils sparking at each other over a base.
+  ["C...C", "M...M", "P.L.P", "MMMMM"],
+  // Sample freezer bank with a row of status lights.
+  ["MMMMMM", "MLMLML", "MSSSSM"],
+];
+
+/** Subcells kept between a free-standing machine and the room walls. */
+const MACHINE_WALL_GAP = 4;
+
+function placeMachine(world: PixelWorld, r: LabRoom, rng: Rng, wreck: boolean): boolean {
+  const art = MACHINES[rng.int(MACHINES.length)];
+  // Random quarter turn and mirror.
+  const swap = rng.next() < 0.5;
+  const flipX = rng.next() < 0.5;
+  const flipY = rng.next() < 0.5;
+  const h0 = art.length;
+  const w0 = art[0].length;
+  const w = swap ? h0 : w0;
+  const h = swap ? w0 : h0;
+  const n = r.size * 2;
+  const span = n - MACHINE_WALL_GAP * 2;
+  if (span < Math.max(w, h)) return false;
+  const ox = r.x * 2 + MACHINE_WALL_GAP + rng.int(span - w + 1);
+  const oy = r.y * 2 + MACHINE_WALL_GAP + rng.int(span - h + 1);
+  // One clear subcell all round so machines never fuse with each other or the tanks.
+  for (let y = -1; y <= h; y++) {
+    for (let x = -1; x <= w; x++) if (!free(world, ox + x, oy + y)) return false;
+  }
+  const coreColor = rng.int(4);
+  const tint = rng.int(256);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let ax = flipX ? w - 1 - x : x;
+      let ay = flipY ? h - 1 - y : y;
+      if (swap) [ax, ay] = [ay, ax];
+      const ch = art[ay][ax];
+      if (ch === ".") continue;
+      const k = ch === "M" ? SUB.metal : ch === "P" ? SUB.pipe : ch === "S" ? SUB.screen : ch === "L" ? SUB.led : SUB.core;
+      let t = (tint + x * 29 + y * 13) & 255;
+      if (k === SUB.led) t = ledTint(rng);
+      else if (k === SUB.core) t = (coreColor << 6) | rng.int(64);
+      putPart(world, ox + x, oy + y, k, t, rng, wreck);
+    }
+  }
+  return true;
+}
+
+/** A status light: mostly green, some cyan, a few amber and red; random rhythm. */
+function ledTint(rng: Rng): number {
+  const r = rng.next();
+  const color = r < 0.55 ? 0 : r < 0.75 ? 3 : r < 0.9 ? 1 : 2;
+  return (color << 6) | rng.int(64);
+}
+
+/**
+ * Place one equipment pixel. In overrun rooms the piece is smashed: chunks are
+ * missing, casings are scorched, and only a few lights still blink, mostly red.
+ */
+function putPart(world: PixelWorld, sx: number, sy: number, kind: number, tint: number, rng: Rng, wreck: boolean): void {
+  if (wreck) {
+    if (rng.next() < 0.3) return;
+    if (kind === SUB.led || kind === SUB.screen) {
+      if (rng.next() < 0.35) {
+        kind = SUB.led;
+        tint = ((rng.next() < 0.7 ? 2 : 1) << 6) | rng.int(64);
+      } else kind = SUB.wreck;
+    } else if (kind === SUB.metal || (kind === SUB.pipe && rng.next() < 0.4)) {
+      kind = rng.next() < 0.75 ? SUB.wreck : SUB.metal;
+    } else if (kind === SUB.core && rng.next() < 0.5) {
+      kind = SUB.wreck;
+    }
+  }
+  putSub(world, sx, sy, kind, tint);
 }
 
 /** A subcell inside an empty, plain floor cell (not door, glass, generator, threshold or occupied). */
