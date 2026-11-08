@@ -10,7 +10,8 @@ export interface BlightGrid {
 /**
  * Marks the edge of Blight inside one square of subcells: for every Blight
  * subcell, the row or column of mask pixels on each side that faces something
- * that is not Blight. The world's border counts as Blight, so it draws no edge.
+ * that is not Blight, including corner pixels touching a non-Blight diagonal.
+ * The world's border counts as Blight, so it draws no edge.
  * `out` has `subs * EDGE_PIXELS_PER_SUB` pixels a side, 1 for edge, and `solid`
  * is a reusable `(subs + 2)²` scratch. Returns how many mask pixels were set.
  */
@@ -60,6 +61,12 @@ export function markBlightEdges(
       if (solid[i + pad] === 0) for (let p = left; p <= right; p++) mark(p, bottom);
       if (solid[i - 1] === 0) for (let p = top; p <= bottom; p++) mark(left, p);
       if (solid[i + 1] === 0) for (let p = top; p <= bottom; p++) mark(right, p);
+      // Join the two faces around a concave corner. This subcell can be
+      // surrounded on all four faces while its diagonal opens into the cavity.
+      if (solid[i - pad - 1] === 0) mark(left, top);
+      if (solid[i - pad + 1] === 0) mark(right, top);
+      if (solid[i + pad - 1] === 0) mark(left, bottom);
+      if (solid[i + pad + 1] === 0) mark(right, bottom);
     }
   }
   return count;

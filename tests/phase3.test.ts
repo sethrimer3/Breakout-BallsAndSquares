@@ -97,7 +97,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(st.speed).toBeCloseTo(SOLDIER.speed * 1.8, 5);
     expect(st.damage).toBe(SOLDIER.damage + 1);
     expect(st.fireRate).toBeCloseTo(SOLDIER.fireRate * 1.12, 5);
-    expect(st.dropChance).toBeCloseTo(0.2, 5);
+    expect(st.dropChance).toBeCloseTo(0.4, 5);
 
     // Upgrade gold drop chance, multi-drop, magnet range, and pickup lifetime.
     expect(upg.buy("drop_chance")).toBe(true);
@@ -105,7 +105,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(upg.buy("magnet_range")).toBe(true);
     expect(upg.buy("pickup_lifetime")).toBe(true);
     const st2 = upg.getSoldierStats();
-    expect(st2.dropChance).toBeCloseTo(0.2 + 0.1 + 0.25, 5);
+    expect(st2.dropChance).toBeCloseTo(0.45 * 1.08, 5);
     expect(st2.magnetRange).toBeGreaterThan(st.magnetRange);
     expect(st2.pickupLifetime).toBeGreaterThan(st.pickupLifetime);
 
@@ -304,8 +304,8 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(st.coreTimeReduction).toBe(16);
     expect(st.coreDamageBonus).toBe(2);
     expect(st.coreLootBurst).toBe(12);
-    expect(st.crystalDropBonus).toBeCloseTo(0.15, 5);
-    expect(st.tier3ResourceBonus).toBeCloseTo(0.2, 5);
+    expect(st.crystalDropBonus).toBeCloseTo(0.08, 5);
+    expect(st.tier3ResourceBonus).toBeCloseTo(0.1, 5);
 
     // Verify CombatSystem applies globalDamageBonus + coreDamageBonus against a Blight Core cell.
     const w = new PixelWorld({ width: 20, height: 20, cellSize: 10, roomSize: 6 });

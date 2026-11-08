@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { EDGE_PIXELS_PER_SUB, markBlightEdges, type BlightGrid } from "../src/rendering/blightEdges";
 import { ESSENCE_FPS, ESSENCE_SIZE, essenceFrame, essencePixels, perlin } from "../src/rendering/blightEssence";
+import { PixelWorld } from "../src/world/PixelWorld";
+import { TerrainChunks } from "../src/world/TerrainChunks";
 
 describe("Blight Essence glob", () => {
   it("is the same size every frame, with a black body and a burning ring", () => {
@@ -51,6 +53,43 @@ function edges(rows: string[], sx0: number, sy0: number, subs: number): { out: U
 }
 
 describe("Blight edge mask", () => {
+  it.each([
+    { dx: -1, dy: -1, px: 2, py: 2 },
+    { dx: 1, dy: -1, px: 3, py: 2 },
+    { dx: -1, dy: 1, px: 2, py: 3 },
+    { dx: 1, dy: 1, px: 3, py: 3 },
+  ])("joins the inside corner facing diagonal ($dx, $dy)", ({ dx, dy, px, py }) => {
+    const rows = Array.from({ length: 3 }, (_, y) =>
+      Array.from({ length: 3 }, (_, x) => x === 1 + dx && y === 1 + dy ? "." : "#").join(""));
+    const { out, size } = edges(rows, 0, 0, 3);
+    for (let y = 2; y <= 3; y++) {
+      for (let x = 2; x <= 3; x++) {
+        expect(out[y * size + x]).toBe(x === px && y === py ? 1 : 0);
+      }
+    }
+    // The same corner still joins when the diagonal is in another chunk.
+    const chunk = edges(rows, 1, 1, 1);
+    expect(Array.from(chunk.out)).toEqual([
+      px === 2 && py === 2 ? 1 : 0, px === 3 && py === 2 ? 1 : 0,
+      px === 2 && py === 3 ? 1 : 0, px === 3 && py === 3 ? 1 : 0,
+    ]);
+  });
+
+  it("rebuilds diagonal chunks when a corner cell changes", () => {
+    const world = new PixelWorld({ width: 8, height: 8, cellSize: 8, roomSize: 2 });
+    const chunks = new TerrainChunks(world, 4);
+    const changed: number[] = [];
+    chunks.markCell(3, 3);
+    chunks.take(Infinity, changed);
+    expect(changed.sort()).toEqual([0, 1, 2, 3]);
+    chunks.markCell(4, 4);
+    chunks.take(Infinity, changed);
+    expect(changed.sort()).toEqual([0, 1, 2, 3]);
+    chunks.markCell(1, 1);
+    chunks.take(Infinity, changed);
+    expect(changed).toEqual([0]);
+  });
+
   it("rings one lone subcell on all sides and finds nothing in clean air", () => {
     const { out, count } = edges(["....", ".#..", "....", "...."], 0, 0, 4);
     expect(count).toBe(4); // the 2x2 mask pixels of that subcell

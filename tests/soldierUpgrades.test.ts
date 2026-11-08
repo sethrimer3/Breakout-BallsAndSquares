@@ -186,14 +186,15 @@ describe("Zone drops and Blight Essence pickups", () => {
   });
 
   it("reaches farther for a soldier with Scavenger", () => {
+    const distance = LOOT.baseMagnetRange * 1.5;
     const pulled = (magnetMult: number): number => {
       const loot = new LootSystem(4);
       const s = new Soldier(0, 0, 1, 0, 60);
       s.mods = { ...s.mods, magnetMult };
-      loot.spawnOne(40, 0, 5, new Rng(3));
+      loot.spawnOne(distance, 0, 5, new Rng(3));
       loot.vx[0] = 0;
       loot.vy[0] = 0;
-      loot.x[0] = 40;
+      loot.x[0] = distance;
       loot.y[0] = 0;
       loot.update(1 / 60, [s], LOOT.baseMagnetRange);
       return loot.vx[0];

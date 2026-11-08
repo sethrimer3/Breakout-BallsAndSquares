@@ -550,10 +550,10 @@ export const CASING = {
 export const LOOT = {
   /** Maximum active golden square pickups (SoA pool capacity). */
   poolSize: 8192,
-  /** Base probability (0..1) of a destroyed pixel dropping a golden square (1/5 = 0.2). */
-  baseDropChance: 0.2,
+  /** Starting expected currency drops per destroyed block, before resource upgrades. */
+  baseDropChance: 0.4,
   /** Base attraction radius (world units) within which pickups are pulled toward a soldier. */
-  baseMagnetRange: 32,
+  baseMagnetRange: 48,
   /** Base time (seconds) before an uncollected pickup despawns. */
   baseLifetime: 6,
   /** Distance from soldier center (world units) at which a pickup is collected. */
