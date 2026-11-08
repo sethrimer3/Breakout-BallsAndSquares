@@ -23,6 +23,8 @@ export const MAT = {
   glass: 1,
   /** Blast door; opens when shot by a squad holding its tier's keycard. */
   door: 2,
+  /** A seam of crystal in a lab wall (tier 2 orange, tier 3 green); breaks like an ordinary block. */
+  crystal: 3,
 } as const;
 
 /** Kinds of 50% sub-pixels (`world.subKind`). */
@@ -143,10 +145,10 @@ export class PixelWorld implements SolidQuery {
   readonly centerX: number;
   readonly centerY: number;
   /** Inclusive bounds of the starting room, in cells. */
-  readonly roomX0: number;
-  readonly roomY0: number;
-  readonly roomX1: number;
-  readonly roomY1: number;
+  roomX0: number;
+  roomY0: number;
+  roomX1: number;
+  roomY1: number;
 
   readonly health: Uint16Array;
   /** Per-cell color variation seed (0..255). */
@@ -235,6 +237,19 @@ export class PixelWorld implements SolidQuery {
     };
   }
 
+  /**
+   * Move the starting room (where squads deploy and the spawn slab is drawn) to
+   * be centered on cell `(cx, cy)`. Depth and tiers still count from the world
+   * center. Call before `generateWorld`, which carves the room.
+   */
+  setStartRoom(cx: number, cy: number): void {
+    const half = Math.floor(this.roomSize / 2);
+    this.roomX0 = Math.max(1, Math.min(this.width - this.roomSize - 1, cx - half));
+    this.roomY0 = Math.max(1, Math.min(this.height - this.roomSize - 1, cy - half));
+    this.roomX1 = this.roomX0 + this.roomSize - 1;
+    this.roomY1 = this.roomY0 + this.roomSize - 1;
+  }
+
   get worldWidth(): number {
     return this.width * this.cellSize;
   }
@@ -318,6 +333,10 @@ export class PixelWorld implements SolidQuery {
         const door = this.doors[this.doorId[i] - 1];
         // Doors break like ordinary blocks of their tier; a keycard just opens them in one hit.
         return blockHealthForTier(door ? door.tier : 1, dist);
+      }
+      if (m === MAT.crystal) {
+        const z = Math.min(2, Math.max(0, this.wall[i] - 1));
+        return blockHealthForTier((z + 1) as 1 | 2 | 3, dist);
       }
       if (m === MAT.glass) {
         return Math.max(1, Math.ceil(maxHealthForDistance(dist) * FACILITY.glassHealthMult));

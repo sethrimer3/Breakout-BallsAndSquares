@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SIM, SOLDIER, WORLD } from "../src/config";
+import { SIM, SOLDIER, TERRAIN, WORLD } from "../src/config";
 import { gridRaycast, makeRayHit } from "../src/core/gridRaycast";
 import { Rng } from "../src/core/Rng";
 import { Soldier, baseSoldierStats } from "../src/entities/Soldier";
@@ -38,18 +38,19 @@ describe("Phase 1 — world & generation", () => {
     const w = new PixelWorld(WORLD);
     expect(w.maxHealthAt(w.centerX, w.centerY)).toBe(1);
     expect(w.maxHealthAt(w.centerX + 5, w.centerY)).toBe(1);
-    expect(w.maxHealthAt(w.centerX + 16, w.centerY)).toBe(2);
-    expect(w.maxHealthAt(w.centerX + 37, w.centerY)).toBe(10);
+    expect(w.maxHealthAt(w.centerX + 16, w.centerY)).toBe(1);
+    expect(w.maxHealthAt(w.centerX + 40, w.centerY)).toBe(3);
+    expect(w.maxHealthAt(w.centerX + 5 + TERRAIN.zone2Depth, w.centerY)).toBe(10);
     expect(w.maxHealthAt(0, 0)).toBe(500);
   });
 
   it("generates a seed-dependent research lab maze with reachable rooms, valid sizes, and tougher zone walls", () => {
     const w1 = new PixelWorld(WORLD);
-    generateWorld(w1, 101);
+    generateWorld(w1, 101, { procedural: true });
     const w2 = new PixelWorld(WORLD);
-    generateWorld(w2, 202);
+    generateWorld(w2, 202, { procedural: true });
     const w1Copy = new PixelWorld(WORLD);
-    generateWorld(w1Copy, 101);
+    generateWorld(w1Copy, 101, { procedural: true });
 
     const layout1 = w1.labLayout!;
     const layout2 = w2.labLayout!;

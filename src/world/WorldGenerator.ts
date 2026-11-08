@@ -3,6 +3,7 @@ import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
 import { placeLabEquipment } from "./LabEquipment";
 import { decorateLab } from "./LabDetails";
+import { buildAuthoredLayout, labFrame, sectorAtCell, sectorBounds, sectorRing, zoneForSectorRing, LAB_SEED, SECTORS_PER_SIDE, type LabFrame, type RoomKind } from "./labMap";
 import { MAT, SUB, type PixelWorld } from "./PixelWorld";
 
 export interface LabRoom {
@@ -21,6 +22,10 @@ export interface LabRoom {
   coreId?: number;
   /** How well the room has held up (`ROOM_STATE`): pristine, worn, decayed or overrun. */
   state?: RoomState;
+  /** Hand-made lab only: the sector holding the room's center. */
+  sector?: number;
+  /** Hand-made lab only: what the blueprint asks for (overrun rooms and tank rooms are fixed). */
+  kind?: RoomKind;
 }
 
 /** Condition of a lab room or hallway, from freshly built to swallowed by Blight. */
@@ -50,6 +55,15 @@ export interface LabLayout {
   seed: number;
   rooms: LabRoom[];
   corridors: LabCorridorSegment[];
+  /** Set when the layout is the hand-made lab blueprint (see labMap.ts). */
+  frame?: LabFrame;
+}
+
+export interface GenerateOptions {
+  /** Sectors whose generators were all destroyed in earlier runs: they start cleared. */
+  conquered?: ReadonlySet<number>;
+  /** Force the old procedural maze even when the world fits the hand-made lab. */
+  procedural?: boolean;
 }
 
 /** Cells kept between a lab room and the starting room. */
@@ -85,7 +99,7 @@ interface ZoneBand {
  * deepest zone). Carves the empty starting room and leaves its exit clear.
  * Does not fire listeners.
  */
-export function generateWorld(world: PixelWorld, seed: number): void {
+export function generateWorld(world: PixelWorld, seed: number, options: GenerateOptions = {}): void {
   const { width, height, health, tint, wall } = world;
   wall.fill(0);
   world.decor.fill(0);
@@ -97,9 +111,13 @@ export function generateWorld(world: PixelWorld, seed: number): void {
   world.mat.fill(0);
   world.doorId.fill(0);
 
-  // Build the procedural lab layout (for worlds large enough to host zones).
-  const layout = buildLabLayout(world, seed);
+  // The hand-made lab when the world can hold it; otherwise a procedural maze.
+  // `seed` still drives what changes run to run (crystal veins).
+  const frame = options.procedural ? null : labFrame(world);
+  const layout = frame ? buildAuthoredLayout(frame) : buildLabLayout(world, seed);
   world.labLayout = layout;
+  const runSeed = seed;
+  if (frame) seed = LAB_SEED;
 
   // Pass 1: Paint 1-3 cell thick wall outlines around every room and corridor.
   for (const room of layout.rooms) {
@@ -201,6 +219,96 @@ export function generateWorld(world: PixelWorld, seed: number): void {
 
   // Half-size consoles, racks, pipes and machines along room walls and some hallways.
   placeLabEquipment(world, layout);
+
+  if (frame) {
+    placeCrystalVeins(world, frame, runSeed);
+    if (options.conquered) clearConqueredSectors(world, frame, options.conquered);
+  }
+}
+
+/**
+ * Seams of crystal in the lab's walls, rolled fresh every run: orange crystal
+ * in tier 2 sectors, green in tier 3. A vein is a short random walk through
+ * wall cells starting from a face that touches open floor, so it can be seen
+ * and dug out. Crystal breaks like an ordinary block of its tier, a soft spot
+ * in a hard wall, and is the only source of crystals.
+ */
+export function placeCrystalVeins(world: PixelWorld, frame: LabFrame, runSeed: number): void {
+  const rng = new Rng((runSeed ^ 0x3c6ef372) >>> 0 || 1);
+  const { width, health, wall, mat } = world;
+  const open = (x: number, y: number): boolean => world.inBounds(x, y) && health[y * width + x] === 0;
+  const isWall = (x: number, y: number): boolean => {
+    if (!world.inBounds(x, y)) return false;
+    const i = y * width + x;
+    return wall[i] > 0 && health[i] > 0 && mat[i] === MAT.none && world.coreId[i] === 0 && world.blight[i] === 0;
+  };
+  const sectors = SECTORS_PER_SIDE * SECTORS_PER_SIDE;
+  for (let s = 0; s < sectors; s++) {
+    if (zoneForSectorRing(sectorRing(s)) < 1) continue;
+    const b = sectorBounds(frame, s);
+    // Exposed wall faces in this sector.
+    const faces: number[] = [];
+    for (let y = b.y0; y <= b.y1; y++) {
+      for (let x = b.x0; x <= b.x1; x++) {
+        if (isWall(x, y) && (open(x - 1, y) || open(x + 1, y) || open(x, y - 1) || open(x, y + 1))) faces.push(y * width + x);
+      }
+    }
+    if (faces.length === 0) continue;
+    const veins = FACILITY.crystalVeinsMin + rng.int(FACILITY.crystalVeinsMax - FACILITY.crystalVeinsMin + 1);
+    for (let v = 0; v < veins; v++) {
+      let i = faces[rng.int(faces.length)];
+      const cells = FACILITY.crystalVeinMin + rng.int(FACILITY.crystalVeinMax - FACILITY.crystalVeinMin + 1);
+      for (let k = 0; k < cells; k++) {
+        mat[i] = MAT.crystal;
+        const x = i % width;
+        const y = (i - x) / width;
+        const steps = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => isWall(x + dx, y + dy));
+        if (steps.length === 0) break;
+        const [dx, dy] = steps[rng.int(steps.length)];
+        i = (y + dy) * width + x + dx;
+      }
+    }
+  }
+  // Veins are as tough as an ordinary block of their tier, not wall-grade.
+  for (let i = 0; i < mat.length; i++) {
+    if (mat[i] === MAT.crystal) health[i] = world.maxHealthAt(i % width, (i / width) | 0);
+  }
+}
+
+/**
+ * Sectors conquered in earlier runs start cleared: their generators are dead
+ * and the Blight they fed is gone, though the scars stay.
+ */
+export function clearConqueredSectors(world: PixelWorld, frame: LabFrame, conquered: ReadonlySet<number>): void {
+  if (conquered.size === 0) return;
+  const { width } = world;
+  for (const core of world.blightCores) {
+    const s = sectorAtCell(frame, core.cx, core.cy);
+    if (!conquered.has(s)) continue;
+    core.alive = false;
+    for (const i of core.cells) {
+      world.health[i] = 0;
+      world.blight[i] = 0;
+    }
+  }
+  for (const s of conquered) {
+    const b = sectorBounds(frame, s);
+    for (let y = b.y0; y <= b.y1; y++) {
+      for (let x = b.x0; x <= b.x1; x++) {
+        const i = y * width + x;
+        if (world.blight[i] && world.coreId[i] === 0) {
+          world.blight[i] = 0;
+          if (world.wall[i] === 0 && world.mat[i] === MAT.none) world.health[i] = 0;
+        }
+        for (let dy = 0; dy < 2; dy++) {
+          for (let dx = 0; dx < 2; dx++) {
+            const si = (y * 2 + dy) * world.subWidth + x * 2 + dx;
+            if (world.subKind[si] === SUB.blight && world.subHealth[si] > 0) world.subHealth[si] = 0;
+          }
+        }
+      }
+    }
+  }
 }
 
 /** Call `fn` with the index of every in-bounds cell of an inclusive rectangle. */

@@ -1363,7 +1363,7 @@ export class UpgradeTree {
 
   closeAndDeploy(): void {
     this.hide();
-    this.game.startRun();
+    this.game.beginDeploy();
   }
 
   get visible(): boolean {

@@ -21,6 +21,9 @@ const EDGE_FIRE_FULL_ZOOM = 1.5;
 const FROZEN_FIRE_TIME = 7.25;
 /** Edge canvases grow in steps this size, so a moving view doesn't reallocate them. */
 const EDGE_CANVAS_STEP = 256;
+/** Matte albedo of crystal veins: tier 2 orange, tier 3 green. */
+const CRYSTAL_ORANGE = [212, 120, 48] as const;
+const CRYSTAL_GREEN = [70, 182, 118] as const;
 
 /** A soft round light falloff in one color, for drawing scaled into the lightmap. */
 function radialSprite(c: RGB): HTMLCanvasElement {
@@ -627,6 +630,10 @@ export class TerrainRenderer {
           }
           continue;
         }
+        if (material === MAT.crystal) {
+          this.paintCrystal(cx, cy, i, hp, up, left, down, right, tx0, ty0, put);
+          continue;
+        }
         const t = tint[i] / 255;
         const tier = this.materialTier(cx, cy);
         const base = MATERIAL_BASE[tier];
@@ -641,7 +648,7 @@ export class TerrainRenderer {
         const shade = band > 0 ? 1 - band * 0.18 : 1;
         const dmg = hp < maxHp ? (1 - hp / maxHp) * 0.5 : 0;
         // Structural walls and doors carry a band of matte tier paint on their open faces.
-        const painted = (world.wall[i] > 0 || material === MAT.door) && world.blight[i] === 0 && world.coreId[i] === 0;
+        const painted = (world.wall[i] > 0 || material === MAT.door) && material !== MAT.crystal && world.blight[i] === 0 && world.coreId[i] === 0;
         const paintTier = painted ? this.tierAt(cx, cy) : 0;
         const paint = TIER_PAINT[paintTier];
         for (let oy = 0; oy < TEX; oy++) {
@@ -752,6 +759,60 @@ export class TerrainRenderer {
       col[0] += (255 - col[0]) * lighten;
       col[1] += (255 - col[1]) * lighten;
       col[2] += (255 - col[2]) * lighten;
+    }
+  }
+
+  /**
+   * A seam of crystal set in a wall: matte faceted shards, orange in tier 2
+   * walls and green in tier 3, lit on the upper-left faces like the rock
+   * around it. No glow: lights and muzzle flashes reveal it.
+   */
+  private paintCrystal(
+    cx: number,
+    cy: number,
+    i: number,
+    hp: number,
+    up: boolean,
+    left: boolean,
+    down: boolean,
+    right: boolean,
+    tx0: number,
+    ty0: number,
+    put: (x: number, y: number, r: number, g: number, b: number, a: number) => void,
+  ): void {
+    const w = this.world;
+    const green = w.wall[i] >= 3;
+    const base = green ? CRYSTAL_GREEN : CRYSTAL_ORANGE;
+    const maxHp = w.maxHealthAt(cx, cy);
+    const dmg = hp < maxHp ? (1 - hp / maxHp) * 0.45 : 0;
+    for (let oy = 0; oy < TEX; oy++) {
+      for (let ox = 0; ox < TEX; ox++) {
+        const gx = cx * TEX + ox;
+        const gy = cy * TEX + oy;
+        // Facets: diagonal bands cut at a per-cell angle; odd bands catch the light.
+        const cut = hash2(cx, cy, 41) > 0.5 ? gx + gy : gx - gy;
+        const band = Math.floor((cut + Math.floor(hash2(cx, cy, 43) * 4)) / 2) & 1;
+        let m = band ? 1.18 : 0.78;
+        m *= 0.9 + hash2(gx, gy, 44) * 0.2;
+        // A few dark grains of host rock between shards.
+        if (hash2(gx, gy, 45) < 0.12) m = 0.42;
+        let add = 0;
+        if ((up && oy === 0) || (left && ox === 0)) {
+          m *= 1.45;
+          add = 18;
+        } else if ((down && oy === TEX - 1) || (right && ox === TEX - 1)) {
+          m *= 0.6;
+        }
+        let r = base[0] * m + add;
+        let g = base[1] * m + add;
+        let b = base[2] * m + add;
+        if (dmg > 0) {
+          r += (150 - r) * dmg;
+          g += (140 - g) * dmg;
+          b += (128 - b) * dmg;
+        }
+        put(tx0 + ox, ty0 + oy, r, g, b, 255);
+      }
     }
   }
 

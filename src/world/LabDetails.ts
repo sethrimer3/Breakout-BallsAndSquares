@@ -462,7 +462,9 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
   const byZone: LabRoom[][] = [[], [], []];
   for (const room of layout.rooms) byZone[room.zone].push(room);
   const overrunIds = new Set<number>();
-  for (const zRooms of byZone) {
+  // The hand-made lab says exactly which rooms are overrun.
+  if (layout.frame) for (const r of layout.rooms) if (r.kind === "overrun") overrunIds.add(r.id);
+  for (const zRooms of layout.frame ? [] : byZone) {
     if (zRooms.length === 0) continue;
     const count = Math.max(1, Math.round(zRooms.length * 0.3));
     const startIdx = rng.int(zRooms.length);
@@ -492,7 +494,8 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
       overrunRoomWithBlight(world, room, seed);
     } else {
       paintRoomFloor(world, room, seed);
-      if (rng.next() < FACILITY.tankRoomChance) placeTanks(world, room, rng);
+      const tanks = layout.frame ? room.kind === "tanks" : rng.next() < FACILITY.tankRoomChance;
+      if (tanks) placeTanks(world, room, rng);
     }
     if (rng.next() < FACILITY.sentryRoomChance) placeSentry(world, room, rng);
   }

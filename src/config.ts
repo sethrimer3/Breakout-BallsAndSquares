@@ -30,10 +30,15 @@ export const TERRAIN = {
   chunkRebuildBudget: 24,
   /** How long a damaged-cell hit flash lasts (seconds). */
   hitFlashTime: 0.09,
-  /** Depth (cells beyond the room edge) where Zone 2 starts. */
-  zone2Depth: 32,
-  /** Depth (cells beyond the room edge) where Zone 3 starts. */
-  zone3Depth: 52,
+  /**
+   * Depth (cells beyond the room edge) where Zone 2 starts: the inner edge of
+   * the hand-made lab's sector ring 2 (sectors are 49 cells, see labMap.ts).
+   */
+  zone2Depth: 69,
+  /** Depth (cells beyond the room edge) where Zone 3 starts: the inner edge of sector ring 3. */
+  zone3Depth: 118,
+  /** Depth past the start of Zone 3 over which its blocks climb from 100 HP to the cap. */
+  zone3Span: 100,
 };
 
 /** 0 = Zone 1 (slate/grey/brown), 1 = Zone 2 (burnt orange/red/maroon/cream), 2 = Zone 3 (dark green/blue/turquoise/chartreuse). */
@@ -58,7 +63,7 @@ export function maxHealthForDistance(distance: number): number {
   } else {
     // Tier 3 (Zone 3): 100 - 500 HP
     const depthInZone = depth - TERRAIN.zone3Depth;
-    const span = 40;
+    const span = TERRAIN.zone3Span;
     return Math.min(TERRAIN.maxHealthCap, Math.max(100, 100 + Math.floor((depthInZone * 400) / span)));
   }
 }
@@ -108,6 +113,14 @@ export const FACILITY = {
   tankSharedWallChance: 0.6,
   /** Chance a hallway is choked with collapsed rubble. */
   rubbleCorridorChance: 0.3,
+  /** Crystal veins rolled per tier 2 / tier 3 sector each run (inclusive range). */
+  crystalVeinsMin: 2,
+  crystalVeinsMax: 4,
+  /** Cells per crystal vein (inclusive range). */
+  crystalVeinMin: 3,
+  crystalVeinMax: 7,
+  /** Crystals dropped per broken vein cell, before drop-rate upgrades. */
+  crystalVeinDrops: 2.5,
   /** Share of a rubble hallway's sub-pixels that are filled. */
   rubbleDensity: 0.88,
   /** Chance each wall of a lab room gets half-size equipment (consoles, racks, pipes, machines). */

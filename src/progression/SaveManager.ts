@@ -103,8 +103,21 @@ export interface SaveData {
     autoMove: boolean;
     alwaysShootWhenAutoMoveOff: boolean;
   };
+  /** Progress through the hand-made lab, by sector index (see world/labMap.ts). */
+  lab: {
+    /** Sectors a soldier or turret has seen. */
+    discovered: number[];
+    /** Discovered sectors with every Blight generator destroyed: safe to deploy into. */
+    conquered: number[];
+    /** Sector the squad last deployed into. */
+    spawn: number;
+  };
   lastSaved?: number;
 }
+
+/** Sector count of the hand-made lab (9 × 9) and its middle, kept here so saves stay valid. */
+const LAB_SECTORS = 81;
+export const LAB_START_SECTOR = 40;
 
 export function defaultSaveData(): SaveData {
   const upgrades = {} as Record<UpgradeId, number>;
@@ -133,7 +146,16 @@ export function defaultSaveData(): SaveData {
       autoMove: true,
       alwaysShootWhenAutoMoveOff: false,
     },
+    lab: { discovered: [LAB_START_SECTOR], conquered: [LAB_START_SECTOR], spawn: LAB_START_SECTOR },
   };
+}
+
+function sectorList(v: unknown): number[] {
+  const out = new Set<number>([LAB_START_SECTOR]);
+  if (Array.isArray(v)) {
+    for (const s of v) if (typeof s === "number" && Number.isInteger(s) && s >= 0 && s < LAB_SECTORS) out.add(s);
+  }
+  return [...out].sort((a, b) => a - b);
 }
 
 function finiteNonNeg(v: unknown, fallback = 0, max = 1e12): number {
@@ -251,6 +273,13 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     def.settings.autoMove = typeof s.autoMove === "boolean" ? s.autoMove : true;
     def.settings.alwaysShootWhenAutoMoveOff =
       typeof s.alwaysShootWhenAutoMoveOff === "boolean" ? s.alwaysShootWhenAutoMoveOff : false;
+  }
+
+  if (obj.lab && typeof obj.lab === "object") {
+    const lab = obj.lab as Record<string, unknown>;
+    def.lab.discovered = sectorList(lab.discovered);
+    def.lab.conquered = sectorList(lab.conquered).filter((s) => def.lab.discovered.includes(s));
+    def.lab.spawn = typeof lab.spawn === "number" && def.lab.conquered.includes(lab.spawn) ? lab.spawn : LAB_START_SECTOR;
   }
 
   if (typeof obj.lastSaved === "number" && Number.isFinite(obj.lastSaved)) {

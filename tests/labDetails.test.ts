@@ -11,7 +11,7 @@ const SEEDS = [101, 202, 303, 404];
 
 function world(seed: number): PixelWorld {
   const w = new PixelWorld(WORLD);
-  generateWorld(w, seed);
+  generateWorld(w, seed, { procedural: true });
   return w;
 }
 
