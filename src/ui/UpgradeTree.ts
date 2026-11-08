@@ -341,10 +341,10 @@ export class UpgradeTree {
       if (this.visible) this.fitToScreen();
     });
     this.stageEl = this.root.querySelector(".tree-stage") as HTMLDivElement;
-    // The compact layout's stage takes whatever room the grid leaves it.
+    // The stage takes whatever room the layout grid leaves it.
     new ResizeObserver(() => {
       const w = this.stageEl.clientWidth;
-      if (this.root.classList.contains("tree-compact") && w > 0) this.resizeStage(w, this.stageEl.clientHeight);
+      if (w > 0) this.resizeStage(w, this.stageEl.clientHeight);
     }).observe(this.stageEl);
     this.loadoutWrap = this.root.querySelector(".loadout-stage") as HTMLDivElement;
     this.linksEl = this.root.querySelector(".tree-links") as HTMLCanvasElement;
@@ -798,12 +798,10 @@ export class UpgradeTree {
     if (compact) {
       this.root.classList.add("tree-compact");
       this.root.classList.toggle("tree-portrait", vh > vw);
-      // Hidden on the loadout screen: keep the last size until it shows again.
-      if (this.stageEl.clientWidth > 0) this.resizeStage(this.stageEl.clientWidth, this.stageEl.clientHeight);
-      return;
     }
-    this.resizeStage(STAGE_W, STAGE_H);
-    if (s >= 1) return;
+    // Hidden on the loadout screen: keep the last size until it shows again.
+    if (this.stageEl.clientWidth > 0) this.resizeStage(this.stageEl.clientWidth, this.stageEl.clientHeight);
+    if (compact || s >= 1) return;
     this.shellEl.style.transform = `scale(${s})`;
     this.fitBoxEl.style.width = `${Math.floor(w * s)}px`;
     this.fitBoxEl.style.height = `${Math.floor(h * s)}px`;
@@ -1065,8 +1063,8 @@ export class UpgradeTree {
     const left = Math.min(this.stageW - w, Math.max(0, Math.round(screenX - w / 2)));
     this.tooltipEl.style.left = `${left}px`;
     let top = Math.round(screenY - 40 * this.view.s) - h;
-    // Phones: nothing above the stage to spill onto, so flip below the node and keep it on the stage.
-    if (this.root.classList.contains("tree-compact") && top < 0) {
+    // Nothing above the stage to spill onto, so flip below the node and keep it on the stage.
+    if (top < 0) {
       top = Math.max(0, Math.min(this.stageH - h, Math.round(screenY + 40 * this.view.s)));
     }
     this.tooltipEl.style.top = `${top}px`;
