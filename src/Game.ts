@@ -3,6 +3,7 @@ import { AudioSystem } from "./audio/AudioSystem";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
 import { SentrySystem } from "./entities/Sentry";
+import { CreatureSystem, type Creature } from "./entities/Creatures";
 import { LootKind, lootKindForZone, LootSystem } from "./entities/LootSystem";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, baseSoldierStats, type SecondaryWeaponType, type SoldierStats } from "./entities/Soldier";
@@ -54,6 +55,8 @@ export class Game {
   readonly glass: GlassSystem;
   readonly doors: DoorSystem;
   readonly sentries: SentrySystem;
+  /** The Blight's flowers, worms and escaped tank specimens. */
+  readonly creatures: CreatureSystem;
   private sightSources: SightSource[] = [];
   readonly camera: CameraSystem;
   readonly terrain: TerrainRenderer;
@@ -143,6 +146,7 @@ export class Game {
       onGrenadeThrow: (s, x, y, dx, dy) => this.onGrenadeThrow(s, x, y, dx, dy),
       onGrenadeStick: (x, y, nx, ny) => this.onGrenadeStick(x, y, nx, ny),
       onGrenadeBeep: (x, y, pct) => this.onGrenadeBeep(x, y, pct),
+      onCreatureHit: (x, y, nx, ny) => this.onCreatureHit(x, y, nx, ny),
     });
     this.growth = new GrowthSystem(this.world, this.rng, {
       onSoldierKilled: (s) => this.onSoldierKilled(s),
@@ -157,6 +161,14 @@ export class Game {
     this.glass = new GlassSystem(this.world, { onShatter: (cx, cy) => this.onGlassShatter(cx, cy) });
     this.doors = new DoorSystem(this.world, { onOpen: () => this.audio.playDoorOpen() });
     this.sentries = new SentrySystem(this.world, () => this.audio.playSentryWake());
+    this.creatures = new CreatureSystem(this.world, this.rng, {
+      onSoldierHit: (s, dmg, x, y) => this.hurtSoldier(s, dmg, x, y),
+      onSporeLaunch: () => this.audio.playSpore(),
+      onSporeBurst: (x, y, r) => this.onSporeBurst(x, y, r),
+      onCreatureKilled: (c, x, y) => this.onCreatureKilled(c, x, y),
+      onSpecimenFreed: () => this.audio.playSpore(),
+    });
+    this.combat.targets = this.creatures;
     this.camera = new CameraSystem(this.world);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.camera.following = this.camera.defaultFollow;
@@ -899,6 +911,7 @@ export class Game {
   }
 
   private onExplosion(x: number, y: number, radiusWorld: number): void {
+    this.creatures.explode(x, y, radiusWorld, 6 + this.stats.globalDamageBonus);
     this.audio.playDestroy();
     this.shakeForExplosion(x, y, radiusWorld);
     const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
@@ -1082,6 +1095,58 @@ export class Game {
     this.onExplosion(wx, wy, radiusCells * cs);
   }
 
+  /**
+   * A creature's bite or spore. Soldier health soaks hits first; a soldier
+   * with none left (or none to begin with) dies on the next one.
+   */
+  private hurtSoldier(s: Soldier, damage: number, x: number, y: number): void {
+    if (!s.alive) return;
+    if (s.health > 0) {
+      s.health = Math.max(0, s.health - damage);
+      this.audio.playImpact();
+      for (let i = 0; i < 6; i++) {
+        const a = Math.atan2(s.y - y, s.x - x) + this.rng.range(-1, 1);
+        const sp = this.rng.range(30, 90);
+        this.particles.spawn(PKind.Spark, s.x, s.y, Math.cos(a) * sp, Math.sin(a) * sp, 0.2, 1, 0xff4b8b, 5);
+      }
+      return;
+    }
+    s.alive = false;
+    this.onSoldierKilled(s);
+  }
+
+  private onCreatureHit(x: number, y: number, nx: number, ny: number): void {
+    this.audio.playImpact();
+    for (let i = 0; i < 5; i++) {
+      const a = Math.atan2(ny, nx) + this.rng.range(-1.2, 1.2);
+      const sp = this.rng.range(30, 100);
+      this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * sp, Math.sin(a) * sp, 0.15, 1, 0xff6ab8, 6);
+    }
+  }
+
+  private onSporeBurst(x: number, y: number, r: number): void {
+    for (let i = 0; i < 14; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(15, r * 7);
+      this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.2, 0.45), 1, i % 2 ? 0xff4b8b : 0xffc0e0, 5);
+    }
+    this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.25, r, 0xff4b8b, 1);
+  }
+
+  /** Splatter, and a little loot for the trouble. */
+  private onCreatureKilled(c: Creature, x: number, y: number): void {
+    this.audio.playDestroy();
+    const col = c.kind === "specimen" ? 0x56c49a : 0xd8267a;
+    for (let i = 0; i < 16; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(20, 110);
+      this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.7), 1, col, 4);
+    }
+    const zone = zoneForDepth(this.world.depthOf(Math.floor(x / this.world.cellSize), Math.floor(y / this.world.cellSize)));
+    const chance = c.kind === "flower" ? 0.6 : c.kind === "worm" ? 1 : 2;
+    this.loot.spawnDropsForBlock(x, y, chance, this.stats.pickupLifetime, this.rng, lootKindForZone(zone));
+  }
+
   /** A dormant pixel crumbled to Necrosis Protocol: a puff of dark dust. */
   private onBlightDecay(sx: number, sy: number): void {
     if (this.rng.next() > 0.35) return;
@@ -1103,6 +1168,7 @@ export class Game {
     this.glass.reset();
     this.doors.reset();
     this.sentries.reset();
+    this.creatures.reset();
     this.applyFacilityStats();
   }
 
@@ -1294,6 +1360,7 @@ export class Game {
     this.combat.updateGrenades(dt);
     this.combat.updateTurrets(dt);
     this.glass.update(dt);
+    this.creatures.update(dt, this.runStats.time, this.soldiers, this.growth);
     this.doors.update(dt);
     this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
     this.updateFog(dt);

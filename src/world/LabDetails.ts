@@ -1,4 +1,4 @@
-import { FACILITY } from "../config";
+import { CREATURES, FACILITY } from "../config";
 import { valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
 import { MAT, type PixelWorld } from "./PixelWorld";
@@ -114,6 +114,8 @@ function placeTanks(world: PixelWorld, r: LabRoom, rng: Rng): void {
   const oy = r.y + Math.floor((r.size - height) / 2);
   for (let row = 0; row < rows; row++) {
     const ty = oy + row * (3 + TANK_ROW_GAP);
+    // A whole row holds one kind, so a chain-shatter releases one kind of trouble.
+    const specimens = rng.next() < CREATURES.specimenRowChance;
     for (let k = 0; k < n; k++) {
       const tx = ox + k * stride;
       for (let y = 0; y < 3; y++) {
@@ -127,7 +129,13 @@ function placeTanks(world: PixelWorld, r: LabRoom, rng: Rng): void {
           world.decor[i] = DECOR.glass;
         }
       }
-      placeSmallGenerator(world, r, tx + 1, ty + 1);
+      if (specimens) {
+        const i = (ty + 1) * world.width + tx + 1;
+        world.decor[i] = DECOR.fluid;
+        world.specimenSpots.push({ cx: tx + 1, cy: ty + 1, zone: r.zone });
+      } else {
+        placeSmallGenerator(world, r, tx + 1, ty + 1);
+      }
     }
   }
 }
@@ -309,6 +317,7 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
   world.blightCores = [];
   world.doors = [];
   world.sentrySpots = [];
+  world.specimenSpots = [];
 
   for (const seg of layout.corridors) paintCorridor(world, seg);
 

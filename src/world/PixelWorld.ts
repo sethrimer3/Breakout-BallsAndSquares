@@ -55,6 +55,14 @@ export interface SentrySpot {
   ry1: number;
 }
 
+/** A creature floating in a glass tank, released when the tank breaks. */
+export interface SpecimenSpot {
+  /** Cell of the tank's hollow center. */
+  cx: number;
+  cy: number;
+  zone: 0 | 1 | 2;
+}
+
 export type CellChangeKind = "damaged" | "destroyed" | "grown" | "set";
 
 export type CellListener = (cx: number, cy: number, kind: CellChangeKind) => void;
@@ -130,6 +138,8 @@ export class PixelWorld implements SolidQuery {
   doors: Door[] = [];
   /** Dormant sentry turret positions from generation. */
   sentrySpots: SentrySpot[] = [];
+  /** Glass tanks holding a specimen instead of a small generator. */
+  specimenSpots: SpecimenSpot[] = [];
   /** Highest keycard tier the squad holds (0 = none). */
   keycardTier = 0;
   /**

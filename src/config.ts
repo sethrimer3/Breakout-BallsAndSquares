@@ -133,6 +133,61 @@ export const FACILITY = {
   tierGlowAlpha: 0.6,
 };
 
+/** Biological Blight enemies: flowers, worms and escaped tank specimens. */
+export const CREATURES = {
+  /** Flowers: chance per second that an exposed, living colony sprouts one (scaled by its size). */
+  flowerSpawnPerSec: 0.18,
+  /** Colony size (half-size pixels) at which the flower chance is at full strength. */
+  flowerColonySize: 600,
+  /** Max flowers alive at once, plus this many per minute of run time. */
+  flowerCap: 4,
+  flowerCapPerMinute: 2,
+  flowerCapMax: 24,
+  /** No new flower within this many world units of another. */
+  flowerSpacing: 40,
+  flowerHealth: 3,
+  flowerRange: 112,
+  flowerCooldown: 3.6,
+  /** Seconds the petals spread before a spore launches. */
+  flowerWindup: 0.8,
+  sporeSpeed: 58,
+  sporeLife: 3,
+  /** Blast radius of a spore (world units). */
+  sporeRadius: 9,
+  sporeDamage: 1,
+
+  /** Worms appear after this many seconds of run time. */
+  wormStartSeconds: 55,
+  /** Chance per second, per exposed living colony, that a worm crawls out. */
+  wormSpawnPerSec: 0.035,
+  wormCap: 2,
+  wormCapPerMinute: 1,
+  wormCapMax: 8,
+  wormSegments: 11,
+  /** World units between segments. */
+  wormSpacing: 2.6,
+  wormSpeed: 22,
+  wormTurnRate: 3.2,
+  wormHealth: 6,
+  wormLife: 26,
+  /** World units crawled between trail pixels. */
+  wormTrailStep: 3,
+  /** Range (world units) at which a worm looks for dormant Blight to reconnect. */
+  wormSeekRange: 640,
+
+  /** Chance a row of glass tanks holds specimens instead of small generators. */
+  specimenRowChance: 0.4,
+  specimenHealth: 10,
+  specimenHealthPerZone: 8,
+  specimenSpeed: 34,
+  specimenSightCells: 18,
+  specimenRadius: 3,
+
+  /** Damage a creature deals on contact, and how often. */
+  biteDamage: 1,
+  biteCooldown: 0.7,
+};
+
 /** Size of one pixel-art pixel (soldier sprites, bullets) in world units. */
 export const ART_PIXEL = 1;
 
