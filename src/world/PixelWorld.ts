@@ -48,6 +48,38 @@ export function isDecorSub(kind: number): boolean {
   return kind >= SUB.metal;
 }
 
+/** How a room light behaves. */
+export const LIGHT_KIND = {
+  /** Bright, steady clinical panel in a pristine area. */
+  bright: 0,
+  /** Dimmer, warmer panel in a worn area. */
+  dim: 1,
+  /** A failing tube that sputters on and off. */
+  flicker: 2,
+  /** Pink glow thrown by a living Blight Core over its overrun room. */
+  blight: 3,
+  /** Even wash over a whole pristine room or hallway (no panel of its own). */
+  wash: 4,
+} as const;
+
+export interface RoomLight {
+  kind: (typeof LIGHT_KIND)[keyof typeof LIGHT_KIND];
+  /** Panel bounds in cells (inclusive); for a wash or blight glow, the area lit. */
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+  /** Light never spills past this inclusive cell rectangle (the room or hallway interior). */
+  cx0: number;
+  cy0: number;
+  cx1: number;
+  cy1: number;
+  /** Per-light random phase (0..1) for flicker timing. */
+  phase: number;
+  /** For a blight glow: the Blight Core id that powers it. */
+  coreId?: number;
+}
+
 export interface Door {
   id: number;
   /** Keycard tier that opens it (1..3, the zone of the room it seals + 1). */
@@ -153,6 +185,8 @@ export class PixelWorld implements SolidQuery {
   labLayout: LabLayout | null = null;
   /** Blast doors between rooms and hallways. */
   doors: Door[] = [];
+  /** Light panels and room glows, drawn into the lightmap (see TerrainRenderer.drawRoomLight). */
+  roomLights: RoomLight[] = [];
   /** Dormant sentry turret positions from generation. */
   sentrySpots: SentrySpot[] = [];
   /** Glass tanks holding a specimen instead of a small generator. */

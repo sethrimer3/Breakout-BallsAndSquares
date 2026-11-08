@@ -2,7 +2,9 @@ import { COLORS, FACILITY, TERRAIN, TERRAIN as T, zoneForDepth } from "../config
 import { EDGE_PIXELS_PER_SUB, markBlightEdges } from "./blightEdges";
 import { paintPortal } from "./portalNoise";
 import type { CameraSystem } from "../systems/CameraSystem";
-import { MAT, SUB, type PixelWorld } from "../world/PixelWorld";
+import { hash2 } from "../core/math";
+import { DECOR } from "../world/LabDetails";
+import { LIGHT_KIND, MAT, SUB, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
 
 type RGB = readonly [number, number, number];
@@ -23,6 +25,36 @@ const GLOW_RES = 4;
 /** Glow alpha (0..255) by pixel step from a block's exposed face: inside, then outside. */
 const GLOW_IN = [210, 80] as const;
 const GLOW_OUT = [90, 26] as const;
+
+/** A soft round light falloff in one color, for drawing scaled into the lightmap. */
+function radialSprite(c: RGB): HTMLCanvasElement {
+  const size = 64;
+  const canvas = document.createElement("canvas");
+  canvas.width = size;
+  canvas.height = size;
+  const g = canvas.getContext("2d")!;
+  const grad = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grad.addColorStop(0, `rgba(${c[0]},${c[1]},${c[2]},1)`);
+  grad.addColorStop(0.4, `rgba(${c[0]},${c[1]},${c[2]},0.5)`);
+  grad.addColorStop(1, `rgba(${c[0]},${c[1]},${c[2]},0)`);
+  g.fillStyle = grad;
+  g.fillRect(0, 0, size, size);
+  return canvas;
+}
+
+/**
+ * A failing fluorescent tube: dark most of the time, then a burst of stutters,
+ * sometimes catching for a moment. `phase` (0..1) staggers tubes apart.
+ */
+export function flickerLevel(t: number, phase: number): number {
+  const period = 2.5 + phase * 3;
+  const f = ((t + phase * 17) % period) / period;
+  if (f > 0.35) return 0.04;
+  const step = Math.floor(t * 14);
+  const h = hash2(step, Math.floor(phase * 1000), 91);
+  if (f > 0.22) return h < 0.85 ? 0.95 : 0.2; // caught, with a hiccup
+  return h < 0.45 ? 0.9 : 0.06;
+}
 
 function mix(a: RGB, b: RGB, t: number, out: number[]): void {
   out[0] = a[0] + (b[0] - a[0]) * t;
@@ -104,6 +136,13 @@ export class TerrainRenderer {
   private glowImage: ImageData;
   /** Subcell indices of every blinking status light and pulsing machine core. */
   private lights = new Int32Array(0);
+  /** Two pixels per world cell: the lab's floors, under the terrain. */
+  private floorCanvas: HTMLCanvasElement;
+  /** Soft round light sprites (white and Blight pink) for the room lights. */
+  private panelGlow: HTMLCanvasElement;
+  private blightGlow: HTMLCanvasElement;
+  private reducedMotion: MediaQueryList | null =
+    typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
 
   constructor(private world: PixelWorld, chunkSize: number) {
     this.chunks = new TerrainChunks(world, chunkSize);
@@ -132,6 +171,11 @@ export class TerrainRenderer {
     this.glowCanvas = document.createElement("canvas");
     this.glowCanvas.width = world.width;
     this.glowCanvas.height = world.height;
+    this.floorCanvas = document.createElement("canvas");
+    this.floorCanvas.width = world.width * 2;
+    this.floorCanvas.height = world.height * 2;
+    this.panelGlow = radialSprite([255, 255, 255]);
+    this.blightGlow = radialSprite([255, 70, 160]);
     // Broken or overgrown machinery goes dark.
     world.addListener((cx, cy, kind) => {
       if (kind === "destroyed" || kind === "grown") {
@@ -146,7 +190,162 @@ export class TerrainRenderer {
     this.chunks.take(Infinity, this.scratch);
     for (const k of this.scratch) this.buildChunk(k);
     this.buildGlow();
+    this.buildFloor();
     this.collectLights();
+  }
+
+  /**
+   * Paint the lab floors: tile seams one half-cell wide, a little grain per
+   * pixel, light panels and cracks. Empty cells with no decor stay clear, so the
+   * cavity background shows through dug-out rock.
+   */
+  private buildFloor(): void {
+    const w = this.world;
+    const W2 = w.width * 2;
+    const g = this.floorCanvas.getContext("2d")!;
+    const image = g.createImageData(W2, w.height * 2);
+    const data = image.data;
+    const pal = COLORS.labDecor;
+    for (let cy = 0; cy < w.height; cy++) {
+      for (let cx = 0; cx < w.width; cx++) {
+        const d = w.decor[cy * w.width + cx];
+        if (d === 0) continue;
+        for (let k = 0; k < 4; k++) {
+          const dx = k & 1;
+          const dy = k >> 1;
+          let c: RGB = pal[d];
+          // Seams run along the top and left half of the tile's first row and column.
+          if (d === DECOR.cleanSeam || d === DECOR.floorLine) {
+            const seam = (cx % 4 === 0 && dx === 0) || (cy % 4 === 0 && dy === 0);
+            if (!seam) c = pal[d === DECOR.cleanSeam ? DECOR.cleanFloor : DECOR.floor];
+          } else if (d === DECOR.grime || d === DECOR.blightStain) {
+            // Grime and stains soak in unevenly, speckled over the old floor.
+            if (hash2(cx * 2 + dx, cy * 2 + dy, 131) < 0.3) c = pal[DECOR.floor];
+          }
+          const px = cx * 2 + dx;
+          const py = cy * 2 + dy;
+          const grain = 0.95 + hash2(px, py, 77) * 0.1;
+          const p = (py * W2 + px) * 4;
+          data[p] = Math.min(255, c[0] * grain);
+          data[p + 1] = Math.min(255, c[1] * grain);
+          data[p + 2] = Math.min(255, c[2] * grain);
+          data[p + 3] = 255;
+        }
+      }
+    }
+    g.putImageData(image, 0, 0);
+  }
+
+  /** Draw the lab floors. Call before `draw`, in the albedo pass. */
+  drawFloor(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
+    const cs = this.chunks.chunkSize;
+    ctx.imageSmoothingEnabled = false;
+    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      ctx.drawImage(this.floorCanvas, kx * cs * 2, ky * cs * 2, cs * 2, cs * 2, sx, sy, sw, sh);
+    });
+  }
+
+  /** Brightness (0..1) of a room light right now; 0 when it is off or gone. */
+  private lightLevel(l: RoomLight, t: number, still: boolean): number {
+    const w = this.world;
+    if (l.kind === LIGHT_KIND.blight) {
+      const core = l.coreId ? w.blightCores[l.coreId - 1] : undefined;
+      if (!core || !core.alive) return 0;
+      return still ? 0.8 : 0.7 + 0.3 * Math.sin(t * 1.3 + l.phase * 6.28);
+    }
+    if (l.kind !== LIGHT_KIND.wash) {
+      // A panel goes dark once Blight grows over it or rock fills its cell.
+      const i = l.y0 * w.width + l.x0;
+      if (w.health[i] > 0 || w.decor[i] !== DECOR.lightPanel) return 0;
+    }
+    if (l.kind === LIGHT_KIND.flicker) return still ? 0.35 : flickerLevel(t, l.phase);
+    return 1;
+  }
+
+  /**
+   * Add the lab's own lighting to the lightmap: an even wash over pristine
+   * rooms and halls, a pool under each working panel, and a pink glow around
+   * each living Blight Core. Each light stays inside its room.
+   */
+  drawRoomLight(g: CanvasRenderingContext2D, cam: CameraSystem, time: number): void {
+    const w = this.world;
+    const lights = w.roomLights;
+    if (lights.length === 0) return;
+    const still = this.reducedMotion?.matches ?? false;
+    const cs = w.cellSize;
+    const vx0 = cam.screenToWorldX(0) / cs - 2;
+    const vy0 = cam.screenToWorldY(0) / cs - 2;
+    const vx1 = cam.screenToWorldX(cam.viewW) / cs + 2;
+    const vy1 = cam.screenToWorldY(cam.viewH) / cs + 2;
+    const z = cam.zoom;
+    g.save();
+    g.globalCompositeOperation = "lighter";
+    for (const l of lights) {
+      if (l.cx1 < vx0 || l.cy1 < vy0 || l.cx0 > vx1 || l.cy0 > vy1) continue;
+      const level = this.lightLevel(l, time, still);
+      if (level <= 0.02) continue;
+      const rx = cam.worldToScreenX(l.cx0 * cs);
+      const ry = cam.worldToScreenY(l.cy0 * cs);
+      const rw = (l.cx1 - l.cx0 + 1) * cs * z;
+      const rh = (l.cy1 - l.cy0 + 1) * cs * z;
+      if (l.kind === LIGHT_KIND.wash) {
+        g.globalAlpha = FACILITY.washStrength;
+        g.fillStyle = "rgb(150, 170, 190)";
+        g.fillRect(rx, ry, rw, rh);
+        continue;
+      }
+      g.save();
+      g.beginPath();
+      g.rect(rx, ry, rw, rh);
+      g.clip();
+      const mx = cam.worldToScreenX(((l.x0 + l.x1 + 1) / 2) * cs);
+      const my = cam.worldToScreenY(((l.y0 + l.y1 + 1) / 2) * cs);
+      let rad: number;
+      if (l.kind === LIGHT_KIND.blight) {
+        rad = Math.max(rw, rh) * 0.75;
+        g.globalAlpha = level * FACILITY.blightGlowStrength;
+        g.drawImage(this.blightGlow, mx - rad, my - rad, rad * 2, rad * 2);
+      } else {
+        rad = FACILITY.panelRadiusCells * cs * z;
+        const strength = l.kind === LIGHT_KIND.bright ? 0.55 : l.kind === LIGHT_KIND.dim ? 0.4 : 0.6;
+        g.globalAlpha = level * strength;
+        g.drawImage(this.panelGlow, mx - rad, my - rad, rad * 2, rad * 2);
+      }
+      g.restore();
+    }
+    g.restore();
+  }
+
+  /** The lit tubes themselves, drawn additively after the lighting pass. */
+  drawPanels(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number): void {
+    const w = this.world;
+    const still = this.reducedMotion?.matches ?? false;
+    const cs = w.cellSize;
+    const vx0 = cam.screenToWorldX(0) / cs - 2;
+    const vy0 = cam.screenToWorldY(0) / cs - 2;
+    const vx1 = cam.screenToWorldX(cam.viewW) / cs + 2;
+    const vy1 = cam.screenToWorldY(cam.viewH) / cs + 2;
+    const z = cam.zoom;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (const l of w.roomLights) {
+      if (l.kind === LIGHT_KIND.wash || l.kind === LIGHT_KIND.blight) continue;
+      if (l.x1 < vx0 || l.y1 < vy0 || l.x0 > vx1 || l.y0 > vy1) continue;
+      const level = this.lightLevel(l, time, still);
+      if (level <= 0.02) continue;
+      const x = cam.worldToScreenX(l.x0 * cs);
+      const y = cam.worldToScreenY(l.y0 * cs);
+      const pw = (l.x1 - l.x0 + 1) * cs * z;
+      const ph = (l.y1 - l.y0 + 1) * cs * z;
+      ctx.fillStyle = l.kind === LIGHT_KIND.bright ? "rgb(200, 225, 255)" : l.kind === LIGHT_KIND.dim ? "rgb(255, 225, 170)" : "rgb(190, 255, 220)";
+      // Halo, then the tube, inset half a subcell so the panel frame shows.
+      ctx.globalAlpha = level * 0.18;
+      ctx.fillRect(x - cs * z * 0.5, y - cs * z * 0.5, pw + cs * z, ph + cs * z);
+      ctx.globalAlpha = level * 0.85;
+      const inset = cs * z * 0.25;
+      ctx.fillRect(x + inset, y + inset, pw - inset * 2, ph - inset * 2);
+    }
+    ctx.restore();
   }
 
   private collectLights(): void {

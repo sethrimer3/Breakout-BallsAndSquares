@@ -19,7 +19,13 @@ export interface LabRoom {
   overrun?: boolean;
   /** 1-based Blight Core id if `overrun` is true. */
   coreId?: number;
+  /** How well the room has held up (`ROOM_STATE`): pristine, worn, decayed or overrun. */
+  state?: RoomState;
 }
+
+/** Condition of a lab room or hallway, from freshly built to swallowed by Blight. */
+export const ROOM_STATE = { pristine: 0, worn: 1, decayed: 2, overrun: 3 } as const;
+export type RoomState = (typeof ROOM_STATE)[keyof typeof ROOM_STATE];
 
 export interface LabCorridorSegment {
   zone: 0 | 1 | 2;
@@ -36,6 +42,8 @@ export interface LabCorridorSegment {
   wallThickness: number;
   /** True if this hallway has collapsed and is choked with half-size rubble. */
   rubble?: boolean;
+  /** How well the hallway has held up (`ROOM_STATE`; never overrun). */
+  state?: RoomState;
 }
 
 export interface LabLayout {

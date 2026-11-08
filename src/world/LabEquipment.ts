@@ -1,7 +1,7 @@
 import { FACILITY } from "../config";
 import { Rng } from "../core/Rng";
 import { MAT, SUB, type PixelWorld } from "./PixelWorld";
-import type { LabCorridorSegment, LabLayout, LabRoom } from "./WorldGenerator";
+import { ROOM_STATE, type LabCorridorSegment, type LabLayout, type LabRoom } from "./WorldGenerator";
 
 /**
  * Half-size destructible lab equipment: consoles, computers, server racks and
@@ -13,6 +13,9 @@ import type { LabCorridorSegment, LabLayout, LabRoom } from "./WorldGenerator";
  * fills empty cells).
  */
 
+/** How a piece has fared: freshly installed, in daily use, or smashed. */
+type Style = "new" | "worn" | "wreck";
+
 /** Room-interior offset (in cells) from each wall, per side: top, right, bottom, left. */
 type Side = 0 | 1 | 2 | 3;
 
@@ -20,20 +23,33 @@ export function placeLabEquipment(world: PixelWorld, layout: LabLayout): void {
   const rng = new Rng((layout.seed ^ 0x51e7c0de) >>> 0 || 1);
   for (const room of layout.rooms) {
     if (inStartRoom(world, room)) continue;
-    // Overrun rooms keep only smashed remains of what used to stand there.
+    // Overrun rooms keep only smashed remains of what used to stand there;
+    // decayed rooms lose some pieces; pristine rooms gleam.
     const wreck = !!room.overrun;
+    const decayed = room.state === ROOM_STATE.decayed;
+    const pieceStyle = (): Style =>
+      wreck || (decayed && rng.next() < FACILITY.decayedWreckChance) ? "wreck"
+      : room.state === ROOM_STATE.pristine ? "new"
+      : "worn";
     const sideChance = wreck ? FACILITY.wreckSideChance : FACILITY.equipmentSideChance;
     for (let side = 0 as Side; side < 4; side = (side + 1) as Side) {
       if (rng.next() > sideChance) continue;
       const pieces = wreck ? 1 + rng.int(2) : 2 + rng.int(3);
-      for (let p = 0; p < pieces; p++) retry(() => placePiece(world, room, side, rng, wreck));
+      for (let p = 0; p < pieces; p++) {
+        const style = pieceStyle();
+        retry(() => placePiece(world, room, side, rng, style));
+      }
     }
-    if (wreck) scatterDebris(world, room, rng);
+    if (wreck) scatterDebris(world, room, rng, 1);
+    else if (decayed) scatterDebris(world, room, rng, 0.4);
     if (!wreck && rng.next() < FACILITY.serverRoomChance) {
       placeServerFarm(world, room, rng);
     } else if (rng.next() < FACILITY.machineRoomChance) {
       const count = wreck ? 1 + rng.int(2) : 2 + rng.int(FACILITY.machinesPerRoom - 1);
-      for (let m = 0; m < count; m++) retry(() => placeMachine(world, room, rng, wreck));
+      for (let m = 0; m < count; m++) {
+        const style = pieceStyle();
+        retry(() => placeMachine(world, room, rng, style));
+      }
     }
   }
   // Corridor segments run into rooms; hallway pipes stop at the room's edge.
@@ -123,9 +139,9 @@ function placeServerFarm(world: PixelWorld, r: LabRoom, rng: Rng): void {
 }
 
 /** Loose scraps of smashed equipment strewn over an overrun room's floor. */
-function scatterDebris(world: PixelWorld, r: LabRoom, rng: Rng): void {
+function scatterDebris(world: PixelWorld, r: LabRoom, rng: Rng, amount: number): void {
   const n = r.size * 2;
-  const count = Math.round(r.size * FACILITY.overrunDebrisPerCell);
+  const count = Math.round(r.size * FACILITY.overrunDebrisPerCell * amount);
   for (let i = 0; i < count; i++) {
     const sx = r.x * 2 + 2 + rng.int(n - 4);
     const sy = r.y * 2 + 2 + rng.int(n - 4);
@@ -161,7 +177,7 @@ function subAt(r: LabRoom, side: Side, along: number, depth: number): { sx: numb
 /** Pieces that stand against a wall. */
 const WALL_PIECES = 7;
 
-function placePiece(world: PixelWorld, r: LabRoom, side: Side, rng: Rng, wreck: boolean): boolean {
+function placePiece(world: PixelWorld, r: LabRoom, side: Side, rng: Rng, style: Style): boolean {
   const n = r.size * 2;
   const kind = rng.int(WALL_PIECES);
   // Lengths and depths in subcells.
@@ -220,7 +236,7 @@ function placePiece(world: PixelWorld, r: LabRoom, side: Side, rng: Rng, wreck: 
       let t = (tint + i * 37 + d * 11) & 255;
       if (k === SUB.led) t = ledTint(rng);
       else if (k === SUB.core) t = (coreColor << 6) | rng.int(64);
-      putPart(world, sx, sy, k, t, rng, wreck);
+      putPart(world, sx, sy, k, t, rng, style);
     }
   }
   return true;
@@ -270,7 +286,7 @@ const MACHINES: readonly (readonly string[])[] = [
 /** Subcells kept between a free-standing machine and the room walls. */
 const MACHINE_WALL_GAP = 4;
 
-function placeMachine(world: PixelWorld, r: LabRoom, rng: Rng, wreck: boolean): boolean {
+function placeMachine(world: PixelWorld, r: LabRoom, rng: Rng, style: Style): boolean {
   const art = MACHINES[rng.int(MACHINES.length)];
   // Random quarter turn and mirror.
   const swap = rng.next() < 0.5;
@@ -302,7 +318,7 @@ function placeMachine(world: PixelWorld, r: LabRoom, rng: Rng, wreck: boolean): 
       let t = (tint + x * 29 + y * 13) & 255;
       if (k === SUB.led) t = ledTint(rng);
       else if (k === SUB.core) t = (coreColor << 6) | rng.int(64);
-      putPart(world, ox + x, oy + y, k, t, rng, wreck);
+      putPart(world, ox + x, oy + y, k, t, rng, style);
     }
   }
   return true;
@@ -319,8 +335,12 @@ function ledTint(rng: Rng): number {
  * Place one equipment pixel. In overrun rooms the piece is smashed: chunks are
  * missing, casings are scorched, and only a few lights still blink, mostly red.
  */
-function putPart(world: PixelWorld, sx: number, sy: number, kind: number, tint: number, rng: Rng, wreck: boolean): void {
-  if (wreck) {
+function putPart(world: PixelWorld, sx: number, sy: number, kind: number, tint: number, rng: Rng, style: Style): void {
+  if (style === "new") {
+    // Fresh casings are polished bright, and every status light reads all-clear.
+    if (kind === SUB.metal) tint = 150 + (tint % 106);
+    else if (kind === SUB.led) tint = ((rng.next() < 0.7 ? 0 : 3) << 6) | (tint & 63);
+  } else if (style === "wreck") {
     if (rng.next() < 0.3) return;
     if (kind === SUB.led || kind === SUB.screen) {
       if (rng.next() < 0.35) {

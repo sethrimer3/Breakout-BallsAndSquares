@@ -133,6 +133,38 @@ export const FACILITY = {
   overrunDebrisPerCell: 1.2,
   /** Chance each wall piece in an overrun room survives as smashed wreckage. */
   wreckSideChance: 0.7,
+  /**
+   * Room condition. Each room and hallway gets a decay score from how close it is
+   * to a Blight-overrun room, how deep its zone is, and some noise: below
+   * `pristineBelow` it is clean and brightly lit, above `decayedAbove` it is
+   * grimy, cracked, stained and lit by failing tubes, and worn in between.
+   */
+  decayReachCells: 34,
+  /** Distance (cells) from an overrun room's center inside which decay is strongest. */
+  decayCoreCells: 10,
+  decayPerZone: 0.14,
+  decayNoise: 0.5,
+  pristineBelow: 0.34,
+  decayedAbove: 0.62,
+  /** Lightmap brightness of the even wash over pristine rooms and halls (0..1). */
+  washStrength: 0.22,
+  /** Radius (cells) of the pool of light under each ceiling panel. */
+  panelRadiusCells: 6,
+  /** Lightmap strength of the pink glow a living Blight Core throws over its room. */
+  blightGlowStrength: 0.4,
+  /** Spacing (cells) of ceiling light panels in rooms and hallways. */
+  panelPitch: 6,
+  /** Share of worn-area panels that are dead or flickering. */
+  wornDeadChance: 0.25,
+  wornFlickerChance: 0.15,
+  /** Share of decayed-area panels that still sputter (the rest are dead). */
+  decayedFlickerChance: 0.3,
+  /** Chance a decayed room's wall is blown out (pristine rooms never are). */
+  decayedBreachChance: 0.5,
+  /** Chance a worn room's wall is blown out. */
+  wornBreachChance: 0.15,
+  /** Chance a decayed room's equipment piece is smashed, pixel by pixel. */
+  decayedWreckChance: 0.45,
   /** Chance a room holds a dormant sentry turret. */
   sentryRoomChance: 0.4,
   /** Blight generation rate of a small (1×1) generator relative to a full Blight Core. */
@@ -633,9 +665,24 @@ export const COLORS = {
     [138, 24, 78], // dark pink blight vein / tendril
     [185, 28, 98], // blight core outer shell
     [255, 72, 164], // blight core pulsing heart
+    [178, 186, 194], // pristine floor: clean pale tile
+    [128, 136, 148], // pristine tile seam
+    [236, 246, 255], // light panel (lit)
+    [58, 62, 68], // dead light panel
+    [40, 38, 34], // grime
+    [14, 12, 12], // floor crack
+    [214, 228, 238], // pristine wall trim
+    [204, 210, 218], // pristine wall panel
+    [150, 158, 170], // pristine wall panel seam
+    [40, 36, 34], // grimy, stained wall
+    [104, 24, 62], // Blight-flecked wall
+    [18, 18, 22], // missing floor tile
   ] as const,
   /** How strongly each lab detail covers the cell's own color (same order). */
-  labDecorMix: [0, 0.45, 0.55, 0.7, 0.55, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.85, 0.92, 1, 1] as const,
+  labDecorMix: [
+    0, 0.45, 0.55, 0.7, 0.55, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.85, 0.92, 1, 1,
+    0.5, 0.55, 1, 1, 0.5, 0.7, 0.6, 0.74, 0.74, 0.5, 0.55, 0.8,
+  ] as const,
   /** Emergency-power glow added over the dark scene (same order; black = none). */
   labGlow: [
     [0, 0, 0], // none
@@ -660,6 +707,18 @@ export const COLORS = {
     [110, 18, 64], // dark pink blight vein / tendril
     [175, 28, 96], // blight core outer shell
     [255, 90, 180], // blight core pulsing heart
+    [0, 0, 0], // pristine floor
+    [0, 0, 0], // pristine tile seam
+    [0, 0, 0], // light panel (lit separately, see TerrainRenderer.drawPanels)
+    [0, 0, 0], // dead light panel
+    [0, 0, 0], // grime
+    [0, 0, 0], // floor crack
+    [0, 0, 0], // pristine wall trim
+    [0, 0, 0], // pristine wall panel
+    [0, 0, 0], // pristine wall panel seam
+    [0, 0, 0], // grimy wall
+    [26, 4, 14], // Blight-flecked wall
+    [0, 0, 0], // missing floor tile
   ] as const,
   /** Collapsed rubble sub-pixel colors (RGB): concrete, ash, rust, sand, slate, char. */
   rubble: [
