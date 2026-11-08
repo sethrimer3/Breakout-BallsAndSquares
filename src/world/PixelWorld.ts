@@ -145,10 +145,10 @@ export class PixelWorld implements SolidQuery {
   readonly centerX: number;
   readonly centerY: number;
   /** Inclusive bounds of the starting room, in cells. */
-  readonly roomX0: number;
-  readonly roomY0: number;
-  readonly roomX1: number;
-  readonly roomY1: number;
+  roomX0: number;
+  roomY0: number;
+  roomX1: number;
+  roomY1: number;
 
   readonly health: Uint16Array;
   /** Per-cell color variation seed (0..255). */
@@ -235,6 +235,19 @@ export class PixelWorld implements SolidQuery {
     this.subSolidQuery = {
       solidAt: (sx: number, sy: number) => this.subSolidAt(sx, sy),
     };
+  }
+
+  /**
+   * Move the starting room (where squads deploy and the spawn slab is drawn) to
+   * be centered on cell `(cx, cy)`. Depth and tiers still count from the world
+   * center. Call before `generateWorld`, which carves the room.
+   */
+  setStartRoom(cx: number, cy: number): void {
+    const half = Math.floor(this.roomSize / 2);
+    this.roomX0 = Math.max(1, Math.min(this.width - this.roomSize - 1, cx - half));
+    this.roomY0 = Math.max(1, Math.min(this.height - this.roomSize - 1, cy - half));
+    this.roomX1 = this.roomX0 + this.roomSize - 1;
+    this.roomY1 = this.roomY0 + this.roomSize - 1;
   }
 
   get worldWidth(): number {

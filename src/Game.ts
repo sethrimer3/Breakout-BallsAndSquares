@@ -31,6 +31,9 @@ import { GrowthSystem } from "./world/GrowthSystem";
 import { FogOfWar, type SightSource } from "./world/FogOfWar";
 import { MAT, PixelWorld, SUB } from "./world/PixelWorld";
 import { generateWorld } from "./world/WorldGenerator";
+import { LabMap } from "./ui/LabMap";
+import { LabProgress } from "./world/LabProgress";
+import { CENTER_SECTOR, labFrame, sectorSpawnCell } from "./world/labMap";
 
 export type Flash = MuzzleLight;
 
@@ -99,6 +102,10 @@ export class Game {
     isDragging: false,
   };
   private bankedThisRun = false;
+  /** Discovered / conquered sectors of the hand-made lab (mirrors `save.data.lab`). */
+  labProgress = new LabProgress();
+  labMap!: LabMap;
+  private labCheckT = 0;
   onUpgradePurchased?: () => void;
   timeScale = 1;
   /** Full-screen iris used for level intro and run-end transitions. */
@@ -172,7 +179,8 @@ export class Game {
     this.camera = new CameraSystem(this.world);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.camera.following = this.camera.defaultFollow;
-    generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
+    this.loadLabProgress();
+    this.generateLab();
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
     this.terrain.dormantAt = (si) => this.growth.colonies.isDormantSub(si);
     this.growth.colonies.onVisualChange = (sx, sy) => this.terrain.chunks.markCell(sx >> 1, sy >> 1);
@@ -188,6 +196,7 @@ export class Game {
     this.pauseMenu = new PauseMenu(uiRoot, this);
     this.resultsScreen = new ResultsScreen(uiRoot, this);
     this.upgradeTree = new UpgradeTree(uiRoot, this);
+    this.labMap = new LabMap(uiRoot, this);
     this.input = new Input(canvas, {
       canPlace: () => this.canPlaceSoldier(),
       canShootManual: () => this.canShootManual(),
@@ -288,8 +297,10 @@ export class Game {
     this.pauseMenu.hide();
     this.resultsScreen.hide();
     this.upgradeTree.hide();
-    const regen = this.runStats.time > 0;
-    if (regen) generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30));
+    this.labMap?.hide();
+    // The hand-made lab is rebuilt every run: the chosen spawn and conquered sectors may have changed.
+    const regen = this.runStats.time > 0 || !!this.world.labLayout?.frame;
+    if (regen) this.generateLab();
     this.growth.reset();
     if (regen) this.terrain.rebuildAll();
     this.stats = this.upgrades.getSoldierStats();
@@ -335,6 +346,75 @@ export class Game {
     this.hud.update(this, performance.now(), true);
   }
 
+  /** Read lab progress from the active save slot. */
+  private loadLabProgress(): void {
+    const lab = this.save.data.lab;
+    this.labProgress = new LabProgress(lab.discovered, lab.conquered);
+  }
+
+  /**
+   * Regenerate the world for a new run: the hand-made lab with conquered
+   * sectors already cleared, and the starting room moved to the chosen
+   * spawn sector (the middle unless another conquered sector was picked).
+   */
+  private generateLab(): void {
+    const frame = labFrame(this.world);
+    if (frame) {
+      const lab = this.save.data.lab;
+      if (!this.labProgress.conquered.has(lab.spawn)) lab.spawn = CENTER_SECTOR;
+      const at = sectorSpawnCell(frame, lab.spawn);
+      this.world.setStartRoom(at.cx, at.cy);
+    }
+    generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30), { conquered: this.labProgress.conquered });
+    this.labProgress.attach(this.world);
+  }
+
+  /** Sectors a squad may deploy into: conquered ones. */
+  canDeployInto(sector: number): boolean {
+    return this.labProgress.conquered.has(sector);
+  }
+
+  /**
+   * Begin deploying a new run: the lab map to pick a sector when the world is
+   * the hand-made lab, else straight into a run.
+   */
+  beginDeploy(): void {
+    if (!this.world.labLayout?.frame) {
+      this.startRun();
+      return;
+    }
+    this.abortDeathSequence();
+    this.mainMenu.hide();
+    this.pauseMenu.hide();
+    this.resultsScreen.hide();
+    this.upgradeTree.hide();
+    this.paused = true;
+    this.labMap.show();
+  }
+
+  /** Start a run deployed into a conquered `sector`. */
+  deployInto(sector: number): void {
+    if (!this.canDeployInto(sector)) return;
+    this.save.data.lab.spawn = sector;
+    this.save.save();
+    this.startRun();
+  }
+
+  /** Discover sectors the squad stands in, conquer cleared ones, and save progress. */
+  private updateLabProgress(dt: number): void {
+    this.labCheckT -= dt;
+    if (this.labCheckT > 0 || !this.world.labLayout?.frame) return;
+    this.labCheckT = 0.5;
+    const cs = this.world.cellSize;
+    const cells: { cx: number; cy: number }[] = [];
+    for (const s of this.soldiers) if (s.alive) cells.push({ cx: Math.floor(s.x / cs), cy: Math.floor(s.y / cs) });
+    if (!this.labProgress.update(cells)) return;
+    const lab = this.save.data.lab;
+    lab.discovered = [...this.labProgress.discovered].sort((a, b) => a - b);
+    lab.conquered = [...this.labProgress.conquered].sort((a, b) => a - b);
+    this.save.save();
+  }
+
   /** Bank currency & lifetime pixels earned in the current run (idempotent per run). */
   bankCurrentRun(): { time: boolean; depth: boolean; pixels: boolean } {
     const r = this.runStats;
@@ -361,11 +441,11 @@ export class Game {
 
   restartAndBank(): void {
     this.bankCurrentRun();
-    this.startRun();
+    this.beginDeploy();
   }
 
   togglePauseMenu(show?: boolean): void {
-    if (this.runOver || this.upgradeTree.visible || this.mainMenu.visible) return;
+    if (this.runOver || this.upgradeTree.visible || this.mainMenu.visible || this.labMap.visible) return;
     this.aimState.active = false;
     this.aimState.isDragging = false;
     const next = show ?? !this.pauseMenu.visible;
@@ -393,6 +473,7 @@ export class Game {
 
   selectSaveSlot(slot: number): void {
     this.save.selectSlot(slot);
+    this.loadLabProgress();
     this.applyUpgrades();
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.autoMove = this.save.data.settings.autoMove;
@@ -406,12 +487,17 @@ export class Game {
     this.pauseMenu.hide();
     this.resultsScreen.hide();
     this.upgradeTree.hide();
+    this.labMap?.hide();
     this.paused = true;
     this.mainMenu.show();
     this.hud.update(this, performance.now(), true);
   }
 
   private onKey(code: string): void {
+    if (this.labMap.visible) {
+      this.labMap.onKey(code);
+      return;
+    }
     if (this.upgradeTree.visible) {
       if (code === "Space" || code === "Enter") {
         this.upgradeTree.onPrimaryAction();
@@ -423,7 +509,7 @@ export class Game {
     if (this.mainMenu.visible) {
       if (code === "Space" || code === "Enter") {
         this.mainMenu.hide();
-        this.startRun();
+        this.beginDeploy();
       } else if (code === "KeyU") {
         this.openUpgrades();
       } else if (code === "Digit1" || code === "Numpad1") {
@@ -449,7 +535,7 @@ export class Game {
         break;
       case "Escape":
         if (this.aimState.active) this.onAimCancel();
-        else if (this.resultsScreen.visible) this.startRun();
+        else if (this.resultsScreen.visible) this.beginDeploy();
         else this.togglePauseMenu();
         break;
       case "Digit1":
@@ -1271,6 +1357,7 @@ export class Game {
 
   step(dt: number): void {
     this.runStats.time += dt;
+    this.updateLabProgress(dt);
 
     const commander = this.getCommander();
 

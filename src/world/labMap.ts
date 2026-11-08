@@ -317,3 +317,39 @@ export function buildAuthoredLayout(frame: LabFrame, blueprint: Blueprint = pars
   }
   return { seed: LAB_SEED, rooms, corridors, frame };
 }
+
+/**
+ * World cell where a squad deploying into sector `index` lands: the middle of
+ * the sector's biggest room that is not overrun, else of any room, else the
+ * hallway nearest the sector's middle (where a small landing clearing is cut).
+ */
+export function sectorSpawnCell(frame: LabFrame, index: number, lines: readonly string[] = LAB_BLUEPRINT): { cx: number; cy: number } {
+  const col = index % SECTORS_PER_SIDE;
+  const row = (index - col) / SECTORS_PER_SIDE;
+  const c0 = col * SECTOR_CHARS;
+  const r0 = row * SECTOR_CHARS;
+  const inSector = (c: number, r: number): boolean => c >= c0 && c < c0 + SECTOR_CHARS && r >= r0 && r < r0 + SECTOR_CHARS;
+  const rooms = parseBlueprint(lines).rooms.filter((b) => inSector(b.col + ((b.span - 1) >> 1), b.row + ((b.span - 1) >> 1)));
+  const rank: Record<RoomKind, number> = { room: 0, tanks: 1, overrun: 2 };
+  rooms.sort((a, b) => rank[a.kind] - rank[b.kind] || b.span - a.span);
+  if (rooms.length > 0) {
+    const b = rooms[0];
+    const size = b.span * CHAR_CELLS - 4;
+    return { cx: frame.x0 + b.col * CHAR_CELLS + 2 + (size >> 1), cy: frame.y0 + b.row * CHAR_CELLS + 2 + (size >> 1) };
+  }
+  const mid = (SECTOR_CHARS - 1) / 2;
+  let best = { c: c0 + mid, r: r0 + mid };
+  let bestD = Infinity;
+  for (let r = r0; r < r0 + SECTOR_CHARS; r++) {
+    for (let c = c0; c < c0 + SECTOR_CHARS; c++) {
+      if (!"-|+".includes(lines[r][c])) continue;
+      const d = Math.abs(c - c0 - mid) + Math.abs(r - r0 - mid);
+      if (d < bestD) {
+        bestD = d;
+        best = { c, r };
+      }
+    }
+  }
+  const half = (CHAR_CELLS - 1) / 2;
+  return { cx: frame.x0 + best.c * CHAR_CELLS + half, cy: frame.y0 + best.r * CHAR_CELLS + half };
+}

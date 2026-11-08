@@ -29,7 +29,7 @@ export class ResultsScreen {
     this.body = this.root.querySelector(".results-body") as HTMLDivElement;
     this.root.querySelector('[data-act="retry"]')!.addEventListener("click", () => {
       this.hide();
-      this.game.startRun();
+      this.game.beginDeploy();
     });
     this.root.querySelector('[data-act="upgrades"]')!.addEventListener("click", () => {
       this.hide();

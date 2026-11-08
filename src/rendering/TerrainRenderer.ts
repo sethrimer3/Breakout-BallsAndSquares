@@ -22,8 +22,8 @@ const FROZEN_FIRE_TIME = 7.25;
 /** Edge canvases grow in steps this size, so a moving view doesn't reallocate them. */
 const EDGE_CANVAS_STEP = 256;
 /** Matte albedo of crystal veins: tier 2 orange, tier 3 green. */
-const CRYSTAL_ORANGE = [178, 98, 40] as const;
-const CRYSTAL_GREEN = [56, 150, 98] as const;
+const CRYSTAL_ORANGE = [212, 120, 48] as const;
+const CRYSTAL_GREEN = [70, 182, 118] as const;
 
 /** A soft round light falloff in one color, for drawing scaled into the lightmap. */
 function radialSprite(c: RGB): HTMLCanvasElement {

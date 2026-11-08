@@ -119,7 +119,7 @@ export class MainMenu {
       this.game.save.save();
     }
     this.hide();
-    this.game.startRun();
+    this.game.beginDeploy();
   }
 
   private openSettings(): void {
