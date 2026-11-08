@@ -30,3 +30,19 @@ describe("matte tier materials", () => {
     }
   });
 });
+
+describe("inside-corner paint", () => {
+  it("joins the two wall stripes at an inside corner", async () => {
+    // TerrainRenderer imports DOM-only helpers lazily; the band helper is pure.
+    const { innerCornerBand } = await import("../src/rendering/TerrainRenderer");
+    const painted = (ul: boolean, ur: boolean, dl: boolean, dr: boolean) => {
+      const out: string[] = [];
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if (innerCornerBand(x, y, ul, ur, dl, dr, 1)) out.push(`${x},${y}`);
+      return out.sort().join(" ");
+    };
+    expect(painted(true, false, false, false)).toBe("0,1 1,0 1,1");
+    expect(painted(false, false, false, true)).toBe("2,2 2,3 3,2");
+    expect(innerCornerBand(0, 0, true, false, false, false, 0)).toBe(true);
+    expect(innerCornerBand(1, 1, true, false, false, false, 0)).toBe(false);
+  });
+});

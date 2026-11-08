@@ -147,9 +147,13 @@ export const FACILITY = {
   pristineBelow: 0.34,
   decayedAbove: 0.62,
   /** Lightmap brightness of the even wash over pristine rooms and halls (0..1). */
-  washStrength: 0.13,
-  /** Radius (cells) of the pool of light under each ceiling panel. */
-  panelRadiusCells: 6,
+  washStrength: 0.08,
+  /** Radius (cells) of the pool of light under each ceiling panel (shadow-traced). */
+  panelRadiusCells: 9,
+  /** Evenly spaced base rays per panel light (terrain corners add precision). */
+  panelBaseRays: 64,
+  /** Most stale panel lights re-traced per frame (panels are cached until nearby terrain changes). */
+  panelTracesPerFrame: 6,
   /** Lightmap strength of the pink glow a living Blight Core throws over its room. */
   blightGlowStrength: 0.4,
   /** Spacing (cells) of ceiling light panels in rooms and hallways. */

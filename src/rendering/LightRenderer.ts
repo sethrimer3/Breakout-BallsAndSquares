@@ -1,6 +1,7 @@
 import { GROWTH, LIGHT } from "../config";
 import type { Game } from "../Game";
 import type { LitCells } from "../systems/LightingSystem";
+import { LIGHT_KIND } from "../world/PixelWorld";
 import { CanvasSoftener } from "./SoftLight";
 import type { Sprites } from "./sprites";
 
@@ -78,6 +79,20 @@ function buildLut(stops: readonly Stop[]): Float32Array {
 const FLASH_LUT = buildLut(FLASH_STOPS);
 const FIERY_FLASH_LUT = buildLut(FIERY_FLASH_STOPS);
 const SOFT_LUT = buildLut(SOFT_STOPS);
+
+/** Ceiling panel light by `LIGHT_KIND`: cold clinical white, warm worn tube, sickly failing tube. */
+const PANEL_COLORS: readonly (readonly [number, number, number])[] = [
+  [200, 225, 255],
+  [255, 222, 168],
+  [190, 255, 220],
+];
+const PANEL_STOPS: readonly (readonly Stop[])[] = PANEL_COLORS.map(([r, g, b]) => [
+  [0, r, g, b, 0.62],
+  [0.35, r, g, b, 0.3],
+  [0.75, r, g, b, 0.08],
+  [1, r, g, b, 0],
+]);
+const PANEL_LUTS = PANEL_STOPS.map(buildLut);
 
 function makeLayer(alpha: boolean): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement("canvas");
@@ -201,6 +216,20 @@ export class LightRenderer {
         }
       }
     }
+    // Ceiling panels: cached shadow-traced pools, so lab equipment and walls cast shadows.
+    const now = performance.now() / 1000;
+    for (const f of game.lighting.fixtures) {
+      if (!f || !f.poly) continue;
+      const sx = cam.worldToScreenX(f.x);
+      const sy = cam.worldToScreenY(f.y);
+      const rad = f.radius * cam.zoom;
+      if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
+      const level = game.terrain.lightLevel(f.light, now);
+      if (level <= 0.02) continue;
+      this.tracePolygonPath(air, game, f.poly, f.polyCount);
+      air.fillStyle = gradientFor(air, sx, sy, rad, PANEL_STOPS[panelIndex(f.light.kind)], level);
+      air.fill();
+    }
     this.finishAirLayer(g, "lighter", devW, devH, dpr);
 
     g.globalCompositeOperation = "lighter";
@@ -232,7 +261,7 @@ export class LightRenderer {
     }
 
     // The lab's own ceiling panels and Blight glows, kept inside their rooms.
-    game.terrain.drawRoomLight(g, cam, performance.now() / 1000);
+    game.terrain.drawRoomLight(g, cam, performance.now() / 1000, game.lighting.fixtures);
 
     // 4) Light on walls, whole cells at a time.
     const wallsLit = this.updateWallLight(game);
@@ -341,6 +370,13 @@ export class LightRenderer {
       const l = lighting.softLights[i];
       this.addWallLight(game, l.lit, l.x, l.y, l.radius, l.strength, SOFT_LUT);
     }
+    const now = performance.now() / 1000;
+    for (const f of lighting.fixtures) {
+      if (!f || !f.poly || f.lit.count === 0) continue;
+      const level = game.terrain.lightLevel(f.light, now);
+      if (level <= 0.02) continue;
+      this.addWallLight(game, f.lit, f.x, f.y, f.radius, level, PANEL_LUTS[panelIndex(f.light.kind)]);
+    }
     const flashMult = game.muzzleFlashMultiplier;
     const flashLut = game.fieryMuzzleFlash ? FIERY_FLASH_LUT : FLASH_LUT;
     if (flashMult > 0) {
@@ -446,4 +482,8 @@ function gradientFor(
     grad.addColorStop(o, `rgba(${r}, ${gr}, ${b}, ${a * strength})`);
   }
   return grad;
+}
+
+function panelIndex(kind: number): number {
+  return kind === LIGHT_KIND.dim ? 1 : kind === LIGHT_KIND.flicker ? 2 : 0;
 }

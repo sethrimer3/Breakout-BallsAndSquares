@@ -1,8 +1,8 @@
-import { LIGHT, SOLDIER } from "../config";
+import { FACILITY, LIGHT, SOLDIER } from "../config";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Soldier } from "../entities/Soldier";
 import type { CameraSystem } from "./CameraSystem";
-import type { PixelWorld } from "../world/PixelWorld";
+import { LIGHT_KIND, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 
 export type LightQuality = "high" | "medium" | "low";
 
@@ -85,6 +85,23 @@ function makeSoftLight(): SoftLight {
   };
 }
 
+/**
+ * A ceiling panel's shadow-traced light. Panels never move, so the polygon is
+ * kept until terrain near the panel changes.
+ */
+export interface FixtureLight {
+  light: RoomLight;
+  x: number;
+  y: number;
+  radius: number;
+  poly: Float32Array | null;
+  polyCount: number;
+  lit: LitCells;
+  dirty: boolean;
+}
+
+const EMPTY_LIT: LitCells = { cells: new Int32Array(0), count: 0 };
+
 const rayHit = makeRayHit();
 
 /**
@@ -143,8 +160,75 @@ export class LightingSystem {
   private litStamps: Uint32Array;
   private litStamp = 0;
 
+  /** Shadow-traced ceiling panels, parallel to `world.roomLights` (null for washes and Blight glows). */
+  fixtures: (FixtureLight | null)[] = [];
+  private fixtureSource: RoomLight[] | null = null;
+  private scratchPoly = new Float32Array(LIGHT.maxRays * 2);
+  private scratchLit = makeLitCells();
+
   constructor(private world: PixelWorld) {
     this.litStamps = new Uint32Array(world.width * world.height);
+    world.addListener((cx, cy, kind) => {
+      if (kind !== "damaged") this.invalidateFixtures(cx, cy);
+    });
+  }
+
+  /** Re-trace every panel whose light could reach cell (cx, cy). */
+  private invalidateFixtures(cx: number, cy: number): void {
+    const cs = this.world.cellSize;
+    const x = (cx + 0.5) * cs;
+    const y = (cy + 0.5) * cs;
+    for (const f of this.fixtures) {
+      if (!f || f.dirty) continue;
+      const r = f.radius + cs;
+      if (Math.abs(f.x - x) < r && Math.abs(f.y - y) < r) f.dirty = true;
+    }
+  }
+
+  /**
+   * Trace light and shadow for the ceiling panels near the view: up to
+   * `FACILITY.panelTracesPerFrame` stale ones a frame, nearest first in list order.
+   */
+  updateFixtures(cam: CameraSystem): void {
+    const w = this.world;
+    if (w.roomLights !== this.fixtureSource) {
+      this.fixtureSource = w.roomLights;
+      const cs = w.cellSize;
+      this.fixtures = w.roomLights.map((l) =>
+        l.kind === LIGHT_KIND.wash || l.kind === LIGHT_KIND.blight
+          ? null
+          : {
+              light: l,
+              x: ((l.x0 + l.x1 + 1) / 2) * cs,
+              y: ((l.y0 + l.y1 + 1) / 2) * cs,
+              radius: FACILITY.panelRadiusCells * cs,
+              poly: null,
+              polyCount: 0,
+              lit: EMPTY_LIT,
+              dirty: true,
+            },
+      );
+    }
+    let budget = FACILITY.panelTracesPerFrame;
+    const margin = FACILITY.panelRadiusCells * w.cellSize;
+    const x0 = cam.screenToWorldX(0) - margin;
+    const y0 = cam.screenToWorldY(0) - margin;
+    const x1 = cam.screenToWorldX(cam.viewW) + margin;
+    const y1 = cam.screenToWorldY(cam.viewH) + margin;
+    for (const f of this.fixtures) {
+      if (budget <= 0) break;
+      if (!f || !f.dirty || f.x < x0 || f.x > x1 || f.y < y0 || f.y > y1) continue;
+      budget--;
+      f.dirty = false;
+      const n = this.trace(
+        f.x, f.y, 1, 0, f.radius, -3, [], this.scratchPoly, this.scratchLit,
+        FACILITY.panelBaseRays, 0, this.preset.maxCornerRays,
+      );
+      f.poly = n > 0 ? this.scratchPoly.slice(0, n * 2) : null;
+      f.polyCount = n;
+      const lc = this.scratchLit.count;
+      f.lit = { cells: this.scratchLit.cells.slice(0, lc), count: lc };
+    }
   }
 
   get preset(): QualityPreset {

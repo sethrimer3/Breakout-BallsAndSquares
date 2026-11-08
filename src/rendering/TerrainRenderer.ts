@@ -64,6 +64,32 @@ function sampleRamp(ramp: Ramp4, t: number, out: number[]): void {
   else mix(ramp[2], ramp[3], (t - 2 / 3) * 3, out);
 }
 
+/**
+ * True when texel (ox, oy) lies on the band `depth` texels in from an open
+ * diagonal neighbor, joining the bands of the two walls that meet at an inside
+ * corner (depth 0 is the outer lip, 1 the paint stripe).
+ */
+export function innerCornerBand(
+  ox: number,
+  oy: number,
+  ul: boolean,
+  ur: boolean,
+  dl: boolean,
+  dr: boolean,
+  depth: number,
+): boolean {
+  const lo = depth;
+  const hi = TEX - 1 - depth;
+  const hit = (col: number, row: number, left: boolean, upper: boolean): boolean =>
+    (ox === col && (upper ? oy <= row : oy >= row)) || (oy === row && (left ? ox <= col : ox >= col));
+  return (
+    (ul && hit(lo, lo, true, true)) ||
+    (ur && hit(hi, lo, false, true)) ||
+    (dl && hit(lo, hi, true, false)) ||
+    (dr && hit(hi, hi, false, false))
+  );
+}
+
 /** Cheap integer hash to 0..1, for activity-light flicker. */
 function hash01(n: number): number {
   n = Math.imul(n ^ (n >>> 15), 0x2c1b3c6d);
@@ -277,8 +303,8 @@ export class TerrainRenderer {
     });
   }
 
-  /** Brightness (0..1) of a room light right now; 0 when it is off or gone. */
-  private lightLevel(l: RoomLight, t: number, still: boolean): number {
+  /** Brightness (0..1) of a room light at wall-clock `t`; 0 when it is off or gone. */
+  lightLevel(l: RoomLight, t: number, still = this.reducedMotion?.matches ?? false): number {
     const w = this.world;
     if (l.kind === LIGHT_KIND.blight) {
       const core = l.coreId ? w.blightCores[l.coreId - 1] : undefined;
@@ -299,7 +325,12 @@ export class TerrainRenderer {
    * rooms and halls, a pool under each working panel, and a pink glow around
    * each living Blight Core. Each light stays inside its room.
    */
-  drawRoomLight(g: CanvasRenderingContext2D, cam: CameraSystem, time: number): void {
+  drawRoomLight(
+    g: CanvasRenderingContext2D,
+    cam: CameraSystem,
+    time: number,
+    shadowed?: readonly ({ poly: Float32Array | null } | null)[],
+  ): void {
     const w = this.world;
     const lights = w.roomLights;
     if (lights.length === 0) return;
@@ -312,7 +343,10 @@ export class TerrainRenderer {
     const z = cam.zoom;
     g.save();
     g.globalCompositeOperation = "lighter";
-    for (const l of lights) {
+    for (let n = 0; n < lights.length; n++) {
+      const l = lights[n];
+      // Panels already drawn with shadows (LightRenderer) skip the flat pool.
+      if (shadowed?.[n]?.poly) continue;
       if (l.cx1 < vx0 || l.cy1 < vy0 || l.cx0 > vx1 || l.cy0 > vy1) continue;
       const level = this.lightLevel(l, time, still);
       if (level <= 0.02) continue;
@@ -567,6 +601,16 @@ export class TerrainRenderer {
         const left = cx > 0 && health[i - 1] === 0;
         const down = cy < world.height - 1 && health[i + W] === 0;
         const right = cx < W - 1 && health[i + 1] === 0;
+        // Inside corners: both side neighbors solid, only the diagonal open.
+        const hasL = cx > 0;
+        const hasR = cx < W - 1;
+        const hasU = cy > 0;
+        const hasD = cy < world.height - 1;
+        const cUL = !up && !left && hasU && hasL && health[i - W - 1] === 0;
+        const cUR = !up && !right && hasU && hasR && health[i - W + 1] === 0;
+        const cDL = !down && !left && hasD && hasL && health[i + W - 1] === 0;
+        const cDR = !down && !right && hasD && hasR && health[i + W + 1] === 0;
+        const anyCorner = cUL || cUR || cDL || cDR;
         if (material === MAT.glass) {
           // See-through containment glass, brighter along faces that touch the air.
           const g = COLORS.glass;
@@ -617,7 +661,11 @@ export class TerrainRenderer {
             // Paint sits one texel in from an open face, worn through in places.
             if (
               paintTier > 0 &&
-              ((up && oy === 1) || (left && ox === 1) || (down && oy === TEX - 2) || (right && ox === TEX - 2)) &&
+              ((up && oy === 1) ||
+                (left && ox === 1) ||
+                (down && oy === TEX - 2) ||
+                (right && ox === TEX - 2) ||
+                (anyCorner && innerCornerBand(ox, oy, cUL, cUR, cDL, cDR, 1))) &&
               hash2(gx, gy, 77) > 0.2
             ) {
               const pg = 0.9 + hash2(gx, gy, 78) * 0.16;
@@ -637,10 +685,10 @@ export class TerrainRenderer {
             // Matte relief: a pale lip on faces toward the upper left, shadow on the rest.
             let m = 1;
             let add = 0;
-            if ((up && oy === 0) || (left && ox === 0)) {
+            if ((up && oy === 0) || (left && ox === 0) || (anyCorner && innerCornerBand(ox, oy, cUL, cUR, cDL, false, 0))) {
               m = 1.7;
               add = 22;
-            } else if ((down && oy === TEX - 1) || (right && ox === TEX - 1)) {
+            } else if ((down && oy === TEX - 1) || (right && ox === TEX - 1) || (cDR && innerCornerBand(ox, oy, false, false, false, true, 0))) {
               m = 0.62;
             }
             put(tx0 + ox, ty0 + oy, col[0] * m + add, col[1] * m + add, col[2] * m + add, 255);
