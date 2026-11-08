@@ -1217,6 +1217,120 @@ button {
 .tree-cat-panel.hidden {
   display: none !important;
 }
+.tree-cat-short,
+.tree-nav {
+  display: none;
+}
+
+/*
+ * Small screens: the matrix is scaled down to fit, so its category buttons move
+ * into this unscaled menu (UpgradeTree.fitToScreen) with thumb-sized targets.
+ * Landscape puts it on the left as a rail; portrait puts it on top as a grid.
+ */
+.tree-railmode .tree-nav:not(.hidden) {
+  display: block;
+  flex: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 6px;
+  background: var(--bg-0);
+  box-shadow: 0 0 0 var(--px2) var(--line);
+}
+.tree-nav-side {
+  flex-direction: row;
+  gap: 10px;
+}
+.tree-nav-top {
+  flex-direction: column;
+  gap: 10px;
+}
+.tree-nav-side .tree-nav {
+  max-height: 100%;
+}
+.tree-nav-top .tree-nav {
+  width: 100%;
+  max-width: 560px;
+}
+.tree-nav .tree-tabs-container {
+  margin: 0;
+  padding: 4px;
+  gap: 10px;
+  align-items: stretch;
+}
+.tree-nav-side .tree-tabs-container {
+  flex-direction: row;
+}
+.tree-nav .tree-cat-name {
+  display: none;
+}
+.tree-nav .tree-cat-short {
+  display: inline;
+  letter-spacing: 0.5px;
+}
+.tree-nav .cat-caret {
+  margin-left: auto;
+}
+.tree-nav .tree-categories,
+.tree-nav .tree-cat-panel,
+.tree-nav .soldier-slot-tabs {
+  display: grid;
+  gap: 8px;
+  justify-content: stretch;
+}
+.tree-nav-side .tree-categories,
+.tree-nav-side .tree-cat-panel,
+.tree-nav-side .soldier-slot-tabs {
+  grid-template-columns: 1fr;
+  align-content: start;
+}
+.tree-nav-top .tree-categories {
+  grid-template-columns: 1fr 1fr;
+}
+.tree-nav-top .tree-cat-panel,
+.tree-nav-top .soldier-slot-tabs {
+  grid-template-columns: 1fr 1fr;
+  width: 100%;
+}
+.tree-nav .tree-cat-panel > .soldier-slot-tabs {
+  grid-column: 1 / -1;
+}
+.tree-nav .tree-category-panels {
+  width: auto;
+}
+/* A steady width, so the matrix doesn't resize when switching categories. */
+.tree-nav-side .tree-category-panels {
+  min-width: 196px;
+}
+.tree-nav-side .tree-categories {
+  min-width: 150px;
+}
+/* Touch has no real hover: don't leave a lit frame where the finger was. */
+@media (hover: none) {
+  .tree-nav .tree-cat-btn:hover:not(.active),
+  .tree-nav .tree-tab:hover:not(.active) {
+    --fc: var(--line);
+    color: #88a8c8;
+  }
+}
+.tree-nav-side .tree-categories {
+  padding-right: 10px;
+  box-shadow: var(--px2) 0 0 0 var(--line);
+}
+.tree-nav .tree-cat-btn,
+.tree-nav .tree-tab {
+  min-height: 44px;
+  padding: 6px 12px;
+  gap: 10px;
+  white-space: nowrap;
+}
+.tree-nav .tree-cat-btn .px,
+.tree-nav .tree-tab .px {
+  --px: var(--px2) !important;
+}
+.tree-nav .tree-cat-btn.expanded:not(.active) {
+  --fc: #4f7a99;
+  color: #e4f4ff;
+}
 .tree-tabs {
   display: flex;
   flex-wrap: wrap;
