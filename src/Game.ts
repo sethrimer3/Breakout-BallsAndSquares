@@ -1445,6 +1445,7 @@ export class Game {
       }
     }
     this.lighting.updateSoftLights(this.soldiers, this.world.roomCenterX, this.world.roomCenterY, cam, grenadeLights);
+    this.lighting.updateFixtures(cam);
     const elapsed = performance.now() - t0;
     this.lighting.lastComputeMs = elapsed;
     this.debugInfo.lightMs = elapsed;
