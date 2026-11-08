@@ -2392,17 +2392,10 @@ button {
 .labmap-grid {
   display: grid;
   grid-template-columns: 16px repeat(9, var(--tile)) 16px;
-  grid-auto-rows: var(--tile);
-  gap: 2px;
+  grid-template-rows: 14px repeat(9, var(--tile)) 14px;
+  gap: 0;
   justify-content: center;
   margin: 10px 0 8px;
-}
-.labmap-grid > .labmap-label:nth-child(-n + 11),
-.labmap-grid > .labmap-label:nth-last-child(-n + 11) {
-  height: 14px;
-}
-.labmap-grid {
-  grid-template-rows: 14px repeat(9, var(--tile)) 14px;
 }
 .labmap-label {
   display: flex;
@@ -2410,42 +2403,43 @@ button {
   justify-content: center;
   font-family: var(--font-small);
   font-size: var(--f8);
-  color: #8a8174;
+  color: #6f685e;
 }
+/* One seamless survey sheet: sectors butt up against each other with no
+   lines between them; only the selection is framed. */
 .labmap-tile {
   pointer-events: auto;
   cursor: pointer;
   padding: 0;
   border: none;
-  background: #0b0e14;
+  background: #07080b;
   position: relative;
-  outline: var(--px1) solid #1a2029;
-  outline-offset: -1px;
 }
 .labmap-tile canvas {
   display: block;
   width: 100%;
   height: 100%;
-  image-rendering: pixelated;
 }
-.labmap-tile.discovered {
-  outline-color: #4a3a46;
+/* Conquered: a small chip of the tier's paint in the corner. */
+.labmap-tile.conquered::after {
+  content: "";
+  position: absolute;
+  top: var(--px2);
+  left: var(--px2);
+  width: var(--px4);
+  height: var(--px4);
+  background: #3e5c8a;
+  box-shadow: var(--px1) var(--px1) 0 0 #05070d;
 }
-.labmap-tile.conquered[data-tier="1"] {
-  outline: var(--px2) solid #3e5c8a;
-  outline-offset: -2px;
+.labmap-tile.conquered[data-tier="2"]::after {
+  background: #b0402e;
 }
-.labmap-tile.conquered[data-tier="2"] {
-  outline: var(--px2) solid #8c2a20;
-  outline-offset: -2px;
+.labmap-tile.conquered[data-tier="3"]::after {
+  background: #c27a2a;
 }
-.labmap-tile.conquered[data-tier="3"] {
-  outline: var(--px2) solid #a4601e;
-  outline-offset: -2px;
-}
-.labmap-tile.selected[data-tier] {
+.labmap-tile.selected {
   outline: var(--px2) solid #e8e0cf;
-  outline-offset: 0;
+  outline-offset: calc(-1 * var(--px2));
   z-index: 1;
 }
 .labmap-info {
