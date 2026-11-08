@@ -32,6 +32,7 @@ import { FogOfWar, type SightSource } from "./world/FogOfWar";
 import { MAT, PixelWorld, SUB } from "./world/PixelWorld";
 import { generateWorld } from "./world/WorldGenerator";
 import { LabMap } from "./ui/LabMap";
+import { renderSectorThumbs } from "./rendering/SectorThumbs";
 import { LabProgress } from "./world/LabProgress";
 import { CENTER_SECTOR, labFrame, sectorSpawnCell } from "./world/labMap";
 
@@ -197,6 +198,7 @@ export class Game {
     this.resultsScreen = new ResultsScreen(uiRoot, this);
     this.upgradeTree = new UpgradeTree(uiRoot, this);
     this.labMap = new LabMap(uiRoot, this);
+    this.refreshSectorThumbs();
     this.input = new Input(canvas, {
       canPlace: () => this.canPlaceSoldier(),
       canShootManual: () => this.canShootManual(),
@@ -302,7 +304,10 @@ export class Game {
     const regen = this.runStats.time > 0 || !!this.world.labLayout?.frame;
     if (regen) this.generateLab();
     this.growth.reset();
-    if (regen) this.terrain.rebuildAll();
+    if (regen) {
+      this.terrain.rebuildAll();
+      this.refreshSectorThumbs();
+    }
     this.stats = this.upgrades.getSoldierStats();
     this.resetFog();
     this.resetFacility();
@@ -367,6 +372,12 @@ export class Game {
     }
     generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30), { conquered: this.labProgress.conquered });
     this.labProgress.attach(this.world);
+  }
+
+  /** Photograph every sector of the freshly built lab for the lab map. */
+  private refreshSectorThumbs(): void {
+    const frame = this.world.labLayout?.frame;
+    if (frame && this.labMap) this.labMap.setThumbs(renderSectorThumbs(this.world, this.terrain, frame));
   }
 
   /** Sectors a squad may deploy into: conquered ones. */
