@@ -1,7 +1,8 @@
-import { FACILITY, GROWTH, growthRateAt } from "../config";
+import { FACILITY, GROWTH, growthRateAt, overdriveWallRate } from "../config";
 import type { Rng } from "../core/Rng";
 import type { Soldier } from "../entities/Soldier";
 import { cellOverlapsCircle, circleIsClear } from "../systems/PhysicsSystem";
+import { BlightColonies } from "./BlightColonies";
 import { Frontier } from "./Frontier";
 import type { PixelWorld } from "./PixelWorld";
 
@@ -10,6 +11,10 @@ export interface GrowthEvents {
   onSoldierKilled?(soldier: Soldier, cx: number, cy: number): void;
   onSoldierRescued?(soldier: Soldier, fromCx: number, fromCy: number, toCx: number, toCy: number, hpCost: number): void;
   onBlightExplode?(cx: number, cy: number, radiusCells: number, damage: number): void;
+  /** A dormant pixel crumbled away to the decay upgrade (half-size subcell coords). */
+  onDecay?(sx: number, sy: number): void;
+  /** The Blight entered (true) or left (false) overdrive. */
+  onOverdrive?(active: boolean): void;
 }
 
 interface PendingExplosion {
@@ -56,15 +61,18 @@ export class GrowthSystem {
   totalSubBlightEvents = 0;
   nearEventsTotal = 0;
   private acc = 0;
-  /** Per-core accumulator (`accByCore[coreId - 1]`) so each living Blight Core acts as its own independent generator. */
-  private coreAcc: number[] = [];
-  /** Reusable BFS buffers for connected pink blight + core component discovery. */
-  private bfsStamp: Uint32Array;
-  private curStamp = 0;
-  private bfsQueue: Int32Array;
-  private perimBuf: number[] = [];
-  private memberBuf: number[] = [];
-  private coreProcessed = new Uint8Array(0);
+  /** Connected generator Blight, kept up to date as pixels grow and die. */
+  readonly colonies: BlightColonies;
+  /** True while the generator rate is at or above `GROWTH.overdriveRate`: the walls replicate too. */
+  overdrive = false;
+  /** Seconds spent in the current overdrive (0 outside it). */
+  overdriveTime = 0;
+  /** Wall replication rate (copy events / second); 0 outside overdrive. */
+  wallRate = 0;
+  /** Decay events per second per dormant colony front (0 = no decay upgrade). */
+  decayRate = 0;
+  /** Dormant pixels decayed away this run. */
+  decayed = 0;
   /** Rolling telemetry ring (time, 1 if near soldier else 0). */
   private telTime: number[] = [];
   private telNear: number[] = [];
@@ -75,9 +83,12 @@ export class GrowthSystem {
     private events: GrowthEvents = {},
   ) {
     this.frontier = new Frontier(world);
-    const subN = world.subWidth * world.subHeight;
-    this.bfsStamp = new Uint32Array(subN);
-    this.bfsQueue = new Int32Array(subN);
+    this.colonies = new BlightColonies(world);
+  }
+
+  /** Relabel colonies from scratch (after editing world arrays directly). */
+  resync(): void {
+    this.colonies.rebuild();
   }
 
   reset(): void {
@@ -86,7 +97,11 @@ export class GrowthSystem {
     this.coreRate = 0;
     this.exposedCoresCount = 0;
     this.acc = 0;
-    this.coreAcc = this.world.blightCores.map(() => 0);
+    this.colonies.rebuild();
+    this.overdrive = false;
+    this.overdriveTime = 0;
+    this.wallRate = 0;
+    this.decayed = 0;
     this.timeOffset = 0;
     this.coresDestroyed = 0;
     this.totalEvents = 0;
@@ -158,15 +173,11 @@ export class GrowthSystem {
 
     const shiftedTime = runTime - (this.graceSeconds - GROWTH.graceSeconds) - this.timeOffset;
     this.rate = growthRateAt(shiftedTime, this.startRate) * this.rateMultiplier;
-    if (this.rate <= 0) {
-      this.coreRate = 0;
-      this.exposedCoresCount = 0;
-      return;
-    }
+    this.updateOverdrive(dt);
 
-    // 1) Normal terrain frontier replication.
-    if (this.frontier.size > 0) {
-      this.acc += this.rate * dt;
+    // 1) Wall replication: only in overdrive do the facility's walls turn to Blight.
+    if (this.overdrive && this.frontier.size > 0) {
+      this.acc += this.wallRate * dt;
       let steps = 0;
       while (this.acc >= 1 && steps < GROWTH.maxEventsPerStep && this.frontier.size > 0) {
         if (this.replicateOne(runTime, soldiers)) {
@@ -179,156 +190,125 @@ export class GrowthSystem {
         steps++;
       }
       if (this.acc > GROWTH.maxEventsPerStep) this.acc = GROWTH.maxEventsPerStep;
+    } else {
+      this.acc = 0;
     }
 
-    // 2) Blight Core pink sub-pixel generators:
-    // Every living Blight Core acts as its own generator producing `this.rate` 50%-smaller pink
-    // blight sub-pixels per second around the open-air perimeter of its connected pink blight.
-    // Multiple cores connected together through pink blight compound (`k * this.rate` around the shared perimeter).
+    // 2) Generators: each colony with a living generator grows pink sub-pixels around its
+    // edge; linked generators compound. Dormant colonies freeze (and decay with the upgrade).
     this.updateCoreGenerators(dt, runTime, soldiers);
   }
 
   /**
-   * Tick all living Blight Core generators. If `k` living cores are connected together
-   * via pink blight (or adjacent core cells), their connected component receives `k * rate * dt`
-   * sub-pixel growth events distributed randomly around the component's open-air perimeter.
+   * Enter overdrive when the generator rate reaches `GROWTH.overdriveRate`, and
+   * leave it (resetting the wall clock) if killing generators pulls it back down.
    */
-  updateCoreGenerators(dt: number, runTime: number, soldiers: readonly Soldier[]): void {
-    const cores = this.world.blightCores;
-    if (!cores || cores.length === 0 || this.rate <= 0) {
-      this.coreRate = 0;
-      this.exposedCoresCount = 0;
-      return;
+  private updateOverdrive(dt: number): void {
+    const on = this.rate >= GROWTH.overdriveRate;
+    if (on !== this.overdrive) {
+      this.overdrive = on;
+      this.overdriveTime = 0;
+      this.events.onOverdrive?.(on);
     }
-    while (this.coreAcc.length < cores.length) this.coreAcc.push(0);
-
-    // Each living core is its own generator: it banks `rate * dt` sub-pixels per step.
-    let anyDue = false;
-    for (let i = 0; i < cores.length; i++) {
-      if (!cores[i].alive) {
-        this.coreAcc[i] = 0;
-        continue;
-      }
-      this.coreAcc[i] += this.rate * dt * (cores[i].size === 1 ? FACILITY.smallCoreRateMult : 1);
-      if (this.coreAcc[i] >= 1) anyDue = true;
-    }
-    // Nothing to place this step: keep last step's exposure telemetry.
-    if (!anyDue) return;
-
-    // Group living cores into connected components (cores touching each other or
-    // linked through pink blight). A component with k cores spends all k banks
-    // around its shared open-air perimeter, so connected cores compound.
-    const processed = this.coreProcessed.length >= cores.length ? this.coreProcessed : (this.coreProcessed = new Uint8Array(cores.length * 2));
-    processed.fill(0);
-    const perim = this.perimBuf;
-    const members = this.memberBuf;
-    let exposed = 0;
-    for (let i = 0; i < cores.length; i++) {
-      if (!cores[i].alive || processed[i]) continue;
-      this.collectComponent(cores[i].id, perim, members);
-      let total = 0;
-      for (let m = 0; m < members.length; m++) {
-        processed[members[m] - 1] = 1;
-        total += this.coreAcc[members[m] - 1];
-      }
-      if (perim.length === 0) {
-        // Sealed in solid terrain: generators idle until soldiers expose them.
-        for (let m = 0; m < members.length; m++) this.coreAcc[members[m] - 1] = 0;
-        continue;
-      }
-      exposed += members.length;
-      const cap = GROWTH.maxEventsPerStep * members.length;
-      const n = Math.min(Math.floor(total), cap, perim.length);
-      for (let e = 0; e < n; e++) {
-        // Random perimeter subcell, without replacement so one step never stacks.
-        const k = this.rng.int(perim.length);
-        const si = perim[k];
-        perim[k] = perim[perim.length - 1];
-        perim.length--;
-        this.growSubPixel(si, runTime, soldiers);
-      }
-      // Spread the leftover fractional pressure back over the member cores.
-      const share = Math.min(GROWTH.maxEventsPerStep, (total - n) / members.length);
-      for (let m = 0; m < members.length; m++) this.coreAcc[members[m] - 1] = share;
-    }
-    this.exposedCoresCount = exposed;
-    this.coreRate = exposed * this.rate;
-  }
-
-  /** True if subcell `(sx, sy)` is part of a living Blight Core or has pink sub-blight (`subHealth > 0`). */
-  private isPinkOrCoreSubcell(sx: number, sy: number): boolean {
-    const w = this.world;
-    if (w.isPinkSub(sy * w.subWidth + sx)) return true;
-    const cx = sx >> 1;
-    const cy = sy >> 1;
-    const idx = cy * w.width + cx;
-    return w.coreId[idx] > 0 && w.health[idx] > 0;
+    if (on) this.overdriveTime += dt;
+    this.wallRate = on ? overdriveWallRate(this.overdriveTime) : 0;
   }
 
   /**
-   * Flood the connected pink blight + living core component that contains `coreId`.
-   * Fills `outPerimeter` with every open-air subcell touching it, and `outMembers`
-   * with the ids of every living core in it (including `coreId`).
+   * Tick every colony. An active colony banks `rate * dt` per living generator
+   * in it (half for a small tank generator), so linked generators compound,
+   * and spends the bank on random open-air spots around its edge. A dormant
+   * colony (no living generator) never grows; with the decay upgrade it
+   * slowly crumbles from its edges instead.
    */
-  collectComponent(coreId: number, outPerimeter: number[], outMembers: number[]): void {
-    outPerimeter.length = 0;
-    outMembers.length = 0;
-    const w = this.world;
-    const core = w.blightCores[coreId - 1];
-    if (!core || !core.alive) return;
-    outMembers.push(coreId);
-
-    if ((this.curStamp = (this.curStamp + 1) >>> 0) === 0) {
-      this.bfsStamp.fill(0);
-      this.curStamp = 1;
-    }
-    const stamp = this.curStamp;
-    const visited = this.bfsStamp;
-    const queue = this.bfsQueue;
-    const sw = w.subWidth;
-    const sh = w.subHeight;
-    let head = 0;
-    let tail = 0;
-
-    // Seed BFS with the subcells of all surviving normal cells of `core`.
-    for (let k = 0; k < core.cells.length; k++) {
-      const cellIdx = core.cells[k];
-      if (w.health[cellIdx] === 0) continue;
-      const cx = cellIdx % w.width;
-      const cy = Math.floor(cellIdx / w.width);
-      for (let dy = 0; dy < 2; dy++) {
-        for (let dx = 0; dx < 2; dx++) {
-          const sx = cx * 2 + dx;
-          const sy = cy * 2 + dy;
-          const si = sy * sw + sx;
-          if (visited[si] !== stamp) {
-            visited[si] = stamp;
-            queue[tail++] = si;
-          }
-        }
+  updateCoreGenerators(dt: number, runTime: number, soldiers: readonly Soldier[]): void {
+    const cols = this.colonies;
+    cols.update(dt, GROWTH.splitCheckSeconds);
+    const cores = this.world.blightCores;
+    let exposed = 0;
+    const rate = this.rate;
+    for (const c of cols.list) {
+      if (!c.active) {
+        c.acc = 0;
+        continue;
+      }
+      if (rate <= 0) continue;
+      let gens = 0;
+      let living = 0;
+      for (const id of c.cores) {
+        const core = cores[id - 1];
+        if (!core || !core.alive) continue;
+        living++;
+        gens += core.size === 1 ? FACILITY.smallCoreRateMult : 1;
+      }
+      if (c.edges.length === 0) {
+        // Sealed in solid terrain: generators idle until soldiers expose them.
+        c.acc = 0;
+        continue;
+      }
+      exposed += living;
+      c.acc += rate * dt * gens;
+      if (c.acc < 1) continue;
+      const cap = GROWTH.maxEventsPerStep * Math.max(1, living);
+      let n = Math.min(Math.floor(c.acc), cap);
+      c.acc -= n;
+      if (c.acc > cap) c.acc = cap;
+      let tries = n * 3;
+      while (n > 0 && tries-- > 0 && c.edges.length > 0) {
+        const si = c.edges[this.rng.int(c.edges.length)];
+        const dest = this.openNeighbor(si);
+        if (dest < 0) continue;
+        this.growSubPixel(dest, runTime, soldiers);
+        n--;
       }
     }
+    this.exposedCoresCount = exposed;
+    this.coreRate = exposed * rate;
+    this.updateDecay(dt);
+  }
 
-    while (head < tail) {
-      const cur = queue[head++];
-      const sx = cur % sw;
-      const sy = (cur - sx) / sw;
-      for (let d = 0; d < 4; d++) {
-        const nx = sx + DX[d];
-        const ny = sy + DY[d];
-        if (nx < 0 || ny < 0 || nx >= sw || ny >= sh) continue;
-        const ni = ny * sw + nx;
-        if (visited[ni] === stamp) continue;
+  /** A random open-air 4-neighbor of subcell `si`, or -1. */
+  private openNeighbor(si: number): number {
+    const w = this.world;
+    const sw = w.subWidth;
+    const sx = si % sw;
+    const sy = (si - sx) / sw;
+    const start = this.rng.int(4);
+    for (let k = 0; k < 4; k++) {
+      const d = (start + k) & 3;
+      const nx = sx + DX[d];
+      const ny = sy + DY[d];
+      if (nx < 0 || ny < 0 || nx >= sw || ny >= w.subHeight) continue;
+      if (!w.subSolidAt(nx, ny)) return ny * sw + nx;
+    }
+    return -1;
+  }
 
-        if (this.isPinkOrCoreSubcell(nx, ny)) {
-          visited[ni] = stamp;
-          queue[tail++] = ni;
-          const cid = w.coreId[(ny >> 1) * w.width + (nx >> 1)];
-          if (cid > 0 && w.blightCores[cid - 1]?.alive && outMembers.indexOf(cid) < 0) outMembers.push(cid);
-        } else if (!w.subSolidAt(nx, ny)) {
-          // Open air subcell on the outer perimeter of this connected pink blight!
-          visited[ni] = stamp;
-          outPerimeter.push(ni);
+  /**
+   * Necrosis: dormant colonies lose health from their edges inward, so they
+   * darken, crumble and vanish. Generator cells never decay.
+   */
+  private updateDecay(dt: number): void {
+    if (this.decayRate <= 0) return;
+    const w = this.world;
+    const sw = w.subWidth;
+    for (const c of this.colonies.list) {
+      if (c.active || c.edges.length === 0) {
+        c.decayAcc = 0;
+        continue;
+      }
+      // Bigger fronts crumble faster, so a colony shrinks at a steady pace.
+      c.decayAcc += dt * this.decayRate * Math.max(1, Math.sqrt(c.edges.length));
+      let n = Math.min(Math.floor(c.decayAcc), GROWTH.maxDecayPerStep);
+      c.decayAcc -= Math.floor(c.decayAcc);
+      while (n-- > 0 && c.edges.length > 0) {
+        const si = c.edges[this.rng.int(c.edges.length)];
+        if (!w.isPinkSub(si)) continue;
+        const sx = si % sw;
+        const sy = (si - sx) / sw;
+        if (w.damageSub(sx, sy, 1) === 2) {
+          this.decayed++;
+          this.events.onDecay?.(sx, sy);
         }
       }
     }
@@ -336,8 +316,17 @@ export class GrowthSystem {
 
   /** True if the Blight Core `coreId` (or its connected pink blight) touches at least one open-air subcell. */
   isCoreExposed(coreId: number): boolean {
-    this.collectComponent(coreId, this.perimBuf, this.memberBuf);
-    return this.perimBuf.length > 0;
+    const core = this.world.blightCores[coreId - 1];
+    if (!core) return false;
+    const w = this.world;
+    for (const ci of core.cells) {
+      if (w.health[ci] === 0) continue;
+      const cx = ci % w.width;
+      const cy = Math.floor(ci / w.width);
+      const c = this.colonies.colonyAt(cy * 2 * w.subWidth + cx * 2);
+      if (c) return c.edges.length > 0;
+    }
+    return false;
   }
 
   /** Grow one 50%-smaller pink blight sub-pixel into open-air subcell index `destSub`. */

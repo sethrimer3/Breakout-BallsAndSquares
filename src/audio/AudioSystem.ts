@@ -306,4 +306,38 @@ export class AudioSystem {
       osc.stop(start + 0.07);
     });
   }
+
+  /** Falling sawtooth wail as the Blight goes into overdrive. */
+  playOverdrive(): void {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(220, t);
+    osc.frequency.exponentialRampToValueAtTime(55, t + 0.9);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(this.vol(0.09), t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 1.05);
+  }
+
+  /** Wet pop of a Blight flower launching a spore, or a creature lunging. */
+  playSpore(): void {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(180 + Math.random() * 60, t);
+    osc.frequency.exponentialRampToValueAtTime(420, t + 0.08);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(this.vol(0.05), t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(t);
+    osc.stop(t + 0.11);
+  }
 }

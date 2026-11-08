@@ -14,6 +14,8 @@ const EDGE_FIRE_RATIO = 0.7;
 const EDGE_FIRE_FPS = 15;
 /** Below this zoom the edges are so thin the fire paints at half size, then scales up. */
 const EDGE_FIRE_FULL_ZOOM = 1.5;
+/** The moment dormant Blight's edge fire is stopped at (any fixed time works). */
+const FROZEN_FIRE_TIME = 7.25;
 /** Edge canvases grow in steps this size, so a moving view doesn't reallocate them. */
 const EDGE_CANVAS_STEP = 256;
 /** Tier glow canvases hold this many pixels per cell edge. */
@@ -59,6 +61,15 @@ export class TerrainRenderer {
   private edgeFire = document.createElement("canvas");
   private edgeFireLow = document.createElement("canvas");
   private edgeFireKey = "";
+  /** Per chunk: the edges of dormant Blight, drawn with a frozen, darkened fire. */
+  private dormantMasks: (HTMLCanvasElement | null)[] = [];
+  private dormantLive: Uint8Array;
+  private dormantVersion = 0;
+  private dormantUnion = document.createElement("canvas");
+  private dormantFire = document.createElement("canvas");
+  private dormantFireKey = "";
+  /** True for a half-size subcell index whose colony has no living generator. */
+  dormantAt: ((si: number) => boolean) | null = null;
   /** Per chunk: soft tier-colored glow on exposed block faces, made the first time it has any. */
   private glowCanvases: (HTMLCanvasElement | null)[] = [];
   private glowLive: Uint8Array;
@@ -78,6 +89,8 @@ export class TerrainRenderer {
     const edgeSize = subChunk * EDGE_PIXELS_PER_SUB;
     this.edgeMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
     this.edgeLive = new Uint8Array(n);
+    this.dormantMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
+    this.dormantLive = new Uint8Array(n);
     this.edgeBits = new Uint8Array(edgeSize * edgeSize);
     this.edgeSolid = new Uint8Array((subChunk + 2) * (subChunk + 2));
     this.edgeImage = new ImageData(edgeSize, edgeSize);
@@ -110,6 +123,19 @@ export class TerrainRenderer {
     const g = this.glowCanvas.getContext("2d")!;
     const image = g.createImageData(world.width, world.height);
     for (let i = 0; i < world.decor.length; i++) {
+      if (world.health[i] === 0) {
+        // Half-size screens and status LEDs cast a soft monitor glow over their cell.
+        const sc = this.screenIn(i);
+        if (sc >= 0) {
+          const c = COLORS.labScreen[sc];
+          const p = i * 4;
+          image.data[p] = c[0] * 0.4;
+          image.data[p + 1] = c[1] * 0.4;
+          image.data[p + 2] = c[2] * 0.4;
+          image.data[p + 3] = 255;
+        }
+        continue;
+      }
       const c = COLORS.labGlow[world.decor[i]];
       if ((c[0] === 0 && c[1] === 0 && c[2] === 0) || world.health[i] === 0) continue;
       const p = i * 4;
@@ -119,6 +145,18 @@ export class TerrainRenderer {
       image.data[p + 3] = 255;
     }
     g.putImageData(image, 0, 0);
+  }
+
+  /** Screen color index of the first live screen sub-pixel in cell `i`, or -1. */
+  private screenIn(i: number): number {
+    const w = this.world;
+    const cx = i % w.width;
+    const cy = (i - cx) / w.width;
+    for (let k = 0; k < 4; k++) {
+      const si = (cy * 2 + (k >> 1)) * w.subWidth + cx * 2 + (k & 1);
+      if (w.subHealth[si] > 0 && w.subKind[si] === SUB.screen) return (w.subTint[si] >> 6) & 3;
+    }
+    return -1;
   }
 
   /** Add the lab's slowly pulsing glow. Call after the lighting pass. */
@@ -175,10 +213,20 @@ export class TerrainRenderer {
                 data[p + 3] = 0;
               } else {
                 const subT = world.subTint[si] / 255;
-                if (world.subKind[si] === SUB.rubble) {
+                const sk = world.subKind[si];
+                if (sk === SUB.rubble) {
                   const pal = COLORS.rubble;
                   const c = pal[world.subTint[si] % pal.length];
                   const v = 0.82 + (world.subTint[si] >> 3) / 32 * 0.36;
+                  col[0] = c[0] * v;
+                  col[1] = c[1] * v;
+                  col[2] = c[2] * v;
+                } else if (sk === SUB.metal || sk === SUB.pipe) {
+                  sampleRamp(sk === SUB.metal ? COLORS.labMetal : COLORS.labPipe, 0.3 + subT * 0.4, col);
+                } else if (sk === SUB.screen) {
+                  const c = COLORS.labScreen[(world.subTint[si] >> 6) & 3];
+                  // Scanline flicker baked per pixel; brighter on even rows.
+                  const v = (sy & 1) === 0 ? 0.95 : 0.7;
                   col[0] = c[0] * v;
                   col[1] = c[1] * v;
                   col[2] = c[2] * v;
@@ -186,7 +234,15 @@ export class TerrainRenderer {
                   sampleRamp(COLORS.pinkBlight, subT, col);
                 }
                 const maxSubHp = world.maxSubHealthAt(sx, sy);
-                if (subHp < maxSubHp) {
+                if (this.dormantAt?.(si)) {
+                  // Dormant: drained to a bruised violet, and decay darkens it further.
+                  const rot = subHp < maxSubHp ? 1 - subHp / maxSubHp : 0;
+                  const lum = (col[0] + col[1] + col[2]) / 3;
+                  const k = 0.5 - rot * 0.3;
+                  col[0] = (lum * 0.55 + col[0] * 0.45) * k;
+                  col[1] = (lum * 0.55 + col[1] * 0.45) * k * 0.85;
+                  col[2] = (lum * 0.55 + col[2] * 0.45) * k * 1.1;
+                } else if (subHp < maxSubHp) {
                   const d = 1 - subHp / maxSubHp;
                   const lighten = d * 0.55;
                   col[0] += (255 - col[0]) * lighten;
@@ -436,26 +492,46 @@ export class TerrainRenderer {
 
   private buildEdgeMask(k: number, kx: number, ky: number): void {
     const subs = this.chunks.chunkSize * 2;
-    const count = markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid);
+    const dormant = this.dormantAt;
+    const sw = this.world.subWidth;
+    const live = dormant ? (sx: number, sy: number) => !dormant(sy * sw + sx) : undefined;
+    const count = markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid, live);
     if (count === 0) {
       if (this.edgeLive[k]) {
         this.edgeLive[k] = 0;
         this.edgeVersion++;
       }
-      return;
+    } else {
+      this.edgeMasks[k] = this.writeMask(this.edgeMasks[k]);
+      this.edgeLive[k] = 1;
+      this.edgeVersion++;
     }
-    let mask = this.edgeMasks[k];
+    const dCount = dormant
+      ? markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid, (sx, sy) => dormant(sy * sw + sx))
+      : 0;
+    if (dCount === 0) {
+      if (this.dormantLive[k]) {
+        this.dormantLive[k] = 0;
+        this.dormantVersion++;
+      }
+    } else {
+      this.dormantMasks[k] = this.writeMask(this.dormantMasks[k]);
+      this.dormantLive[k] = 1;
+      this.dormantVersion++;
+    }
+  }
+
+  /** Copy `edgeBits` into a chunk mask canvas (made on first use). */
+  private writeMask(mask: HTMLCanvasElement | null): HTMLCanvasElement {
     if (!mask) {
       mask = document.createElement("canvas");
       mask.width = mask.height = this.edgeImage.width;
-      this.edgeMasks[k] = mask;
     }
     const data = this.edgeImage.data;
     const bits = this.edgeBits;
     for (let i = 0; i < bits.length; i++) data[i * 4 + 3] = bits[i] * 255;
     mask.getContext("2d")!.putImageData(this.edgeImage, 0, 0);
-    this.edgeLive[k] = 1;
-    this.edgeVersion++;
+    return mask;
   }
 
   /**
@@ -465,6 +541,26 @@ export class TerrainRenderer {
    * world and emissive, so draw it after the lighting pass. `seconds` is wall clock.
    */
   drawBlightEdges(ctx: CanvasRenderingContext2D, cam: CameraSystem, seconds: number): void {
+    const shrink = cam.zoom < EDGE_FIRE_FULL_ZOOM ? 2 : 1;
+    this.drawEdgeLayer(ctx, cam, this.edgeMasks, this.edgeLive, this.edgeUnion, this.edgeFire, seconds, shrink, false);
+    this.drawEdgeLayer(ctx, cam, this.dormantMasks, this.dormantLive, this.dormantUnion, this.dormantFire, seconds, shrink, true);
+  }
+
+  /**
+   * One edge layer: live Blight burns with moving fire; dormant Blight shows the
+   * same fire stopped dead (painted once at a fixed time) and dimmed.
+   */
+  private drawEdgeLayer(
+    ctx: CanvasRenderingContext2D,
+    cam: CameraSystem,
+    masks: (HTMLCanvasElement | null)[],
+    live: Uint8Array,
+    union: HTMLCanvasElement,
+    fire: HTMLCanvasElement,
+    seconds: number,
+    shrink: number,
+    frozen: boolean,
+  ): void {
     const size = this.edgeImage.width;
     const cols = this.chunks.cols;
     let kx0 = Infinity;
@@ -472,7 +568,7 @@ export class TerrainRenderer {
     let kx1 = -1;
     let ky1 = -1;
     this.forEachVisibleChunk(cam, (kx, ky) => {
-      if (!this.edgeLive[ky * cols + kx]) return;
+      if (!live[ky * cols + kx]) return;
       if (kx < kx0) kx0 = kx;
       if (ky < ky0) ky0 = ky;
       if (kx > kx1) kx1 = kx;
@@ -481,22 +577,28 @@ export class TerrainRenderer {
     if (kx1 < 0) return;
     const w = (kx1 - kx0 + 1) * size;
     const h = (ky1 - ky0 + 1) * size;
-    const shrink = cam.zoom < EDGE_FIRE_FULL_ZOOM ? 2 : 1;
-    const key = `${Math.floor(seconds * EDGE_FIRE_FPS)}:${this.edgeVersion}:${kx0}:${ky0}:${kx1}:${ky1}:${shrink}`;
-    if (key !== this.edgeFireKey) {
-      this.edgeFireKey = key;
-      this.paintEdgeFire(kx0, ky0, kx1, ky1, w, h, seconds, shrink);
+    const version = frozen ? this.dormantVersion : this.edgeVersion;
+    const tick = frozen ? "frozen" : `${Math.floor(seconds * EDGE_FIRE_FPS)}`;
+    const key = `${tick}:${version}:${kx0}:${ky0}:${kx1}:${ky1}:${shrink}`;
+    if (key !== (frozen ? this.dormantFireKey : this.edgeFireKey)) {
+      if (frozen) this.dormantFireKey = key;
+      else this.edgeFireKey = key;
+      this.paintEdgeFire(masks, live, union, fire, kx0, ky0, kx1, ky1, w, h, frozen ? FROZEN_FIRE_TIME : seconds, shrink, frozen);
     }
     const smoothing = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
     this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
-      if (!this.edgeLive[ky * cols + kx]) return;
-      ctx.drawImage(this.edgeFire, (kx - kx0) * size, (ky - ky0) * size, size, size, sx, sy, sw, sh);
+      if (!live[ky * cols + kx]) return;
+      ctx.drawImage(fire, (kx - kx0) * size, (ky - ky0) * size, size, size, sx, sy, sw, sh);
     });
     ctx.imageSmoothingEnabled = smoothing;
   }
 
   private paintEdgeFire(
+    masks: (HTMLCanvasElement | null)[],
+    live: Uint8Array,
+    union: HTMLCanvasElement,
+    fire: HTMLCanvasElement,
     kx0: number,
     ky0: number,
     kx1: number,
@@ -505,11 +607,10 @@ export class TerrainRenderer {
     h: number,
     seconds: number,
     shrink: number,
+    frozen: boolean,
   ): void {
     const size = this.edgeImage.width;
     const cols = this.chunks.cols;
-    const union = this.edgeUnion;
-    const fire = this.edgeFire;
     if (union.width < w || union.height < h) {
       const cw = Math.max(union.width, Math.ceil(w / EDGE_CANVAS_STEP) * EDGE_CANVAS_STEP);
       const ch = Math.max(union.height, Math.ceil(h / EDGE_CANVAS_STEP) * EDGE_CANVAS_STEP);
@@ -521,7 +622,7 @@ export class TerrainRenderer {
     for (let ky = ky0; ky <= ky1; ky++) {
       for (let kx = kx0; kx <= kx1; kx++) {
         const k = ky * cols + kx;
-        if (this.edgeLive[k]) u.drawImage(this.edgeMasks[k]!, (kx - kx0) * size, (ky - ky0) * size);
+        if (live[k]) u.drawImage(masks[k]!, (kx - kx0) * size, (ky - ky0) * size);
       }
     }
     const f = fire.getContext("2d")!;
@@ -547,6 +648,12 @@ export class TerrainRenderer {
       f.setTransform(1, 0, 0, 1, -ox, -oy);
       paintPortal(f, box, seconds, EDGE_FIRE_RATIO);
       f.setTransform(1, 0, 0, 1, 0, 0);
+    }
+    if (frozen) {
+      // Cold and still: the fire's colors pulled toward a dull violet.
+      f.globalCompositeOperation = "source-atop";
+      f.fillStyle = "rgba(70, 52, 110, 0.62)";
+      f.fillRect(0, 0, w, h);
     }
     f.globalCompositeOperation = "destination-in";
     f.drawImage(union, 0, 0);

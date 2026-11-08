@@ -112,6 +112,8 @@ export interface SoldierStats {
   blightRateMultiplier: number;
   blightStartRate: number;
   blightWeakenChance: number;
+  /** Decay rate for dormant (disconnected) Blight; 0 without Necrosis Protocol. */
+  blightNecrosisRate: number;
   explosiveBlightChance: number;
   explosiveBlightDamage: number;
   explosiveBlightRadius: number;
@@ -192,6 +194,7 @@ export function baseSoldierStats(): SoldierStats {
     blightRateMultiplier: 1,
     blightStartRate: GROWTH.baseRate,
     blightWeakenChance: 0,
+    blightNecrosisRate: 0,
     explosiveBlightChance: 0,
     explosiveBlightDamage: 1,
     explosiveBlightRadius: 1.2,

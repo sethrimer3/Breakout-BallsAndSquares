@@ -1,4 +1,5 @@
-import { TERRAIN } from "../config";
+import { UpgradeRoom, type RoomKind } from "./upgradeRooms";
+import { SOLDIER, TERRAIN } from "../config";
 import type { SecondaryWeaponType, WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
 import type { SoldierBehavior } from "../progression/SaveManager";
@@ -235,6 +236,10 @@ export class UpgradeTree {
   private pinchStartDist = 0;
   private raf = 0;
   private lastFrame = 0;
+  /** The pixel-art room above the matrix (lab, armory or barracks). */
+  private room = new UpgradeRoom();
+  private roomEl: HTMLDivElement;
+  private roomLabelEl: HTMLSpanElement;
 
   constructor(parent: HTMLElement, private game: Game) {
     this.root = document.createElement("div");
@@ -298,6 +303,9 @@ export class UpgradeTree {
             <span class="leg-item" style="--leg-c: #ff4b8b">${sprite("warn", { color: UI_COLORS.blight, scale: 1 })} BLIGHT</span>
           </div>
         </div>
+        <div class="tree-room" aria-hidden="true">
+          <span class="tree-room-label"></span>
+        </div>
         <div class="tree-stage">
           <div class="tree-clip">
             <div class="tree-view">
@@ -332,6 +340,9 @@ export class UpgradeTree {
       if (this.visible) this.fitToScreen();
     });
     this.stageEl = this.root.querySelector(".tree-stage") as HTMLDivElement;
+    this.roomEl = this.root.querySelector(".tree-room") as HTMLDivElement;
+    this.roomLabelEl = this.root.querySelector(".tree-room-label") as HTMLSpanElement;
+    this.roomEl.prepend(this.room.canvas);
     this.loadoutWrap = this.root.querySelector(".loadout-stage") as HTMLDivElement;
     this.linksEl = this.root.querySelector(".tree-links") as HTMLCanvasElement;
     this.viewEl = this.root.querySelector(".tree-view") as HTMLDivElement;
@@ -558,6 +569,7 @@ export class UpgradeTree {
     this.legendEl.classList.toggle("hidden", this.inLoadoutScreen);
     this.legendEl.style.visibility = "hidden";
     this.stageEl.classList.toggle("hidden", this.inLoadoutScreen);
+    this.roomEl.style.display = this.inLoadoutScreen ? "none" : "";
     this.loadoutWrap.classList.toggle("hidden", !this.inLoadoutScreen);
 
     const loadoutUnlocked = this.isLoadoutUnlocked();
@@ -861,6 +873,7 @@ export class UpgradeTree {
     const dt = this.lastFrame ? Math.min(1 / 30, (time - this.lastFrame) / 1000) : 0;
     this.lastFrame = time;
     if (this.inLoadoutScreen) return;
+    this.drawRoom(time / 1000, dt);
     const heldId = this.drag?.moved ? this.drag.id : null;
     if (reducedMotion()) {
       for (const b of this.activeBodies) {
@@ -1288,6 +1301,48 @@ export class UpgradeTree {
       if (!unlocked) lvlEl.innerHTML = lockIcon();
       else lvlEl.textContent = maxed ? "MAX" : `${lvl}/${def.maxLevel}`;
     }
+  }
+
+  /** Which room goes with a tab: research for the Blight & base, the armory for weapons, the barracks for soldiers. */
+  private roomKind(): RoomKind | null {
+    const tab = this.activeTab;
+    if (tab === "blight" || tab === "facility") return "lab";
+    if (tab === "core" || tab === "soldier") return "barracks";
+    if (tab === "resources") return null;
+    return "armory";
+  }
+
+  private drawRoom(t: number, dt: number): void {
+    const kind = this.roomKind();
+    this.roomEl.classList.toggle("hidden", !kind);
+    if (!kind) return;
+    const up = this.game.upgrades;
+    const lv = (id: string): number => up.levelOf(id as UpgradeId);
+    const tab = this.activeTab;
+    const slot = this.soldierSlot;
+    const sl = (id: string): number => (tab === "soldier" ? up.soldierLevelOf(slot, id as SoldierUpgradeId) : 0);
+    const tabDefs = kind === "lab" ? UPGRADE_DEFS.filter((d) => d.branch === "blight" || d.branch === "facility") : tab === "soldier" ? [] : UPGRADE_DEFS.filter((d) => d.branch === tab);
+    const weaponLevels = tabDefs.map((d) => ({ id: d.id as string, level: lv(d.id) }));
+    let total = weaponLevels.reduce((a, w) => a + w.level, 0);
+    if (tab === "soldier") total = SOLDIER_UPGRADE_DEFS.reduce((a, d) => a + sl(d.id), 0);
+    this.room.draw(
+      kind,
+      {
+        level: lv,
+        total,
+        soldiers: SOLDIER.maxSoldiers + lv("extra_soldier"),
+        speedLv: lv("ball_speed") + sl("s_stride"),
+        healthLv: lv("soldier_health") + sl("s_vitality"),
+        damageLv: lv("core_damage") + sl("s_marksman") + sl("s_penetrator"),
+        fireRateLv: lv("core_fire_rate") + sl("s_rate") + sl("s_twin_fire"),
+        weapon: tab,
+        weaponLevels,
+      },
+      reducedMotion() ? 0 : t,
+      dt,
+    );
+    this.roomLabelEl.textContent =
+      kind === "lab" ? "BLIGHT RESEARCH LAB" : kind === "armory" ? "WEAPON ARMORY" : tab === "soldier" ? `BARRACKS · SOLDIER #${slot + 1}` : "SOLDIER BARRACKS";
   }
 
   show(): void {

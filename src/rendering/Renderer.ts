@@ -6,6 +6,7 @@ import type { Soldier } from "../entities/Soldier";
 import { PKind } from "../entities/ParticleSystem";
 import type { Game } from "../Game";
 import { FieryFlashRenderer } from "./FieryFlashRenderer";
+import { CreatureRenderer } from "./CreatureRenderer";
 import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
 import { createSprites, type Sprites } from "./sprites";
@@ -28,6 +29,7 @@ export class Renderer {
   private ctx: CanvasRenderingContext2D;
   private dpr = 1;
   private sprites: Sprites;
+  private creatureRenderer = new CreatureRenderer();
   private lightRenderer: LightRenderer;
   private fieryFlash: FieryFlashRenderer;
   private fogRenderer: FogRenderer;
@@ -90,6 +92,7 @@ export class Renderer {
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
     game.terrain.drawTierGlow(ctx, cam, game.runStats.time);
     this.drawSentries();
+    this.creatureRenderer.draw(ctx, cam, game.creatures, this.motion.matches ? 0 : performance.now() / 1000);
     const wallClockMs = performance.now();
     const still = this.motion.matches;
     game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);

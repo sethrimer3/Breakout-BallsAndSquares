@@ -110,6 +110,12 @@ export const FACILITY = {
   rubbleCorridorChance: 0.3,
   /** Share of a rubble hallway's sub-pixels that are filled. */
   rubbleDensity: 0.88,
+  /** Chance each wall of a lab room gets half-size equipment (consoles, racks, pipes, machines). */
+  equipmentSideChance: 0.55,
+  /** Chance a clear hallway carries a pipe run along one side. */
+  corridorPipeChance: 0.35,
+  /** Equipment health as a share of the zone's normal block health. */
+  equipmentHealthMult: 0.75,
   /** Chance a room holds a dormant sentry turret. */
   sentryRoomChance: 0.4,
   /** Blight generation rate of a small (1×1) generator relative to a full Blight Core. */
@@ -131,6 +137,61 @@ export const FACILITY = {
   ] as const,
   /** Overall strength of the tier glow (0..1). */
   tierGlowAlpha: 0.6,
+};
+
+/** Biological Blight enemies: flowers, worms and escaped tank specimens. */
+export const CREATURES = {
+  /** Flowers: chance per second that an exposed, living colony sprouts one (scaled by its size). */
+  flowerSpawnPerSec: 0.18,
+  /** Colony size (half-size pixels) at which the flower chance is at full strength. */
+  flowerColonySize: 600,
+  /** Max flowers alive at once, plus this many per minute of run time. */
+  flowerCap: 4,
+  flowerCapPerMinute: 2,
+  flowerCapMax: 24,
+  /** No new flower within this many world units of another. */
+  flowerSpacing: 40,
+  flowerHealth: 3,
+  flowerRange: 112,
+  flowerCooldown: 3.6,
+  /** Seconds the petals spread before a spore launches. */
+  flowerWindup: 0.8,
+  sporeSpeed: 58,
+  sporeLife: 3,
+  /** Blast radius of a spore (world units). */
+  sporeRadius: 9,
+  sporeDamage: 1,
+
+  /** Worms appear after this many seconds of run time. */
+  wormStartSeconds: 55,
+  /** Chance per second, per exposed living colony, that a worm crawls out. */
+  wormSpawnPerSec: 0.035,
+  wormCap: 2,
+  wormCapPerMinute: 1,
+  wormCapMax: 8,
+  wormSegments: 14,
+  /** World units between segments. */
+  wormSpacing: 1.7,
+  wormSpeed: 22,
+  wormTurnRate: 3.2,
+  wormHealth: 6,
+  wormLife: 26,
+  /** World units crawled between trail pixels. */
+  wormTrailStep: 3,
+  /** Range (world units) at which a worm looks for dormant Blight to reconnect. */
+  wormSeekRange: 640,
+
+  /** Chance a row of glass tanks holds specimens instead of small generators. */
+  specimenRowChance: 0.4,
+  specimenHealth: 10,
+  specimenHealthPerZone: 8,
+  specimenSpeed: 34,
+  specimenSightCells: 18,
+  specimenRadius: 3,
+
+  /** Damage a creature deals on contact, and how often. */
+  biteDamage: 1,
+  biteCooldown: 0.7,
 };
 
 /** Size of one pixel-art pixel (soldier sprites, bullets) in world units. */
@@ -352,7 +413,26 @@ export const GROWTH = {
   coreKillTimeReduction: 12,
   /** Health bonus added to a Blight Core cell relative to normal cell health at its distance. */
   coreHealthBonus: 4,
+  /**
+   * Generator rate (sub-pixels / second) at which the Blight goes into OVERDRIVE.
+   * Only in overdrive do the facility's walls themselves replicate as Blight.
+   */
+  overdriveRate: 70,
+  /** Wall replication rate (copy events / second) the moment overdrive begins. */
+  overdriveWallBase: 1.5,
+  /** Exponential base per second of overdrive for wall replication. */
+  overdriveExpBase: 1.07,
+  /** Seconds between checks for colonies a cut split in two (dormancy shows within this). */
+  splitCheckSeconds: 0.1,
+  /** Max decayed pixels per colony per physics step. */
+  maxDecayPerStep: 6,
 };
+
+/** Wall replication rate after `overdriveSeconds` of overdrive. */
+export function overdriveWallRate(overdriveSeconds: number): number {
+  if (overdriveSeconds <= 0) return 0;
+  return Math.min(GROWTH.maxRate, GROWTH.overdriveWallBase + Math.pow(GROWTH.overdriveExpBase, overdriveSeconds) - 1);
+}
 
 /** Growth rate (copy events / second) at `runTime` seconds into the run (spec §7). */
 export function growthRateAt(runTime: number, startRate = GROWTH.baseRate): number {
@@ -572,6 +652,25 @@ export const COLORS = {
     [168, 148, 110],
     [98, 110, 128],
     [58, 52, 48],
+  ] as const,
+  /** Half-size lab equipment ramps (dark to light): machine casing, pipes, and screen colors. */
+  labMetal: [
+    [58, 66, 82],
+    [92, 104, 124],
+    [130, 144, 164],
+    [176, 188, 204],
+  ] as const,
+  labPipe: [
+    [70, 46, 34],
+    [124, 82, 52],
+    [172, 118, 70],
+    [214, 168, 112],
+  ] as const,
+  labScreen: [
+    [80, 230, 255],
+    [110, 255, 160],
+    [255, 190, 70],
+    [255, 90, 110],
   ] as const,
   /** Containment glass (RGB) and how opaque it is (0..255). */
   glass: [120, 190, 210] as const,

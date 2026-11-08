@@ -21,6 +21,8 @@ export function markBlightEdges(
   subs: number,
   out: Uint8Array,
   solid: Uint8Array,
+  /** Only Blight subcells passing this draw edges (e.g. only dormant ones). Omitted: all do. */
+  include?: (sx: number, sy: number) => boolean,
 ): number {
   const pad = subs + 2;
   let any = false;
@@ -31,7 +33,7 @@ export function markBlightEdges(
       const outside = sx < 0 || sy < 0 || sx >= grid.subWidth || sy >= grid.subHeight;
       const here = outside || grid.isBlightSubAt(sx, sy);
       solid[y * pad + x] = here ? 1 : 0;
-      if (here && !outside && x > 0 && y > 0 && x <= subs && y <= subs) any = true;
+      if (here && !outside && x > 0 && y > 0 && x <= subs && y <= subs && (!include || include(sx, sy))) any = true;
     }
   }
   out.fill(0);
@@ -49,6 +51,7 @@ export function markBlightEdges(
     for (let x = 0; x < subs; x++) {
       const i = (y + 1) * pad + x + 1;
       if (solid[i] === 0) continue;
+      if (include && !include(sx0 + x, sy0 + y)) continue;
       const left = x * EDGE_PIXELS_PER_SUB;
       const top = y * EDGE_PIXELS_PER_SUB;
       const right = left + EDGE_PIXELS_PER_SUB - 1;

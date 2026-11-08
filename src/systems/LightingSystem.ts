@@ -250,11 +250,13 @@ export class LightingSystem {
 
     // A muzzle pressed against a wall sits inside it: back the light out to the
     // wall face, or every ray would hit at t = 0 and the flash would vanish.
-    for (let i = 0; i < 16 && this.world.solidAt(Math.floor(ox / cs), Math.floor(oy / cs)); i++) {
+    const world = this.world;
+    const ss = world.subCellSize;
+    for (let i = 0; i < 16 && world.subSolidAt(Math.floor(ox / ss), Math.floor(oy / ss)); i++) {
       ox -= dirX;
       oy -= dirY;
     }
-    if (this.world.solidAt(Math.floor(ox / cs), Math.floor(oy / cs))) return 0;
+    if (world.subSolidAt(Math.floor(ox / ss), Math.floor(oy / ss))) return 0;
 
     let n = 0;
     const maxVerts = Math.min(angles.length, outPoly.length >>> 1);
@@ -281,27 +283,44 @@ export class LightingSystem {
     const corners = this.corners;
     corners.length = 0;
 
+    // Corners are found on the half-size grid, so half-size blocks (Blight
+    // sub-pixels, rubble, lab equipment) cast their own shadows. Whole-cell
+    // vertices are always checked; the extra half-step vertices only inside
+    // cells that hold half-size blocks.
+    const addCorner = (vx: number, vy: number): void => {
+      const s00 = world.subSolidAt(vx - 1, vy - 1) ? 1 : 0;
+      const s10 = world.subSolidAt(vx, vy - 1) ? 1 : 0;
+      const s01 = world.subSolidAt(vx - 1, vy) ? 1 : 0;
+      const s11 = world.subSolidAt(vx, vy) ? 1 : 0;
+      const sum = s00 + s10 + s01 + s11;
+      // Only outer/inner corners (1 or 3 solid cells, or 2 diagonal cells) are silhouette vertices;
+      // 0 (open air), 4 (interior solid), or 2 side-by-side (flat wall seam) need no corner ray.
+      const isDiagonal = sum === 2 && s00 === s11;
+      if (sum !== 1 && sum !== 3 && !isDiagonal) return;
+      const dx = vx * ss - ox;
+      const dy = vy * ss - oy;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > r2 || d2 < 1e-6) return;
+      corners.push({ angle: Math.atan2(dy, dx), dist2: d2 });
+    };
     for (let gy = gy0; gy <= gy1; gy++) {
-      const wy = gy * cs;
-      const dy = wy - oy;
-      const dy2 = dy * dy;
-      if (dy2 > r2) continue;
-      for (let gx = gx0; gx <= gx1; gx++) {
-        // Check the 2x2 neighborhood around grid vertex (gx, gy).
-        const s00 = this.world.solidAt(gx - 1, gy - 1) ? 1 : 0;
-        const s10 = this.world.solidAt(gx, gy - 1) ? 1 : 0;
-        const s01 = this.world.solidAt(gx - 1, gy) ? 1 : 0;
-        const s11 = this.world.solidAt(gx, gy) ? 1 : 0;
-        const sum = s00 + s10 + s01 + s11;
-        // Only outer/inner corners (1 or 3 solid cells, or 2 diagonal cells) are silhouette vertices;
-        // 0 (open air), 4 (interior solid), or 2 side-by-side (flat wall seam) need no corner ray.
-        const isDiagonal = sum === 2 && s00 === s11;
-        if (sum !== 1 && sum !== 3 && !isDiagonal) continue;
-        const wx = gx * cs;
-        const dx = wx - ox;
-        const d2 = dx * dx + dy2;
-        if (d2 > r2 || d2 < 1e-6) continue;
-        corners.push({ angle: Math.atan2(dy, dx), dist2: d2 });
+      const dy = gy * cs - oy;
+      if (dy * dy > r2) continue;
+      for (let gx = gx0; gx <= gx1; gx++) addCorner(gx * 2, gy * 2);
+    }
+    const W = world.width;
+    for (let cy = gy0 - 1; cy <= gy1; cy++) {
+      if (cy < 0 || cy >= world.height) continue;
+      for (let cx = gx0 - 1; cx <= gx1; cx++) {
+        if (cx < 0 || cx >= W || world.health[cy * W + cx] > 0 || !world.anySolidInCell(cx, cy)) continue;
+        const vx = cx * 2;
+        const vy = cy * 2;
+        addCorner(vx + 1, vy + 1);
+        addCorner(vx + 1, vy);
+        addCorner(vx, vy + 1);
+        // The far edges' midpoints belong to the neighbor too; skip them if it is mixed as well.
+        if (cx + 1 >= W || world.health[cy * W + cx + 1] > 0 || !world.anySolidInCell(cx + 1, cy)) addCorner(vx + 2, vy + 1);
+        if (cy + 1 >= world.height || world.health[(cy + 1) * W + cx] > 0 || !world.anySolidInCell(cx, cy + 1)) addCorner(vx + 1, vy + 2);
       }
     }
 
@@ -348,7 +367,7 @@ export class LightingSystem {
 
       let bestT = radius;
       let hitTerrain = false;
-      if (gridRaycast(this.world, cs, ox, oy, rdx, rdy, radius, rayHit)) {
+      if (gridRaycast(world.subSolidQuery, ss, ox, oy, rdx, rdy, radius, rayHit)) {
         bestT = rayHit.t;
         hitTerrain = true;
       }
@@ -413,7 +432,7 @@ export class LightingSystem {
     const cy = Math.floor(y / w.cellSize);
     if (!w.inBounds(cx, cy)) return;
     const i = cy * w.width + cx;
-    if (w.health[i] === 0 || this.litStamps[i] === this.litStamp) return;
+    if (this.litStamps[i] === this.litStamp || (w.health[i] === 0 && !w.anySolidInCell(cx, cy))) return;
     this.litStamps[i] = this.litStamp;
     if (out.count < out.cells.length) out.cells[out.count++] = i;
   }

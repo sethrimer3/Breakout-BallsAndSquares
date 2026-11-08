@@ -25,6 +25,8 @@ export interface CombatEvents {
   ): void;
   /** A rocket or cluster bomb detonated at (x, y) with radius (world units). */
   onExplosion?(x: number, y: number, radiusWorld: number): void;
+  /** A bullet struck a creature. */
+  onCreatureHit?(x: number, y: number, nx: number, ny: number): void;
   /** A sticky grenade was thrown. */
   onGrenadeThrow?(s: Soldier, x: number, y: number, dx: number, dy: number): void;
   /** A sticky grenade stuck to a surface. */
@@ -35,11 +37,21 @@ export interface CombatEvents {
 
 const hit = makeRayHit();
 
+/** Something bullets can hit besides terrain. */
+export interface BulletTargets {
+  /** Distance along the ray to the nearest target within `maxDist`, or -1. */
+  raycast(ox: number, oy: number, dx: number, dy: number, maxDist: number): number;
+  /** Damage the target the last `raycast` found. */
+  applyHit(damage: number, x: number, y: number): boolean;
+}
+
 export class CombatSystem {
   readonly bullets = new BulletPool(BULLET.poolSize);
   readonly grenades = new StickyGrenadePool(GRENADE.poolSize);
   readonly turrets = new AutoTurretPool(TURRET.poolSize);
   stats: SoldierStats;
+  /** Creatures bullets can hit before the terrain (the Blight's flowers, worms, specimens). */
+  targets: BulletTargets | null = null;
   /** The soldier firing right now, whose own tree shapes the shots they spawn. */
   private shooter: Soldier | null = null;
 
@@ -388,7 +400,24 @@ export class CombatSystem {
 
     while (remDist > 1e-4 && guard++ < 8) {
       // Fine-grid traversal: sees normal cells and 50% pink sub-pixels alike.
-      if (gridRaycast(w.subSolidQuery, ss, curX, curY, b.dx, b.dy, remDist, hit)) {
+      const terrainHit = gridRaycast(w.subSolidQuery, ss, curX, curY, b.dx, b.dy, remDist, hit);
+      // Creatures in front of the terrain hit take the shot instead.
+      if (this.targets) {
+        const ct = this.targets.raycast(curX, curY, b.dx, b.dy, terrainHit ? hit.t : remDist);
+        if (ct >= 0) {
+          const ix = curX + b.dx * ct;
+          const iy = curY + b.dy * ct;
+          if (b.explosionRadius > 0) {
+            this.detonateRocket(b, ix, iy, -b.dx, -b.dy, Math.floor(ix / cs), Math.floor(iy / cs));
+          } else {
+            this.targets.applyHit(b.damage, ix, iy);
+            this.events.onCreatureHit?.(ix, iy, -b.dx, -b.dy);
+          }
+          this.bullets.release(b);
+          return;
+        }
+      }
+      if (terrainHit) {
         const hcx = hit.cx >> 1;
         const hcy = hit.cy >> 1;
         // Rocket / explosive projectile detonates on impact!
