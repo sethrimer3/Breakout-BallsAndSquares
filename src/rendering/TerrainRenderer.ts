@@ -123,6 +123,19 @@ export class TerrainRenderer {
     const g = this.glowCanvas.getContext("2d")!;
     const image = g.createImageData(world.width, world.height);
     for (let i = 0; i < world.decor.length; i++) {
+      if (world.health[i] === 0) {
+        // Half-size screens and status LEDs cast a soft monitor glow over their cell.
+        const sc = this.screenIn(i);
+        if (sc >= 0) {
+          const c = COLORS.labScreen[sc];
+          const p = i * 4;
+          image.data[p] = c[0] * 0.4;
+          image.data[p + 1] = c[1] * 0.4;
+          image.data[p + 2] = c[2] * 0.4;
+          image.data[p + 3] = 255;
+        }
+        continue;
+      }
       const c = COLORS.labGlow[world.decor[i]];
       if ((c[0] === 0 && c[1] === 0 && c[2] === 0) || world.health[i] === 0) continue;
       const p = i * 4;
@@ -132,6 +145,18 @@ export class TerrainRenderer {
       image.data[p + 3] = 255;
     }
     g.putImageData(image, 0, 0);
+  }
+
+  /** Screen color index of the first live screen sub-pixel in cell `i`, or -1. */
+  private screenIn(i: number): number {
+    const w = this.world;
+    const cx = i % w.width;
+    const cy = (i - cx) / w.width;
+    for (let k = 0; k < 4; k++) {
+      const si = (cy * 2 + (k >> 1)) * w.subWidth + cx * 2 + (k & 1);
+      if (w.subHealth[si] > 0 && w.subKind[si] === SUB.screen) return (w.subTint[si] >> 6) & 3;
+    }
+    return -1;
   }
 
   /** Add the lab's slowly pulsing glow. Call after the lighting pass. */
@@ -188,10 +213,20 @@ export class TerrainRenderer {
                 data[p + 3] = 0;
               } else {
                 const subT = world.subTint[si] / 255;
-                if (world.subKind[si] === SUB.rubble) {
+                const sk = world.subKind[si];
+                if (sk === SUB.rubble) {
                   const pal = COLORS.rubble;
                   const c = pal[world.subTint[si] % pal.length];
                   const v = 0.82 + (world.subTint[si] >> 3) / 32 * 0.36;
+                  col[0] = c[0] * v;
+                  col[1] = c[1] * v;
+                  col[2] = c[2] * v;
+                } else if (sk === SUB.metal || sk === SUB.pipe) {
+                  sampleRamp(sk === SUB.metal ? COLORS.labMetal : COLORS.labPipe, 0.3 + subT * 0.4, col);
+                } else if (sk === SUB.screen) {
+                  const c = COLORS.labScreen[(world.subTint[si] >> 6) & 3];
+                  // Scanline flicker baked per pixel; brighter on even rows.
+                  const v = (sy & 1) === 0 ? 0.95 : 0.7;
                   col[0] = c[0] * v;
                   col[1] = c[1] * v;
                   col[2] = c[2] * v;

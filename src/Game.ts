@@ -830,11 +830,12 @@ export class Game {
       if (destroyed) {
         const ss = this.world.subCellSize;
         const si = Math.floor(y / ss) * this.world.subWidth + Math.floor(x / ss);
-        const rubble = this.world.subKind[si] === SUB.rubble;
+        const sk = this.world.subKind[si];
+        const rubble = sk !== SUB.blight;
         for (let i = 0; i < 3; i++) {
           const a = Math.atan2(ny, nx) + this.rng.range(-1.3, 1.3);
           const sp = this.rng.range(20, 70);
-          this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, rubble ? 0x6a625a : 0xd8267a, 4);
+          this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, sk === SUB.pipe ? 0xac7646 : sk === SUB.metal || sk === SUB.screen ? 0x60708a : rubble ? 0x6a625a : 0xd8267a, 4);
         }
         const subZone = zoneForDepth(this.world.depthOf(cx, cy));
         this.loot.spawnDropsForBlock(x, y, this.dropChanceAt(subZone, ownerId) * 0.25, this.stats.pickupLifetime, this.rng, lootKindForZone(subZone));

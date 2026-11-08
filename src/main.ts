@@ -16,3 +16,6 @@ for (const type of ["gesturestart", "gesturechange", "gestureend"]) {
 
 const game = new Game(canvas, ui);
 game.start();
+
+// Dev builds expose the game for console poking and screenshot scripts.
+if (import.meta.env.DEV) (window as unknown as { __game: Game }).__game = game;

@@ -110,6 +110,12 @@ export const FACILITY = {
   rubbleCorridorChance: 0.3,
   /** Share of a rubble hallway's sub-pixels that are filled. */
   rubbleDensity: 0.88,
+  /** Chance each wall of a lab room gets half-size equipment (consoles, racks, pipes, machines). */
+  equipmentSideChance: 0.55,
+  /** Chance a clear hallway carries a pipe run along one side. */
+  corridorPipeChance: 0.35,
+  /** Equipment health as a share of the zone's normal block health. */
+  equipmentHealthMult: 0.75,
   /** Chance a room holds a dormant sentry turret. */
   sentryRoomChance: 0.4,
   /** Blight generation rate of a small (1×1) generator relative to a full Blight Core. */
@@ -163,9 +169,9 @@ export const CREATURES = {
   wormCap: 2,
   wormCapPerMinute: 1,
   wormCapMax: 8,
-  wormSegments: 11,
+  wormSegments: 14,
   /** World units between segments. */
-  wormSpacing: 2.6,
+  wormSpacing: 1.7,
   wormSpeed: 22,
   wormTurnRate: 3.2,
   wormHealth: 6,
@@ -646,6 +652,25 @@ export const COLORS = {
     [168, 148, 110],
     [98, 110, 128],
     [58, 52, 48],
+  ] as const,
+  /** Half-size lab equipment ramps (dark to light): machine casing, pipes, and screen colors. */
+  labMetal: [
+    [58, 66, 82],
+    [92, 104, 124],
+    [130, 144, 164],
+    [176, 188, 204],
+  ] as const,
+  labPipe: [
+    [70, 46, 34],
+    [124, 82, 52],
+    [172, 118, 70],
+    [214, 168, 112],
+  ] as const,
+  labScreen: [
+    [80, 230, 255],
+    [110, 255, 160],
+    [255, 190, 70],
+    [255, 90, 110],
   ] as const,
   /** Containment glass (RGB) and how opaque it is (0..255). */
   glass: [120, 190, 210] as const,

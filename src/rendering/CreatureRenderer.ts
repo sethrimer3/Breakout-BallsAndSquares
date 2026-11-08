@@ -1,4 +1,4 @@
-import { CREATURES } from "../config";
+import { CREATURES, WORLD } from "../config";
 import type { CreatureSystem, Flower, Specimen, Spore, Worm } from "../entities/Creatures";
 import type { CameraSystem } from "../systems/CameraSystem";
 
@@ -117,7 +117,7 @@ export class CreatureRenderer {
     const pal = f.wilt > 0.5 ? WILT : PINK;
     const px = -f.dy;
     const py = f.dx;
-    const len = 2 + f.grow * 6;
+    const len = 2 + f.grow * 8;
     const sway = (1 - f.wilt) * 1.3;
     // Wilting bends the stem over to one side.
     const droop = f.wilt * 0.9;
@@ -143,13 +143,13 @@ export class CreatureRenderer {
     const spin = t * 0.6 + f.seed;
     for (let p = 0; p < petals; p++) {
       const a = spin + (p / petals) * Math.PI * 2;
-      const r0 = 1.5;
-      const r1 = 1.5 + open * 2.6;
+      const r0 = 2;
+      const r1 = 2 + open * 3.4;
       for (let r = r0; r <= r1; r += 0.9) {
         b.put(hx + Math.cos(a) * r, hy + Math.sin(a) * r, r > r1 - 0.9 ? pal[4] : pal[3]);
       }
     }
-    b.disc(hx - 0.5, hy - 0.5, 1.6, (dx, dy, edge) => (edge ? pal[1] : dx + dy < 0 ? pal[2] : pal[0]));
+    b.disc(hx - 0.5, hy - 0.5, 2.3, (dx, dy, edge) => (edge ? pal[1] : dx + dy < 0 ? pal[2] : pal[0]));
     if (f.wilt < 0.5) {
       // The spore swells in the throat as it charges.
       const c = f.charge > 0.66 ? PINK[5] : f.charge > 0.25 ? PINK[4] : PINK[3];
@@ -172,7 +172,7 @@ export class CreatureRenderer {
       const y = seg[k * 2 + 1];
       const along = k / (n - 1);
       const swell = 0.45 * Math.max(0, Math.sin(w.phase * 1.4 - k * 0.9));
-      const r = (2.4 - along * 1.3 + swell) * (w.burrow > 0 ? Math.max(0.3, w.burrow / 0.6) : 1);
+      const r = (2.8 - along * 1.5 + swell) * (w.burrow > 0 ? Math.max(0.3, w.burrow / 0.6) : 1);
       const band = k % 2 === 0;
       b.disc(x - 0.5, y - 0.5, r, (dx, dy, edge) => {
         if (hurt) return edge ? PINK[4] : PINK[5];
@@ -204,6 +204,18 @@ export class CreatureRenderer {
   private specimen(s: Specimen, t: number): void {
     const b = this.batch;
     const hurt = s.hurt > 0;
+    if (!s.free) {
+      // Still in its tank: murky specimen fluid with bubbles rising past it.
+      const cx0 = s.spot.cx * WORLD.cellSize;
+      const cy0 = s.spot.cy * WORLD.cellSize;
+      for (let y = 0; y < 8; y++) {
+        for (let x = 0; x < 8; x++) b.put(cx0 + x, cy0 + y, (x + y + s.seed) % 5 === 0 ? "#174e40" : "#123f35");
+      }
+      for (let k = 0; k < 3; k++) {
+        const by = 7 - ((t * 5 + k * 2.7 + s.seed) % 8);
+        this.glow.put(cx0 + ((k * 3 + s.seed) % 7), cy0 + by, "#1f5a4a");
+      }
+    }
     const bob = s.free ? Math.sin(s.gait * 2) * 0.4 : Math.sin(t * 1.6 + s.seed) * 1.2;
     const x = s.x;
     const y = s.y + bob;
@@ -228,8 +240,8 @@ export class CreatureRenderer {
         const kneeY = hipY + ca * side * reach * 0.6 + sa * (swing * 0.5);
         const footX = hipX - sa * side * reach + ca * (swing + (i - 1) * 0.8);
         const footY = hipY + ca * side * reach + sa * (swing + (i - 1) * 0.8);
-        b.line(hipX, hipY, kneeX, kneeY, SPECIMEN[1]);
-        b.line(kneeX, kneeY, footX, footY, SPECIMEN[0]);
+        b.line(hipX, hipY, kneeX, kneeY, SPECIMEN[2]);
+        b.line(kneeX, kneeY, footX, footY, SPECIMEN[1]);
       }
     }
     // Body: a segmented oval along the facing direction.

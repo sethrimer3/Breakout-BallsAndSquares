@@ -61,6 +61,10 @@ export interface Worm {
   burrow: number;
   biteCd: number;
   hurt: number;
+  /** True while heading for dormant Blight (it burrows in on arrival). */
+  seeking: boolean;
+  /** Last half-size subcell of trail laid (-1 = none), so the trail stays 4-connected. */
+  lastTrail: number;
 }
 
 export interface Specimen {
@@ -276,6 +280,9 @@ export class CreatureSystem {
         burrow: 0,
         biteCd: 0,
         hurt: 0,
+        seeking: false,
+        // The trail starts from the pixel it crawled out of, so it stays attached.
+        lastTrail: si,
       };
       this.worms.push(worm);
       return worm;
@@ -309,7 +316,7 @@ export class CreatureSystem {
       f.grow = Math.min(1, f.grow + dt / 1.4);
       f.wilted = growth.colonies.isDormantSub(f.anchor);
       f.wilt += ((f.wilted ? 1 : 0) - f.wilt) * Math.min(1, dt * 2);
-      const stemLen = 2 + f.grow * 6;
+      const stemLen = 2 + f.grow * 8;
       f.hx = f.x + f.dx * stemLen;
       f.hy = f.y + f.dy * stemLen;
       if (f.wilted || f.grow < 1) {
@@ -454,11 +461,12 @@ export class CreatureSystem {
       worm.trailAcc += step;
       if (worm.trailAcc >= CREATURES.wormTrailStep) {
         worm.trailAcc = 0;
-        this.layTrail(seg[(n - 1) * 2], seg[(n - 1) * 2 + 1], soldiers);
+        this.layTrail(worm, seg[(n - 1) * 2], seg[(n - 1) * 2 + 1], soldiers);
       }
       // Reached dormant Blight: plug the gap and burrow in.
-      if (Math.hypot(worm.tx - seg[0], worm.ty - seg[1]) < 5 && worm.retarget < 1.4) {
-        this.layTrail(seg[0], seg[1], soldiers);
+      if (worm.seeking && Math.hypot(worm.tx - seg[0], worm.ty - seg[1]) < 5) {
+        // Close the gap from the tail's trail up to where the head is.
+        for (let k = n - 1; k >= 0; k--) this.layTrail(worm, seg[k * 2], seg[k * 2 + 1], soldiers);
         worm.burrow = 0.6;
       }
       // Bite anything it crawls over.
@@ -487,6 +495,13 @@ export class CreatureSystem {
     const hy = worm.seg[1];
     let best = CREATURES.wormSeekRange * CREATURES.wormSeekRange;
     let found = false;
+    // Its own fresh trail can be cut off for a moment; never chase that.
+    const tx0 = worm.seg[worm.seg.length - 2];
+    const ty0 = worm.seg[worm.seg.length - 1];
+    const near = (x: number, y: number): boolean => {
+      for (let k = 0; k < worm.seg.length; k += 2) if ((worm.seg[k] - x) ** 2 + (worm.seg[k + 1] - y) ** 2 < 144) return true;
+      return (x - tx0) ** 2 + (y - ty0) ** 2 < 400;
+    };
     for (const c of growth.colonies.list) {
       if (c.active || c.edges.length === 0) continue;
       for (let k = 0; k < 6; k++) {
@@ -495,7 +510,7 @@ export class CreatureSystem {
         const x = (sx + 0.5) * ss;
         const y = ((si - sx) / sw + 0.5) * ss;
         const d2 = (x - hx) ** 2 + (y - hy) ** 2;
-        if (d2 < best) {
+        if (d2 < best && !near(x, y)) {
           best = d2;
           worm.tx = x;
           worm.ty = y;
@@ -503,6 +518,7 @@ export class CreatureSystem {
         }
       }
     }
+    worm.seeking = found;
     if (found) return;
     const s = this.nearestVisible(hx, hy, 400, soldiers, false);
     if (s) {
@@ -514,11 +530,35 @@ export class CreatureSystem {
     }
   }
 
-  private layTrail(x: number, y: number, soldiers: readonly Soldier[]): void {
+  /**
+   * Lay trail Blight at (x, y), plus whatever half-size cells it takes to
+   * reach the last trail pixel by orthogonal steps, so the trail is one
+   * connected strand that can carry a colony's connection along it.
+   */
+  private layTrail(worm: Worm, x: number, y: number, soldiers: readonly Soldier[]): void {
     const w = this.world;
     const ss = w.subCellSize;
-    const sx = Math.floor(x / ss);
-    const sy = Math.floor(y / ss);
+    const sw = w.subWidth;
+    const tx = Math.floor(x / ss);
+    const ty = Math.floor(y / ss);
+    if (worm.lastTrail < 0) {
+      this.putTrail(tx, ty, soldiers);
+      worm.lastTrail = ty * sw + tx;
+      return;
+    }
+    let cx = worm.lastTrail % sw;
+    let cy = (worm.lastTrail - cx) / sw;
+    for (let guard = 0; guard < 16 && (cx !== tx || cy !== ty); guard++) {
+      if (Math.abs(tx - cx) >= Math.abs(ty - cy)) cx += Math.sign(tx - cx);
+      else cy += Math.sign(ty - cy);
+      this.putTrail(cx, cy, soldiers);
+    }
+    worm.lastTrail = cy * sw + cx;
+  }
+
+  private putTrail(sx: number, sy: number, soldiers: readonly Soldier[]): void {
+    const w = this.world;
+    const ss = w.subCellSize;
     if (w.subSolidAt(sx, sy)) return;
     // Never seal a soldier in.
     for (const s of soldiers) {

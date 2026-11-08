@@ -29,6 +29,12 @@ export const MAT = {
 export const SUB = {
   blight: 0,
   rubble: 1,
+  /** Lab equipment: machine casing. */
+  metal: 2,
+  /** Lab equipment: pipework and vents. */
+  pipe: 3,
+  /** Lab equipment: screens and status LEDs. */
+  screen: 4,
 } as const;
 
 export interface Door {
@@ -286,8 +292,10 @@ export class PixelWorld implements SolidQuery {
   /** Max health for a 50% pink blight sub-pixel at `(sx, sy)`. */
   maxSubHealthAt(sx: number, sy: number): number {
     const dist = this.distanceOf(sx >> 1, sy >> 1);
-    if (this.subInBounds(sx, sy) && this.subKind[sy * this.subWidth + sx] === SUB.rubble) {
-      return maxHealthForDistance(dist);
+    if (this.subInBounds(sx, sy)) {
+      const k = this.subKind[sy * this.subWidth + sx];
+      if (k === SUB.rubble) return maxHealthForDistance(dist);
+      if (k !== SUB.blight) return Math.max(1, Math.ceil(maxHealthForDistance(dist) * FACILITY.equipmentHealthMult));
     }
     return Math.max(1, Math.ceil(maxHealthForDistance(dist) * 0.5));
   }

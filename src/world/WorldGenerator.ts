@@ -1,6 +1,7 @@
 import { FACILITY, TERRAIN, zoneForDepth } from "../config";
 import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
+import { placeLabEquipment } from "./LabEquipment";
 import { decorateLab } from "./LabDetails";
 import { MAT, SUB, type PixelWorld } from "./PixelWorld";
 
@@ -189,6 +190,9 @@ export function generateWorld(world: PixelWorld, seed: number): void {
       }
     });
   }
+
+  // Half-size consoles, racks, pipes and machines along room walls and some hallways.
+  placeLabEquipment(world, layout);
 }
 
 /** Call `fn` with the index of every in-bounds cell of an inclusive rectangle. */
