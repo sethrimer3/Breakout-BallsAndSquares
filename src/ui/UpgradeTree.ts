@@ -175,6 +175,9 @@ function toArt(v: number): number {
   return Math.round(v / LINK_PIXEL);
 }
 
+/** Below this matrix scale the category buttons get their own full-size menu. */
+const RAIL_BELOW_SCALE = 0.9;
+
 function reducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
@@ -227,6 +230,8 @@ export class UpgradeTree {
   /** Shell + the box that reserves its scaled size, so small screens see the whole matrix. */
   private shellEl: HTMLDivElement;
   private fitBoxEl: HTMLDivElement;
+  /** Holds the category buttons, unscaled, beside or above the matrix on small screens. */
+  private navEl: HTMLElement;
   /** On-screen px per shell px (1 on desktop, < 1 when shrunk to fit a phone). */
   private uiScale = 1;
   /** Pointer type of the last press on a node: touch taps select before they buy. */
@@ -245,6 +250,7 @@ export class UpgradeTree {
     this.root = document.createElement("div");
     this.root.className = "overlay tree-overlay hidden";
     this.root.innerHTML = `
+      <nav class="tree-nav hidden" aria-label="Upgrade categories"></nav>
       <div class="tree-fit-box"><div class="tree-shell">
         <button class="tree-close" title="Close (Esc)">${sprite("close", { color: UI_COLORS.magenta })}</button>
         <div class="tree-header">
@@ -255,21 +261,25 @@ export class UpgradeTree {
               <button class="tree-cat-btn active expanded" data-cat="systems">
                 ${sprite("soldier", { color: UI_COLORS.soldier, scale: 1 })}
                 <span class="tree-cat-name">CORE / MONEY / BLIGHT / BASE</span>
+                <span class="tree-cat-short">CORE &amp; BASE</span>
                 <span class="cat-caret">▼</span>
               </button>
               <button class="tree-cat-btn" data-cat="primary">
                 ${sprite("rifle", { color: "#52f296", scale: 1 })}
                 <span class="tree-cat-name">PRIMARY WEAPONS</span>
+                <span class="tree-cat-short">PRIMARY</span>
                 <span class="cat-caret">▶</span>
               </button>
               <button class="tree-cat-btn" data-cat="secondary">
                 ${sprite("grenade", { color: "#ff9d3b", scale: 1 })}
                 <span class="tree-cat-name">SECONDARY WEAPONS</span>
+                <span class="tree-cat-short">SECONDARY</span>
                 <span class="cat-caret">▶</span>
               </button>
               <button class="tree-cat-btn" data-cat="soldiers">
                 ${sprite("soldierPlus", { color: UI_COLORS.soldier, scale: 1 })}
                 <span class="tree-cat-name">SOLDIER TREES</span>
+                <span class="tree-cat-short">SOLDIERS</span>
                 <span class="cat-caret">▶</span>
               </button>
             </div>
@@ -336,6 +346,7 @@ export class UpgradeTree {
 
     this.shellEl = this.root.querySelector(".tree-shell") as HTMLDivElement;
     this.fitBoxEl = this.root.querySelector(".tree-fit-box") as HTMLDivElement;
+    this.navEl = this.root.querySelector(".tree-nav") as HTMLElement;
     window.addEventListener("resize", () => {
       if (this.visible) this.fitToScreen();
     });
@@ -565,6 +576,7 @@ export class UpgradeTree {
       }
     }
     this.tabsEl.classList.toggle("hidden", this.inLoadoutScreen);
+    if (this.visible && this.root.classList.contains("tree-railmode")) this.fitToScreen();
     // Keeps its height on other tabs so the panel doesn't jump when switching.
     this.legendEl.classList.toggle("hidden", this.inLoadoutScreen);
     this.legendEl.style.visibility = "hidden";
@@ -767,20 +779,57 @@ export class UpgradeTree {
     this.pinchStartDist = dist;
   }
 
-  /** Shrink the whole matrix (never enlarge) so it fits small screens like phones. */
+  /**
+   * Shrink the whole matrix (never enlarge) so it fits small screens like phones.
+   * When that would shrink the category buttons too far to tap, they move out of
+   * the scaled matrix into a full-size menu: a rail on the left in landscape, a
+   * grid on top in portrait.
+   */
   private fitToScreen(): void {
-    this.shellEl.style.transform = "";
-    this.fitBoxEl.style.width = "";
-    this.fitBoxEl.style.height = "";
-    const w = this.shellEl.offsetWidth;
-    const h = this.shellEl.offsetHeight;
     const pad = 16;
-    const s = Math.min(1, (window.innerWidth - pad) / w, (window.innerHeight - pad) / h);
+    const gap = 10;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // Measure the desktop layout first, buttons in the header.
+    this.setRailMode(false);
+    let { w, h, s } = this.measureShell(vw - pad, vh - pad);
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    if (s < RAIL_BELOW_SCALE || (coarse && s < 1)) {
+      const side = vw > vh;
+      this.setRailMode(true, side);
+      const showNav = !this.tabsEl.classList.contains("hidden");
+      this.navEl.classList.toggle("hidden", !showNav);
+      const navW = showNav && side ? this.navEl.offsetWidth + gap : 0;
+      const navH = showNav && !side ? this.navEl.offsetHeight + gap : 0;
+      ({ w, h, s } = this.measureShell(vw - pad - navW, vh - pad - navH));
+    }
     this.uiScale = s;
     if (s >= 1) return;
     this.shellEl.style.transform = `scale(${s})`;
     this.fitBoxEl.style.width = `${Math.floor(w * s)}px`;
     this.fitBoxEl.style.height = `${Math.floor(h * s)}px`;
+  }
+
+  private measureShell(availW: number, availH: number): { w: number; h: number; s: number } {
+    this.shellEl.style.transform = "";
+    this.fitBoxEl.style.width = "";
+    this.fitBoxEl.style.height = "";
+    const w = this.shellEl.offsetWidth;
+    const h = this.shellEl.offsetHeight;
+    return { w, h, s: Math.min(1, availW / w, availH / h) };
+  }
+
+  /** Move the category buttons between the matrix header and the full-size menu. */
+  private setRailMode(on: boolean, side = true): void {
+    this.root.classList.toggle("tree-railmode", on);
+    this.root.classList.toggle("tree-nav-side", on && side);
+    this.root.classList.toggle("tree-nav-top", on && !side);
+    if (on) {
+      if (this.tabsEl.parentElement !== this.navEl) this.navEl.append(this.tabsEl);
+    } else {
+      this.navEl.classList.add("hidden");
+      if (this.tabsEl.parentElement !== this.subEl.parentElement) this.legendEl.before(this.tabsEl);
+    }
   }
 
   /** `steered`: the player moved the view away from the fit, so offer FIT. */
