@@ -1029,6 +1029,26 @@ export class TerrainRenderer {
     });
   }
 
+  /**
+   * Copy the floors and terrain of cells (x0, y0)..(x0 + w - 1, y0 + h - 1) into
+   * `ctx` at full texel resolution (TEX px per cell), top-left at (0, 0). Used
+   * for the lab map's sector pictures; chunks must already be built.
+   */
+  drawRegion(ctx: CanvasRenderingContext2D, x0: number, y0: number, w: number, h: number): void {
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this.floorCanvas, x0 * TEX, y0 * TEX, w * TEX, h * TEX, 0, 0, w * TEX, h * TEX);
+    const cs = this.chunks.chunkSize;
+    const kx0 = Math.max(0, Math.floor(x0 / cs));
+    const ky0 = Math.max(0, Math.floor(y0 / cs));
+    const kx1 = Math.min(this.chunks.cols - 1, Math.floor((x0 + w - 1) / cs));
+    const ky1 = Math.min(this.chunks.rows - 1, Math.floor((y0 + h - 1) / cs));
+    for (let ky = ky0; ky <= ky1; ky++) {
+      for (let kx = kx0; kx <= kx1; kx++) {
+        ctx.drawImage(this.canvases[ky * this.chunks.cols + kx], (kx * cs - x0) * TEX, (ky * cs - y0) * TEX);
+      }
+    }
+  }
+
   update(): void {
     this.chunks.take(TERRAIN.chunkRebuildBudget, this.scratch);
     this.rebuiltLastFrame = this.scratch.length;

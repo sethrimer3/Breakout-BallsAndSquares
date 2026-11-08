@@ -1,11 +1,15 @@
 import type { Game } from "../Game";
+import { THUMB_SIZE, renderUncharted } from "../rendering/SectorThumbs";
 import {
   CENTER_SECTOR,
   LAB_BLUEPRINT,
   SECTORS_PER_SIDE,
   SECTOR_CHARS,
+  labFrame,
   sectorName,
   sectorRing,
+  sectorBounds,
+  sectorSpawnCell,
   zoneForSectorRing,
 } from "../world/labMap";
 
@@ -42,6 +46,8 @@ export class LabMap {
   private tiles: HTMLButtonElement[] = [];
   private canvases: HTMLCanvasElement[] = [];
   private selected = CENTER_SECTOR;
+  /** Lit pictures of each sector from the latest generated world (see SectorThumbs). */
+  private thumbs: HTMLCanvasElement[] | null = null;
 
   constructor(parent: HTMLElement, private game: Game) {
     this.root = document.createElement("div");
@@ -64,6 +70,11 @@ export class LabMap {
     this.root.querySelector('[data-act="back"]')!.addEventListener("click", () => this.back());
     this.deployBtn.addEventListener("click", () => this.deploy());
     parent.append(this.root);
+  }
+
+  /** Pictures of every sector, taken right after the lab is generated for a run. */
+  setThumbs(thumbs: HTMLCanvasElement[]): void {
+    this.thumbs = thumbs;
   }
 
   get visible(): boolean {
@@ -138,8 +149,8 @@ export class LabMap {
         tile.className = "labmap-tile";
         tile.setAttribute("aria-label", `Sector ${sectorName(s)}`);
         const canvas = document.createElement("canvas");
-        canvas.width = THUMB_PX;
-        canvas.height = THUMB_PX;
+        canvas.width = THUMB_SIZE;
+        canvas.height = THUMB_SIZE;
         tile.append(canvas);
         tile.addEventListener("click", () => {
           if (this.selected === s && this.game.canDeployInto(s)) this.deploy();
@@ -154,6 +165,40 @@ export class LabMap {
     edgeRow();
   }
 
+  private drawTile(s: number, discovered: boolean, conquered: boolean): void {
+    const canvas = this.canvases[s];
+    const g = canvas.getContext("2d");
+    if (!g) return;
+    g.imageSmoothingEnabled = false;
+    const thumb = this.thumbs?.[s];
+    if (!discovered) {
+      g.drawImage(renderUncharted(s), 0, 0);
+    } else if (thumb) {
+      g.drawImage(thumb, 0, 0);
+    } else {
+      drawSectorThumb(this.scratch, s, discovered, conquered);
+      g.drawImage(this.scratch, 0, 0, THUMB_SIZE, THUMB_SIZE);
+    }
+    // A deploy beacon where the squad would land.
+    const frame = labFrame(this.game.world);
+    if (s === this.selected && frame && this.game.canDeployInto(s)) {
+      const at = sectorSpawnCell(frame, s);
+      const b = sectorBounds(frame, s);
+      const k = THUMB_SIZE / (b.x1 - b.x0 + 1);
+      const x = Math.round((at.cx - b.x0 + 0.5) * k);
+      const y = Math.round((at.cy - b.y0 + 0.5) * k);
+      const u = 4;
+      g.fillStyle = "#05070d";
+      for (let i = -3; i <= 3; i++) g.fillRect(x - (3 - Math.abs(i) + 1) * u, y + i * u - u / 2, (3 - Math.abs(i) + 1) * 2 * u, u);
+      g.fillStyle = "#38d6ff";
+      for (let i = -2; i <= 2; i++) g.fillRect(x - (2 - Math.abs(i) + 0.5) * u, y + i * u - u / 2, (2 - Math.abs(i) + 0.5) * 2 * u, u);
+      g.fillStyle = "#dff8ff";
+      g.fillRect(x - u / 2, y - u / 2, u, u);
+    }
+  }
+
+  private scratch = Object.assign(document.createElement("canvas"), { width: THUMB_PX, height: THUMB_PX });
+
   private render(): void {
     const progress = this.game.labProgress;
     for (let s = 0; s < this.tiles.length; s++) {
@@ -165,7 +210,7 @@ export class LabMap {
       tile.classList.toggle("conquered", conquered);
       tile.classList.toggle("selected", s === this.selected);
       tile.dataset.tier = String(tier);
-      drawSectorThumb(this.canvases[s], s, discovered, conquered);
+      this.drawTile(s, discovered, conquered);
     }
     const s = this.selected;
     const tier = zoneForSectorRing(sectorRing(s)) + 1;
