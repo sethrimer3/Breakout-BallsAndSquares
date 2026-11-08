@@ -583,6 +583,8 @@ export const FOG = {
   tileCells: 2,
   /** Soldier sight radius, in cells. Walls block sight. */
   soldierSightCells: 13,
+  /** Extra soldier sight radius per Recon Optics level, in cells. */
+  sightPerLevel: 2,
   /** Autoturret sight radius, in cells. */
   turretSightCells: 7,
   /** Rays cast per soldier when tracing sight. */

@@ -96,4 +96,24 @@ describe("fog of war", () => {
     def.apply(s, 1);
     expect(s.permanentMapping).toBe(true);
   });
+
+  it("Recon Optics widens soldier sight in the fog", () => {
+    const def = UPGRADE_BY_ID.recon_optics;
+    expect(def.parent).toBe("cartography_uplink");
+    const s = baseSoldierStats();
+    expect(s.sightCells).toBe(FOG.soldierSightCells);
+    def.apply(s, 3);
+    expect(s.sightCells).toBe(FOG.soldierSightCells + 3 * FOG.sightPerLevel);
+
+    // A wider eye lights tiles a narrow one never reaches.
+    const near = { x: 400, y: 400, radiusCells: FOG.soldierSightCells };
+    const far = { ...near, radiusCells: s.sightCells };
+    const probeX = near.x + (FOG.soldierSightCells + 4) * 8;
+    const a = new FogOfWar(openWorld());
+    const b = new FogOfWar(openWorld());
+    run(a, 6, [near]);
+    run(b, 6, [far]);
+    expect(a.lightAt(probeX, near.y)).toBe(0);
+    expect(b.lightAt(probeX, near.y)).toBeGreaterThan(0.5);
+  });
 });

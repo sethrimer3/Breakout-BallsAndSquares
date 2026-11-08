@@ -316,6 +316,20 @@ export class UpgradeRoom {
       const sweep = Math.floor((t * 12) % 24);
       this.px(g, 264 + sweep, FLOOR_Y - 14, 1, 5, C.green);
     }
+    // Recon Optics: a scope mast that grows taller and pings wider with each level.
+    const optics = this.piece("optics", 294, 22, L("recon_optics"));
+    if (optics) {
+      const h = 6 + optics * 2;
+      this.px(g, 292, FLOOR_Y - h, 1, h, C.metal2);
+      this.px(g, 290, FLOOR_Y - h - 2, 5, 2, C.metal1);
+      this.px(g, 294, FLOOR_Y - h - 2, 1, 1, Math.floor(t * 3) % 2 ? C.green : C.screen);
+      const ping = (t * 0.7) % 1;
+      const pr = Math.round(ping * (2 + optics));
+      if (ping < 0.8) {
+        this.px(g, 292 - pr, FLOOR_Y - h - 1, 1, 1, C.green);
+        this.px(g, 292 + pr, FLOOR_Y - h - 1, 1, 1, C.green);
+      }
+    }
     // General sophistication: a growing bank of monitors and machines.
     const banks = Math.min(6, Math.floor(s.total / 5));
     this.piece("banks", 330, 12, banks);
