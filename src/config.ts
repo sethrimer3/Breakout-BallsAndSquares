@@ -583,6 +583,10 @@ export const FOG = {
   tileCells: 2,
   /** Soldier sight radius, in cells. Walls block sight. */
   soldierSightCells: 13,
+  /** Sight stretches smoothly toward a soldier's facing direction. */
+  forwardSightMult: 1.8,
+  /** Fog clears faster directly ahead, tapering back to normal at the sides. */
+  forwardRevealMult: 2.5,
   /** Extra soldier sight radius per Recon Optics level, in cells. */
   sightPerLevel: 2,
   /** Autoturret sight radius, in cells. */

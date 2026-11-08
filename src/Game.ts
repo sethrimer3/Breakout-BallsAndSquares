@@ -1209,7 +1209,9 @@ export class Game {
     let n = 0;
     const take = (): SightSource => {
       if (n === src.length) src.push({ x: 0, y: 0, radiusCells: 0 });
-      return src[n++];
+      const source = src[n++];
+      source.facingAngle = undefined;
+      return source;
     };
     const w = this.world;
     const room = take();
@@ -1223,6 +1225,7 @@ export class Game {
         e.x = s.x;
         e.y = s.y;
         e.radiusCells = this.stats.sightCells;
+        e.facingAngle = s.facingAngle;
       }
       for (const t of this.combat.turrets.items) {
         if (!t.active) continue;

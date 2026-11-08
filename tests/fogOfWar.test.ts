@@ -3,7 +3,7 @@ import { FOG } from "../src/config";
 import { UPGRADE_BY_ID } from "../src/progression/UpgradeDefinitions";
 import { baseSoldierStats } from "../src/entities/Soldier";
 import { fogAlpha } from "../src/rendering/FogRenderer";
-import { FogOfWar } from "../src/world/FogOfWar";
+import { FogOfWar, type SightSource } from "../src/world/FogOfWar";
 
 const N = 128;
 const CS = 8;
@@ -17,13 +17,58 @@ function openWorld(solid: (cx: number, cy: number) => boolean = () => false) {
   };
 }
 
-function run(fog: FogOfWar, seconds: number, src: { x: number; y: number; radiusCells: number }[]) {
+function run(fog: FogOfWar, seconds: number, src: SightSource[]) {
   for (let t = 0; t < seconds * 60; t++) fog.update(1 / 60, src);
 }
 
 const eye = { x: 64 * CS + 4, y: 64 * CS + 4, radiusCells: FOG.soldierSightCells };
 
 describe("fog of war", () => {
+  it("reveals farther ahead while keeping peripheral and rear vision", () => {
+    const fog = new FogOfWar(openWorld());
+    run(fog, 10, [{ ...eye, facingAngle: 0 }]);
+    expect(fog.lightAt(eye.x + 19 * CS, eye.y)).toBeGreaterThan(0.9);
+    expect(fog.lightAt(eye.x - 19 * CS, eye.y)).toBe(0);
+    expect(fog.lightAt(eye.x, eye.y + 19 * CS)).toBe(0);
+    expect(fog.lightAt(eye.x - 8 * CS, eye.y)).toBeGreaterThan(0.9);
+    expect(fog.lightAt(eye.x, eye.y + 8 * CS)).toBeGreaterThan(0.9);
+  });
+
+  it("clears fog faster ahead, and follows a turn toward unexplored space", () => {
+    const fog = new FogOfWar(openWorld());
+    const normal = new FogOfWar(openWorld());
+    const source = { ...eye, facingAngle: 0 };
+    run(fog, 1, [source]);
+    run(normal, 1, [eye]);
+    expect(fog.lightAt(eye.x + 8 * CS, eye.y)).toBeGreaterThan(
+      normal.lightAt(eye.x + 8 * CS, eye.y) + 0.1,
+    );
+    source.facingAngle = Math.PI;
+    run(fog, 10, [source]);
+    expect(fog.lightAt(eye.x - 19 * CS, eye.y)).toBeGreaterThan(0.9);
+  });
+
+  it("stops forward vision at full blocks and half-size blocks", () => {
+    for (const halfSize of [false, true]) {
+      const world = openWorld((cx) => !halfSize && cx === 68);
+      const fog = new FogOfWar({ ...world,
+        ...(halfSize ? { subSolidAt: (sx: number) => sx === 136 } : {}),
+      });
+      run(fog, 10, [{ ...eye, facingAngle: 0 }]);
+      expect(fog.lightAt(eye.x + 2 * CS, eye.y)).toBeGreaterThan(0.9);
+      expect(fog.lightAt(eye.x + 19 * CS, eye.y)).toBe(0);
+    }
+  });
+
+  it("combines opposing soldiers' sight without depending on source order", () => {
+    const sources = [{ ...eye, facingAngle: 0 }, { ...eye, facingAngle: Math.PI }];
+    const a = new FogOfWar(openWorld());
+    const b = new FogOfWar(openWorld());
+    run(a, 3, sources);
+    run(b, 3, [...sources].reverse());
+    expect(a.light).toEqual(b.light);
+  });
+
   it("starts black everywhere", () => {
     const fog = new FogOfWar(openWorld());
     expect(fog.lightAt(eye.x, eye.y)).toBe(0);

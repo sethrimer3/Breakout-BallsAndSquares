@@ -16,6 +16,8 @@ export interface SightSource {
   y: number;
   /** Sight radius in cells. */
   radiusCells: number;
+  /** Soldiers look forward; room lights and turrets keep circular sight. */
+  facingAngle?: number;
 }
 
 /**
@@ -45,6 +47,7 @@ export class FogOfWar {
   private readonly lastSeen: Float32Array;
   private readonly seenStamp: Uint32Array;
   private readonly srcStamp: Uint32Array;
+  private readonly revealBoost: Float32Array;
   private readonly noise: Float32Array;
   private stamp = 0;
   private time = 0;
@@ -71,6 +74,7 @@ export class FogOfWar {
     this.lastSeen = new Float32Array(n);
     this.seenStamp = new Uint32Array(n);
     this.srcStamp = new Uint32Array(n);
+    this.revealBoost = new Float32Array(n);
     this.noise = new Float32Array(n);
     this.reseed(1);
   }
@@ -83,6 +87,7 @@ export class FogOfWar {
     this.lastSeen.fill(0);
     this.seenStamp.fill(0);
     this.srcStamp.fill(0);
+    this.revealBoost.fill(0);
     this.stamp = 0;
     this.time = 0;
     this.bx0 = 1;
@@ -162,22 +167,31 @@ export class FogOfWar {
     const cx0 = src.x / cs;
     const cy0 = src.y / cs;
     const r = src.radiusCells;
+    const directional = src.facingAngle !== undefined;
+    const forwardX = directional ? Math.cos(src.facingAngle!) : 0;
+    const forwardY = directional ? Math.sin(src.facingAngle!) : 0;
+    const maxRadius = r * (directional ? FOG.forwardSightMult : 1);
     const ts = this.tileSize;
     const stx = Math.floor(src.x / ts);
     const sty = Math.floor(src.y / ts);
     if (stx >= 0 && sty >= 0 && stx < tw && sty < this.th) {
       seenStamp[sty * tw + stx] = stamp;
       srcStamp[sty * tw + stx] = stamp;
+      this.revealBoost[sty * tw + stx] = 1;
     }
-    const pad = Math.ceil(r / tileCells) + 2;
+    const pad = Math.ceil(maxRadius / tileCells) + 2;
     this.grow(stx - pad, sty - pad, stx + pad, sty + pad);
     const step = 0.5;
-    const steps = Math.ceil(r / step);
     const sub = world.subSolidAt;
     for (let k = 0; k < rays; k++) {
       const a = (k / rays) * Math.PI * 2;
       const dx = Math.cos(a) * step;
       const dy = Math.sin(a) * step;
+      // A broad, smoothly tapered lobe rather than a hard flashlight cone.
+      const alignment = Math.max(0, (dx * forwardX + dy * forwardY) / step);
+      const forward = alignment * alignment;
+      const steps = Math.ceil(r * (1 + (FOG.forwardSightMult - 1) * forward) / step);
+      const boost = 1 + (FOG.forwardRevealMult - 1) * forward;
       let px = cx0;
       let py = cy0;
       let lastTile = -1;
@@ -189,6 +203,7 @@ export class FogOfWar {
         if (cx < 0 || cy < 0 || cx >= world.width || cy >= world.height) break;
         const ti = Math.floor(cy / tileCells) * tw + Math.floor(cx / tileCells);
         if (ti !== lastTile) {
+          this.revealBoost[ti] = seenStamp[ti] === stamp ? Math.max(this.revealBoost[ti], boost) : boost;
           seenStamp[ti] = stamp;
           lastTile = ti;
         }
@@ -203,7 +218,8 @@ export class FogOfWar {
     this.stamp++;
     const rays = FOG.sightRays;
     for (const s of sources) {
-      this.trace(s, Math.max(16, Math.round((rays * s.radiusCells) / FOG.soldierSightCells)));
+      const reach = s.facingAngle === undefined ? 1 : FOG.forwardSightMult;
+      this.trace(s, Math.max(16, Math.round((rays * s.radiusCells * reach) / FOG.soldierSightCells)));
     }
     if (this.bx0 > this.bx1) return;
 
@@ -233,7 +249,7 @@ export class FogOfWar {
               if (u > maxN) maxN = u;
               if (d > maxN) maxN = d;
               // Light only seeps in from a lit neighbor, so it flows out from the soldier.
-              nv = v + reveal * noise[i] * maxN;
+              nv = v + reveal * this.revealBoost[i] * noise[i] * maxN;
             }
             if (nv > 1) nv = 1;
           }
