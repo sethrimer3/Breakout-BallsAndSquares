@@ -1263,6 +1263,36 @@ button {
   gap: 6px;
   color: var(--leg-c, #ffffff);
 }
+/* Pixel-art room above the matrix: lab, armory or barracks, built from what you own. */
+.tree-room {
+  position: relative;
+  width: 760px;
+  height: 100px;
+  margin: 4px auto 0;
+  background: #0a0e16;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+.tree-room canvas {
+  display: block;
+  width: 760px;
+  height: 100px;
+  image-rendering: pixelated;
+}
+.tree-room-label {
+  position: absolute;
+  left: 6px;
+  top: 4px;
+  padding: 1px 4px;
+  font-family: var(--font-small);
+  font-size: var(--f8);
+  color: var(--muted);
+  background: rgba(5, 8, 14, 0.75);
+  pointer-events: none;
+}
+.tree-room.hidden {
+  visibility: hidden;
+}
+
 .tree-stage {
   position: relative;
   width: 760px;
