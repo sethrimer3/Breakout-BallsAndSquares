@@ -1,7 +1,7 @@
 import { FACILITY } from "../config";
 import { Rng } from "../core/Rng";
 import { MAT, SUB, type PixelWorld } from "./PixelWorld";
-import type { LabLayout, LabRoom } from "./WorldGenerator";
+import type { LabCorridorSegment, LabLayout, LabRoom } from "./WorldGenerator";
 
 /**
  * Half-size destructible lab equipment: consoles, computers, server racks and
@@ -28,7 +28,10 @@ export function placeLabEquipment(world: PixelWorld, layout: LabLayout): void {
       const pieces = wreck ? 1 + rng.int(2) : 2 + rng.int(3);
       for (let p = 0; p < pieces; p++) retry(() => placePiece(world, room, side, rng, wreck));
     }
-    if (rng.next() < FACILITY.machineRoomChance) {
+    if (wreck) scatterDebris(world, room, rng);
+    if (!wreck && rng.next() < FACILITY.serverRoomChance) {
+      placeServerFarm(world, room, rng);
+    } else if (rng.next() < FACILITY.machineRoomChance) {
       const count = wreck ? 1 + rng.int(2) : 2 + rng.int(FACILITY.machinesPerRoom - 1);
       for (let m = 0; m < count; m++) retry(() => placeMachine(world, room, rng, wreck));
     }
@@ -46,9 +49,11 @@ export function placeLabEquipment(world: PixelWorld, layout: LabLayout): void {
     if (world.subInBounds(sx, sy) && !inRoom[(sy >> 1) * world.width + (sx >> 1)]) putSub(world, sx, sy, k, tint);
   };
   for (const seg of layout.corridors) {
-    if (seg.rubble || seg.width < 3 || rng.next() > FACILITY.corridorPipeChance) continue;
-    // A pipe bundle hugging one side of the hallway, one half-cell thick.
+    if (seg.rubble || seg.width < 3) continue;
     const near = rng.next() < 0.5;
+    if (rng.next() < FACILITY.corridorFixtureChance) placeCorridorFixtures(world, seg, !near, rng, inRoom);
+    if (rng.next() > FACILITY.corridorPipeChance) continue;
+    // A pipe bundle hugging one side of the hallway, one half-cell thick.
     const tint = rng.int(256);
     if (seg.axis === "h") {
       const sy = near ? seg.y0 * 2 : seg.y1 * 2 + 1;
@@ -57,6 +62,77 @@ export function placeLabEquipment(world: PixelWorld, layout: LabLayout): void {
       const sx = near ? seg.x0 * 2 : seg.x1 * 2 + 1;
       for (let sy = seg.y0 * 2 + 2; sy <= seg.y1 * 2 - 1; sy++) pipe(sx, sy, sy % 7 === 0 ? SUB.metal : SUB.pipe, tint);
     }
+  }
+}
+
+/**
+ * Hallway fixtures along one wall: terminals with a screen, junction boxes with
+ * status lights, and lone red emergency beacons, spaced out down the hall.
+ */
+function placeCorridorFixtures(world: PixelWorld, seg: LabCorridorSegment, near: boolean, rng: Rng, inRoom: Uint8Array): void {
+  const h = seg.axis === "h";
+  const a0 = (h ? seg.x0 : seg.y0) * 2 + 3;
+  const a1 = (h ? seg.x1 : seg.y1) * 2 - 3;
+  // Depth 0 hugs the wall; depth 1 is one subcell further into the hall.
+  const at = (along: number, d: number): { sx: number; sy: number } => {
+    const across = near ? (h ? seg.y0 : seg.x0) * 2 + d : (h ? seg.y1 : seg.x1) * 2 + 1 - d;
+    return h ? { sx: along, sy: across } : { sx: across, sy: along };
+  };
+  const ok = (sx: number, sy: number): boolean =>
+    world.subInBounds(sx, sy) && !inRoom[(sy >> 1) * world.width + (sx >> 1)] && free(world, sx, sy);
+  for (let a = a0 + rng.int(6); a + 2 <= a1; a += 7 + rng.int(9)) {
+    const kind = rng.int(3);
+    // [along offset, depth, kind]
+    const parts: [number, number, number][] =
+      kind === 0
+        ? [[0, 0, SUB.metal], [1, 0, SUB.metal], [2, 0, SUB.metal], [0, 1, SUB.metal], [1, 1, SUB.screen], [2, 1, SUB.metal]]
+        : kind === 1
+          ? [[0, 0, SUB.metal], [1, 0, SUB.metal], [0, 1, SUB.led], [1, 1, SUB.led]]
+          : [[0, 0, SUB.metal], [0, 1, SUB.led]];
+    if (!parts.every(([o, d]) => { const p = at(a + o, d); return ok(p.sx, p.sy); })) continue;
+    const tint = rng.int(256);
+    for (const [o, d, k] of parts) {
+      const p = at(a + o, d);
+      let t = (tint + o * 41) & 255;
+      if (k === SUB.led) t = kind === 2 ? (2 << 6) | (rng.int(16) * 4) : ledTint(rng);
+      putSub(world, p.sx, p.sy, k, t);
+    }
+  }
+}
+
+/** A server farm: rows of two-wide racks with lit faces, aisles between them. */
+function placeServerFarm(world: PixelWorld, r: LabRoom, rng: Rng): void {
+  const n = r.size * 2;
+  const vertical = rng.next() < 0.5;
+  const pitch = 5; // 2 rack + 3 aisle
+  const inset = MACHINE_WALL_GAP;
+  const tint = rng.int(256);
+  for (let row = inset; row + 2 <= n - inset; row += pitch) {
+    // Each row is broken into racks with a 1-subcell gap so the room stays passable.
+    for (let a = inset; a < n - inset; a++) {
+      if ((a - inset) % 6 === 5) continue;
+      for (let d = 0; d < 2; d++) {
+        const sx = r.x * 2 + (vertical ? row + d : a);
+        const sy = r.y * 2 + (vertical ? a : row + d);
+        if (!free(world, sx, sy)) continue;
+        const lit = (a + d) % 2 === 0;
+        putSub(world, sx, sy, lit ? SUB.led : SUB.metal, lit ? ledTint(rng) : (tint + a * 17) & 255);
+      }
+    }
+  }
+}
+
+/** Loose scraps of smashed equipment strewn over an overrun room's floor. */
+function scatterDebris(world: PixelWorld, r: LabRoom, rng: Rng): void {
+  const n = r.size * 2;
+  const count = Math.round(r.size * FACILITY.overrunDebrisPerCell);
+  for (let i = 0; i < count; i++) {
+    const sx = r.x * 2 + 2 + rng.int(n - 4);
+    const sy = r.y * 2 + 2 + rng.int(n - 4);
+    if (!free(world, sx, sy)) continue;
+    const roll = rng.next();
+    const k = roll < 0.75 ? SUB.wreck : roll < 0.92 ? SUB.metal : SUB.pipe;
+    putSub(world, sx, sy, k, rng.int(256));
   }
 }
 
@@ -179,6 +255,16 @@ const MACHINES: readonly (readonly string[])[] = [
   ["C...C", "M...M", "P.L.P", "MMMMM"],
   // Sample freezer bank with a row of status lights.
   ["MMMMMM", "MLMLML", "MSSSSM"],
+  // Holo table: a projector ring around a glowing display.
+  [".MSM.", "MSCSM", "SCCCS", "MSCSM", ".MLM."],
+  // Robotic arm on a turntable, reaching for something.
+  ["....C", "...P.", "..P..", "MMP..", "MLM.."],
+  // Containment field generator: two emitters holding a shimmering field.
+  ["MLM", "P.P", "CCC", "CCC", "P.P", "MLM"],
+  // Particle accelerator: a long ring with a hot spot and beam monitors.
+  ["..MPPPPPM..", ".P.......P.", "M.........M", "P...SLS...P", "P...LCL...P", "P...SLS...P", "M.........M", ".P.......P.", "..MPPCPPM.."],
+  // Gene sequencer: stacked sample trays beside a readout.
+  ["MSSM", "MLLM", "MCCM", "MLLM", "MMMM"],
 ];
 
 /** Subcells kept between a free-standing machine and the room walls. */

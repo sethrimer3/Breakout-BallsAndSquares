@@ -125,6 +125,12 @@ export const FACILITY = {
   machineRoomChance: 0.85,
   /** Most free-standing pieces tried per room (fewer fit in small or crowded rooms). */
   machinesPerRoom: 5,
+  /** Chance a lab room is a server farm: rows of blinking racks instead of machines. */
+  serverRoomChance: 0.18,
+  /** Chance a clear hallway gets wall terminals, junction boxes and emergency beacons. */
+  corridorFixtureChance: 0.6,
+  /** Loose scraps of smashed equipment scattered over an overrun room's floor, per cell of room edge. */
+  overrunDebrisPerCell: 1.2,
   /** Chance each wall piece in an overrun room survives as smashed wreckage. */
   wreckSideChance: 0.7,
   /** Chance a room holds a dormant sentry turret. */
