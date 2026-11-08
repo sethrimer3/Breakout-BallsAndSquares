@@ -1217,8 +1217,7 @@ button {
 .tree-cat-panel.hidden {
   display: none !important;
 }
-.tree-cat-heading,
-.tree-room-fold {
+.tree-cat-heading {
   display: none;
 }
 .tree-tabs {
@@ -1266,35 +1265,6 @@ button {
   align-items: center;
   gap: 6px;
   color: var(--leg-c, #ffffff);
-}
-/* Pixel-art room above the matrix: lab, armory or barracks, built from what you own. */
-.tree-room {
-  position: relative;
-  width: 760px;
-  height: 100px;
-  margin: 4px auto 0;
-  background: #0a0e16;
-  box-shadow: inset 0 0 0 1px var(--line);
-}
-.tree-room canvas {
-  display: block;
-  width: 760px;
-  height: 100px;
-  image-rendering: pixelated;
-}
-.tree-room-label {
-  position: absolute;
-  left: 6px;
-  top: 4px;
-  padding: 1px 4px;
-  font-family: var(--font-small);
-  font-size: var(--f8);
-  color: var(--muted);
-  background: rgba(5, 8, 14, 0.75);
-  pointer-events: none;
-}
-.tree-room.hidden {
-  visibility: hidden;
 }
 
 .tree-stage {
@@ -2232,7 +2202,7 @@ button {
 /*
  * Phones (UpgradeTree.fitToScreen adds .tree-compact): the matrix fills the
  * screen at real size instead of being scaled down. Landscape: category menu
- * on the left quarter, tree in the middle half, room on the right quarter,
+ * on the left quarter, the tree on the rest with the wallet above it,
  * Deploy under the menu. Portrait (.tree-portrait): stacked.
  */
 .tree-compact .tree-fit-box {
@@ -2244,13 +2214,12 @@ button {
   height: 100%;
   padding: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1.5fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    "nav stage close"
-    "nav stage room"
-    "nav stage wallet"
-    "actions stage life";
+    "nav wallet life close"
+    "nav stage stage stage"
+    "actions stage stage stage";
   gap: 8px;
 }
 .tree-compact .tree-header,
@@ -2338,36 +2307,18 @@ button {
   margin: 0;
   min-height: 0;
 }
-.tree-compact .tree-room {
-  grid-area: room;
-  width: auto;
-  height: auto;
-  margin: 0;
-  min-height: 0;
-  display: flex;
-}
-.tree-compact .tree-room canvas {
-  display: none;
-}
-.tree-compact .tree-room .tree-room-fold {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  object-position: top;
-}
 .tree-compact .tree-points-val {
   grid-area: wallet;
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   gap: 4px 10px;
 }
 .tree-compact .tree-life {
   grid-area: life;
-  align-self: end;
-  text-align: center;
+  align-self: center;
+  text-align: right;
   line-height: 1.5;
 }
 .tree-compact .tree-actions {
@@ -2380,14 +2331,13 @@ button {
   padding: 8px 6px;
 }
 
-/* Portrait phones: menu on top, then the tree, the room strip and the wallet. */
+/* Portrait phones: menu on top, then the tree and the wallet. */
 .tree-compact.tree-portrait .tree-shell {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
-  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
   grid-template-areas:
     "nav nav close"
     "stage stage stage"
-    "room room room"
     "wallet wallet wallet"
     "actions life life";
 }
@@ -2395,19 +2345,14 @@ button {
 .tree-compact.tree-portrait .soldier-slot-tabs {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.tree-compact.tree-portrait .tree-room .tree-room-fold {
-  display: none;
-}
-.tree-compact.tree-portrait .tree-room canvas:not(.tree-room-fold) {
-  display: block;
-  width: 100%;
-  height: auto;
-}
 .tree-compact.tree-portrait .tree-actions {
   justify-content: flex-end;
 }
 .tree-compact.tree-portrait .tree-life {
-  align-self: center;
+  text-align: center;
+}
+.tree-compact.tree-portrait .tree-points-val {
+  justify-content: center;
 }
 .tree-compact .tree-cat-btn.expanded:not(.active) {
   --fc: #4f7a99;
