@@ -29,7 +29,7 @@ import { DoorSystem } from "./world/DoorSystem";
 import { GlassSystem } from "./world/GlassSystem";
 import { GrowthSystem } from "./world/GrowthSystem";
 import { FogOfWar, type SightSource } from "./world/FogOfWar";
-import { PixelWorld, SUB } from "./world/PixelWorld";
+import { MAT, PixelWorld, SUB } from "./world/PixelWorld";
 import { generateWorld } from "./world/WorldGenerator";
 
 export type Flash = MuzzleLight;
@@ -838,7 +838,7 @@ export class Game {
           this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, sk === SUB.pipe ? 0xac7646 : sk === SUB.wreck ? 0x3a3640 : sk === SUB.core ? 0x9a6ae0 : sk >= SUB.metal ? 0x60708a : rubble ? 0x6a625a : 0xd8267a, 4);
         }
         const subZone = zoneForDepth(this.world.depthOf(cx, cy));
-        this.loot.spawnDropsForBlock(x, y, this.dropChanceAt(subZone, ownerId) * 0.25, this.stats.pickupLifetime, this.rng, lootKindForZone(subZone));
+        this.loot.spawnDropsForBlock(x, y, this.dropChanceAt(this.blockLootZone(subZone), ownerId) * 0.25, this.stats.pickupLifetime, this.rng, lootKindForZone(this.blockLootZone(subZone)));
         this.checkSecondaryCharge(ownerId);
       }
       return;
@@ -861,15 +861,30 @@ export class Game {
       const depth = this.world.depthOf(cx, cy);
       if (depth > this.runStats.maxDepth) this.runStats.maxDepth = depth;
       const zone = zoneForDepth(depth);
-      const lootKind = lootKindForZone(zone);
-      this.loot.spawnDropsForBlock(
-        ccx,
-        ccy,
-        this.dropChanceAt(zone, ownerId),
-        this.stats.pickupLifetime,
-        this.rng,
-        lootKind,
-      );
+      const lootKind = lootKindForZone(this.blockLootZone(zone));
+      const ci = cy * this.world.width + cx;
+      if (this.world.mat[ci] === MAT.crystal) {
+        // A crystal vein: the lab's only source of crystals.
+        this.world.mat[ci] = MAT.none;
+        const veinZone = Math.max(1, Math.min(2, this.world.wall[ci] - 1));
+        this.loot.spawnDropsForBlock(
+          ccx,
+          ccy,
+          FACILITY.crystalVeinDrops * (this.dropChanceAt(veinZone, ownerId) / Math.max(1e-6, this.stats.dropChance)),
+          this.stats.pickupLifetime,
+          this.rng,
+          lootKindForZone(veinZone),
+        );
+      } else {
+        this.loot.spawnDropsForBlock(
+          ccx,
+          ccy,
+          this.dropChanceAt(this.blockLootZone(zone), ownerId),
+          this.stats.pickupLifetime,
+          this.rng,
+          lootKind,
+        );
+      }
       const destroyedCore = this.world.checkCoreDestroyedAt(cx, cy);
       if (destroyedCore) {
         const small = destroyedCore.size === 1;
@@ -948,6 +963,14 @@ export class Game {
         6,
       );
     }
+  }
+
+  /**
+   * Zone whose loot an ordinary block at `zone` drops. In the hand-made lab
+   * crystals come only from veins, so every ordinary block drops gold.
+   */
+  private blockLootZone(zone: number): number {
+    return this.world.labLayout?.frame ? 0 : zone;
   }
 
   /** A destroyed block's drop chance: its zone's, then the soldier who broke it. */
@@ -1145,7 +1168,7 @@ export class Game {
     }
     const zone = zoneForDepth(this.world.depthOf(Math.floor(x / this.world.cellSize), Math.floor(y / this.world.cellSize)));
     const chance = c.kind === "flower" ? 0.6 : c.kind === "worm" ? 1 : 2;
-    this.loot.spawnDropsForBlock(x, y, chance, this.stats.pickupLifetime, this.rng, lootKindForZone(zone));
+    this.loot.spawnDropsForBlock(x, y, chance, this.stats.pickupLifetime, this.rng, lootKindForZone(this.blockLootZone(zone)));
   }
 
   /** A dormant pixel crumbled to Necrosis Protocol: a puff of dark dust. */

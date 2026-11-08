@@ -167,7 +167,7 @@ describe("New Features & Upgrades", () => {
 
     // Tier 3 (Zone 3): 100 - 500 HP
     const t3Start = maxHealthForDistance(TERRAIN.roomRadius + TERRAIN.zone3Depth);
-    const t3Deep = maxHealthForDistance(TERRAIN.roomRadius + TERRAIN.zone3Depth + 40);
+    const t3Deep = maxHealthForDistance(TERRAIN.roomRadius + TERRAIN.zone3Depth + TERRAIN.zone3Span);
     expect(t3Start).toBe(100);
     expect(t3Deep).toBe(500);
 

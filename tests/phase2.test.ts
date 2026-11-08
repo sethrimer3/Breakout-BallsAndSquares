@@ -157,7 +157,7 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
       const idx = core.cells[k];
       const cx = idx % w.width;
       const cy = Math.floor(idx / w.width);
-      w.damage(cx, cy, 255);
+      w.damage(cx, cy, w.health[idx]);
       expect(w.checkCoreDestroyedAt(cx, cy)).toBeNull();
     }
     expect(core.alive).toBe(true);
@@ -166,7 +166,7 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
     const lastIdx = core.cells[3];
     const lastCx = lastIdx % w.width;
     const lastCy = Math.floor(lastIdx / w.width);
-    w.damage(lastCx, lastCy, 255);
+    w.damage(lastCx, lastCy, w.health[lastIdx]);
     const killedCore = w.checkCoreDestroyedAt(lastCx, lastCy);
     expect(killedCore).toBe(core);
     expect(core.alive).toBe(false);

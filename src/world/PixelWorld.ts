@@ -23,6 +23,8 @@ export const MAT = {
   glass: 1,
   /** Blast door; opens when shot by a squad holding its tier's keycard. */
   door: 2,
+  /** A seam of crystal in a lab wall (tier 2 orange, tier 3 green); breaks like an ordinary block. */
+  crystal: 3,
 } as const;
 
 /** Kinds of 50% sub-pixels (`world.subKind`). */
@@ -318,6 +320,10 @@ export class PixelWorld implements SolidQuery {
         const door = this.doors[this.doorId[i] - 1];
         // Doors break like ordinary blocks of their tier; a keycard just opens them in one hit.
         return blockHealthForTier(door ? door.tier : 1, dist);
+      }
+      if (m === MAT.crystal) {
+        const z = Math.min(2, Math.max(0, this.wall[i] - 1));
+        return blockHealthForTier((z + 1) as 1 | 2 | 3, dist);
       }
       if (m === MAT.glass) {
         return Math.max(1, Math.ceil(maxHealthForDistance(dist) * FACILITY.glassHealthMult));
