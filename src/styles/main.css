@@ -1217,119 +1217,9 @@ button {
 .tree-cat-panel.hidden {
   display: none !important;
 }
-.tree-cat-short,
-.tree-nav {
+.tree-cat-heading,
+.tree-room-fold {
   display: none;
-}
-
-/*
- * Small screens: the matrix is scaled down to fit, so its category buttons move
- * into this unscaled menu (UpgradeTree.fitToScreen) with thumb-sized targets.
- * Landscape puts it on the left as a rail; portrait puts it on top as a grid.
- */
-.tree-railmode .tree-nav:not(.hidden) {
-  display: block;
-  flex: none;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: 6px;
-  background: var(--bg-0);
-  box-shadow: 0 0 0 var(--px2) var(--line);
-}
-.tree-nav-side {
-  flex-direction: row;
-  gap: 10px;
-}
-.tree-nav-top {
-  flex-direction: column;
-  gap: 10px;
-}
-.tree-nav-side .tree-nav {
-  max-height: 100%;
-}
-.tree-nav-top .tree-nav {
-  width: 100%;
-  max-width: 560px;
-}
-.tree-nav .tree-tabs-container {
-  margin: 0;
-  padding: 4px;
-  gap: 10px;
-  align-items: stretch;
-}
-.tree-nav-side .tree-tabs-container {
-  flex-direction: row;
-}
-.tree-nav .tree-cat-name {
-  display: none;
-}
-.tree-nav .tree-cat-short {
-  display: inline;
-  letter-spacing: 0.5px;
-}
-.tree-nav .cat-caret {
-  margin-left: auto;
-}
-.tree-nav .tree-categories,
-.tree-nav .tree-cat-panel,
-.tree-nav .soldier-slot-tabs {
-  display: grid;
-  gap: 8px;
-  justify-content: stretch;
-}
-.tree-nav-side .tree-categories,
-.tree-nav-side .tree-cat-panel,
-.tree-nav-side .soldier-slot-tabs {
-  grid-template-columns: 1fr;
-  align-content: start;
-}
-.tree-nav-top .tree-categories {
-  grid-template-columns: 1fr 1fr;
-}
-.tree-nav-top .tree-cat-panel,
-.tree-nav-top .soldier-slot-tabs {
-  grid-template-columns: 1fr 1fr;
-  width: 100%;
-}
-.tree-nav .tree-cat-panel > .soldier-slot-tabs {
-  grid-column: 1 / -1;
-}
-.tree-nav .tree-category-panels {
-  width: auto;
-}
-/* A steady width, so the matrix doesn't resize when switching categories. */
-.tree-nav-side .tree-category-panels {
-  min-width: 196px;
-}
-.tree-nav-side .tree-categories {
-  min-width: 150px;
-}
-/* Touch has no real hover: don't leave a lit frame where the finger was. */
-@media (hover: none) {
-  .tree-nav .tree-cat-btn:hover:not(.active),
-  .tree-nav .tree-tab:hover:not(.active) {
-    --fc: var(--line);
-    color: #88a8c8;
-  }
-}
-.tree-nav-side .tree-categories {
-  padding-right: 10px;
-  box-shadow: var(--px2) 0 0 0 var(--line);
-}
-.tree-nav .tree-cat-btn,
-.tree-nav .tree-tab {
-  min-height: 44px;
-  padding: 6px 12px;
-  gap: 10px;
-  white-space: nowrap;
-}
-.tree-nav .tree-cat-btn .px,
-.tree-nav .tree-tab .px {
-  --px: var(--px2) !important;
-}
-.tree-nav .tree-cat-btn.expanded:not(.active) {
-  --fc: #4f7a99;
-  color: #e4f4ff;
 }
 .tree-tabs {
   display: flex;
@@ -2335,5 +2225,199 @@ button {
   }
   100% {
     box-shadow: 0 0 18px rgba(255, 216, 77, 0.9);
+  }
+}
+
+/* ---------------------------------------------------------- compact matrix */
+/*
+ * Phones (UpgradeTree.fitToScreen adds .tree-compact): the matrix fills the
+ * screen at real size instead of being scaled down. Landscape: category menu
+ * on the left quarter, tree in the middle half, room on the right quarter,
+ * Deploy under the menu. Portrait (.tree-portrait): stacked.
+ */
+.tree-compact .tree-fit-box {
+  width: 100%;
+  height: 100%;
+}
+.tree-compact .tree-shell {
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "nav stage close"
+    "nav stage room"
+    "nav stage wallet"
+    "actions stage life";
+  gap: 8px;
+}
+.tree-compact .tree-header,
+.tree-compact .tree-footer {
+  display: contents;
+}
+.tree-compact .tree-title,
+.tree-compact .tree-sub,
+.tree-compact .tree-legend,
+.tree-compact .tree-points-label,
+.tree-compact .cat-caret,
+.tree-compact .tree-cat-name {
+  display: none !important;
+}
+.tree-compact .tree-close {
+  grid-area: close;
+  position: static;
+  justify-self: end;
+}
+.tree-compact .tree-tabs-container {
+  grid-area: nav;
+  margin: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 2px;
+}
+.tree-compact .tree-categories {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+.tree-compact .tree-cat-btn {
+  justify-content: center;
+  min-height: 36px;
+  padding: 4px;
+}
+.tree-compact .tree-cat-btn .px {
+  --px: var(--px2) !important;
+}
+.tree-compact .tree-cat-heading {
+  display: block;
+  font-family: var(--font-small);
+  font-size: var(--f8);
+  line-height: 1.5;
+  color: var(--muted);
+  text-align: left;
+}
+.tree-compact .tree-category-panels {
+  width: 100%;
+}
+.tree-compact .tree-cat-panel,
+.tree-compact .soldier-slot-tabs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4px;
+  min-height: 0;
+  width: 100%;
+}
+.tree-compact .tree-cat-panel > .soldier-slot-tabs {
+  grid-column: 1 / -1;
+}
+.tree-compact .tree-tab {
+  min-height: 28px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.tree-compact .tree-stage {
+  grid-area: stage;
+  width: auto;
+  height: auto;
+  margin: 0;
+  min-width: 0;
+  min-height: 0;
+  box-shadow: inset 0 0 0 var(--px1) var(--line);
+}
+.tree-compact .loadout-stage {
+  grid-area: stage;
+  width: auto;
+  height: auto;
+  margin: 0;
+  min-height: 0;
+}
+.tree-compact .tree-room {
+  grid-area: room;
+  width: auto;
+  height: auto;
+  margin: 0;
+  min-height: 0;
+  display: flex;
+}
+.tree-compact .tree-room canvas {
+  display: none;
+}
+.tree-compact .tree-room .tree-room-fold {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: top;
+}
+.tree-compact .tree-points-val {
+  grid-area: wallet;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px 10px;
+}
+.tree-compact .tree-life {
+  grid-area: life;
+  align-self: end;
+  text-align: center;
+  line-height: 1.5;
+}
+.tree-compact .tree-actions {
+  grid-area: actions;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+}
+.tree-compact .tree-actions .btn {
+  padding: 8px 6px;
+}
+
+/* Portrait phones: menu on top, then the tree, the room strip and the wallet. */
+.tree-compact.tree-portrait .tree-shell {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto auto auto;
+  grid-template-areas:
+    "nav nav close"
+    "stage stage stage"
+    "room room room"
+    "wallet wallet wallet"
+    "actions life life";
+}
+.tree-compact.tree-portrait .tree-cat-panel,
+.tree-compact.tree-portrait .soldier-slot-tabs {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.tree-compact.tree-portrait .tree-room .tree-room-fold {
+  display: none;
+}
+.tree-compact.tree-portrait .tree-room canvas:not(.tree-room-fold) {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.tree-compact.tree-portrait .tree-actions {
+  justify-content: flex-end;
+}
+.tree-compact.tree-portrait .tree-life {
+  align-self: center;
+}
+.tree-compact .tree-cat-btn.expanded:not(.active) {
+  --fc: #4f7a99;
+  color: #e4f4ff;
+}
+/* Touch has no real hover: don't leave a lit frame where the finger was. */
+@media (hover: none) {
+  .tree-compact .tree-cat-btn:hover:not(.active):not(.expanded),
+  .tree-compact .tree-tab:hover:not(.active) {
+    --fc: var(--line);
+    color: #88a8c8;
   }
 }

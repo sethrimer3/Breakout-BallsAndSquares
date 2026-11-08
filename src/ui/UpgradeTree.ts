@@ -1,4 +1,4 @@
-import { UpgradeRoom, type RoomKind } from "./upgradeRooms";
+import { ROOM_H, ROOM_W, UpgradeRoom, type RoomKind } from "./upgradeRooms";
 import { SOLDIER, TERRAIN } from "../config";
 import type { SecondaryWeaponType, WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
@@ -175,8 +175,11 @@ function toArt(v: number): number {
   return Math.round(v / LINK_PIXEL);
 }
 
-/** Below this matrix scale the category buttons get their own full-size menu. */
-const RAIL_BELOW_SCALE = 0.9;
+/** Below this matrix scale, phones get the compact full-screen layout instead. */
+const COMPACT_BELOW_SCALE = 0.9;
+/** The room strip is shown as this many stacked floors in the compact layout. */
+const ROOM_FLOORS = 3;
+const FLOOR_GAP = 2;
 
 function reducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -230,8 +233,11 @@ export class UpgradeTree {
   /** Shell + the box that reserves its scaled size, so small screens see the whole matrix. */
   private shellEl: HTMLDivElement;
   private fitBoxEl: HTMLDivElement;
-  /** Holds the category buttons, unscaled, beside or above the matrix on small screens. */
-  private navEl: HTMLElement;
+  /** The tree stage's size in its own pixels: fixed on desktop, the screen's on phones. */
+  private stageW = STAGE_W;
+  private stageH = STAGE_H;
+  /** The room strip folded into three floors, for the phone layout's narrow column. */
+  private roomFold = document.createElement("canvas");
   /** On-screen px per shell px (1 on desktop, < 1 when shrunk to fit a phone). */
   private uiScale = 1;
   /** Pointer type of the last press on a node: touch taps select before they buy. */
@@ -250,7 +256,6 @@ export class UpgradeTree {
     this.root = document.createElement("div");
     this.root.className = "overlay tree-overlay hidden";
     this.root.innerHTML = `
-      <nav class="tree-nav hidden" aria-label="Upgrade categories"></nav>
       <div class="tree-fit-box"><div class="tree-shell">
         <button class="tree-close" title="Close (Esc)">${sprite("close", { color: UI_COLORS.magenta })}</button>
         <div class="tree-header">
@@ -258,31 +263,28 @@ export class UpgradeTree {
           <div class="tree-sub">CORE SYSTEMS, WEAPON TREES &amp; SQUAD LOADOUT</div>
           <div class="tree-tabs-container">
             <div class="tree-categories">
-              <button class="tree-cat-btn active expanded" data-cat="systems">
+              <button class="tree-cat-btn active expanded" data-cat="systems" title="CORE / MONEY / BLIGHT / BASE">
                 ${sprite("soldier", { color: UI_COLORS.soldier, scale: 1 })}
                 <span class="tree-cat-name">CORE / MONEY / BLIGHT / BASE</span>
-                <span class="tree-cat-short">CORE &amp; BASE</span>
                 <span class="cat-caret">▼</span>
               </button>
-              <button class="tree-cat-btn" data-cat="primary">
+              <button class="tree-cat-btn" data-cat="primary" title="PRIMARY WEAPONS">
                 ${sprite("rifle", { color: "#52f296", scale: 1 })}
                 <span class="tree-cat-name">PRIMARY WEAPONS</span>
-                <span class="tree-cat-short">PRIMARY</span>
                 <span class="cat-caret">▶</span>
               </button>
-              <button class="tree-cat-btn" data-cat="secondary">
+              <button class="tree-cat-btn" data-cat="secondary" title="SECONDARY WEAPONS">
                 ${sprite("grenade", { color: "#ff9d3b", scale: 1 })}
                 <span class="tree-cat-name">SECONDARY WEAPONS</span>
-                <span class="tree-cat-short">SECONDARY</span>
                 <span class="cat-caret">▶</span>
               </button>
-              <button class="tree-cat-btn" data-cat="soldiers">
+              <button class="tree-cat-btn" data-cat="soldiers" title="SOLDIER TREES">
                 ${sprite("soldierPlus", { color: UI_COLORS.soldier, scale: 1 })}
                 <span class="tree-cat-name">SOLDIER TREES</span>
-                <span class="tree-cat-short">SOLDIERS</span>
                 <span class="cat-caret">▶</span>
               </button>
             </div>
+            <div class="tree-cat-heading">${CATEGORIES[0].name}</div>
             <div class="tree-category-panels">
               <div class="tree-cat-panel" data-cat="systems">
                 <button class="tree-tab active" data-tab="core">${tabHtml("core", "CORE")}</button>
@@ -346,7 +348,6 @@ export class UpgradeTree {
 
     this.shellEl = this.root.querySelector(".tree-shell") as HTMLDivElement;
     this.fitBoxEl = this.root.querySelector(".tree-fit-box") as HTMLDivElement;
-    this.navEl = this.root.querySelector(".tree-nav") as HTMLElement;
     window.addEventListener("resize", () => {
       if (this.visible) this.fitToScreen();
     });
@@ -354,6 +355,15 @@ export class UpgradeTree {
     this.roomEl = this.root.querySelector(".tree-room") as HTMLDivElement;
     this.roomLabelEl = this.root.querySelector(".tree-room-label") as HTMLSpanElement;
     this.roomEl.prepend(this.room.canvas);
+    // The compact layout's stage takes whatever room the grid leaves it.
+    new ResizeObserver(() => {
+      const w = this.stageEl.clientWidth;
+      if (this.root.classList.contains("tree-compact") && w > 0) this.resizeStage(w, this.stageEl.clientHeight);
+    }).observe(this.stageEl);
+    this.roomFold.className = "tree-room-fold";
+    this.roomFold.width = Math.ceil(ROOM_W / ROOM_FLOORS);
+    this.roomFold.height = ROOM_H * ROOM_FLOORS + FLOOR_GAP * (ROOM_FLOORS - 1);
+    this.roomEl.append(this.roomFold);
     this.loadoutWrap = this.root.querySelector(".loadout-stage") as HTMLDivElement;
     this.linksEl = this.root.querySelector(".tree-links") as HTMLCanvasElement;
     this.viewEl = this.root.querySelector(".tree-view") as HTMLDivElement;
@@ -475,6 +485,9 @@ export class UpgradeTree {
       if (caret) caret.textContent = isExpanded ? "▼" : "▶";
     });
 
+    const heading = this.root.querySelector(".tree-cat-heading") as HTMLElement;
+    heading.textContent = CATEGORIES.find((c) => c.id === this.expandedCategory)?.name ?? "";
+
     this.root.querySelectorAll(".tree-cat-panel").forEach((panel) => {
       const el = panel as HTMLElement;
       const cat = el.dataset.cat as UpgradeCategory;
@@ -576,7 +589,6 @@ export class UpgradeTree {
       }
     }
     this.tabsEl.classList.toggle("hidden", this.inLoadoutScreen);
-    if (this.visible && this.root.classList.contains("tree-railmode")) this.fitToScreen();
     // Keeps its height on other tabs so the panel doesn't jump when switching.
     this.legendEl.classList.toggle("hidden", this.inLoadoutScreen);
     this.legendEl.style.visibility = "hidden";
@@ -735,7 +747,7 @@ export class UpgradeTree {
       if (!p || p.pointerId !== e.pointerId) return;
       const x = p.viewX + (e.clientX - p.startX) / this.uiScale;
       const y = p.viewY + (e.clientY - p.startY) / this.uiScale;
-      this.setView(clampView({ x, y, s: this.view.s }, this.bounds), true);
+      this.setView(clampView({ x, y, s: this.view.s }, this.bounds, this.stageW, this.stageH), true);
     });
     const release = (e: PointerEvent): void => {
       this.stagePointers.delete(e.pointerId);
@@ -757,13 +769,15 @@ export class UpgradeTree {
           -Math.sign(e.deltaY),
           (e.clientX - rect.left) / this.uiScale,
           (e.clientY - rect.top) / this.uiScale,
+          this.stageW,
+          this.stageH,
         );
         this.hideTooltip();
         this.setView(next, true);
       },
       { passive: false },
     );
-    this.fitBtn.addEventListener("click", () => this.setView(fitView(this.bounds), false));
+    this.fitBtn.addEventListener("click", () => this.setView(fitView(this.bounds, this.stageW, this.stageH), false));
   }
 
   /** Two-finger pinch: one zoom step each time the spread changes by a quarter. */
@@ -775,61 +789,52 @@ export class UpgradeTree {
     const rect = this.stageEl.getBoundingClientRect();
     const px = ((a.x + b.x) / 2 - rect.left) / this.uiScale;
     const py = ((a.y + b.y) / 2 - rect.top) / this.uiScale;
-    this.setView(zoomAt(this.view, this.bounds, ratio > 1 ? 1 : -1, px, py), true);
+    this.setView(zoomAt(this.view, this.bounds, ratio > 1 ? 1 : -1, px, py, this.stageW, this.stageH), true);
     this.pinchStartDist = dist;
   }
 
   /**
-   * Shrink the whole matrix (never enlarge) so it fits small screens like phones.
-   * When that would shrink the category buttons too far to tap, they move out of
-   * the scaled matrix into a full-size menu: a rail on the left in landscape, a
-   * grid on top in portrait.
+   * Shrink the whole matrix (never enlarge) so it fits mid-size screens. When
+   * that would shrink it too far (phones), switch to the compact layout instead:
+   * a full-screen grid at real size, with category buttons on the left, the
+   * tree in the middle and the room on the right (stacked in portrait).
    */
   private fitToScreen(): void {
     const pad = 16;
-    const gap = 10;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    // Measure the desktop layout first, buttons in the header.
-    this.setRailMode(false);
-    let { w, h, s } = this.measureShell(vw - pad, vh - pad);
+    // Measure the desktop layout first.
+    this.root.classList.remove("tree-compact", "tree-portrait");
+    this.shellEl.style.transform = "";
+    this.fitBoxEl.style.width = "";
+    this.fitBoxEl.style.height = "";
+    const w = this.shellEl.offsetWidth;
+    const h = this.shellEl.offsetHeight;
+    const s = Math.min(1, (vw - pad) / w, (vh - pad) / h);
     const coarse = window.matchMedia("(pointer: coarse)").matches;
-    if (s < RAIL_BELOW_SCALE || (coarse && s < 1)) {
-      const side = vw > vh;
-      this.setRailMode(true, side);
-      const showNav = !this.tabsEl.classList.contains("hidden");
-      this.navEl.classList.toggle("hidden", !showNav);
-      const navW = showNav && side ? this.navEl.offsetWidth + gap : 0;
-      const navH = showNav && !side ? this.navEl.offsetHeight + gap : 0;
-      ({ w, h, s } = this.measureShell(vw - pad - navW, vh - pad - navH));
+    const compact = s < COMPACT_BELOW_SCALE || (coarse && s < 1);
+    this.uiScale = compact ? 1 : s;
+    if (compact) {
+      this.root.classList.add("tree-compact");
+      this.root.classList.toggle("tree-portrait", vh > vw);
+      // Hidden on the loadout screen: keep the last size until it shows again.
+      if (this.stageEl.clientWidth > 0) this.resizeStage(this.stageEl.clientWidth, this.stageEl.clientHeight);
+      return;
     }
-    this.uiScale = s;
+    this.resizeStage(STAGE_W, STAGE_H);
     if (s >= 1) return;
     this.shellEl.style.transform = `scale(${s})`;
     this.fitBoxEl.style.width = `${Math.floor(w * s)}px`;
     this.fitBoxEl.style.height = `${Math.floor(h * s)}px`;
   }
 
-  private measureShell(availW: number, availH: number): { w: number; h: number; s: number } {
-    this.shellEl.style.transform = "";
-    this.fitBoxEl.style.width = "";
-    this.fitBoxEl.style.height = "";
-    const w = this.shellEl.offsetWidth;
-    const h = this.shellEl.offsetHeight;
-    return { w, h, s: Math.min(1, availW / w, availH / h) };
-  }
-
-  /** Move the category buttons between the matrix header and the full-size menu. */
-  private setRailMode(on: boolean, side = true): void {
-    this.root.classList.toggle("tree-railmode", on);
-    this.root.classList.toggle("tree-nav-side", on && side);
-    this.root.classList.toggle("tree-nav-top", on && !side);
-    if (on) {
-      if (this.tabsEl.parentElement !== this.navEl) this.navEl.append(this.tabsEl);
-    } else {
-      this.navEl.classList.add("hidden");
-      if (this.tabsEl.parentElement !== this.subEl.parentElement) this.legendEl.before(this.tabsEl);
-    }
+  /** Give the tree a new stage size and fit it again. */
+  private resizeStage(w: number, h: number): void {
+    if (w === this.stageW && h === this.stageH) return;
+    this.stageW = w;
+    this.stageH = h;
+    this.hideTooltip();
+    this.setView(fitView(this.bounds, w, h), false);
   }
 
   /** `steered`: the player moved the view away from the fit, so offer FIT. */
@@ -860,7 +865,7 @@ export class UpgradeTree {
     if (this.activeBodies.length > 0) {
       this.bounds = treeBounds(this.activeBodies.map((b) => ({ x: b.hx, y: b.hy })));
       this.sizeLinkCanvas();
-      this.setView(fitView(this.bounds), false);
+      this.setView(fitView(this.bounds, this.stageW, this.stageH), false);
     }
 
     const grow = sprout && !reducedMotion();
@@ -1077,9 +1082,14 @@ export class UpgradeTree {
     const h = this.tooltipEl.offsetHeight;
     const screenX = this.view.x + pos.x * this.view.s;
     const screenY = this.view.y + pos.y * this.view.s;
-    const left = Math.min(STAGE_W - w, Math.max(0, Math.round(screenX - w / 2)));
+    const left = Math.min(this.stageW - w, Math.max(0, Math.round(screenX - w / 2)));
     this.tooltipEl.style.left = `${left}px`;
-    this.tooltipEl.style.top = `${Math.round(screenY - 40 * this.view.s) - h}px`;
+    let top = Math.round(screenY - 40 * this.view.s) - h;
+    // Phones: nothing above the stage to spill onto, so flip below the node and keep it on the stage.
+    if (this.root.classList.contains("tree-compact") && top < 0) {
+      top = Math.max(0, Math.min(this.stageH - h, Math.round(screenY + 40 * this.view.s)));
+    }
+    this.tooltipEl.style.top = `${top}px`;
   }
 
   private hideTooltip(): void {
@@ -1390,8 +1400,21 @@ export class UpgradeTree {
       reducedMotion() ? 0 : t,
       dt,
     );
+    if (this.root.classList.contains("tree-compact")) this.foldRoom();
     this.roomLabelEl.textContent =
       kind === "lab" ? "BLIGHT RESEARCH LAB" : kind === "armory" ? "WEAPON ARMORY" : tab === "soldier" ? `BARRACKS · SOLDIER #${slot + 1}` : "SOLDIER BARRACKS";
+  }
+
+  /** Copy the room strip into stacked floors, left part on top. */
+  private foldRoom(): void {
+    const g = this.roomFold.getContext("2d")!;
+    const fw = this.roomFold.width;
+    g.clearRect(0, 0, fw, this.roomFold.height);
+    for (let i = 0; i < ROOM_FLOORS; i++) {
+      const sx = i * fw;
+      const sw = Math.min(fw, ROOM_W - sx);
+      g.drawImage(this.room.canvas, sx, 0, sw, ROOM_H, 0, i * (ROOM_H + FLOOR_GAP), sw, ROOM_H);
+    }
   }
 
   show(): void {
