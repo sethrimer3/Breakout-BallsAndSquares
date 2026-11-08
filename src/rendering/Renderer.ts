@@ -71,6 +71,7 @@ export class Renderer {
     const rRad = 88 * cam.zoom;
     ctx.drawImage(this.sprites.soldierGlow, rcx - rRad, rcy - rRad, rRad * 2, rRad * 2);
 
+    game.terrain.drawFloor(ctx, cam);
     game.terrain.draw(ctx, cam, game.showChunkBorders);
     this.drawDoors();
 
@@ -90,6 +91,7 @@ export class Renderer {
     //    scene + additive air-scatter cone so shadows behind walls & soldiers pop.
     this.lightRenderer.renderLighting(ctx, game, this.dpr);
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
+    game.terrain.drawPanels(ctx, cam, performance.now() / 1000);
     game.terrain.drawTierGlow(ctx, cam, game.runStats.time);
     game.terrain.drawLabLights(ctx, cam, performance.now() / 1000, this.motion.matches);
     this.drawSentries();

@@ -231,6 +231,9 @@ export class LightRenderer {
       g.globalAlpha = 1;
     }
 
+    // The lab's own ceiling panels and Blight glows, kept inside their rooms.
+    game.terrain.drawRoomLight(g, cam, performance.now() / 1000);
+
     // 4) Light on walls, whole cells at a time.
     const wallsLit = this.updateWallLight(game);
     if (wallsLit) game.terrain.drawCellOverlay(g, cam, this.wallCanvas);

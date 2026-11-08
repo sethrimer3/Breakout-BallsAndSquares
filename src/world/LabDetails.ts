@@ -1,8 +1,8 @@
 import { CREATURES, FACILITY } from "../config";
-import { valueNoise } from "../core/math";
+import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
-import { MAT, type PixelWorld } from "./PixelWorld";
-import type { LabCorridorSegment, LabLayout, LabRoom } from "./WorldGenerator";
+import { LIGHT_KIND, MAT, type PixelWorld, type RoomLight } from "./PixelWorld";
+import { ROOM_STATE, type LabCorridorSegment, type LabLayout, type LabRoom, type RoomState } from "./WorldGenerator";
 
 /**
  * Facility set dressing painted over the lab maze: tiled floors, blast doors,
@@ -39,6 +39,18 @@ export const DECOR = {
   blightVein: 19,
   blightCoreShell: 20,
   blightCoreHeart: 21,
+  cleanFloor: 22,
+  cleanSeam: 23,
+  lightPanel: 24,
+  deadPanel: 25,
+  grime: 26,
+  crack: 27,
+  trim: 28,
+  cleanWall: 29,
+  cleanWallSeam: 30,
+  grimeWall: 31,
+  fleshWall: 32,
+  missingTile: 33,
 } as const;
 
 /** Floor tile size, in cells. */
@@ -51,7 +63,6 @@ const TANK_ROW_GAP = 3;
 const MAX_CORES = 255;
 /** Longer wall openings are corridors running alongside the room, not doors. */
 const MAX_DOOR_WIDTH = 6;
-const BREACHED_ROOM_CHANCE = 0.2;
 const BREACH_WIDTH = 5;
 
 /** Cell `along` a room's side and `out` cells past its interior (-1 = inside). */
@@ -74,25 +85,144 @@ function wallAt(world: PixelWorld, x: number, y: number): number {
   return world.inBounds(x, y) ? world.wall[y * world.width + x] : 0;
 }
 
-function paintCorridor(world: PixelWorld, seg: LabCorridorSegment): void {
+function paintCorridor(world: PixelWorld, seg: LabCorridorSegment, seed: number): void {
+  const state = seg.state ?? ROOM_STATE.worn;
   const mid = seg.axis === "h" ? Math.floor((seg.y0 + seg.y1) / 2) : Math.floor((seg.x0 + seg.x1) / 2);
   for (let y = seg.y0; y <= seg.y1; y++) {
     for (let x = seg.x0; x <= seg.x1; x++) {
       const across = seg.axis === "h" ? y : x;
       const along = seg.axis === "h" ? x : y;
       const dash = across === mid && along % TILE < 2;
-      setDecor(world, x, y, dash ? DECOR.guideLine : DECOR.floor);
+      if (state === ROOM_STATE.pristine) {
+        setDecor(world, x, y, dash ? DECOR.guideLine : DECOR.cleanFloor);
+      } else if (state === ROOM_STATE.decayed) {
+        setDecor(world, x, y, decayedFloorAt(x, y, seed, dash ? DECOR.guideLine : DECOR.floor, 0));
+      } else {
+        setDecor(world, x, y, dash ? DECOR.guideLine : DECOR.floor);
+      }
+    }
+  }
+  if (seg.rubble) return;
+  // Ceiling tubes down the middle of the hall, set between the guide-line dashes.
+  const pitch = FACILITY.panelPitch + 2;
+  const a0 = seg.axis === "h" ? seg.x0 : seg.y0;
+  const a1 = seg.axis === "h" ? seg.x1 : seg.y1;
+  for (let a = a0 + 3; a + 1 <= a1 - 2; a += pitch) {
+    const panel = seg.axis === "h"
+      ? { x0: a, y0: mid, x1: a + 1, y1: mid }
+      : { x0: mid, y0: a, x1: mid, y1: a + 1 };
+    addPanel(world, panel, { cx0: seg.x0, cy0: seg.y0, cx1: seg.x1, cy1: seg.y1 }, state, hash2(a, mid, seed + 7));
+  }
+  if (state === ROOM_STATE.pristine) {
+    world.roomLights.push({ kind: LIGHT_KIND.wash, x0: seg.x0, y0: seg.y0, x1: seg.x1, y1: seg.y1, cx0: seg.x0, cy0: seg.y0, cx1: seg.x1, cy1: seg.y1, phase: 0 });
+  }
+}
+
+type Rect = { x0: number; y0: number; x1: number; y1: number };
+type Clip = { cx0: number; cy0: number; cx1: number; cy1: number };
+
+/**
+ * A ceiling light panel: bright in pristine areas, mostly lit in worn ones,
+ * mostly dead in decayed ones. `roll` (0..1) decides which.
+ */
+function addPanel(world: PixelWorld, p: Rect, clip: Clip, state: RoomState, roll: number): void {
+  let kind: RoomLight["kind"] | -1;
+  if (state === ROOM_STATE.pristine) kind = LIGHT_KIND.bright;
+  else if (state === ROOM_STATE.worn) {
+    kind = roll < FACILITY.wornDeadChance ? -1 : roll < FACILITY.wornDeadChance + FACILITY.wornFlickerChance ? LIGHT_KIND.flicker : LIGHT_KIND.dim;
+  } else {
+    kind = roll < FACILITY.decayedFlickerChance ? LIGHT_KIND.flicker : -1;
+  }
+  for (let y = p.y0; y <= p.y1; y++) {
+    for (let x = p.x0; x <= p.x1; x++) setDecor(world, x, y, kind === -1 ? DECOR.deadPanel : DECOR.lightPanel);
+  }
+  if (kind !== -1) world.roomLights.push({ kind, ...p, ...clip, phase: (roll * 7.31) % 1 });
+}
+
+/**
+ * Floor of a decayed area: blotches of grime, hairline cracks, missing tiles
+ * and Blight stains creeping in. `base` is what an untouched cell shows.
+ */
+function decayedFloorAt(x: number, y: number, seed: number, base: number, edge: number): number {
+  const stain = valueNoise(x, y, 6, seed + 211) + edge * 0.25;
+  if (stain > 0.74) return DECOR.blightStain;
+  // Thin crack lines along the crests of a coarse noise field.
+  const c = valueNoise(x, y, 9, seed + 307);
+  if (Math.abs(c - 0.5) < 0.025) return DECOR.crack;
+  if (hash2(x >> 2, y >> 2, seed + 401) < 0.06) return DECOR.missingTile;
+  if (valueNoise(x, y, 4, seed + 503) > 0.58) return DECOR.grime;
+  return base;
+}
+
+function paintRoomFloor(world: PixelWorld, r: LabRoom, seed: number): void {
+  const state = r.state ?? ROOM_STATE.worn;
+  for (let y = 0; y < r.size; y++) {
+    for (let x = 0; x < r.size; x++) {
+      const wx = r.x + x;
+      const wy = r.y + y;
+      const line = wx % TILE === 0 || wy % TILE === 0;
+      const edge = x === 0 || y === 0 || x === r.size - 1 || y === r.size - 1;
+      let d: number;
+      if (state === ROOM_STATE.pristine) d = edge ? DECOR.trim : line ? DECOR.cleanSeam : DECOR.cleanFloor;
+      else if (state === ROOM_STATE.decayed) {
+        const near = Math.min(x, y, r.size - 1 - x, r.size - 1 - y);
+        d = decayedFloorAt(wx, wy, seed, line ? DECOR.floorLine : DECOR.floor, Math.max(0, 1 - near / 4));
+      } else d = line ? DECOR.floorLine : DECOR.floor;
+      setDecor(world, wx, wy, d);
+    }
+  }
+  // A grid of ceiling panels, inset from the walls so equipment rarely hides them.
+  const pitch = FACILITY.panelPitch;
+  const span = r.size - 6;
+  if (span < 3) return;
+  const nx = Math.max(1, Math.floor((span + 2) / pitch));
+  const ox = r.x + 3 + Math.floor((span - ((nx - 1) * pitch + 3)) / 2);
+  const clip = { cx0: r.x, cy0: r.y, cx1: r.x + r.size - 1, cy1: r.y + r.size - 1 };
+  for (let j = 0; j < nx; j++) {
+    for (let i = 0; i < nx; i++) {
+      const px = ox + i * pitch;
+      const py = ox - r.x + r.y + j * pitch;
+      addPanel(world, { x0: px, y0: py, x1: px + 2, y1: py }, clip, state, hash2(px, py, seed + 13));
+    }
+  }
+  if (state === ROOM_STATE.pristine) world.roomLights.push({ kind: LIGHT_KIND.wash, x0: clip.cx0, y0: clip.cy0, x1: clip.cx1, y1: clip.cy1, ...clip, phase: 0 });
+}
+
+/**
+ * Wall finish by condition: clean pale panels around pristine rooms, grime on
+ * decayed ones, flecks of Blight around overrun ones. Worn walls stay bare.
+ */
+function paintRoomWalls(world: PixelWorld, r: LabRoom, seed: number): void {
+  const state = r.state ?? ROOM_STATE.worn;
+  if (state === ROOM_STATE.worn) return;
+  const t = r.wallThickness;
+  for (let y = r.y - t; y < r.y + r.size + t; y++) {
+    for (let x = r.x - t; x < r.x + r.size + t; x++) {
+      if (x >= r.x && x < r.x + r.size && y >= r.y && y < r.y + r.size) continue;
+      if (wallAt(world, x, y) === 0) continue;
+      const i = y * world.width + x;
+      if (world.decor[i] === DECOR.doorLight) continue;
+      let d: number;
+      if (state === ROOM_STATE.pristine) d = (x + y) % 3 === 0 ? DECOR.cleanWallSeam : DECOR.cleanWall;
+      else if (state === ROOM_STATE.decayed) d = valueNoise(x, y, 3, seed + 601) > 0.45 ? DECOR.grimeWall : DECOR.none;
+      else d = valueNoise(x, y, 3, seed + 613) > 0.4 ? DECOR.fleshWall : DECOR.grimeWall;
+      if (d !== DECOR.none) world.decor[i] = d;
     }
   }
 }
 
-function paintRoomFloor(world: PixelWorld, r: LabRoom): void {
-  for (let y = 0; y < r.size; y++) {
-    for (let x = 0; x < r.size; x++) {
-      const line = x % TILE === 0 || y % TILE === 0;
-      setDecor(world, r.x + x, r.y + y, line ? DECOR.floorLine : DECOR.floor);
-    }
-  }
+/** Decay score of a spot: near Blight, deep zones and bad luck all wear a place down. */
+function decayAt(x: number, y: number, zone: number, cores: { x: number; y: number }[], seed: number): number {
+  let best = Infinity;
+  for (const c of cores) best = Math.min(best, Math.hypot(c.x - x, c.y - y));
+  const reach = FACILITY.decayReachCells;
+  const near = Math.max(0, Math.min(1, 1 - (best - FACILITY.decayCoreCells) / reach));
+  const noise = valueNoise(x, y, 28, seed + 919) - 0.5;
+  return near * 0.75 + zone * FACILITY.decayPerZone + noise * FACILITY.decayNoise;
+}
+
+function stateFor(decay: number): RoomState {
+  return decay < FACILITY.pristineBelow ? ROOM_STATE.pristine : decay < FACILITY.decayedAbove ? ROOM_STATE.worn : ROOM_STATE.decayed;
 }
 
 /**
@@ -297,6 +427,13 @@ function overrunRoomWithBlight(world: PixelWorld, r: LabRoom, seed: number): voi
   }
   r.overrun = true;
   r.coreId = cid;
+  world.roomLights.push({
+    kind: LIGHT_KIND.blight,
+    x0: r.x, y0: r.y, x1: r.x + r.size - 1, y1: r.y + r.size - 1,
+    cx0: r.x, cy0: r.y, cx1: r.x + r.size - 1, cy1: r.y + r.size - 1,
+    phase: hash2(r.x, r.y, seed),
+    coreId: cid,
+  });
   world.blightCores.push({
     id: cid,
     roomId: r.id,
@@ -318,8 +455,7 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
   world.doors = [];
   world.sentrySpots = [];
   world.specimenSpots = [];
-
-  for (const seg of layout.corridors) paintCorridor(world, seg);
+  world.roomLights = [];
 
   // Pick rooms in each zone to be overrun with dark pink blight and host a Blight Core
   // (~30% of rooms, and at least 1 room per zone that has rooms).
@@ -337,21 +473,41 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
     }
   }
 
+  // Condition: rooms near an overrun room have decayed; far from the Blight the
+  // facility still looks freshly built.
+  const cores = layout.rooms.filter((r) => overrunIds.has(r.id)).map((r) => ({ x: r.x + r.size / 2, y: r.y + r.size / 2 }));
+  for (const room of layout.rooms) {
+    room.state = overrunIds.has(room.id)
+      ? ROOM_STATE.overrun
+      : stateFor(decayAt(room.x + room.size / 2, room.y + room.size / 2, room.zone, cores, seed));
+  }
+  for (const seg of layout.corridors) {
+    seg.state = stateFor(decayAt((seg.x0 + seg.x1) / 2, (seg.y0 + seg.y1) / 2, seg.zone, cores, seed));
+    paintCorridor(world, seg, seed);
+  }
+
   for (const room of layout.rooms) {
     if (overrunIds.has(room.id)) {
       room.overrun = true;
       overrunRoomWithBlight(world, room, seed);
     } else {
-      paintRoomFloor(world, room);
+      paintRoomFloor(world, room, seed);
       if (rng.next() < FACILITY.tankRoomChance) placeTanks(world, room, rng);
     }
     if (rng.next() < FACILITY.sentryRoomChance) placeSentry(world, room, rng);
   }
+  // Worse finishes go on last, so a wall shared with a ruined room shows the damage.
+  for (const state of [ROOM_STATE.pristine, ROOM_STATE.decayed, ROOM_STATE.overrun]) {
+    for (const room of layout.rooms) if (room.state === state) paintRoomWalls(world, room, seed);
+  }
   for (const room of layout.rooms) paintDoors(world, room);
   for (const room of layout.rooms) {
-    if (overrunIds.has(room.id) || rng.next() < BREACHED_ROOM_CHANCE) {
-      breachRoom(world, room, rng, seed);
-    }
+    const chance =
+      room.state === ROOM_STATE.overrun ? 1
+      : room.state === ROOM_STATE.decayed ? FACILITY.decayedBreachChance
+      : room.state === ROOM_STATE.worn ? FACILITY.wornBreachChance
+      : 0;
+    if (rng.next() < chance) breachRoom(world, room, rng, seed);
   }
   // The starting room stays bare.
   for (let y = world.roomY0; y <= world.roomY1; y++) {
