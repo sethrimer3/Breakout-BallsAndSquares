@@ -1,4 +1,5 @@
 import { ART_PIXEL, SOLDIER } from "../config";
+import { SOLDIER_SHAPES, shapeSdf, type SoldierShape } from "../entities/soldierShapes";
 
 /** Pre-rendered sprites (avoid creating gradients per particle per frame). */
 
@@ -36,12 +37,55 @@ export const SOLDIER_PALETTE = {
  * center pixel.
  */
 export function soldierGrid(sphereRadius: number, ringRadius: number, withRing = true): string[] {
+  return soldierShapeGrid(SOLDIER_SHAPES[0], 0, sphereRadius, ringRadius, withRing);
+}
+
+/** Bevel width of polygon bodies, in body units (about 1.5 art pixels). */
+const SHAPE_BEVEL = 0.34;
+
+/** How much of the full dome curve polygon tops keep (0 = flat, 1 = dome). */
+const SHAPE_DOME = 0.6;
+
+/** Deepest point inside a shape (body units), used to normalise its dome. */
+const shapeDepthCache = new Map<SoldierShape, number>();
+function shapeMaxDepth(shape: SoldierShape): number {
+  let d = shapeDepthCache.get(shape);
+  if (d !== undefined) return d;
+  d = 0;
+  for (let y = -1.5; y <= 1.5; y += 0.02) {
+    for (let x = -1.5; x <= 1.5; x += 0.02) d = Math.max(d, -shapeSdf(shape, x, y));
+  }
+  shapeDepthCache.set(shape, d);
+  return d;
+}
+
+/**
+ * Pixel grid for a soldier of any body shape, rotated so its front points along
+ * `angle` (radians, screen space). The body is shaded as a bevelled slab (the
+ * sphere as a dome), always lit from the upper left, so rotated sprites keep
+ * consistent lighting. For the sphere this is exactly the shaded ball.
+ */
+export function soldierShapeGrid(
+  shape: SoldierShape,
+  angle: number,
+  sphereRadius: number,
+  ringRadius: number,
+  withRing = true,
+): string[] {
   const n = 2 * Math.ceil(ringRadius - 0.5) + 1;
   const c = n / 2;
   const lx = -0.5;
   const ly = -0.55;
   const lz = 0.67;
   const lm = Math.hypot(lx, ly, lz);
+  const ca = Math.cos(angle);
+  const sa = Math.sin(angle);
+  // The sphere is a full dome; polygons get a flat top with a narrow bevel so
+  // their straight edges and corners still read at this tiny size, plus a
+  // gentle curve over the top so they keep the sphere's soft shading.
+  const maxDepth = shapeMaxDepth(shape);
+  const bevel = shape.verts ? Math.min(SHAPE_BEVEL, maxDepth) : maxDepth;
+  const h = 0.01;
   const rows: string[] = [];
   for (let y = 0; y < n; y++) {
     let row = "";
@@ -49,10 +93,24 @@ export function soldierGrid(sphereRadius: number, ringRadius: number, withRing =
       const dx = x + 0.5 - c;
       const dy = y + 0.5 - c;
       const d = Math.hypot(dx, dy);
-      if (d <= sphereRadius) {
-        const nx = dx / sphereRadius;
-        const ny = dy / sphereRadius;
-        const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+      // Screen pixel -> body space (undo the rotation, scale to body units).
+      const bx = (dx * ca + dy * sa) / sphereRadius;
+      const by = (-dx * sa + dy * ca) / sphereRadius;
+      const sd = shapeSdf(shape, bx, by);
+      if (sd <= 0) {
+        // Outward gradient of the outline, back in screen space.
+        let gx = shapeSdf(shape, bx + h, by) - shapeSdf(shape, bx - h, by);
+        let gy = shapeSdf(shape, bx, by + h) - shapeSdf(shape, bx, by - h);
+        const gl = Math.hypot(gx, gy) || 1;
+        gx /= gl;
+        gy /= gl;
+        const sgx = gx * ca - gy * sa;
+        const sgy = gx * sa + gy * ca;
+        const dome = Math.max(0, 1 + sd / maxDepth);
+        const q = Math.min(1, Math.max(0, 1 + sd / bevel, shape.verts ? dome * SHAPE_DOME : dome));
+        const nx = sgx * q;
+        const ny = sgy * q;
+        const nz = Math.sqrt(Math.max(0, 1 - q * q));
         const i = (nx * lx + ny * ly + nz * lz) / lm;
         row += i > 0.96 ? "w" : i > 0.82 ? "+" : i > 0.3 ? "#" : "-";
       } else if (withRing && d <= ringRadius && d > ringRadius - 1) {
@@ -66,9 +124,7 @@ export function soldierGrid(sphereRadius: number, ringRadius: number, withRing =
   return rows;
 }
 
-/** Pixel-art soldier sprite at one canvas pixel per art pixel (draw with smoothing off). */
-export function soldierSprite(sphereRadius: number, ringRadius: number, withRing = true): HTMLCanvasElement {
-  const grid = soldierGrid(sphereRadius, ringRadius, withRing);
+function gridToCanvas(grid: string[]): HTMLCanvasElement {
   const [c, g] = makeCanvas(grid.length);
   for (let y = 0; y < grid.length; y++) {
     for (let x = 0; x < grid.length; x++) {
@@ -79,6 +135,41 @@ export function soldierSprite(sphereRadius: number, ringRadius: number, withRing
     }
   }
   return c;
+}
+
+/** Rotation steps cached per shape (11.25 degrees each). */
+export const SOLDIER_ANGLE_STEPS = 32;
+const shapeSpriteCache = new Map<string, HTMLCanvasElement>();
+
+/**
+ * Cached pixel-art sprite for a soldier shape facing `angle`. The sphere ignores
+ * the angle. Drawn at one canvas pixel per art pixel, like `soldierSprite`.
+ */
+export function soldierShapeSprite(shapeIndex: number, angle: number, withRing: boolean): HTMLCanvasElement {
+  const shape = SOLDIER_SHAPES[shapeIndex] ?? SOLDIER_SHAPES[0];
+  const steps = SOLDIER_ANGLE_STEPS;
+  const step = shape.verts
+    ? ((Math.round((angle / (Math.PI * 2)) * steps) % steps) + steps) % steps
+    : 0;
+  const key = `${shapeIndex}:${step}:${withRing ? 1 : 0}`;
+  let c = shapeSpriteCache.get(key);
+  if (!c) {
+    const grid = soldierShapeGrid(
+      shape,
+      (step / steps) * Math.PI * 2,
+      SOLDIER.renderRadius / ART_PIXEL,
+      SOLDIER.ringRadius / ART_PIXEL,
+      withRing,
+    );
+    c = gridToCanvas(grid);
+    shapeSpriteCache.set(key, c);
+  }
+  return c;
+}
+
+/** Pixel-art soldier sprite at one canvas pixel per art pixel (draw with smoothing off). */
+export function soldierSprite(sphereRadius: number, ringRadius: number, withRing = true): HTMLCanvasElement {
+  return gridToCanvas(soldierGrid(sphereRadius, ringRadius, withRing));
 }
 
 /** Pre-rendered golden square with a soft outer radial glow for ultra-fast single-drawImage loot rendering. */
