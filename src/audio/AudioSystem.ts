@@ -1,7 +1,8 @@
 import type { SaveManager } from "../progression/SaveManager";
+import fireCrackleUrl from "../assets/audio/fire-crackle.mp3?url";
 
 /**
- * Procedural Web Audio synthesizer (no external assets).
+ * Procedural effects and a quiet, sampled fire ambience loop.
  * AudioContext is lazily created on the first user gesture and throttled per
  * sound category so high fire rates never saturate the mixer.
  */
@@ -14,8 +15,23 @@ export class AudioSystem {
   private lastPickupAt = 0;
   private lastGlassAt = 0;
   private lastFlameAt = 0;
+  private fireBuffer: AudioBuffer | null = null;
+  private fireLoad: Promise<void> | null = null;
+  private fireFailed = false;
+  private fireSource: AudioBufferSourceNode | null = null;
+  private fireGain: GainNode | null = null;
+  private fireSilentAt: number | null = null;
+  private hasGesture = false;
 
-  constructor(private save: SaveManager) {}
+  constructor(private save: SaveManager) {
+    if (typeof window === "undefined") return;
+    const unlock = (): void => { this.hasGesture = true; this.ensure(); };
+    window.addEventListener("pointerdown", unlock, { passive: true });
+    window.addEventListener("keydown", unlock);
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) this.stopFireAmbience();
+    });
+  }
 
   get muted(): boolean {
     return this.save.data.settings.muted;
@@ -24,7 +40,56 @@ export class AudioSystem {
   toggleMute(): boolean {
     this.save.data.settings.muted = !this.save.data.settings.muted;
     this.save.save();
+    if (this.muted) this.stopFireAmbience();
+    else this.ensure();
     return this.save.data.settings.muted;
+  }
+
+  /** One loop for all fires, capped at 8% before master volume, with smooth camera fades. */
+  updateFireAmbience(level: number): void {
+    const target = this.muted || document.hidden ? 0
+      : Math.max(0, Math.min(1, level)) * this.save.data.settings.volume * 0.08;
+    const ctx = target > 0 && this.hasGesture ? this.ensure() : this.ctx;
+    if (!ctx) return;
+    if (target > 0 && this.hasGesture && !this.fireBuffer && !this.fireLoad && !this.fireFailed) {
+      this.fireLoad = (async () => {
+        const response = await fetch(fireCrackleUrl);
+        if (!response.ok) throw new Error("Fire ambience asset could not be loaded");
+        this.fireBuffer = await ctx.decodeAudioData(await response.arrayBuffer());
+      })().catch(() => {
+        this.fireFailed = true;
+        console.warn("BREACH: fire ambience unavailable; other sound effects remain active.");
+      }).finally(() => { this.fireLoad = null; });
+    }
+    if (target > 0 && this.hasGesture && this.fireBuffer && !this.fireSource) {
+      this.fireGain = ctx.createGain();
+      this.fireGain.gain.value = 0;
+      this.fireSource = ctx.createBufferSource();
+      this.fireSource.buffer = this.fireBuffer;
+      this.fireSource.loop = true;
+      this.fireSource.connect(this.fireGain).connect(ctx.destination);
+      this.fireSource.start();
+    }
+    if (!this.fireGain) return;
+    this.fireGain.gain.setTargetAtTime(target, ctx.currentTime, 0.12);
+    if (target > 0) this.fireSilentAt = null;
+    else {
+      this.fireSilentAt ??= ctx.currentTime;
+      if (ctx.currentTime - this.fireSilentAt > 0.8) this.stopFireAmbience();
+    }
+  }
+
+  private stopFireAmbience(): void {
+    if (this.fireGain && this.ctx) {
+      this.fireGain.gain.cancelScheduledValues(this.ctx.currentTime);
+      this.fireGain.gain.setValueAtTime(0, this.ctx.currentTime);
+    }
+    this.fireSource?.stop();
+    this.fireSource?.disconnect();
+    this.fireGain?.disconnect();
+    this.fireSource = null;
+    this.fireGain = null;
+    this.fireSilentAt = null;
   }
 
   private ensure(): AudioContext | null {

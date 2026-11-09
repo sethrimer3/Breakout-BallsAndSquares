@@ -1,5 +1,6 @@
 import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
+import { fireAmbienceLevel } from "./audio/fireAmbience";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
 import { SentrySystem } from "./entities/Sentry";
@@ -1882,6 +1883,7 @@ export class Game {
     this.updateFlashPolygons();
     this.terrain.update();
     this.renderer.draw();
+    this.audio.updateFireAmbience(this.paused || this.runOver ? 0 : fireAmbienceLevel(this.fire, this.world, this.camera));
     this.hud.update(this, now);
     this.debugOverlay.update();
     const t2 = performance.now();
