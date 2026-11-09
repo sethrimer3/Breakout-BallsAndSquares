@@ -180,6 +180,13 @@ export class Game {
     this.camera = new CameraSystem(this.world);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.camera.following = this.camera.defaultFollow;
+    // Knock-on rubble breaks puff a little grit.
+    this.world.onRubbleCrumble = (sx, sy) => {
+      const ss = this.world.subCellSize;
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(10, 40);
+      this.particles.spawn(PKind.Debris, (sx + 0.5) * ss, (sy + 0.5) * ss, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.25, 0.5), 1, 0x5a544c, 4);
+    };
     this.loadLabProgress();
     this.generateLab();
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);

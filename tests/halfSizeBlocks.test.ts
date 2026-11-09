@@ -36,3 +36,34 @@ describe("half-size blocks", () => {
     expect(fog.lightAt(200, 256)).toBeLessThan(0.05);
   });
 });
+
+describe("rubble crumbling", () => {
+  function rubbleField(): PixelWorld {
+    const w = new PixelWorld({ width: 16, height: 16, cellSize: 8, roomSize: 4 });
+    w.health.fill(0);
+    for (let sy = 4; sy < 12; sy++) {
+      for (let sx = 4; sx < 12; sx++) {
+        const si = sy * w.subWidth + sx;
+        w.subKind[si] = SUB.rubble;
+        w.subHealth[si] = 5;
+      }
+    }
+    return w;
+  }
+  const alive = (w: PixelWorld, sx: number, sy: number): boolean => w.subHealth[sy * w.subWidth + sx] > 0;
+
+  it("breaks the orthogonal neighbors of rubble the squad destroys, without chaining", () => {
+    const w = rubbleField();
+    expect(w.damageSub(8, 8, 99, true)).toBe(2);
+    for (const [x, y] of [[9, 8], [7, 8], [8, 9], [8, 7]]) expect(alive(w, x, y)).toBe(false);
+    // Diagonals and the next ring stay: the knock-on breaks don't spread.
+    for (const [x, y] of [[9, 9], [7, 7], [10, 8], [8, 10], [6, 8], [8, 6]]) expect(alive(w, x, y)).toBe(true);
+  });
+
+  it("does not crumble neighbors when something else breaks the rubble", () => {
+    const w = rubbleField();
+    expect(w.damageSub(8, 8, 99)).toBe(2);
+    expect(alive(w, 9, 8)).toBe(true);
+    expect(alive(w, 8, 9)).toBe(true);
+  });
+});

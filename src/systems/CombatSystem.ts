@@ -436,7 +436,7 @@ export class CombatSystem {
         if (isBlight && b.blightMultiplier > 1) {
           hitDmg = Math.round(hitDmg * b.blightMultiplier);
         }
-        const result = w.damageSub(hit.cx, hit.cy, hitDmg);
+        const result = w.damageSub(hit.cx, hit.cy, hitDmg, true);
         this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, result, isSub, b.ownerId);
 
         // Katana slashes cleave adjacent subcells across the slash arc width!
@@ -535,7 +535,7 @@ export class CombatSystem {
         if (isBlight && b.blightMultiplier > 1) {
           dmg = Math.round(dmg * b.blightMultiplier);
         }
-        const res = w.damageSub(sx, sy, dmg);
+        const res = w.damageSub(sx, sy, dmg, true);
         if (res > 0) {
           const wx = (sx + 0.5) * ss;
           const wy = (sy + 0.5) * ss;
@@ -575,7 +575,7 @@ export class CombatSystem {
         const isCore = !wasSub && w.coreId[idx] > 0;
         let dmg = Math.max(1, Math.round(b.damage * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
         if (b.blightMultiplier > 1 && w.isBlightAt(cx, cy)) dmg = Math.round(dmg * b.blightMultiplier);
-        const res = w.damage(cx, cy, dmg);
+        const res = w.damage(cx, cy, dmg, true);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
           const wy = (cy + 0.5) * cs;
@@ -753,7 +753,7 @@ export class CombatSystem {
           dmg = Math.round(dmg * g.blightMultiplier);
         }
 
-        const res = w.damage(cx, cy, dmg);
+        const res = w.damage(cx, cy, dmg, true);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
           const wy = (cy + 0.5) * cs;
