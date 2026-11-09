@@ -99,7 +99,7 @@ export const CATEGORIES: readonly CategoryInfo[] = [
     name: "PRIMARY WEAPONS",
     icon: "rifle",
     color: "#52f296",
-    branches: ["pistol", "shotgun", "assault_rifle", "rocket_launcher", "sniper_rifle", "katana"],
+    branches: ["pistol", "shotgun", "assault_rifle", "rocket_launcher", "sniper_rifle", "katana", "flamethrower"],
   },
   {
     id: "secondary",
@@ -154,6 +154,7 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   rocket_launcher: { icon: "launcher", color: "#ff5c40" },
   sniper_rifle: { icon: "sniper", color: UI_COLORS.soldier },
   katana: { icon: "katana", color: "#38d6ff" },
+  flamethrower: { icon: "flamethrower", color: "#ff7a18" },
   grenade: { icon: "grenade", color: "#ff9d3b" },
   turret: { icon: "turret", color: "#38d6ff" },
   facility: { icon: "keycard", color: "#7fb2ff" },
@@ -291,6 +292,7 @@ export class UpgradeTree {
                 <button class="tree-tab" data-tab="rocket_launcher"></button>
                 <button class="tree-tab" data-tab="sniper_rifle"></button>
                 <button class="tree-tab" data-tab="katana"></button>
+                <button class="tree-tab" data-tab="flamethrower"></button>
               </div>
               <div class="tree-cat-panel hidden" data-cat="secondary">
                 <button class="tree-tab" data-tab="grenade"></button>
@@ -497,6 +499,7 @@ export class UpgradeTree {
       st.rocketUnlocked ||
       st.sniperUnlocked ||
       st.katanaUnlocked ||
+      st.flameUnlocked ||
       st.grenadeUnlocked ||
       st.turretUnlocked ||
       hasBehaviors
@@ -564,6 +567,8 @@ export class UpgradeTree {
         this.subEl.textContent = "SNIPER RIFLE WEAPON TREE — HIGH-VELOCITY PENETRATING ROUNDS & CRITS";
       } else if (tab === "katana") {
         this.subEl.textContent = "KATANA WEAPON TREE — RAPID HIGH-PIERCE ENERGY SLASHES & ANTI-BLIGHT CRITS";
+      } else if (tab === "flamethrower") {
+        this.subEl.textContent = "FLAMETHROWER WEAPON TREE — SHORT-RANGE FIRE STREAM THAT SETS RUBBLE BURNING";
       } else if (tab === "grenade") {
         this.subEl.textContent = "STICKY GRENADE SECONDARY WEAPON TREE — HIGH-EXPLOSIVE STICKY ORDNANCE";
       } else if (tab === "turret") {
@@ -1017,6 +1022,7 @@ export class UpgradeTree {
         (branch === "rocket_launcher" && def.id !== "rocket_unlock" && u.levelOf("rocket_unlock") === 0) ||
         (branch === "sniper_rifle" && def.id !== "sniper_unlock" && u.levelOf("sniper_unlock") === 0) ||
         (branch === "katana" && def.id !== "katana_unlock" && u.levelOf("katana_unlock") === 0) ||
+        (branch === "flamethrower" && def.id !== "flame_unlock" && u.levelOf("flame_unlock") === 0) ||
         (branch === "grenade" && def.id !== "grenade_unlock" && u.levelOf("grenade_unlock") === 0) ||
         (branch === "turret" && def.id !== "turret_unlock" && u.levelOf("turret_unlock") === 0);
       const rem = Math.max(0, def.unlockLifetimePixels - this.game.lifetimePixels);
@@ -1087,6 +1093,7 @@ export class UpgradeTree {
       { id: "rocket_launcher", label: "ROCKET", unlocked: st.rocketUnlocked },
       { id: "sniper_rifle", label: "SNIPER", unlocked: st.sniperUnlocked },
       { id: "katana", label: "KATANA", unlocked: st.katanaUnlocked },
+      { id: "flamethrower", label: "FLAMER", unlocked: st.flameUnlocked },
     ];
 
     const secondaryDefs: { id: SecondaryWeaponType | null; label: string; unlocked: boolean; icon: SpriteName }[] = [
@@ -1125,6 +1132,8 @@ export class UpgradeTree {
         wSummary = `Sniper · ${st.sniperDamage} DMG · ${st.sniperPierce} Pierce · ${Math.round(st.sniperCritChance * 100)}% Crit`;
       } else if (curW === "katana") {
         wSummary = `Slash · ${st.katanaDamage} DMG (${st.katanaBlightMultiplier}× Blight) · ${st.katanaPierce} Pierce · ${st.katanaFireRate.toFixed(1)}/s`;
+      } else if (curW === "flamethrower") {
+        wSummary = `Flame · ${st.flameDamage} DMG · ${st.flameFireRate.toFixed(1)}/s · ignites rubble`;
       }
       if (curS === "grenade") {
         wSummary += ` · NADE: ${st.grenadeBlocksRequired} blk (${st.grenadeDamage} dmg)`;
@@ -1283,6 +1292,7 @@ export class UpgradeTree {
       ["rocket_launcher", "ROCKET", st.rocketUnlocked],
       ["sniper_rifle", "SNIPER", st.sniperUnlocked],
       ["katana", "KATANA", st.katanaUnlocked],
+      ["flamethrower", "FLAMER", st.flameUnlocked],
       ["grenade", "GRENADE", st.grenadeUnlocked],
       ["turret", "TURRET", st.turretUnlocked],
     ];
@@ -1306,6 +1316,7 @@ export class UpgradeTree {
       this.activeTab === "rocket_launcher" ||
       this.activeTab === "sniper_rifle" ||
       this.activeTab === "katana" ||
+      this.activeTab === "flamethrower" ||
       this.activeTab === "grenade" ||
       this.activeTab === "turret";
     this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);

@@ -4,6 +4,7 @@ import {
   GRENADE,
   GROWTH,
   KATANA,
+  FLAMETHROWER,
   LOOT,
   ROCKET_LAUNCHER,
   SHOTGUN,
@@ -21,7 +22,8 @@ export type WeaponType =
   | "assault_rifle"
   | "rocket_launcher"
   | "sniper_rifle"
-  | "katana";
+  | "katana"
+  | "flamethrower";
 
 export type SecondaryWeaponType = "grenade" | "turret";
 
@@ -75,6 +77,13 @@ export interface SoldierStats {
   katanaBulletSpeed: number;
   katanaPierce: number;
   katanaSlashWidth: number;
+  // Flamethrower stats
+  flameUnlocked: boolean;
+  flameFireRate: number;
+  flameDamage: number;
+  flameLifetime: number;
+  /** Multiplier on how long rubble burns. */
+  flameBurnMult: number;
   // Secondary Ability: Grenade stats
   grenadeUnlocked: boolean;
   grenadeBlocksRequired: number;
@@ -169,6 +178,11 @@ export function baseSoldierStats(): SoldierStats {
     katanaBulletSpeed: KATANA.bulletSpeed,
     katanaPierce: KATANA.pierce,
     katanaSlashWidth: KATANA.slashWidth,
+    flameUnlocked: false,
+    flameFireRate: FLAMETHROWER.fireRate,
+    flameDamage: FLAMETHROWER.damage,
+    flameLifetime: FLAMETHROWER.lifetime,
+    flameBurnMult: 1,
     grenadeUnlocked: false,
     grenadeBlocksRequired: GRENADE.blocksRequired,
     grenadeEnergyRequired: GRENADE.energyRequired,

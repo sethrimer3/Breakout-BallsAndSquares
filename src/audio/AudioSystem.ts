@@ -13,6 +13,7 @@ export class AudioSystem {
   private lastDestroyAt = 0;
   private lastPickupAt = 0;
   private lastGlassAt = 0;
+  private lastFlameAt = 0;
 
   constructor(private save: SaveManager) {}
 
@@ -84,6 +85,30 @@ export class AudioSystem {
     osc.connect(og).connect(ctx.destination);
     osc.start(t);
     osc.stop(t + 0.055);
+  }
+
+  /** Flamethrower: a soft, low roar of filtered noise, overlapping into a steady hiss. */
+  playFlame(): void {
+    const now = performance.now();
+    if (now - this.lastFlameAt < 70) return;
+    this.lastFlameAt = now;
+    const ctx = this.ensure();
+    if (!ctx || !this.noiseBuf) return;
+    const t = ctx.currentTime;
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuf;
+    src.playbackRate.value = 0.6 + Math.random() * 0.15;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(900 + Math.random() * 300, t);
+    filter.Q.value = 0.8;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.linearRampToValueAtTime(this.vol(0.11), t + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
+    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.start(t);
+    src.stop(t + 0.17);
   }
 
   /** Sharp blade slice / whoosh. */

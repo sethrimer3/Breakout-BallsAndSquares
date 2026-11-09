@@ -6,6 +6,7 @@ import type { Soldier } from "../entities/Soldier";
 import { PKind } from "../entities/ParticleSystem";
 import type { Game } from "../Game";
 import { FieryFlashRenderer } from "./FieryFlashRenderer";
+import { FireRenderer } from "./FireRenderer";
 import { CreatureRenderer } from "./CreatureRenderer";
 import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
@@ -34,6 +35,7 @@ export class Renderer {
   private creatureRenderer = new CreatureRenderer();
   private lightRenderer: LightRenderer;
   private fieryFlash: FieryFlashRenderer;
+  private fireRenderer = new FireRenderer();
   private fogRenderer: FogRenderer;
 
   constructor(
@@ -117,6 +119,7 @@ export class Renderer {
 
     // Blight Essence is black, so it can't go in the additive pass below.
     this.drawEssence(wallClockMs, still);
+    this.fireRenderer.drawSmoke(ctx, cam, game.fire);
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -126,6 +129,7 @@ export class Renderer {
     if (fiery) this.fieryFlash.drawHotPixels(ctx, game);
     else this.drawMuzzleFlares();
     this.drawBullets();
+    this.fireRenderer.drawGlow(ctx, cam, game.fire, game.world, still ? 0 : wallClockMs / 1000);
     this.drawAdditiveParticles();
     ctx.restore();
 
@@ -605,6 +609,8 @@ export class Renderer {
       const isRocket = b.style === 1;
       const isSniper = b.style === 2;
       const isSlash = b.style === 3;
+      // Flame jets are drawn as the fire they shed (FireRenderer).
+      if (b.style === 4) continue;
 
       if (isSlash) {
         this.drawSlash(b);

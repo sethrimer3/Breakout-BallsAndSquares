@@ -25,6 +25,7 @@ const BRANCHES: UpgradeBranch[] = [
   "rocket_launcher",
   "sniper_rifle",
   "katana",
+  "flamethrower",
 ];
 
 /** A rectangular tree of `cols` by `rows` cells around the center. */

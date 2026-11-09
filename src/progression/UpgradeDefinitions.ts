@@ -4,6 +4,7 @@ import {
   GRENADE,
   GROWTH,
   KATANA,
+  FLAMETHROWER,
   LOOT,
   ROCKET_LAUNCHER,
   SHOTGUN,
@@ -25,6 +26,7 @@ export type UpgradeBranch =
   | "rocket_launcher"
   | "sniper_rifle"
   | "katana"
+  | "flamethrower"
   | "grenade"
   | "turret"
   | "facility"
@@ -103,6 +105,12 @@ export type UpgradeId =
   | "katana_pierce"
   | "katana_fire_rate"
   | "katana_arc"
+  // Flamethrower Tree
+  | "flame_unlock"
+  | "flame_damage"
+  | "flame_range"
+  | "flame_fire_rate"
+  | "flame_kindling"
   // Grenade Tree (Secondary Weapon)
   | "grenade_unlock"
   | "grenade_charge"
@@ -1491,6 +1499,112 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       s.katanaSlashWidth = KATANA.slashWidth + 3 * lvl;
     },
     icon: "blast",
+  },
+
+  // =========================================================================
+  // 9b) FLAMETHROWER TREE (Starts locked — short-range stream that sets rubble alight)
+  // =========================================================================
+  {
+    id: "flame_unlock",
+    branch: "flamethrower",
+    name: "Unlock Flamethrower",
+    shortDesc: "Unlocks the Flamethrower — a short-range stream of fire that sets collapsed rubble burning",
+    color: "#ff7a18",
+    grid: { col: 0, row: 0 },
+    parent: null,
+    maxLevel: 1,
+    baseCost: 110,
+    costMultiplier: 1,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "UNLOCKED" : "LOCKED"),
+    formatDelta: () => "UNLOCK WEAPON",
+    apply: (s, lvl) => {
+      s.flameUnlocked = lvl > 0;
+    },
+    icon: "flamethrower",
+  },
+  {
+    id: "flame_damage",
+    branch: "flamethrower",
+    name: "Hotter Mix",
+    shortDesc: "+1 damage per flame jet per level",
+    color: "#ff5c40",
+    grid: { col: 1, row: 0 },
+    parent: "flame_unlock",
+    maxLevel: 6,
+    baseCost: 50,
+    costMultiplier: 1.7,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => FLAMETHROWER.damage + lvl,
+    formatValue: (v) => `${v} DMG`,
+    formatDelta: () => "+1 DMG",
+    apply: (s, lvl) => {
+      s.flameDamage = FLAMETHROWER.damage + lvl;
+    },
+    icon: "impact",
+  },
+  {
+    id: "flame_range",
+    branch: "flamethrower",
+    name: "Pressure Nozzle",
+    shortDesc: "+15% flame reach per level",
+    color: "#ffd84d",
+    grid: { col: 0, row: -1 },
+    parent: "flame_unlock",
+    maxLevel: 5,
+    currency: "crystals",
+    baseCost: 12,
+    costMultiplier: 1.65,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => Math.round(100 * (1 + 0.15 * lvl)),
+    formatValue: (v) => `${v}% REACH`,
+    formatDelta: () => "+15% REACH",
+    apply: (s, lvl) => {
+      s.flameLifetime = FLAMETHROWER.lifetime * (1 + 0.15 * lvl);
+    },
+    icon: "range",
+  },
+  {
+    id: "flame_fire_rate",
+    branch: "flamethrower",
+    name: "Wide Valve",
+    shortDesc: "+12% flame jets per second per level",
+    color: "#ff9d3b",
+    grid: { col: -1, row: 0 },
+    parent: "flame_unlock",
+    maxLevel: 6,
+    baseCost: 40,
+    costMultiplier: 1.6,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => +(FLAMETHROWER.fireRate * (1 + 0.12 * lvl)).toFixed(1),
+    formatValue: (v) => `${v.toFixed(1)}/s`,
+    formatDelta: () => "+12% RATE",
+    apply: (s, lvl) => {
+      s.flameFireRate = FLAMETHROWER.fireRate * (1 + 0.12 * lvl);
+    },
+    icon: "fireRate",
+  },
+  {
+    id: "flame_kindling",
+    branch: "flamethrower",
+    name: "Kindling",
+    shortDesc: "Burning rubble burns 30% longer per level",
+    color: "#ff7a18",
+    grid: { col: 0, row: 1 },
+    parent: "flame_unlock",
+    maxLevel: 4,
+    currency: "crystals",
+    baseCost: 10,
+    costMultiplier: 1.7,
+    unlockLifetimePixels: 80,
+    valueAt: (lvl) => Math.round(100 * (1 + 0.3 * lvl)),
+    formatValue: (v) => `${v}% BURN`,
+    formatDelta: () => "+30% BURN",
+    apply: (s, lvl) => {
+      s.flameBurnMult = 1 + 0.3 * lvl;
+    },
+    icon: "flame",
   },
 
   // =========================================================================

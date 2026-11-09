@@ -67,6 +67,9 @@ export class UpgradeManager {
     if (def.branch === "katana" && def.id !== "katana_unlock") {
       if (this.levelOf("katana_unlock") === 0) return false;
     }
+    if (def.branch === "flamethrower" && def.id !== "flame_unlock") {
+      if (this.levelOf("flame_unlock") === 0) return false;
+    }
     if (def.branch === "grenade" && def.id !== "grenade_unlock") {
       if (this.levelOf("grenade_unlock") === 0) return false;
     }

@@ -68,6 +68,8 @@ export interface SoftLight {
   y: number;
   radius: number;
   strength: number;
+  /** Warm firelight (burning rubble, flamethrower nozzle) instead of the cool soldier glow. */
+  warm: boolean;
   poly: Float32Array;
   /** 0 when not shadow-traced this frame: the glow then lights open air only. */
   polyCount: number;
@@ -80,6 +82,7 @@ function makeSoftLight(): SoftLight {
     y: 0,
     radius: 0,
     strength: 0,
+    warm: false,
     poly: new Float32Array(LIGHT.maxRays * 2),
     polyCount: 0,
     lit: makeLitCells(),
@@ -270,7 +273,7 @@ export class LightingSystem {
     roomX: number,
     roomY: number,
     cam: CameraSystem,
-    extraLights?: readonly { x: number; y: number; radius: number; strength: number }[],
+    extraLights?: readonly { x: number; y: number; radius: number; strength: number; warm?: boolean }[],
   ): void {
     this.softCount = 0;
     this.addSoftLight(roomX, roomY, LIGHT.roomLightRadius, LIGHT.roomLightStrength, -1, soldiers, cam);
@@ -284,7 +287,7 @@ export class LightingSystem {
     if (extraLights) {
       for (let i = 0; i < extraLights.length; i++) {
         const el = extraLights[i];
-        this.addSoftLight(el.x, el.y, el.radius, el.strength, -2, soldiers, cam);
+        this.addSoftLight(el.x, el.y, el.radius, el.strength, -2, soldiers, cam, el.warm ?? false);
       }
     }
   }
@@ -297,9 +300,11 @@ export class LightingSystem {
     ownerId: number,
     soldiers: readonly Soldier[],
     cam: CameraSystem,
+    warm = false,
   ): void {
     const idx = this.softCount++;
     const l = this.softLights[idx] ?? (this.softLights[idx] = makeSoftLight());
+    l.warm = warm;
     l.x = x;
     l.y = y;
     l.radius = radius;
