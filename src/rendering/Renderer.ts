@@ -9,7 +9,8 @@ import { FieryFlashRenderer } from "./FieryFlashRenderer";
 import { CreatureRenderer } from "./CreatureRenderer";
 import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
-import { createSprites, type Sprites } from "./sprites";
+import { createSprites, soldierShapeSprite, type Sprites } from "./sprites";
+import { soldierShapeIndex } from "../entities/soldierShapes";
 import { TIER_PAINT } from "./materials";
 
 /** Door core lightened toward the rim as it takes damage. */
@@ -405,7 +406,8 @@ export class Renderer {
       const sy = cam.worldToScreenY(s.y);
       // The ring marks the soldier the camera is following (auto or Tab-selected).
       const selected = cam.following && cam.targetId === s.id;
-      this.drawSoldierSprite(selected ? this.sprites.soldierSelected : this.sprites.soldier, sx, sy);
+      // Each loadout slot has its own body shape, rotated to face where it aims.
+      this.drawSoldierSprite(soldierShapeSprite(soldierShapeIndex(s.slotIndex), s.facingAngle, selected), sx, sy);
       if (s.secondary) {
         this.drawSoldierEnergyOutline(s, sx, sy);
       }

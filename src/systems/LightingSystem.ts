@@ -1,6 +1,7 @@
 import { FACILITY, LIGHT, SOLDIER } from "../config";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Soldier } from "../entities/Soldier";
+import { SOLDIER_SHAPES, rayPolygonDistance, shapeOccluder, soldierShapeIndex } from "../entities/soldierShapes";
 import type { CameraSystem } from "./CameraSystem";
 import { LIGHT_KIND, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 
@@ -156,6 +157,8 @@ export class LightingSystem {
 
   private angles = new Float64Array(LIGHT.maxRays);
   private corners: CornerCand[] = [];
+  /** Soldier occluders gathered for the current trace. */
+  private occluders: { x: number; y: number; n: number; poly: Float32Array }[] = [];
   /** Per-cell stamp so `markLitCells` lists each cell once per light. */
   private litStamps: Uint32Array;
   private litStamp = 0;
@@ -423,21 +426,48 @@ export class LightingSystem {
       angles[n++] = normalizeAngle(a + eps);
     }
 
-    // 4) Tangent rays to nearby soldier balls (excluding the shooter).
+    // 4) Silhouette rays to nearby soldiers (excluding the shooter). Round soldiers
+    //    use circle tangents; shaped soldiers use the outermost corners of their
+    //    rotated outline, so their shadows turn with them.
     const occR = SOLDIER.occluderRadius;
-    for (let i = 0; i < soldiers.length && n + 4 <= maxVerts; i++) {
+    const occScale = occR / SOLDIER.renderRadius;
+    const occ = this.occluders;
+    let occN = 0;
+    for (let i = 0; i < soldiers.length; i++) {
       const s = soldiers[i];
       if (!s.alive || s.id === ownerId) continue;
       const dx = s.x - ox;
       const dy = s.y - oy;
       const dist = Math.hypot(dx, dy);
-      if (dist <= occR + 0.2 || dist > radius + occR) continue;
+      if (dist <= occR + 0.2 || dist > radius + occR * 1.5) continue;
+      const o = occ[occN] ?? (occ[occN] = { x: 0, y: 0, n: 0, poly: new Float32Array(16) });
+      occN++;
+      o.x = s.x;
+      o.y = s.y;
+      o.n = shapeOccluder(SOLDIER_SHAPES[soldierShapeIndex(s.slotIndex)], s.x, s.y, s.facingAngle, occScale, o.poly);
+      if (n + 4 > maxVerts) continue;
       const centerAng = Math.atan2(dy, dx);
-      const half = Math.asin(Math.min(0.9999, occR / dist));
-      angles[n++] = normalizeAngle(centerAng - half - eps);
-      angles[n++] = normalizeAngle(centerAng - half + eps);
-      angles[n++] = normalizeAngle(centerAng + half - eps);
-      angles[n++] = normalizeAngle(centerAng + half + eps);
+      let lo: number;
+      let hi: number;
+      if (o.n === 0) {
+        const half = Math.asin(Math.min(0.9999, occR / dist));
+        lo = centerAng - half;
+        hi = centerAng + half;
+      } else {
+        lo = Infinity;
+        hi = -Infinity;
+        for (let v = 0; v < o.n; v++) {
+          const rel = normalizeAngle(Math.atan2(o.poly[v * 2 + 1] - oy, o.poly[v * 2] - ox) - centerAng);
+          if (rel < lo) lo = rel;
+          if (rel > hi) hi = rel;
+        }
+        lo += centerAng;
+        hi += centerAng;
+      }
+      angles[n++] = normalizeAngle(lo - eps);
+      angles[n++] = normalizeAngle(lo + eps);
+      angles[n++] = normalizeAngle(hi - eps);
+      angles[n++] = normalizeAngle(hi + eps);
     }
 
     // Sort ray angles in ascending order.
@@ -456,11 +486,12 @@ export class LightingSystem {
         hitTerrain = true;
       }
 
-      // Check soldier circle occluders.
-      for (let j = 0; j < soldiers.length; j++) {
-        const s = soldiers[j];
-        if (!s.alive || s.id === ownerId) continue;
-        const ct = rayCircleDistance(ox, oy, rdx, rdy, s.x, s.y, occR);
+      // Check soldier occluders (circles or rotated outlines).
+      for (let j = 0; j < occN; j++) {
+        const o = occ[j];
+        const ct = o.n === 0
+          ? rayCircleDistance(ox, oy, rdx, rdy, o.x, o.y, occR)
+          : rayPolygonDistance(ox, oy, rdx, rdy, o.poly, o.n);
         if (ct < bestT) {
           bestT = ct;
           hitTerrain = false;
