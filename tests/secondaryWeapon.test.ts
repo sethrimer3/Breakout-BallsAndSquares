@@ -114,6 +114,7 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
       "rocket_launcher",
       "sniper_rifle",
       "katana",
+      "flamethrower",
     ]);
     expect(secondaryCat.branches).toEqual(["grenade", "turret"]);
   });

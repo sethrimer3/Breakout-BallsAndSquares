@@ -1,4 +1,4 @@
-import { ASSAULT_RIFLE, BULLET, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET } from "../config";
+import { ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET } from "../config";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Rng } from "../core/Rng";
@@ -33,6 +33,11 @@ export interface CombatEvents {
   onGrenadeStick?(x: number, y: number, nx: number, ny: number): void;
   /** A sticky grenade beeped during fuse countdown. */
   onGrenadeBeep?(x: number, y: number, pct: number): void;
+  /**
+   * A flame jet licked terrain at subcell (sx, sy). Returns true if rubble there
+   * is burning, in which case the jet does no damage (see FireSystem).
+   */
+  onFlameHit?(sx: number, sy: number, x: number, y: number, nx: number, ny: number): boolean;
 }
 
 const hit = makeRayHit();
@@ -91,6 +96,9 @@ export class CombatSystem {
         break;
       case "katana":
         rate = this.stats.katanaFireRate;
+        break;
+      case "flamethrower":
+        rate = this.stats.flameFireRate;
         break;
     }
     rate *= this.stats.globalFireRateMult * s.mods.fireRateMult;
@@ -246,6 +254,26 @@ export class CombatSystem {
           -tilt,
         );
       }
+    } else if (s.weapon === "flamethrower") {
+      const halfSpreadRad = FLAMETHROWER.spreadDeg * DEG;
+      const a = this.rng.range(-halfSpreadRad, halfSpreadRad);
+      const c = Math.cos(a);
+      const sn = Math.sin(a);
+      this.spawnBullet(
+        s.x,
+        s.y,
+        dx * c - dy * sn,
+        dx * sn + dy * c,
+        FLAMETHROWER.bulletSpeed * this.rng.range(0.85, 1.15),
+        this.stats.flameDamage,
+        this.stats.flameLifetime * this.rng.range(0.85, 1.1),
+        s.radius + BULLET.muzzleGap,
+        s.id,
+        0,
+        0,
+        0,
+        4,
+      );
     } else {
       // Pistol
       this.spawnBullet(
@@ -307,7 +335,7 @@ export class CombatSystem {
     pierceLeft: number,
     explosionRadius: number,
     clusterCount: number,
-    style: 0 | 1 | 2 | 3,
+    style: 0 | 1 | 2 | 3 | 4,
   ): void {
     const b = this.bullets.acquire();
     if (!b) return;
@@ -430,6 +458,13 @@ export class CombatSystem {
         const inside = w.inBounds(hcx, hcy);
         const cellIdx = hcy * w.width + hcx;
         const isSub = inside && w.health[cellIdx] === 0;
+        // Flames don't chip fresh or burning rubble: they set it alight and splash
+        // out. Burnt-out (charred) rubble takes the hit like any other block.
+        const flameOnRubble = b.style === 4 && isSub && w.isRubbleSub(hit.cy * w.subWidth + hit.cx);
+        if (flameOnRubble && this.events.onFlameHit?.(hit.cx, hit.cy, hit.x, hit.y, hit.nx, hit.ny)) {
+          this.bullets.release(b);
+          return;
+        }
         const isCore = inside && !isSub && w.coreId[cellIdx] > 0;
         const isBlight = isSub ? w.isBlightSubAt(hit.cx, hit.cy) : w.isBlightAt(hcx, hcy);
         let hitDmg = b.damage + (isCore ? this.stats.coreDamageBonus : 0);
@@ -438,6 +473,7 @@ export class CombatSystem {
         }
         const result = w.damageSub(hit.cx, hit.cy, hitDmg, true);
         this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, result, isSub, b.ownerId);
+        if (b.style === 4 && !flameOnRubble) this.events.onFlameHit?.(hit.cx, hit.cy, hit.x, hit.y, hit.nx, hit.ny);
 
         // Katana slashes cleave adjacent subcells across the slash arc width!
         if (b.style === 3 && b.slashWidth > 0) {

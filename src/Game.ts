@@ -14,6 +14,7 @@ import { ScreenTransition } from "./rendering/ScreenTransition";
 import { TerrainRenderer } from "./rendering/TerrainRenderer";
 import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
+import { FireSystem } from "./systems/FireSystem";
 import { Input } from "./systems/Input";
 import { LightingSystem, makeLitCells, type LitCells, type MuzzleLight } from "./systems/LightingSystem";
 import { PhysicsSystem, findClearDeployPoint, findSpawnPoint } from "./systems/PhysicsSystem";
@@ -53,6 +54,8 @@ export class Game {
   readonly rng = new Rng();
   readonly physics: PhysicsSystem;
   readonly combat: CombatSystem;
+  /** Flamethrower flames and burning rubble. */
+  readonly fire: FireSystem;
   readonly growth: GrowthSystem;
   readonly lighting: LightingSystem;
   readonly fog: FogOfWar;
@@ -155,7 +158,14 @@ export class Game {
       onGrenadeStick: (x, y, nx, ny) => this.onGrenadeStick(x, y, nx, ny),
       onGrenadeBeep: (x, y, pct) => this.onGrenadeBeep(x, y, pct),
       onCreatureHit: (x, y, nx, ny) => this.onCreatureHit(x, y, nx, ny),
+      onFlameHit: (sx, sy, x, y, nx, ny) => {
+        this.fire.splash(x, y, nx, ny);
+        return this.fire.ignite(sx, sy) || this.fire.isBurning(sy * this.world.subWidth + sx);
+      },
     });
+    this.fire = new FireSystem(this.world, this.rng);
+    // Burnt-out rubble repaints charred.
+    this.fire.onChar = (sx, sy) => this.terrain.chunks.markCell(sx >> 1, sy >> 1);
     this.growth = new GrowthSystem(this.world, this.rng, {
       onSoldierKilled: (s) => this.onSoldierKilled(s),
       onSoldierRescued: (s, fromCx, fromCy, toCx, toCy, hpCost) =>
@@ -338,6 +348,8 @@ export class Game {
     this.combat.grenades.clear();
     this.combat.turrets.clear();
     this.particles.clear();
+    this.fire.clear();
+    this.fire.burnMult = this.stats.flameBurnMult;
     this.casings.clear();
     this.loot.clear();
     this.runStats.reset();
@@ -750,6 +762,8 @@ export class Game {
         return this.stats.sniperUnlocked;
       case "katana":
         return this.stats.katanaUnlocked;
+      case "flamethrower":
+        return this.stats.flameUnlocked;
     }
   }
 
@@ -830,6 +844,8 @@ export class Game {
       else if (commander.weapon === "assault_rifle") rate = this.stats.arFireRate;
       else if (commander.weapon === "rocket_launcher") rate = this.stats.rocketFireRate;
       else if (commander.weapon === "sniper_rifle") rate = this.stats.sniperFireRate;
+      else if (commander.weapon === "katana") rate = this.stats.katanaFireRate;
+      else if (commander.weapon === "flamethrower") rate = this.stats.flameFireRate;
       commander.fireCooldown = 1 / Math.max(0.1, rate);
     }
   }
@@ -842,6 +858,12 @@ export class Game {
 
   private onShot(s: Soldier, dx: number, dy: number, mx: number, my: number): void {
     this.runStats.shotsFired++;
+    if (s.weapon === "flamethrower") {
+      // No white muzzle flash: the stream lights its surroundings with warm firelight.
+      this.audio.playFlame();
+      this.fire.nozzle(s.id, mx + dx * 10, my + dy * 10);
+      return;
+    }
     if (s.weapon === "katana") {
       this.audio.playSlash();
       for (let i = 0; i < 4; i++) {
@@ -1489,6 +1511,7 @@ export class Game {
       this.combat.updateSoldier(s, dt);
     }
     this.combat.updateBullets(dt);
+    this.fire.update(dt, this.combat.bullets.items);
     this.combat.updateGrenades(dt);
     this.combat.updateTurrets(dt);
     this.glass.update(dt);
@@ -1564,7 +1587,7 @@ export class Game {
       }
     }
     this.lighting.lastShadowLights = shadowed;
-    const grenadeLights: { x: number; y: number; radius: number; strength: number }[] = [];
+    const grenadeLights: { x: number; y: number; radius: number; strength: number; warm?: boolean }[] = [];
     for (let i = 0; i < this.combat.grenades.items.length; i++) {
       const g = this.combat.grenades.items[i];
       if (g.active && g.stuck) {
@@ -1572,6 +1595,8 @@ export class Game {
         grenadeLights.push({ x: g.x, y: g.y, radius: 24, strength: flash ? 0.9 : 0.45 });
       }
     }
+    const fireLights = this.fire.collectLights(performance.now() / 1000);
+    for (let i = 0; i < fireLights.length; i++) grenadeLights.push(fireLights[i]);
     this.lighting.updateSoftLights(this.soldiers, this.world.roomCenterX, this.world.roomCenterY, cam, grenadeLights);
     this.lighting.updateFixtures(cam);
     const elapsed = performance.now() - t0;

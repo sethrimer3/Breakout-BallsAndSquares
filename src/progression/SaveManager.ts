@@ -52,6 +52,7 @@ const VALID_WEAPONS: readonly WeaponType[] = [
   "rocket_launcher",
   "sniper_rifle",
   "katana",
+  "flamethrower",
 ];
 const MAX_SOLDIER_SLOTS = 8;
 
@@ -228,6 +229,8 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     } else if (ld.weapon === "sniper_rifle" && (def.upgrades.sniper_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
     } else if (ld.weapon === "katana" && (def.upgrades.katana_unlock ?? 0) === 0) {
+      ld.weapon = "pistol";
+    } else if (ld.weapon === "flamethrower" && (def.upgrades.flame_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
     }
 

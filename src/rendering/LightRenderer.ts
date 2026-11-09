@@ -58,6 +58,14 @@ const SOFT_STOPS: readonly Stop[] = [
   [1, 40, 120, 255, 0],
 ];
 
+/** Firelight from burning rubble and a flamethrower's nozzle: deep amber, no white core. */
+const FIRE_STOPS: readonly Stop[] = [
+  [0, 255, 176, 92, 0.85],
+  [0.3, 255, 128, 44, 0.45],
+  [0.7, 210, 70, 18, 0.12],
+  [1, 130, 32, 0, 0],
+];
+
 const LUT_STEPS = 64;
 
 /** Sample stops into `[r, g, b]` triples of added light (color * alpha). */
@@ -79,6 +87,7 @@ function buildLut(stops: readonly Stop[]): Float32Array {
 const FLASH_LUT = buildLut(FLASH_STOPS);
 const FIERY_FLASH_LUT = buildLut(FIERY_FLASH_STOPS);
 const SOFT_LUT = buildLut(SOFT_STOPS);
+const FIRE_LUT = buildLut(FIRE_STOPS);
 
 /** Ceiling panel light by `LIGHT_KIND`: cold clinical white, warm worn tube, sickly failing tube. */
 const PANEL_COLORS: readonly (readonly [number, number, number])[] = [
@@ -184,12 +193,12 @@ export class LightRenderer {
       const rad = l.radius * cam.zoom;
       if (l.polyCount >= 3) {
         this.tracePolygonPath(air, game, l.poly, l.polyCount);
-        air.fillStyle = gradientFor(air, sx, sy, rad, SOFT_STOPS, l.strength);
+        air.fillStyle = gradientFor(air, sx, sy, rad, l.warm ? FIRE_STOPS : SOFT_STOPS, l.strength);
         air.fill();
       } else {
         // Past the shadow budget, or inside new terrain: air only (masked below).
         air.globalAlpha = l.strength;
-        air.drawImage(this.sprites.soldierGlow, sx - rad, sy - rad, rad * 2, rad * 2);
+        air.drawImage(l.warm ? this.sprites.warmGlow : this.sprites.soldierGlow, sx - rad, sy - rad, rad * 2, rad * 2);
         air.globalAlpha = 1;
       }
     }
@@ -368,7 +377,7 @@ export class LightRenderer {
     const lighting = game.lighting;
     for (let i = 0; i < lighting.softCount; i++) {
       const l = lighting.softLights[i];
-      this.addWallLight(game, l.lit, l.x, l.y, l.radius, l.strength, SOFT_LUT);
+      this.addWallLight(game, l.lit, l.x, l.y, l.radius, l.strength, l.warm ? FIRE_LUT : SOFT_LUT);
     }
     const now = performance.now() / 1000;
     for (const f of lighting.fixtures) {

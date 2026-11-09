@@ -391,6 +391,52 @@ export const KATANA = {
   lifetime: 0.28,
 };
 
+export const FLAMETHROWER = {
+  /** Flame jets per second (a steady stream). */
+  fireRate: 14,
+  /** Damage per jet. Low, but the stream lands a lot of them. */
+  damage: 1,
+  /** Jet speed (units/s). Slow, so the stream has a short reach. */
+  bulletSpeed: 150,
+  /** Jet lifetime (seconds); with `bulletSpeed` this sets the reach (~6 cells). */
+  lifetime: 0.32,
+  /** Half-angle spread jitter (degrees). */
+  spreadDeg: 9,
+};
+
+/** Fire: flame particles and burning rubble (see FireSystem). */
+export const FIRE = {
+  /** Max live flame/smoke particles. */
+  particleCap: 1400,
+  /** Max rubble sub-pixels burning at once. */
+  maxBurning: 900,
+  /** Seconds a rubble sub-pixel burns (random in range), before upgrades. */
+  burnMin: 4,
+  burnMax: 7.5,
+  /** Chance per second that a burning sub-pixel lights each rubble neighbor. */
+  spreadPerSecond: 0.35,
+  /** Flame particles per second rising off each exposed burning sub-pixel. */
+  emitPerSecond: 20,
+  /** Upward pull on flames (units/s^2). */
+  buoyancy: 46,
+  /** Flame particle lifetime range (seconds). */
+  flameLifeMin: 0.28,
+  flameLifeMax: 0.62,
+  /** Burning rubble is grouped into light bins this many cells wide. */
+  lightBinCells: 3,
+  /** Max warm lights from burning rubble per frame (strongest first). */
+  maxLights: 10,
+  /** Light radius (world units) for one burning sub-pixel; grows with more fire. */
+  lightRadiusMin: 30,
+  lightRadiusMax: 70,
+  /** Light strength range for a burning bin. */
+  lightStrengthMin: 0.35,
+  lightStrengthMax: 1.1,
+  /** Radius (world units) and strength of the warm light at a firing nozzle. */
+  nozzleLightRadius: 62,
+  nozzleLightStrength: 0.8,
+};
+
 export const GRENADE = {
   /** Energy requirement to activate sticky grenade. */
   energyRequired: 90,
