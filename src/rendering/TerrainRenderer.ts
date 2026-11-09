@@ -714,7 +714,8 @@ export class TerrainRenderer {
     const sk = world.subKind[si];
     if (sk === SUB.rubble) {
       const pal = COLORS.rubble;
-      const c = pal[world.subTint[si] % pal.length];
+      // Tint bits 0-2 pick the stone's color, bits 3-7 its brightness (see CaveIns).
+      const c = pal[(world.subTint[si] & 7) % pal.length];
       const v = 0.82 + ((world.subTint[si] >> 3) / 32) * 0.36;
       col[0] = c[0] * v;
       col[1] = c[1] * v;

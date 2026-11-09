@@ -2,6 +2,7 @@ import { CREATURES, FACILITY } from "../config";
 import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
 import { LIGHT_KIND, MAT, type PixelWorld, type RoomLight } from "./PixelWorld";
+import { corridorCaveIns } from "./CaveIns";
 import { ROOM_STATE, type LabCorridorSegment, type LabLayout, type LabRoom, type RoomState } from "./WorldGenerator";
 
 /**
@@ -86,7 +87,8 @@ function wallAt(world: PixelWorld, x: number, y: number): number {
 }
 
 function paintCorridor(world: PixelWorld, seg: LabCorridorSegment, seed: number): void {
-  const state = seg.state ?? ROOM_STATE.worn;
+  // A hallway that caved in somewhere is never spotless.
+  const state = seg.rubble && seg.state === ROOM_STATE.pristine ? ROOM_STATE.worn : (seg.state ?? ROOM_STATE.worn);
   const mid = seg.axis === "h" ? Math.floor((seg.y0 + seg.y1) / 2) : Math.floor((seg.x0 + seg.x1) / 2);
   for (let y = seg.y0; y <= seg.y1; y++) {
     for (let x = seg.x0; x <= seg.x1; x++) {
@@ -102,8 +104,9 @@ function paintCorridor(world: PixelWorld, seg: LabCorridorSegment, seed: number)
       }
     }
   }
-  if (seg.rubble) return;
-  // Ceiling tubes down the middle of the hall, set between the guide-line dashes.
+  // Ceiling tubes down the middle of the hall, set between the guide-line dashes;
+  // none left where the ceiling came down.
+  const falls = seg.rubble ? corridorCaveIns(seg, seed) : [];
   const pitch = FACILITY.panelPitch + 2;
   const a0 = seg.axis === "h" ? seg.x0 : seg.y0;
   const a1 = seg.axis === "h" ? seg.x1 : seg.y1;
@@ -111,6 +114,9 @@ function paintCorridor(world: PixelWorld, seg: LabCorridorSegment, seed: number)
     const panel = seg.axis === "h"
       ? { x0: a, y0: mid, x1: a + 1, y1: mid }
       : { x0: mid, y0: a, x1: mid, y1: a + 1 };
+    const px = (panel.x0 + panel.x1 + 1) / 2;
+    const py = (panel.y0 + panel.y1 + 1) / 2;
+    if (falls.some((f) => Math.hypot(f.x - px, f.y - py) < f.r * FACILITY.caveInScatter + 1)) continue;
     addPanel(world, panel, { cx0: seg.x0, cy0: seg.y0, cx1: seg.x1, cy1: seg.y1 }, state, hash2(a, mid, seed + 7));
   }
   if (state === ROOM_STATE.pristine) {
