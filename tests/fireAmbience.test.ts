@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fireAmbienceLevel } from "../src/audio/fireAmbience";
+import { fireAmbienceLevel, fireAmbienceMix } from "../src/audio/fireAmbience";
 import { Rng } from "../src/core/Rng";
 import { CameraSystem } from "../src/systems/CameraSystem";
 import { FireSystem, FKind } from "../src/systems/FireSystem";
@@ -22,14 +22,16 @@ function scene(count = 40) {
 }
 
 describe("Fire ambience spatial mix", () => {
-  it("is loudest at the screen center and falls to silence at or beyond the edges", () => {
+  it("is loudest at the screen center and reaches 25% at the edge and fades to silence off-screen", () => {
     const { camera, level } = scene();
     const center = level();
     camera.x -= 200;
-    expect(level()).toBeCloseTo(center * 0.25);
+    expect(level()).toBeCloseTo(center * 0.625);
     camera.x -= 200;
-    expect(level()).toBe(0);
+    expect(level()).toBeCloseTo(center * 0.25);
     camera.x -= 100;
+    expect(level()).toBeGreaterThan(0);
+    camera.x -= 40;
     expect(level()).toBe(0);
   });
 
@@ -40,6 +42,19 @@ describe("Fire ambience spatial mix", () => {
     expect(small).toBeLessThan(big * 0.05);
     expect(big).toBeLessThanOrEqual(1);
     expect(scene(1400).level()).toBeLessThanOrEqual(1);
+  });
+
+  it("pans fire left and right, including fires that have not entered the screen", () => {
+    const { fire, camera } = scene();
+    const world = new PixelWorld({ width: 128, height: 128, cellSize: 8, roomSize: 10 });
+    camera.x += 450;
+    const left = fireAmbienceMix(fire, world, camera);
+    expect(left.gain).toBeGreaterThan(0);
+    expect(left.pan).toBe(-1);
+    camera.x -= 900;
+    const right = fireAmbienceMix(fire, world, camera);
+    expect(right.gain).toBeCloseTo(left.gain);
+    expect(right.pan).toBe(1);
   });
 
   it("tracks apparent fire size as the camera zooms and excludes smoke", () => {
@@ -59,7 +74,7 @@ describe("Fire ambience spatial mix", () => {
     expect(burning).toBeGreaterThan(0);
     fire.burnLeft[0] = 0.2;
     expect(level()).toBeLessThan(burning);
-    camera.x = 0;
+    camera.x = -100;
     expect(level()).toBe(0);
     fire.clear();
     expect(level()).toBe(0);

@@ -1,6 +1,6 @@
 import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
-import { fireAmbienceLevel } from "./audio/fireAmbience";
+import { fireAmbienceMix } from "./audio/fireAmbience";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
 import { SentrySystem } from "./entities/Sentry";
@@ -188,19 +188,20 @@ export class Game {
     this.fog = new FogOfWar(this.world);
     this.glass = new GlassSystem(this.world, { onShatter: (cx, cy) => this.onGlassShatter(cx, cy) });
     this.doors = new DoorSystem(this.world, {
-      onOpen: () => this.audio.playDoorOpen(),
+      onOpen: (door) => this.audio.playDoorOpen((door.x0 + door.x1 + 1) * this.world.cellSize / 2, (door.y0 + door.y1 + 1) * this.world.cellSize / 2),
       onGateLocked: (door) => this.onGateLocked(door),
     });
-    this.sentries = new SentrySystem(this.world, () => this.audio.playSentryWake());
+    this.sentries = new SentrySystem(this.world, (s) => this.audio.playSentryWake(s.x, s.y));
     this.creatures = new CreatureSystem(this.world, this.rng, {
       onSoldierHit: (s, dmg, x, y) => this.hurtSoldier(s, dmg, x, y),
-      onSporeLaunch: () => this.audio.playSpore(),
+      onSporeLaunch: (x, y) => this.audio.playSpore(x, y),
       onSporeBurst: (x, y, r) => this.onSporeBurst(x, y, r),
       onCreatureKilled: (c, x, y) => this.onCreatureKilled(c, x, y),
-      onSpecimenFreed: () => this.audio.playSpore(),
+      onSpecimenFreed: (s) => this.audio.playSpore(s.x, s.y),
     });
     this.combat.targets = this.creatures;
     this.camera = new CameraSystem(this.world);
+    this.audio.setCamera(this.camera);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.camera.following = this.camera.defaultFollow;
     // Knock-on rubble breaks puff a little grit.
@@ -484,7 +485,7 @@ export class Game {
     if (this.gateHits.length < FACILITY.gateHitsForNotice) return;
     this.gateHits.length = 0;
     this.gateNotice = { door, t0: now };
-    this.audio.playDoorOpen();
+    this.audio.playDoorOpen((door.x0 + door.x1 + 1) * this.world.cellSize / 2, (door.y0 + door.y1 + 1) * this.world.cellSize / 2);
   }
 
   /** Carry the squad on when a soldier walks into the passage beyond an open gate. */
@@ -995,12 +996,12 @@ export class Game {
     this.runStats.shotsFired++;
     if (s.weapon === "flamethrower") {
       // No white muzzle flash: the stream lights its surroundings with warm firelight.
-      this.audio.playFlame();
+      this.audio.playFlame(mx, my);
       this.fire.nozzle(s.id, mx + dx * 10, my + dy * 10);
       return;
     }
     if (s.weapon === "katana") {
-      this.audio.playSlash();
+      this.audio.playSlash(mx, my);
       for (let i = 0; i < 4; i++) {
         const a = Math.atan2(dy, dx) + this.rng.range(-0.7, 0.7);
         const sp = this.rng.range(50, 130);
@@ -1018,7 +1019,7 @@ export class Game {
       }
       return;
     }
-    this.audio.playShot();
+    this.audio.playShot(mx, my);
     const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
     const lit = this.flashLitPool.pop() ?? makeLitCells();
     this.flashes.push({
@@ -1078,8 +1079,8 @@ export class Game {
     ownerId = 0,
   ): void {
     const destroyed = result === 2;
-    if (destroyed) this.audio.playDestroy();
-    else if (result === 1) this.audio.playImpact();
+    if (destroyed) this.audio.playDestroy(x, y);
+    else if (result === 1) this.audio.playImpact(x, y);
     const n = destroyed ? 10 : 4;
     for (let i = 0; i < n; i++) {
       const a = Math.atan2(ny, nx) + this.rng.range(-1.1, 1.1);
@@ -1189,7 +1190,7 @@ export class Game {
 
   private onExplosion(x: number, y: number, radiusWorld: number): void {
     this.creatures.explode(x, y, radiusWorld, 6 + this.stats.globalDamageBonus);
-    this.audio.playDestroy();
+    this.audio.playDestroy(x, y);
     this.shakeForExplosion(x, y, radiusWorld);
     const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
     const lit = this.flashLitPool.pop() ?? makeLitCells();
@@ -1290,7 +1291,7 @@ export class Game {
         this.stats.turretFireRate,
         this.stats.turretTurnSpeed,
       );
-      this.audio.playShot();
+      this.audio.playShot(soldier.x, soldier.y);
       for (let i = 0; i < 8; i++) {
         const a = this.rng.range(0, Math.PI * 2);
         const sp = this.rng.range(30, 90);
@@ -1313,7 +1314,7 @@ export class Game {
   }
 
   private onGrenadeThrow(_s: Soldier, x: number, y: number, dx: number, dy: number): void {
-    this.audio.playShot();
+    this.audio.playShot(x, y);
     for (let i = 0; i < 4; i++) {
       const a = Math.atan2(dy, dx) + this.rng.range(-0.4, 0.4);
       const sp = this.rng.range(15, 35);
@@ -1322,7 +1323,7 @@ export class Game {
   }
 
   private onGrenadeStick(x: number, y: number, nx: number, ny: number): void {
-    this.audio.playImpact();
+    this.audio.playImpact(x, y);
     for (let i = 0; i < 6; i++) {
       const a = Math.atan2(ny, nx) + this.rng.range(-0.8, 0.8);
       const sp = this.rng.range(30, 80);
@@ -1335,7 +1336,7 @@ export class Game {
   }
 
   private onSoldierKilled(s: Soldier): void {
-    this.audio.playSoldierDeath();
+    this.audio.playSoldierDeath(s.x, s.y);
     for (let i = 0; i < 36; i++) {
       const a = this.rng.range(0, Math.PI * 2);
       const sp = this.rng.range(30, 220);
@@ -1349,7 +1350,7 @@ export class Game {
     const cs = this.world.cellSize;
     const fromWx = (fromCx + 0.5) * cs;
     const fromWy = (fromCy + 0.5) * cs;
-    this.audio.playImpact();
+    this.audio.playImpact(fromWx, fromWy);
     for (let i = 0; i < 16; i++) {
       const a = this.rng.range(0, Math.PI * 2);
       const sp = this.rng.range(50, 160);
@@ -1388,7 +1389,7 @@ export class Game {
     if (!s.alive) return;
     if (s.health > 0) {
       s.health = Math.max(0, s.health - damage);
-      this.audio.playImpact();
+      this.audio.playImpact(s.x, s.y);
       for (let i = 0; i < 6; i++) {
         const a = Math.atan2(s.y - y, s.x - x) + this.rng.range(-1, 1);
         const sp = this.rng.range(30, 90);
@@ -1401,7 +1402,7 @@ export class Game {
   }
 
   private onCreatureHit(x: number, y: number, nx: number, ny: number): void {
-    this.audio.playImpact();
+    this.audio.playImpact(x, y);
     for (let i = 0; i < 5; i++) {
       const a = Math.atan2(ny, nx) + this.rng.range(-1.2, 1.2);
       const sp = this.rng.range(30, 100);
@@ -1420,7 +1421,7 @@ export class Game {
 
   /** Splatter, and a little loot for the trouble. */
   private onCreatureKilled(c: Creature, x: number, y: number): void {
-    this.audio.playDestroy();
+    this.audio.playDestroy(x, y);
     const col = c.kind === "specimen" ? 0x56c49a : 0xd8267a;
     for (let i = 0; i < 16; i++) {
       const a = this.rng.range(0, Math.PI * 2);
@@ -1467,7 +1468,7 @@ export class Game {
 
   /** A pane burst in a glass chain: glittering shards, no loot. */
   private onGlassShatter(cx: number, cy: number): void {
-    this.audio.playGlassShatter();
+    this.audio.playGlassShatter((cx + 0.5) * this.world.cellSize, (cy + 0.5) * this.world.cellSize);
     const cs = this.world.cellSize;
     const x = (cx + 0.5) * cs;
     const y = (cy + 0.5) * cs;
@@ -1660,13 +1661,12 @@ export class Game {
     this.runStats.recordSampleIfDue(this.growthRate);
     this.particles.update(dt);
     this.casings.update(dt, this.world);
-    const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange);
+    const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
     if (collected > 0) {
       this.runStats.currency += this.loot.collectedGold;
       this.runStats.crystals += this.loot.collectedCrystals;
       this.runStats.greenCrystals += this.loot.collectedGreenCrystals;
       this.runStats.essence += this.loot.collectedEssence;
-      this.audio.playPickup();
     }
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       if ((this.flashes[i].life -= dt) <= 0) {
@@ -1883,7 +1883,8 @@ export class Game {
     this.updateFlashPolygons();
     this.terrain.update();
     this.renderer.draw();
-    this.audio.updateFireAmbience(this.paused || this.runOver ? 0 : fireAmbienceLevel(this.fire, this.world, this.camera));
+    const fireMix = this.paused || this.runOver ? { gain: 0, pan: 0 } : fireAmbienceMix(this.fire, this.world, this.camera);
+    this.audio.updateFireAmbience(fireMix.gain, fireMix.pan);
     this.hud.update(this, now);
     this.debugOverlay.update();
     const t2 = performance.now();

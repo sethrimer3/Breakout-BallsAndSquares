@@ -80,6 +80,8 @@ The path starts with **Tier 1 Keycard (8 gold)**, then **Lab Map (15 gold)**. Un
 
 Movement speed, fire rate, damage, health and projectile velocity are upgraded on each soldier's own tree. The basic nodes cost gold without an essence requirement, so they are available from the start; advanced tiers still require essence. Retired global Core stat upgrades are removed and their original gold costs refunded once when loading an existing save.
 
+In-world audio is spatial: each sound plays at its configured volume in the screen center, fades linearly to 25% at every edge and corner, then continues to zero one-sixth of a viewport beyond the edge. Left/right stereo panning follows screen position. Fire crackle keeps its quiet base volume and separate fire-size damping. Menu confirmations and global alerts remain centered.
+
 ### Dev settings and a fresh start
 
 Both main-menu and pause-menu Settings have a **Dev** tab. Dev mode enables telemetry/backtick controls and test currency. **Delete & Restart** asks for confirmation, deletes all three BREACH save slots and settings, then reloads the game with fresh A1 progress. It leaves unrelated browser storage alone. Canceling keeps every save.

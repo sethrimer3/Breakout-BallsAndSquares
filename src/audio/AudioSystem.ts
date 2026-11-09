@@ -1,3 +1,5 @@
+import type { CameraSystem } from "../systems/CameraSystem";
+import { spatialMix } from "./spatialAudio";
 import type { SaveManager } from "../progression/SaveManager";
 import fireCrackleUrl from "../assets/audio/fire-crackle.mp3?url";
 
@@ -22,6 +24,8 @@ export class AudioSystem {
   private fireGain: GainNode | null = null;
   private fireSilentAt: number | null = null;
   private hasGesture = false;
+  private camera: CameraSystem | null = null;
+  private firePan: StereoPannerNode | null = null;
 
   constructor(private save: SaveManager) {
     if (typeof window === "undefined") return;
@@ -31,6 +35,23 @@ export class AudioSystem {
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) this.stopFireAmbience();
     });
+  }
+
+  setCamera(camera: CameraSystem): void { this.camera = camera; }
+
+  private audible(x?: number, y?: number): boolean {
+    return !this.camera || x === undefined || y === undefined || spatialMix(this.camera, x, y).gain > 0;
+  }
+
+  private output(ctx: AudioContext, x?: number, y?: number): AudioNode {
+    if (!this.camera || x === undefined || y === undefined) return ctx.destination;
+    const mix = spatialMix(this.camera, x, y);
+    const gain = ctx.createGain();
+    const pan = ctx.createStereoPanner();
+    gain.gain.value = mix.gain;
+    pan.pan.value = mix.pan;
+    gain.connect(pan).connect(ctx.destination);
+    return gain;
   }
 
   get muted(): boolean {
@@ -46,7 +67,7 @@ export class AudioSystem {
   }
 
   /** One loop for all fires, capped at 8% before master volume, with smooth camera fades. */
-  updateFireAmbience(level: number): void {
+  updateFireAmbience(level: number, pan = 0): void {
     const target = this.muted || document.hidden ? 0
       : Math.max(0, Math.min(1, level)) * this.save.data.settings.volume * 0.08;
     const ctx = target > 0 && this.hasGesture ? this.ensure() : this.ctx;
@@ -67,11 +88,13 @@ export class AudioSystem {
       this.fireSource = ctx.createBufferSource();
       this.fireSource.buffer = this.fireBuffer;
       this.fireSource.loop = true;
-      this.fireSource.connect(this.fireGain).connect(ctx.destination);
+      this.firePan = ctx.createStereoPanner();
+      this.fireSource.connect(this.fireGain).connect(this.firePan).connect(ctx.destination);
       this.fireSource.start();
     }
     if (!this.fireGain) return;
     this.fireGain.gain.setTargetAtTime(target, ctx.currentTime, 0.12);
+    this.firePan!.pan.setTargetAtTime(Math.max(-1, Math.min(1, pan)), ctx.currentTime, 0.12);
     if (target > 0) this.fireSilentAt = null;
     else {
       this.fireSilentAt ??= ctx.currentTime;
@@ -87,6 +110,8 @@ export class AudioSystem {
     this.fireSource?.stop();
     this.fireSource?.disconnect();
     this.fireGain?.disconnect();
+    this.firePan?.disconnect();
+    this.firePan = null;
     this.fireSource = null;
     this.fireGain = null;
     this.fireSilentAt = null;
@@ -119,12 +144,14 @@ export class AudioSystem {
   }
 
   /** Crisp pistol crack: filtered noise burst + short punchy pitch drop. */
-  playShot(): void {
+  playShot(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const now = performance.now();
     if (now - this.lastShotAt < 28) return;
     this.lastShotAt = now;
     const ctx = this.ensure();
     if (!ctx || !this.noiseBuf) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
 
     const src = ctx.createBufferSource();
@@ -136,7 +163,7 @@ export class AudioSystem {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(this.vol(0.18), t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.055);
-    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.connect(filter).connect(gain).connect(output);
     src.start(t);
     src.stop(t + 0.06);
 
@@ -147,18 +174,20 @@ export class AudioSystem {
     const og = ctx.createGain();
     og.gain.setValueAtTime(this.vol(0.14), t);
     og.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
-    osc.connect(og).connect(ctx.destination);
+    osc.connect(og).connect(output);
     osc.start(t);
     osc.stop(t + 0.055);
   }
 
   /** Flamethrower: a soft, low roar of filtered noise, overlapping into a steady hiss. */
-  playFlame(): void {
+  playFlame(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const now = performance.now();
     if (now - this.lastFlameAt < 70) return;
     this.lastFlameAt = now;
     const ctx = this.ensure();
     if (!ctx || !this.noiseBuf) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.noiseBuf;
@@ -171,18 +200,20 @@ export class AudioSystem {
     gain.gain.setValueAtTime(0.0001, t);
     gain.gain.linearRampToValueAtTime(this.vol(0.11), t + 0.025);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.16);
-    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.connect(filter).connect(gain).connect(output);
     src.start(t);
     src.stop(t + 0.17);
   }
 
   /** Sharp blade slice / whoosh. */
-  playSlash(): void {
+  playSlash(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const now = performance.now();
     if (now - this.lastShotAt < 28) return;
     this.lastShotAt = now;
     const ctx = this.ensure();
     if (!ctx || !this.noiseBuf) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
 
     const src = ctx.createBufferSource();
@@ -195,18 +226,20 @@ export class AudioSystem {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(this.vol(0.2), t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.connect(filter).connect(gain).connect(output);
     src.start(t);
     src.stop(t + 0.075);
   }
 
   /** Subtle tick when a bullet damages a pixel without destroying it. */
-  playImpact(): void {
+  playImpact(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const now = performance.now();
     if (now - this.lastImpactAt < 35) return;
     this.lastImpactAt = now;
     const ctx = this.ensure();
     if (!ctx) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = "sine";
@@ -215,18 +248,20 @@ export class AudioSystem {
     const g = ctx.createGain();
     g.gain.setValueAtTime(this.vol(0.07), t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.032);
-    osc.connect(g).connect(ctx.destination);
+    osc.connect(g).connect(output);
     osc.start(t);
     osc.stop(t + 0.035);
   }
 
   /** Low, satisfying pop when a terrain pixel shatters. */
-  playDestroy(): void {
+  playDestroy(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const now = performance.now();
     if (now - this.lastDestroyAt < 24) return;
     this.lastDestroyAt = now;
     const ctx = this.ensure();
     if (!ctx) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = "sine";
@@ -235,15 +270,17 @@ export class AudioSystem {
     const g = ctx.createGain();
     g.gain.setValueAtTime(this.vol(0.14), t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.07);
-    osc.connect(g).connect(ctx.destination);
+    osc.connect(g).connect(output);
     osc.start(t);
     osc.stop(t + 0.075);
   }
 
   /** Descending sweep when a soldier is crushed by replicating terrain. */
-  playSoldierDeath(): void {
+  playSoldierDeath(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const ctx = this.ensure();
     if (!ctx) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = "sawtooth";
@@ -252,18 +289,20 @@ export class AudioSystem {
     const g = ctx.createGain();
     g.gain.setValueAtTime(this.vol(0.22), t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-    osc.connect(g).connect(ctx.destination);
+    osc.connect(g).connect(output);
     osc.start(t);
     osc.stop(t + 0.32);
   }
 
   /** Bright high-pitched coin ping when a soldier collects a golden square. */
-  playPickup(): void {
+  playPickup(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const now = performance.now();
     if (now - this.lastPickupAt < 38) return;
     this.lastPickupAt = now;
     const ctx = this.ensure();
     if (!ctx) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = "sine";
@@ -273,15 +312,17 @@ export class AudioSystem {
     const g = ctx.createGain();
     g.gain.setValueAtTime(this.vol(0.09), t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.055);
-    osc.connect(g).connect(ctx.destination);
+    osc.connect(g).connect(output);
     osc.start(t);
     osc.stop(t + 0.06);
   }
 
   /** Bright two-tone chime on upgrade purchase. */
-  playPurchase(): void {
+  playPurchase(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const ctx = this.ensure();
     if (!ctx) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const notes = [523.25, 783.99];
     notes.forEach((freq, idx) => {
@@ -292,16 +333,18 @@ export class AudioSystem {
       const g = ctx.createGain();
       g.gain.setValueAtTime(this.vol(0.18), start);
       g.gain.exponentialRampToValueAtTime(0.001, start + 0.14);
-      osc.connect(g).connect(ctx.destination);
+      osc.connect(g).connect(output);
       osc.start(start);
       osc.stop(start + 0.15);
     });
   }
 
   /** Crisp high-tech radar ping when placing a tactical marker. */
-  playMarkerPing(): void {
+  playMarkerPing(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const ctx = this.ensure();
     if (!ctx) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = "sine";
@@ -310,15 +353,17 @@ export class AudioSystem {
     const g = ctx.createGain();
     g.gain.setValueAtTime(this.vol(0.14), t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    osc.connect(g).connect(ctx.destination);
+    osc.connect(g).connect(output);
     osc.start(t);
     osc.stop(t + 0.13);
   }
 
   /** Short pneumatic hiss with a soft mechanical clunk as a blast door slides open. */
-  playDoorOpen(): void {
+  playDoorOpen(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const ctx = this.ensure();
     if (!ctx || !this.noiseBuf) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.noiseBuf;
@@ -331,7 +376,7 @@ export class AudioSystem {
     gain.gain.setValueAtTime(this.vol(0.001), t);
     gain.gain.exponentialRampToValueAtTime(this.vol(0.12), t + 0.04);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
-    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.connect(filter).connect(gain).connect(output);
     src.start(t);
     src.stop(t + 0.23);
 
@@ -342,18 +387,20 @@ export class AudioSystem {
     const og = ctx.createGain();
     og.gain.setValueAtTime(this.vol(0.06), t);
     og.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
-    osc.connect(og).connect(ctx.destination);
+    osc.connect(og).connect(output);
     osc.start(t);
     osc.stop(t + 0.1);
   }
 
   /** Bright tinkle of a glass pane bursting (throttled, so a chain sounds like a cascade). */
-  playGlassShatter(): void {
+  playGlassShatter(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const now = performance.now();
     if (now - this.lastGlassAt < 30) return;
     this.lastGlassAt = now;
     const ctx = this.ensure();
     if (!ctx || !this.noiseBuf) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const src = ctx.createBufferSource();
     src.buffer = this.noiseBuf;
@@ -363,7 +410,7 @@ export class AudioSystem {
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(this.vol(0.1), t);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
-    src.connect(filter).connect(gain).connect(ctx.destination);
+    src.connect(filter).connect(gain).connect(output);
     src.start(t);
     src.stop(t + 0.1);
 
@@ -373,15 +420,17 @@ export class AudioSystem {
     const og = ctx.createGain();
     og.gain.setValueAtTime(this.vol(0.04), t);
     og.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    osc.connect(og).connect(ctx.destination);
+    osc.connect(og).connect(output);
     osc.start(t);
     osc.stop(t + 0.13);
   }
 
   /** Rising two-step chirp as a dormant sentry boots up. */
-  playSentryWake(): void {
+  playSentryWake(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const ctx = this.ensure();
     if (!ctx) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     [440, 880].forEach((freq, idx) => {
       const start = t + idx * 0.07;
@@ -391,16 +440,18 @@ export class AudioSystem {
       const g = ctx.createGain();
       g.gain.setValueAtTime(this.vol(0.05), start);
       g.gain.exponentialRampToValueAtTime(0.001, start + 0.06);
-      osc.connect(g).connect(ctx.destination);
+      osc.connect(g).connect(output);
       osc.start(start);
       osc.stop(start + 0.07);
     });
   }
 
   /** Falling sawtooth wail as the Blight goes into overdrive. */
-  playOverdrive(): void {
+  playOverdrive(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const ctx = this.ensure();
     if (!ctx) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = "sawtooth";
@@ -409,15 +460,17 @@ export class AudioSystem {
     const g = ctx.createGain();
     g.gain.setValueAtTime(this.vol(0.09), t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
-    osc.connect(g).connect(ctx.destination);
+    osc.connect(g).connect(output);
     osc.start(t);
     osc.stop(t + 1.05);
   }
 
   /** Wet pop of a Blight flower launching a spore, or a creature lunging. */
-  playSpore(): void {
+  playSpore(x?: number, y?: number): void {
+    if (!this.audible(x, y)) return;
     const ctx = this.ensure();
     if (!ctx) return;
+    const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     osc.type = "triangle";
@@ -426,7 +479,7 @@ export class AudioSystem {
     const g = ctx.createGain();
     g.gain.setValueAtTime(this.vol(0.05), t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
-    osc.connect(g).connect(ctx.destination);
+    osc.connect(g).connect(output);
     osc.start(t);
     osc.stop(t + 0.11);
   }
