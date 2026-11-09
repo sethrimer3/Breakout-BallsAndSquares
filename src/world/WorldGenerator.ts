@@ -5,6 +5,7 @@ import { placeLabEquipment } from "./LabEquipment";
 import { decorateLab } from "./LabDetails";
 import { buildAuthoredLayout, labFrame, sectorAtCell, sectorBounds, sectorRing, zoneForSectorRing, LAB_SEED, SECTORS_PER_SIDE, type LabFrame, type RoomKind } from "./labMap";
 import { MAT, SUB, type PixelWorld } from "./PixelWorld";
+import { corridorCaveIns, placeCaveIns, roomCaveIns, type CaveIn } from "./CaveIns";
 
 export interface LabRoom {
   id: number;
@@ -196,26 +197,23 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     }
   }
 
-  // Collapsed hallways: half-size rubble in many colors, outside rooms and doors.
+  // Cave-ins: heaps of half-size rubble where a collapsed hallway's ceiling
+  // came down, and wall sections that gave way in run-down rooms.
+  const inStart = (i: number): boolean => {
+    const x = i % width;
+    const y = (i - x) / width;
+    return x >= world.roomX0 - 2 && x <= world.roomX1 + 2 && y >= world.roomY0 - 2 && y <= world.roomY1 + 2;
+  };
+  const falls: CaveIn[] = [];
   for (const seg of layout.corridors) {
     if (!seg.rubble) continue;
-    forRect(world, seg.x0, seg.y0, seg.x1, seg.y1, (i) => {
-      if (roomMask[i] || health[i] > 0 || wall[i] !== 0 || world.mat[i] !== MAT.none) return;
-      const cx = i % width;
-      const cy = (i - cx) / width;
-      for (let dy = 0; dy < 2; dy++) {
-        for (let dx = 0; dx < 2; dx++) {
-          const sx = cx * 2 + dx;
-          const sy = cy * 2 + dy;
-          if (hash2(sx, sy, seed + 313) > FACILITY.rubbleDensity) continue;
-          const si = sy * world.subWidth + sx;
-          world.subKind[si] = SUB.rubble;
-          world.subTint[si] = Math.floor(hash2(sx, sy, seed + 919) * 256);
-          world.subHealth[si] = world.maxSubHealthAt(sx, sy);
-        }
-      }
-    });
+    for (const c of corridorCaveIns(seg, seed)) {
+      // Halls run into rooms; a fall belongs to the hallway part.
+      if (!roomMask[Math.floor(c.y) * width + Math.floor(c.x)]) falls.push(c);
+    }
   }
+  for (const room of layout.rooms) falls.push(...roomCaveIns(room, seed));
+  placeCaveIns(world, falls, seed, inStart);
 
   // Half-size consoles, racks, pipes and machines along room walls and some hallways.
   placeLabEquipment(world, layout);

@@ -121,8 +121,21 @@ export const FACILITY = {
   crystalVeinMax: 7,
   /** Crystals dropped per broken vein cell, before drop-rate upgrades. */
   crystalVeinDrops: 2.5,
-  /** Share of a rubble hallway's sub-pixels that are filled. */
-  rubbleDensity: 0.88,
+  /** Collapsed hallways cave in about once per this many cells of length... */
+  caveInSpacing: 26,
+  /** ...up to this many cave-ins per hallway. */
+  caveInsPerHallMax: 3,
+  /** Radius range of a cave-in's rubble heap, in cells. */
+  caveInRadiusMin: 3.5,
+  caveInRadiusMax: 7,
+  /** Walls within this share of a cave-in's radius collapse into the heap. */
+  caveInWallBreak: 0.9,
+  /** Stray stones scatter out to this multiple of the heap radius... */
+  caveInScatter: 2.2,
+  /** ...filling this share of the sub-pixels just past the heap's edge. */
+  caveInStrayChance: 0.15,
+  /** Chance a decayed or overrun room has a wall section caved in. */
+  roomCaveInChance: 0.35,
   /** Chance each wall of a lab room gets half-size equipment (consoles, racks, pipes, machines). */
   equipmentSideChance: 0.8,
   /** Chance a clear hallway carries a pipe run along one side. */
@@ -735,14 +748,14 @@ export const COLORS = {
     [26, 4, 14], // Blight-flecked wall
     [0, 0, 0], // missing floor tile
   ] as const,
-  /** Collapsed rubble sub-pixel colors (RGB): concrete, ash, rust, sand, slate, char. */
+  /** Collapsed rubble sub-pixel colors (RGB), matte and close to the wall materials: concrete, ash, rust, sand, slate, char. */
   rubble: [
-    [128, 124, 116],
-    [88, 86, 86],
-    [146, 86, 54],
-    [168, 148, 110],
-    [98, 110, 128],
-    [58, 52, 48],
+    [82, 77, 70],
+    [62, 60, 58],
+    [88, 56, 40],
+    [98, 88, 68],
+    [60, 66, 76],
+    [40, 36, 33],
   ] as const,
   /** Half-size lab equipment ramps (dark to light): machine casing, pipes, and screen colors. */
   labMetal: [
