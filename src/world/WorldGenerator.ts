@@ -3,8 +3,9 @@ import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
 import { placeLabEquipment } from "./LabEquipment";
 import { decorateLab } from "./LabDetails";
-import { buildAuthoredLayout, labFrame, sectorAtCell, sectorBounds, sectorRing, zoneForSectorRing, LAB_SEED, SECTORS_PER_SIDE, type LabFrame, type RoomKind } from "./labMap";
+import { buildAuthoredLayout, gateGeometry, labFrame, LAB_WORLDS, sectorAtCell, sectorBounds, sectorSpawnCell, sectorZone, upgradeSpotCell, upgradeSpotSector, type LabFrame, type LabWorldDef, type RoomKind } from "./labMap";
 import { MAT, SUB, type PixelWorld } from "./PixelWorld";
+import { DECOR } from "./LabDetails";
 import { corridorCaveIns, placeCaveIns, roomCaveIns, type CaveIn } from "./CaveIns";
 
 export interface LabRoom {
@@ -27,6 +28,8 @@ export interface LabRoom {
   sector?: number;
   /** Hand-made lab only: what the blueprint asks for (overrun rooms and tank rooms are fixed). */
   kind?: RoomKind;
+  /** Hand-made lab only: squares of one freeform room share a group. */
+  group?: number;
 }
 
 /** Condition of a lab room or hallway, from freshly built to swallowed by Blight. */
@@ -50,6 +53,8 @@ export interface LabCorridorSegment {
   rubble?: boolean;
   /** How well the hallway has held up (`ROOM_STATE`; never overrun). */
   state?: RoomState;
+  /** The vestibule of a world gate (no rubble or clutter). */
+  gate?: boolean;
 }
 
 export interface LabLayout {
@@ -65,6 +70,10 @@ export interface GenerateOptions {
   conquered?: ReadonlySet<number>;
   /** Force the old procedural maze even when the world fits the hand-made lab. */
   procedural?: boolean;
+  /** Which hand-made lab world to build (zone 1 by default). */
+  labWorld?: LabWorldDef;
+  /** Hand-made lab: sector the squad lands in (the world's starting sector by default). */
+  spawn?: number;
 }
 
 /** Cells kept between a lab room and the starting room. */
@@ -114,11 +123,28 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
 
   // The hand-made lab when the world can hold it; otherwise a procedural maze.
   // `seed` still drives what changes run to run (crystal veins).
-  const frame = options.procedural ? null : labFrame(world);
+  world.doors = [];
+  world.upgradeSpots = [];
+  const def = options.labWorld ?? LAB_WORLDS[1];
+  const frame = options.procedural ? null : labFrame(world, def);
+  world.labLayout = null;
+  // Distance, depth and tiers count from the world's own start.
+  if (frame) {
+    const o = sectorSpawnCell(frame, def.start);
+    world.originX = o.cx;
+    world.originY = o.cy;
+    world.tierBase = def.tierBase;
+    const at = sectorSpawnCell(frame, options.spawn ?? def.start);
+    world.setStartRoom(at.cx, at.cy);
+  } else {
+    world.originX = world.centerX;
+    world.originY = world.centerY;
+    world.tierBase = 0;
+  }
   const layout = frame ? buildAuthoredLayout(frame) : buildLabLayout(world, seed);
   world.labLayout = layout;
   const runSeed = seed;
-  if (frame) seed = LAB_SEED;
+  if (frame) seed = def.seed;
 
   // Pass 1: Paint 1-3 cell thick wall outlines around every room and corridor.
   for (const room of layout.rooms) {
@@ -147,6 +173,14 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
 
   // Facility set dressing. A breach softens wall cells, so this runs before health.
   decorateLab(world, layout);
+  if (frame) {
+    buildGates(world, frame);
+    for (const spot of def.upgrades) {
+      const at = upgradeSpotCell(frame, spot);
+      world.upgradeSpots.push({ id: spot.id, cx: at.cx, cy: at.cy, sector: upgradeSpotSector(def, spot) });
+    }
+    if (def.alien) warpAlienRooms(world, layout, seed);
+  }
 
   // Pass 3: Populate cell health (using wall material health where wall > 0) and tint.
   for (let cy = 0; cy < height; cy++) {
@@ -215,8 +249,13 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
   for (const room of layout.rooms) falls.push(...roomCaveIns(room, seed));
   placeCaveIns(world, falls, seed, inStart);
 
-  // Half-size consoles, racks, pipes and machines along room walls and some hallways.
-  placeLabEquipment(world, layout);
+  if (frame?.def.alien) {
+    // The Blight has stripped the lab bare and crusted its walls instead.
+    growAlienCrust(world, layout, seed);
+  } else {
+    // Half-size consoles, racks, pipes and machines along room walls and some hallways.
+    placeLabEquipment(world, layout);
+  }
 
   if (frame) {
     placeCrystalVeins(world, frame, runSeed);
@@ -240,9 +279,9 @@ export function placeCrystalVeins(world: PixelWorld, frame: LabFrame, runSeed: n
     const i = y * width + x;
     return wall[i] > 0 && health[i] > 0 && mat[i] === MAT.none && world.coreId[i] === 0 && world.blight[i] === 0;
   };
-  const sectors = SECTORS_PER_SIDE * SECTORS_PER_SIDE;
+  const sectors = frame.def.sectors * frame.def.sectors;
   for (let s = 0; s < sectors; s++) {
-    if (zoneForSectorRing(sectorRing(s)) < 1) continue;
+    if (sectorZone(frame.def, s) < 1) continue;
     const b = sectorBounds(frame, s);
     // Exposed wall faces in this sector.
     const faces: number[] = [];
@@ -309,6 +348,155 @@ export function clearConqueredSectors(world: PixelWorld, frame: LabFrame, conque
   }
 }
 
+/**
+ * The huge doors in the middle of a lab world's sides. A gate never breaks:
+ * the matching keycard slides it open, and the passage behind an east gate
+ * carries the squad on to the next world. A west gate is the one the squad
+ * came through, sealed behind them.
+ */
+function buildGates(world: PixelWorld, frame: LabFrame): void {
+  const { width } = world;
+  for (const g of frame.def.gates) {
+    const { door, pocket } = gateGeometry(frame, g);
+    const cells: number[] = [];
+    const id = world.doors.length + 1;
+    for (let y = door.y0; y <= door.y1; y++) {
+      for (let x = door.x0; x <= door.x1; x++) {
+        if (!world.inBounds(x, y)) continue;
+        const i = y * width + x;
+        world.wall[i] = 0;
+        world.mat[i] = MAT.door;
+        world.doorId[i] = id;
+        world.decor[i] = DECOR.door;
+        cells.push(i);
+      }
+    }
+    world.doors.push({ id, tier: g.tier, cells, open: false, ...door, gate: { to: g.to, side: g.side } });
+    // The passage beyond: bare, grimy plating.
+    forRect(world, pocket.x0, pocket.y0, pocket.x1, pocket.y1, (i) => {
+      world.decor[i] = DECOR.grime;
+    });
+    // Hazard stripes across the floor in front of the gate.
+    const fx0 = g.side === "east" ? door.x0 - 2 : door.x1 + 1;
+    forRect(world, fx0, pocket.y0, fx0 + 1, pocket.y1, (i) => {
+      const x = i % width;
+      const y = (i - x) / width;
+      world.decor[i] = (x + y) % 4 < 2 ? DECOR.hazardYellow : DECOR.hazardBlack;
+    });
+  }
+}
+
+/**
+ * Blight-remade rooms: their walls bulge inward in lumpy, organic swellings,
+ * so rooms read as grown chambers rather than built ones. Bulges stay clear of
+ * hallway mouths, doors, tanks and cores, so every room stays reachable.
+ */
+function warpAlienRooms(world: PixelWorld, layout: LabLayout, seed: number): void {
+  const { width, height } = world;
+  const interior = new Uint8Array(width * height);
+  for (const r of layout.rooms) forRect(world, r.x, r.y, r.x + r.size - 1, r.y + r.size - 1, (i) => (interior[i] = 1));
+  // Keep a margin round every hallway (which also covers each room's doorways).
+  const keep = new Uint8Array(width * height);
+  for (const seg of layout.corridors) forRect(world, seg.x0 - 3, seg.y0 - 3, seg.x1 + 3, seg.y1 + 3, (i) => (keep[i] = 1));
+  forRect(world, world.roomX0 - 3, world.roomY0 - 3, world.roomX1 + 3, world.roomY1 + 3, (i) => (keep[i] = 1));
+  for (const spot of world.upgradeSpots) forRect(world, spot.cx - 2, spot.cy - 2, spot.cx + 2, spot.cy + 2, (i) => (keep[i] = 1));
+  // Where squares of one freeform room overlap is the neck joining them: keep it open.
+  const cover = new Uint8Array(width * height);
+  for (const r of layout.rooms) forRect(world, r.x, r.y, r.x + r.size - 1, r.y + r.size - 1, (i) => (cover[i] = Math.min(255, cover[i] + 1)));
+  for (let i = 0; i < cover.length; i++) {
+    if (cover[i] < 2) continue;
+    const x = i % width;
+    const y = (i - x) / width;
+    forRect(world, x - 3, y - 3, x + 3, y + 3, (j) => (keep[j] = 1));
+  }
+  // Distance (0..3) of each interior cell from the room's edge.
+  const dist = new Uint8Array(width * height).fill(255);
+  for (const r of layout.rooms) {
+    for (let y = r.y; y < r.y + r.size; y++) {
+      for (let x = r.x; x < r.x + r.size; x++) {
+        const i = y * width + x;
+        if (!interior[i]) continue;
+        let d = 255;
+        for (let k = 0; k <= 3 && d === 255; k++) {
+          for (let dy = -k; dy <= k && d === 255; dy++) {
+            for (let dx = -k; dx <= k; dx++) {
+              if (Math.max(Math.abs(dx), Math.abs(dy)) !== k) continue;
+              const nx = x + dx, ny = y + dy;
+              if (!world.inBounds(nx, ny) || !interior[ny * width + nx]) {
+                d = k - 1;
+                break;
+              }
+            }
+          }
+        }
+        dist[i] = d;
+      }
+    }
+  }
+  const zoneOf = new Uint8Array(width * height);
+  for (const r of layout.rooms) forRect(world, r.x, r.y, r.x + r.size - 1, r.y + r.size - 1, (i) => (zoneOf[i] = r.zone + 1));
+  for (let i = 0; i < interior.length; i++) {
+    const d = dist[i];
+    if (!interior[i] || d > 2 || keep[i]) continue;
+    if (world.mat[i] !== MAT.none || world.coreId[i] > 0) continue;
+    const x = i % width;
+    const y = (i - x) / width;
+    const swell = valueNoise(x, y, 6, seed + 1201) * 0.75 + valueNoise(x, y, 2, seed + 1213) * 0.25;
+    if (swell <= 0.44 + d * 0.13) continue;
+    world.wall[i] = zoneOf[i];
+    world.decor[i] = DECOR.fleshWall;
+  }
+}
+
+/**
+ * A crust of half-size Blight over the walls of a Blight-remade world, so most
+ * walls look overgrown. Hallways only get a thin skin on the wall side; rooms
+ * can grow whole crusted cells. Colonies tied to a living generator are live
+ * (and sprout flower turrets); the rest lie dormant.
+ */
+function growAlienCrust(world: PixelWorld, layout: LabLayout, seed: number): void {
+  const { width, height, health } = world;
+  const inRoom = new Uint8Array(width * height);
+  for (const r of layout.rooms) forRect(world, r.x, r.y, r.x + r.size - 1, r.y + r.size - 1, (i) => (inRoom[i] = 1));
+  const solidWall = (x: number, y: number): boolean => {
+    if (!world.inBounds(x, y)) return false;
+    const i = y * width + x;
+    return health[i] > 0 && world.wall[i] > 0 && world.mat[i] === MAT.none;
+  };
+  const gateZones = world.doors.filter((d) => d.gate).map((d) => ({ x0: d.x0 - 12, y0: d.y0 - 2, x1: d.x1 + 12, y1: d.y1 + 2 }));
+  const threshold = 1 - FACILITY.alienCrustChance;
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      const i = y * width + x;
+      if (health[i] > 0 || world.mat[i] !== MAT.none) continue;
+      if (x >= world.roomX0 - 2 && x <= world.roomX1 + 2 && y >= world.roomY0 - 2 && y <= world.roomY1 + 2) continue;
+      const up = solidWall(x, y - 1), down = solidWall(x, y + 1), left = solidWall(x - 1, y), right = solidWall(x + 1, y);
+      if (!up && !down && !left && !right) continue;
+      if (gateZones.some((g) => x >= g.x0 && x <= g.x1 && y >= g.y0 && y <= g.y1)) continue;
+      const n = valueNoise(x, y, 5, seed + 1301) * 0.7 + hash2(x, y, seed + 1307) * 0.3;
+      if (n < threshold) continue;
+      const thick = inRoom[i] && n > threshold + (1 - threshold) * 0.55;
+      for (let dy = 0; dy < 2; dy++) {
+        for (let dx = 0; dx < 2; dx++) {
+          const facing = (up && dy === 0) || (down && dy === 1) || (left && dx === 0) || (right && dx === 1);
+          if (!facing && !thick) continue;
+          const sx = x * 2 + dx;
+          const sy = y * 2 + dy;
+          const si = sy * world.subWidth + sx;
+          if (world.subHealth[si] > 0) continue;
+          world.subKind[si] = SUB.blight;
+          world.subTint[si] = Math.floor(hash2(sx, sy, seed + 1311) * 256);
+          world.subHealth[si] = world.maxSubHealthAt(sx, sy);
+        }
+      }
+      // The wall behind is flecked with Blight too.
+      for (const [wx, wy] of [[x, y - 1], [x, y + 1], [x - 1, y], [x + 1, y]]) {
+        if (solidWall(wx, wy)) world.decor[wy * width + wx] = DECOR.fleshWall;
+      }
+    }
+  }
+}
+
 /** Call `fn` with the index of every in-bounds cell of an inclusive rectangle. */
 function forRect(world: PixelWorld, x0: number, y0: number, x1: number, y1: number, fn: (i: number) => void): void {
   const cx0 = Math.max(0, x0);
@@ -355,7 +543,7 @@ function paintWallCorridor(
   for (let y = cy0; y <= cy1; y++) {
     const row = y * world.width;
     for (let x = cx0; x <= cx1; x++) {
-      const z = zoneForDepth(world.depthOf(x, y));
+      const z = world.zoneAt(x, y);
       const mat = (z + 1) as 1 | 2 | 3;
       if (world.wall[row + x] === 0) {
         world.wall[row + x] = mat;

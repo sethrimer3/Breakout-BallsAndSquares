@@ -1,4 +1,4 @@
-import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD, zoneForDepth } from "./config";
+import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
@@ -35,7 +35,9 @@ import { generateWorld } from "./world/WorldGenerator";
 import { LabMap } from "./ui/LabMap";
 import { renderSectorThumbs } from "./rendering/SectorThumbs";
 import { LabProgress } from "./world/LabProgress";
-import { CENTER_SECTOR, labFrame, sectorSpawnCell } from "./world/labMap";
+import { gateGeometry, labWorld, LAB_WORLD_COUNT, type LabWorldDef } from "./world/labMap";
+import type { Door } from "./world/PixelWorld";
+import type { LabWorldProgress } from "./progression/SaveManager";
 
 export type Flash = MuzzleLight;
 
@@ -110,6 +112,12 @@ export class Game {
   labProgress = new LabProgress();
   labMap!: LabMap;
   private labCheckT = 0;
+  /** The "access needed" notice over a locked world gate (run seconds it started), or null. */
+  gateNotice: { door: Door; t0: number } | null = null;
+  /** Recent shots on locked gates (run seconds), for when to show the notice. */
+  private gateHits: number[] = [];
+  /** True while the iris is closing to carry the squad through a gate. */
+  private traveling = false;
   onUpgradePurchased?: () => void;
   timeScale = 1;
   /** Full-screen iris used for level intro and run-end transitions. */
@@ -177,7 +185,10 @@ export class Game {
     this.lighting = new LightingSystem(this.world);
     this.fog = new FogOfWar(this.world);
     this.glass = new GlassSystem(this.world, { onShatter: (cx, cy) => this.onGlassShatter(cx, cy) });
-    this.doors = new DoorSystem(this.world, { onOpen: () => this.audio.playDoorOpen() });
+    this.doors = new DoorSystem(this.world, {
+      onOpen: () => this.audio.playDoorOpen(),
+      onGateLocked: (door) => this.onGateLocked(door),
+    });
     this.sentries = new SentrySystem(this.world, () => this.audio.playSentryWake());
     this.creatures = new CreatureSystem(this.world, this.rng, {
       onSoldierHit: (s, dmg, x, y) => this.hurtSoldier(s, dmg, x, y),
@@ -370,10 +381,33 @@ export class Game {
     this.hud.update(this, performance.now(), true);
   }
 
+  /** The lab world (zone) squads deploy into. */
+  get labDef(): LabWorldDef {
+    return labWorld(this.save.data.lab.world);
+  }
+
+  /** Saved progress through the current lab world. */
+  get labSave(): LabWorldProgress {
+    const lab = this.save.data.lab;
+    return lab.worlds[lab.world];
+  }
+
   /** Read lab progress from the active save slot. */
   private loadLabProgress(): void {
+    const w = this.labSave;
+    this.labProgress = new LabProgress(this.labDef, w.discovered, w.conquered);
+  }
+
+  /** Show another reached world on the lab map (rebuilds the world behind it). */
+  selectLabWorld(id: number): void {
     const lab = this.save.data.lab;
-    this.labProgress = new LabProgress(lab.discovered, lab.conquered);
+    if (id < 1 || id > lab.unlocked || id === lab.world) return;
+    lab.world = id;
+    this.save.save();
+    this.loadLabProgress();
+    this.generateLab();
+    this.terrain.rebuildAll();
+    this.refreshSectorThumbs();
   }
 
   /**
@@ -382,15 +416,14 @@ export class Game {
    * spawn sector (the middle unless another conquered sector was picked).
    */
   private generateLab(): void {
-    const frame = labFrame(this.world);
-    if (frame) {
-      const lab = this.save.data.lab;
-      if (!this.labProgress.conquered.has(lab.spawn)) lab.spawn = CENTER_SECTOR;
-      const at = sectorSpawnCell(frame, lab.spawn);
-      this.world.setStartRoom(at.cx, at.cy);
-    }
-    generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30), { conquered: this.labProgress.conquered });
+    const def = this.labDef;
+    const lab = this.labSave;
+    if (!this.labProgress.conquered.has(lab.spawn)) lab.spawn = def.start;
+    generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30), { conquered: this.labProgress.conquered, labWorld: def, spawn: lab.spawn });
     this.labProgress.attach(this.world);
+    this.creatures.flowerMult = def.alien ? FACILITY.alienFlowerMult : 1;
+    this.gateNotice = null;
+    this.gateHits.length = 0;
   }
 
   /** Photograph every sector of the freshly built lab for the lab map. */
@@ -425,9 +458,101 @@ export class Game {
   /** Start a run deployed into a conquered `sector`. */
   deployInto(sector: number): void {
     if (!this.canDeployInto(sector)) return;
-    this.save.data.lab.spawn = sector;
+    this.labSave.spawn = sector;
     this.save.save();
     this.startRun();
+  }
+
+  /**
+   * A shot bounced off a world gate the squad has no keycard for. Enough of
+   * them in a short while raise the "access needed" notice over the gate.
+   */
+  private onGateLocked(door: Door): void {
+    const now = this.runStats.time;
+    const notice = this.gateNotice;
+    const showing = notice && now - notice.t0 < FACILITY.gateNoticeRise + FACILITY.gateNoticeHold + FACILITY.gateNoticeFade + 0.6;
+    if (showing) return;
+    this.gateHits.push(now);
+    while (this.gateHits.length && now - this.gateHits[0] > FACILITY.gateHitWindow) this.gateHits.shift();
+    if (this.gateHits.length < FACILITY.gateHitsForNotice) return;
+    this.gateHits.length = 0;
+    this.gateNotice = { door, t0: now };
+    this.audio.playDoorOpen();
+  }
+
+  /** Carry the squad on when a soldier walks into the passage beyond an open gate. */
+  private updateGates(): void {
+    const frame = this.world.labLayout?.frame;
+    if (!frame || this.traveling || this.runOver) return;
+    for (const door of this.world.doors) {
+      if (!door.gate || !door.open || door.gate.to < 1 || door.gate.to > LAB_WORLD_COUNT) continue;
+      const g = frame.def.gates.find((x) => x.to === door.gate!.to);
+      if (!g) continue;
+      const { pocket } = gateGeometry(frame, g);
+      const cs = this.world.cellSize;
+      const through = this.soldiers.some((s) => {
+        if (!s.alive) return false;
+        const cx = Math.floor(s.x / cs);
+        const cy = Math.floor(s.y / cs);
+        return cx >= pocket.x0 && cx <= pocket.x1 && cy >= pocket.y0 && cy <= pocket.y1;
+      });
+      if (through) {
+        this.travelToWorld(door.gate.to);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Take the squad through a gate into world `id`: the iris closes, the new
+   * world is built and the surviving soldiers arrive in its gateway room. The
+   * run (its earnings and reserves) carries on.
+   */
+  travelToWorld(id: number): void {
+    if (this.traveling) return;
+    this.traveling = true;
+    const lab = this.save.data.lab;
+    lab.unlocked = Math.max(lab.unlocked, id);
+    this.save.save();
+    this.transition.close(0.6, () => {
+      lab.world = id;
+      this.labSave.spawn = this.labDef.start;
+      this.save.save();
+      this.loadLabProgress();
+      this.generateLab();
+      this.growth.reset();
+      this.terrain.rebuildAll();
+      this.refreshSectorThumbs();
+      this.resetFog();
+      this.resetFacility();
+      for (const fl of this.flashes) {
+        this.flashPolyPool.push(fl.poly);
+        this.flashLitPool.push(fl.lit);
+      }
+      this.flashes = [];
+      this.cellFlashes = [];
+      this.combat.bullets.clear();
+      this.combat.grenades.clear();
+      this.combat.turrets.clear();
+      this.particles.clear();
+      this.fire.clear();
+      this.casings.clear();
+      this.loot.clear();
+      // Arrive in a loose huddle in the gateway room.
+      const cs = this.world.cellSize;
+      const alive = this.soldiers.filter((s) => s.alive);
+      alive.forEach((s, k) => {
+        const a = (k / Math.max(1, alive.length)) * Math.PI * 2;
+        const r = alive.length > 1 ? cs * 2 : 0;
+        s.x = this.world.roomCenterX + Math.cos(a) * r;
+        s.y = this.world.roomCenterY + Math.sin(a) * r;
+      });
+      this.soldiers = alive;
+      this.camera.reset();
+      this.camera.setViewport(this.canvas.clientWidth, this.canvas.clientHeight);
+      this.traveling = false;
+      this.transition.reveal(0.9);
+    });
   }
 
   /** Discover sectors the squad stands in, conquer cleared ones, and save progress. */
@@ -439,7 +564,7 @@ export class Game {
     const cells: { cx: number; cy: number }[] = [];
     for (const s of this.soldiers) if (s.alive) cells.push({ cx: Math.floor(s.x / cs), cy: Math.floor(s.y / cs) });
     if (!this.labProgress.update(cells)) return;
-    const lab = this.save.data.lab;
+    const lab = this.labSave;
     lab.discovered = [...this.labProgress.discovered].sort((a, b) => a - b);
     lab.conquered = [...this.labProgress.conquered].sort((a, b) => a - b);
     this.save.save();
@@ -963,7 +1088,7 @@ export class Game {
           const sp = this.rng.range(20, 70);
           this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, sk === SUB.pipe ? 0xac7646 : sk === SUB.wreck ? 0x3a3640 : sk === SUB.core ? 0x9a6ae0 : sk >= SUB.metal ? 0x60708a : rubble ? 0x6a625a : 0xd8267a, 4);
         }
-        const subZone = zoneForDepth(this.world.depthOf(cx, cy));
+        const subZone = this.world.zoneAt(cx, cy);
         this.loot.spawnDropsForBlock(x, y, this.dropChanceAt(this.blockLootZone(subZone), ownerId) * 0.25, this.stats.pickupLifetime, this.rng, lootKindForZone(this.blockLootZone(subZone)));
         this.checkSecondaryCharge(ownerId);
       }
@@ -986,7 +1111,7 @@ export class Game {
       this.checkSecondaryCharge(ownerId);
       const depth = this.world.depthOf(cx, cy);
       if (depth > this.runStats.maxDepth) this.runStats.maxDepth = depth;
-      const zone = zoneForDepth(depth);
+      const zone = this.world.zoneAt(cx, cy);
       const lootKind = lootKindForZone(this.blockLootZone(zone));
       const ci = cy * this.world.width + cx;
       if (this.world.mat[ci] === MAT.crystal) {
@@ -1292,7 +1417,7 @@ export class Game {
       const sp = this.rng.range(20, 110);
       this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.7), 1, col, 4);
     }
-    const zone = zoneForDepth(this.world.depthOf(Math.floor(x / this.world.cellSize), Math.floor(y / this.world.cellSize)));
+    const zone = this.world.zoneAt(Math.floor(x / this.world.cellSize), Math.floor(y / this.world.cellSize));
     const chance = c.kind === "flower" ? 0.6 : c.kind === "worm" ? 1 : 2;
     this.loot.spawnDropsForBlock(x, y, chance, this.stats.pickupLifetime, this.rng, lootKindForZone(this.blockLootZone(zone)));
   }
@@ -1398,6 +1523,7 @@ export class Game {
   step(dt: number): void {
     this.runStats.time += dt;
     this.updateLabProgress(dt);
+    this.updateGates();
 
     const commander = this.getCommander();
 

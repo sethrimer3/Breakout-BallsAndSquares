@@ -307,20 +307,21 @@ function placeSentry(world: PixelWorld, r: LabRoom, rng: Rng): void {
 }
 
 /** Two-cell-thick blast doors, jamb lights and hazard stripes at every corridor opening. */
-function paintDoors(world: PixelWorld, r: LabRoom): void {
-  const tier = (r.zone + 1) as 1 | 2 | 3;
+function paintDoors(world: PixelWorld, r: LabRoom, interior: Uint8Array): void {
+  const tier = world.tierBase + r.zone + 1;
   for (const cell of roomSides(r)) {
     let along = 0;
     while (along < r.size) {
       const start = cell(along, 0);
-      if (wallAt(world, start.x, start.y) !== 0) {
+      // Inside another square of the same freeform room is not a doorway.
+      const open = (p: { x: number; y: number }): boolean => wallAt(world, p.x, p.y) === 0 && !(world.inBounds(p.x, p.y) && interior[p.y * world.width + p.x]);
+      if (!open(start)) {
         along++;
         continue;
       }
       const from = along;
       while (along < r.size) {
-        const p = cell(along, 0);
-        if (wallAt(world, p.x, p.y) !== 0) break;
+        if (!open(cell(along, 0))) break;
         along++;
       }
       const to = along - 1;
@@ -393,7 +394,7 @@ function breachRoom(world: PixelWorld, r: LabRoom, rng: Rng, seed: number): void
  * glowing Blight Core at its center. Destroying all cells of the core reduces
  * the blight timer.
  */
-function overrunRoomWithBlight(world: PixelWorld, r: LabRoom, seed: number): void {
+function overrunRoomWithBlight(world: PixelWorld, r: LabRoom, seed: number, core = true): void {
   const rcx = r.x + Math.floor((r.size - 2) / 2);
   const rcy = r.y + Math.floor((r.size - 2) / 2);
   const centerFx = rcx + 0.5;
@@ -415,6 +416,8 @@ function overrunRoomWithBlight(world: PixelWorld, r: LabRoom, seed: number): voi
     }
   }
 
+  // The rest of a freeform overrun room: Blight floor, no second core.
+  if (!core) return;
   // Place a 2×2 Blight Core of normal-sized pixels at (rcx..rcx+1, rcy..rcy+1).
   const cid = world.blightCores.length + 1;
   const cells: number[] = [];
@@ -469,7 +472,9 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
   for (const room of layout.rooms) byZone[room.zone].push(room);
   const overrunIds = new Set<number>();
   // The hand-made lab says exactly which rooms are overrun.
-  if (layout.frame) for (const r of layout.rooms) if (r.kind === "overrun") overrunIds.add(r.id);
+  if (layout.frame) for (const r of layout.rooms) if (r.kind === "overrun" || r.kind === "blighted") overrunIds.add(r.id);
+  // In a world the Blight has remade, nothing is clean any more.
+  const rot = layout.frame?.def.alien ? FACILITY.alienDecay : 0;
   for (const zRooms of layout.frame ? [] : byZone) {
     if (zRooms.length === 0) continue;
     const count = Math.max(1, Math.round(zRooms.length * 0.3));
@@ -487,17 +492,17 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
   for (const room of layout.rooms) {
     room.state = overrunIds.has(room.id)
       ? ROOM_STATE.overrun
-      : stateFor(decayAt(room.x + room.size / 2, room.y + room.size / 2, room.zone, cores, seed));
+      : stateFor(decayAt(room.x + room.size / 2, room.y + room.size / 2, room.zone, cores, seed) + rot);
   }
   for (const seg of layout.corridors) {
-    seg.state = stateFor(decayAt((seg.x0 + seg.x1) / 2, (seg.y0 + seg.y1) / 2, seg.zone, cores, seed));
+    seg.state = seg.gate ? ROOM_STATE.worn : stateFor(decayAt((seg.x0 + seg.x1) / 2, (seg.y0 + seg.y1) / 2, seg.zone, cores, seed) + rot);
     paintCorridor(world, seg, seed);
   }
 
   for (const room of layout.rooms) {
     if (overrunIds.has(room.id)) {
-      room.overrun = true;
-      overrunRoomWithBlight(world, room, seed);
+      overrunRoomWithBlight(world, room, seed, room.kind !== "blighted");
+      if (room.kind !== "blighted") room.overrun = true;
     } else {
       paintRoomFloor(world, room, seed);
       const tanks = layout.frame ? room.kind === "tanks" : rng.next() < FACILITY.tankRoomChance;
@@ -509,7 +514,13 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
   for (const state of [ROOM_STATE.pristine, ROOM_STATE.decayed, ROOM_STATE.overrun]) {
     for (const room of layout.rooms) if (room.state === state) paintRoomWalls(world, room, seed);
   }
-  for (const room of layout.rooms) paintDoors(world, room);
+  const interior = new Uint8Array(world.width * world.height);
+  for (const r of layout.rooms) {
+    for (let y = Math.max(0, r.y); y < Math.min(world.height, r.y + r.size); y++) {
+      for (let x = Math.max(0, r.x); x < Math.min(world.width, r.x + r.size); x++) interior[y * world.width + x] = 1;
+    }
+  }
+  for (const room of layout.rooms) paintDoors(world, room, interior);
   for (const room of layout.rooms) {
     const chance =
       room.state === ROOM_STATE.overrun ? 1

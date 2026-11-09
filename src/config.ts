@@ -5,10 +5,10 @@
  */
 
 export const WORLD = {
-  /** World width in cells. */
-  width: 512,
+  /** World width in cells (holds the biggest lab world, 13 × 13 sectors, plus its gates). */
+  width: 672,
   /** World height in cells. */
-  height: 512,
+  height: 672,
   /** Logical world units per cell edge. */
   cellSize: 8,
   /** Edge length (cells) of the empty starting room. */
@@ -97,10 +97,61 @@ export function wallHealthForZone(zone: 0 | 1 | 2, distance: number): number {
   return Math.min(TERRAIN.maxHealthCap, Math.max(300, baseHp + 50));
 }
 
+/**
+ * Ordinary block health of each terrain tier in the hand-made lab worlds
+ * (index = tier): [first sector of the tier band, last]. Zone 1 holds tiers
+ * 1-3, zone 2 tiers 4-6. Health is a Uint16, so nothing may pass 65535.
+ */
+export const TIER_HEALTH: readonly (readonly [number, number])[] = [
+  [1, 1],
+  [1, 5],
+  [10, 50],
+  [100, 500],
+  [800, 2400],
+  [3000, 9000],
+  [12000, 30000],
+];
+
+/** Highest terrain tier with stats. */
+export const MAX_TIER = TIER_HEALTH.length - 1;
+
+/** Health of an ordinary block of `tier`, `t` (0..1) of the way through its band. */
+export function tierHealth(tier: number, t: number): number {
+  const [lo, hi] = TIER_HEALTH[Math.max(1, Math.min(MAX_TIER, tier))];
+  return Math.round(lo + (hi - lo) * Math.max(0, Math.min(1, t)));
+}
+
+/**
+ * Health of a lab wall in a band whose ordinary blocks are `tier`. Walls are
+ * built of the next tier's material and stay well above tunnelling strength.
+ */
+export function tierWallHealth(tier: number, t: number): number {
+  const hp = tierHealth(tier, t);
+  if (tier <= 1) return FACILITY.zone1WallHealth;
+  if (tier === 2) return Math.max(100, hp * 2);
+  if (tier === 3) return Math.min(TERRAIN.maxHealthCap, Math.max(300, hp + 50));
+  return Math.min(65000, Math.round(hp * 2.5));
+}
+
 /** Research-base structures: doors, glass containment tanks, rubble and sentries. */
 export const FACILITY = {
   /** Minimum health of a Zone 1 wall (Tier 2 material). */
   zone1WallHealth: 25,
+  /** Hits on a locked world gate (within `gateHitWindow` seconds) before the "access needed" notice shows. */
+  gateHitsForNotice: 6,
+  gateHitWindow: 2.5,
+  /** Notice timeline (seconds): rise and fade in, float, fade out. */
+  gateNoticeRise: 0.45,
+  gateNoticeHold: 1,
+  gateNoticeFade: 0.55,
+  /** Cells the notice climbs from the middle of the gate. */
+  gateNoticeLift: 4,
+  /** Blight Flower spawn rate and caps are multiplied by this in Blight-remade worlds. */
+  alienFlowerMult: 3,
+  /** Share of open cells beside a wall that grow a Blight crust in Blight-remade worlds. */
+  alienCrustChance: 0.62,
+  /** Extra decay score everywhere in a Blight-remade world (so rooms read decayed). */
+  alienDecay: 0.5,
   /** Seconds between neighbouring glass blocks shattering in a chain. */
   glassChainDelay: 0.05,
   /** Glass health as a share of the zone's normal block health. */

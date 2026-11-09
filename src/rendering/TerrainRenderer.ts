@@ -644,7 +644,7 @@ export class TerrainRenderer {
         const dGrain = 0.94 + t * 0.12;
         const maxHp = world.maxHealthAt(cx, cy);
         // Deeper bands darken slightly for depth perception.
-        const band = (maxHp - 1) / Math.max(1, maxCap - 1);
+        const band = Math.min(1, (maxHp - 1) / Math.max(1, maxCap - 1));
         const shade = band > 0 ? 1 - band * 0.18 : 1;
         const dmg = hp < maxHp ? (1 - hp / maxHp) * 0.5 : 0;
         // Structural walls and doors carry a band of matte tier paint on their open faces.
@@ -817,15 +817,25 @@ export class TerrainRenderer {
     }
   }
 
-  /** Material tier of a solid cell (1..4): zone fill by depth, walls one tier up, doors by keycard. */
+  /**
+   * Tier of an ordinary block: its lab sector's tier, or zone by depth in small
+   * procedural worlds (dithered so the boundary isn't a ruler line).
+   */
+  private fillTier(cx: number, cy: number, i: number): number {
+    const w = this.world;
+    if (w.labLayout?.frame) return w.fillTierAt(cx, cy);
+    const dither = (w.tint[i] / 255 - 0.5) * 3;
+    return zoneForDepth(w.depthOf(cx, cy) + dither) + 1;
+  }
+
+  /** Material tier of a solid cell (1..7): zone fill by tier, walls one tier up, doors by keycard. */
   private materialTier(cx: number, cy: number): number {
     const w = this.world;
     const i = cy * w.width + cx;
     if (w.mat[i] === MAT.door) return w.doors[w.doorId[i] - 1]?.tier ?? 1;
     const wm = w.wall[i];
-    if (wm > 0) return wm + 1;
-    const dither = (w.tint[i] / 255 - 0.5) * 3;
-    return zoneForDepth(w.depthOf(cx, cy) + dither) + 1;
+    if (wm > 0) return w.tierBase + wm + 1;
+    return this.fillTier(cx, cy, i);
   }
 
   /**
@@ -842,10 +852,8 @@ export class TerrainRenderer {
     if (m === MAT.door) return w.doors[w.doorId[i] - 1]?.tier ?? 0;
     if (w.coreId[i] > 0 || w.blight[i] > 0) return 0;
     const wm = w.wall[i];
-    if (wm > 0) return wm + 1;
-    // Matches the color ramp's dithered zone boundary.
-    const dither = (w.tint[i] / 255 - 0.5) * 3;
-    return zoneForDepth(w.depthOf(cx, cy) + dither) + 1;
+    if (wm > 0) return w.tierBase + wm + 1;
+    return this.fillTier(cx, cy, i);
   }
 
   private buildEdgeMask(k: number, kx: number, ky: number): void {

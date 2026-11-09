@@ -1,5 +1,5 @@
 import { COLORS } from "../config";
-import { SECTOR_CELLS, SECTORS_PER_SIDE, sectorBounds, sectorRing, zoneForSectorRing, type LabFrame } from "../world/labMap";
+import { SECTOR_CELLS, sectorBounds, sectorTier, type LabFrame, type LabWorldDef } from "../world/labMap";
 import { LIGHT_KIND, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { hash2, valueNoise } from "../core/math";
 import { MATERIAL_BASE, TEX } from "./materials";
@@ -32,7 +32,7 @@ export function renderSectorThumbs(world: PixelWorld, terrain: TerrainRenderer, 
   const out: HTMLCanvasElement[] = [];
   const light = makeCanvas();
   const lg = light.getContext("2d")!;
-  const sectors = SECTORS_PER_SIDE * SECTORS_PER_SIDE;
+  const sectors = frame.def.sectors * frame.def.sectors;
   for (let s = 0; s < sectors; s++) {
     const canvas = makeCanvas();
     const g = canvas.getContext("2d")!;
@@ -112,22 +112,23 @@ function expose(g: CanvasRenderingContext2D): void {
   g.putImageData(img, 0, 0);
 }
 
-const uncharted = new Map<number, HTMLCanvasElement>();
+const uncharted = new Map<string, HTMLCanvasElement>();
 
 /**
  * An unexplored sector: dark rock tinted by its tier's material. Tells the
  * player what tier waits there, nothing more.
  */
-export function renderUncharted(sector: number): HTMLCanvasElement {
-  const hit = uncharted.get(sector);
+export function renderUncharted(def: LabWorldDef, sector: number): HTMLCanvasElement {
+  const key = `${def.id}:${sector}`;
+  const hit = uncharted.get(key);
   if (hit) return hit;
   const canvas = makeCanvas();
   const g = canvas.getContext("2d")!;
   const img = g.createImageData(THUMB_SIZE, THUMB_SIZE);
-  const tier = zoneForSectorRing(sectorRing(sector)) + 1;
+  const tier = sectorTier(def, sector);
   const base = MATERIAL_BASE[tier];
-  const col = sector % SECTORS_PER_SIDE;
-  const row = (sector - col) / SECTORS_PER_SIDE;
+  const col = sector % def.sectors;
+  const row = (sector - col) / def.sectors;
   for (let y = 0; y < THUMB_SIZE; y++) {
     for (let x = 0; x < THUMB_SIZE; x++) {
       const gx = col * THUMB_SIZE + x;
@@ -143,7 +144,7 @@ export function renderUncharted(sector: number): HTMLCanvasElement {
     }
   }
   g.putImageData(img, 0, 0);
-  uncharted.set(sector, canvas);
+  uncharted.set(key, canvas);
   return canvas;
 }
 

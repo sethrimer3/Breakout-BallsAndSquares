@@ -1,16 +1,19 @@
 import type { Game } from "../Game";
 import { THUMB_SIZE, renderUncharted } from "../rendering/SectorThumbs";
+import { TIER_PAINT } from "../rendering/materials";
 import {
-  CENTER_SECTOR,
-  LAB_BLUEPRINT,
-  SECTORS_PER_SIDE,
+  LAB_WORLDS,
   SECTOR_CHARS,
-  labFrame,
+  gateGeometry,
+  sectorAtCell,
   sectorName,
-  sectorRing,
   sectorBounds,
   sectorSpawnCell,
-  zoneForSectorRing,
+  sectorTier,
+  sectorZone,
+  upgradeSpotCell,
+  upgradeSpotSector,
+  type LabWorldDef,
 } from "../world/labMap";
 
 /** Pixels per blueprint character in a sector thumbnail. */
@@ -19,11 +22,17 @@ const THUMB_PX = SECTOR_CHARS * CHAR_PX;
 
 type RGB = readonly [number, number, number];
 
-/** Matte rock behind each tier's thumbnails (tier 1 concrete, 2 rusted iron, 3 bronze). */
+/** Matte rock behind each tier band's thumbnails (zone 1: concrete, rusted iron, bronze). */
 const ROCK: readonly RGB[] = [
   [38, 42, 48],
   [52, 36, 32],
   [50, 42, 28],
+];
+/** Zone 2's bands: resin, chitin, carapace. */
+const ALIEN_ROCK: readonly RGB[] = [
+  [46, 30, 42],
+  [30, 40, 38],
+  [28, 22, 30],
 ];
 const FLOOR: RGB = [176, 168, 152];
 const FLOOR_EDGE: RGB = [96, 90, 82];
@@ -43,9 +52,12 @@ export class LabMap {
   private grid: HTMLDivElement;
   private info: HTMLDivElement;
   private deployBtn: HTMLButtonElement;
+  private tabs: HTMLDivElement;
   private tiles: HTMLButtonElement[] = [];
   private canvases: HTMLCanvasElement[] = [];
-  private selected = CENTER_SECTOR;
+  private selected = 0;
+  /** World the grid was built for. */
+  private def: LabWorldDef = LAB_WORLDS[1];
   /** Lit pictures of each sector from the latest generated world (see SectorThumbs). */
   private thumbs: HTMLCanvasElement[] | null = null;
 
@@ -55,6 +67,7 @@ export class LabMap {
     this.root.innerHTML = `
       <div class="panel labmap-panel">
         <div class="panel-title">SELECT SECTOR</div>
+        <div class="labmap-tabs"></div>
         <div class="labmap-grid"></div>
         <div class="labmap-info"></div>
         <div class="panel-actions">
@@ -64,6 +77,7 @@ export class LabMap {
       </div>
     `;
     this.grid = this.root.querySelector(".labmap-grid") as HTMLDivElement;
+    this.tabs = this.root.querySelector(".labmap-tabs") as HTMLDivElement;
     this.info = this.root.querySelector(".labmap-info") as HTMLDivElement;
     this.deployBtn = this.root.querySelector('[data-act="deploy"]') as HTMLButtonElement;
     this.buildGrid();
@@ -82,10 +96,34 @@ export class LabMap {
   }
 
   show(): void {
-    const spawn = this.game.save.data.lab.spawn;
-    this.selected = this.game.canDeployInto(spawn) ? spawn : CENTER_SECTOR;
+    this.def = this.game.labDef;
+    this.buildGrid();
+    const spawn = this.game.labSave.spawn;
+    this.selected = this.game.canDeployInto(spawn) ? spawn : this.def.start;
     this.render();
     this.root.classList.remove("hidden");
+  }
+
+  /** Tabs for every world the squad has reached (hidden until zone 2 is). */
+  private buildTabs(): void {
+    const lab = this.game.save.data.lab;
+    this.tabs.innerHTML = "";
+    this.tabs.classList.toggle("hidden", lab.unlocked < 2);
+    for (let id = 1; id <= lab.unlocked; id++) {
+      const def = LAB_WORLDS[id];
+      const b = document.createElement("button");
+      b.className = `btn labmap-tab${id === this.def.id ? " active" : ""}`;
+      b.textContent = `ZONE ${id}`;
+      b.title = def.name;
+      b.addEventListener("click", () => this.switchWorld(id));
+      this.tabs.append(b);
+    }
+  }
+
+  private switchWorld(id: number): void {
+    if (id === this.def.id) return;
+    this.game.selectLabWorld(id);
+    this.show();
   }
 
   hide(): void {
@@ -104,9 +142,10 @@ export class LabMap {
       };
       const d = step[code];
       if (!d) return;
-      const col = Math.max(0, Math.min(SECTORS_PER_SIDE - 1, (this.selected % SECTORS_PER_SIDE) + d[0]));
-      const row = Math.max(0, Math.min(SECTORS_PER_SIDE - 1, Math.floor(this.selected / SECTORS_PER_SIDE) + d[1]));
-      this.select(row * SECTORS_PER_SIDE + col);
+      const n = this.def.sectors;
+      const col = Math.max(0, Math.min(n - 1, (this.selected % n) + d[0]));
+      const row = Math.max(0, Math.min(n - 1, Math.floor(this.selected / n) + d[1]));
+      this.select(row * n + col);
     }
   }
 
@@ -127,7 +166,12 @@ export class LabMap {
   }
 
   private buildGrid(): void {
-    const n = SECTORS_PER_SIDE;
+    this.buildTabs();
+    const n = this.def.sectors;
+    this.grid.innerHTML = "";
+    this.tiles = [];
+    this.canvases = [];
+    this.root.style.setProperty("--sectors", String(n));
     const label = (text: string): HTMLDivElement => {
       const el = document.createElement("div");
       el.className = "labmap-label";
@@ -147,7 +191,7 @@ export class LabMap {
         const s = r * n + c;
         const tile = document.createElement("button");
         tile.className = "labmap-tile";
-        tile.setAttribute("aria-label", `Sector ${sectorName(s)}`);
+        tile.setAttribute("aria-label", `Sector ${sectorName(s, n)}`);
         const canvas = document.createElement("canvas");
         canvas.width = THUMB_SIZE;
         canvas.height = THUMB_SIZE;
@@ -172,17 +216,17 @@ export class LabMap {
     g.imageSmoothingEnabled = false;
     const thumb = this.thumbs?.[s];
     if (!discovered) {
-      g.drawImage(renderUncharted(s), 0, 0);
+      g.drawImage(renderUncharted(this.def, s), 0, 0);
     } else if (thumb) {
       g.drawImage(thumb, 0, 0);
     } else {
-      drawSectorThumb(this.scratch, s, discovered, conquered);
+      drawSectorThumb(this.scratch, this.def, s, discovered, conquered);
       g.drawImage(this.scratch, 0, 0, THUMB_SIZE, THUMB_SIZE);
     }
     // Explored ground fades in hard steps into unexplored neighbors, so the
     // edge of what the squad has seen reads as darkness, not as a grid line.
     if (discovered) {
-      const n = SECTORS_PER_SIDE;
+      const n = this.def.sectors;
       const col = s % n;
       const row = (s - col) / n;
       const hidden = (c: number, r: number): boolean =>
@@ -199,8 +243,9 @@ export class LabMap {
         if (sides[3]) g.fillRect(o, 0, step, THUMB_SIZE);
       }
     }
+    this.drawMarkers(g, s);
     // A deploy beacon where the squad would land.
-    const frame = labFrame(this.game.world);
+    const frame = this.game.world.labLayout?.frame;
     if (s === this.selected && frame && this.game.canDeployInto(s)) {
       const at = sectorSpawnCell(frame, s);
       const b = sectorBounds(frame, s);
@@ -217,6 +262,46 @@ export class LabMap {
     }
   }
 
+  /**
+   * Map markings that show whether or not a sector is explored: world gates
+   * (a heavy door in their tier's paint on the lab's edge) and the sealed
+   * caches where special upgrades will be (a muted gold diamond).
+   */
+  private drawMarkers(g: CanvasRenderingContext2D, s: number): void {
+    const frame = this.game.world.labLayout?.frame;
+    if (!frame || frame.def !== this.def) return;
+    const b = sectorBounds(frame, s);
+    const k = THUMB_SIZE / (b.x1 - b.x0 + 1);
+    const u = Math.round(THUMB_SIZE / 28);
+    for (const gate of this.def.gates) {
+      const { door } = gateGeometry(frame, gate);
+      const inside = gate.side === "east" ? door.x0 - 1 : door.x1 + 1;
+      if (sectorAtCell(frame, inside, (door.y0 + door.y1) >> 1) !== s) continue;
+      const y0 = Math.round((door.y0 - b.y0) * k);
+      const y1 = Math.round((door.y1 + 1 - b.y0) * k);
+      const x = gate.side === "east" ? THUMB_SIZE - u * 4 : 0;
+      g.fillStyle = "#05070d";
+      g.fillRect(x, y0 - u, u * 4, y1 - y0 + u * 2);
+      g.fillStyle = "#3a3d46";
+      g.fillRect(x + u, y0, u * 2, y1 - y0);
+      const c = TIER_PAINT[gate.tier] ?? TIER_PAINT[1];
+      g.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      for (let y = y0 + u; y < y1 - u; y += u * 3) g.fillRect(x + u, y, u * 2, u);
+    }
+    for (const spot of this.def.upgrades) {
+      if (upgradeSpotSector(this.def, spot) !== s) continue;
+      const at = upgradeSpotCell(frame, spot);
+      const x = Math.round((at.cx - b.x0 + 0.5) * k);
+      const y = Math.round((at.cy - b.y0 + 0.5) * k);
+      g.fillStyle = "#05070d";
+      for (let i = -4; i <= 4; i++) g.fillRect(x - (4 - Math.abs(i) + 1) * u, y + i * u - u / 2, (4 - Math.abs(i) + 1) * 2 * u, u);
+      g.fillStyle = "#b8923a";
+      for (let i = -3; i <= 3; i++) g.fillRect(x - (3 - Math.abs(i) + 0.5) * u, y + i * u - u / 2, (3 - Math.abs(i) + 0.5) * 2 * u, u);
+      g.fillStyle = "#05070d";
+      for (let i = -1; i <= 1; i++) g.fillRect(x - (1 - Math.abs(i) + 0.5) * u, y + i * u - u / 2, (1 - Math.abs(i) + 0.5) * 2 * u, u);
+    }
+  }
+
   private scratch = Object.assign(document.createElement("canvas"), { width: THUMB_PX, height: THUMB_PX });
 
   private render(): void {
@@ -224,7 +309,7 @@ export class LabMap {
     for (let s = 0; s < this.tiles.length; s++) {
       const discovered = progress.discovered.has(s);
       const conquered = progress.conquered.has(s);
-      const tier = zoneForSectorRing(sectorRing(s)) + 1;
+      const tier = sectorTier(this.def, s);
       const tile = this.tiles[s];
       tile.classList.toggle("discovered", discovered);
       tile.classList.toggle("conquered", conquered);
@@ -233,11 +318,11 @@ export class LabMap {
       this.drawTile(s, discovered, conquered);
     }
     const s = this.selected;
-    const tier = zoneForSectorRing(sectorRing(s)) + 1;
-    const name = sectorName(s);
+    const tier = sectorTier(this.def, s);
+    const name = `Z${this.def.id} ${sectorName(s, this.def.sectors)}`;
     let status: string;
     if (!progress.discovered.has(s)) status = "UNEXPLORED";
-    else if (progress.conquered.has(s)) status = s === CENTER_SECTOR ? "STAGING AREA - SECURE" : "CONQUERED - SAFE TO DEPLOY";
+    else if (progress.conquered.has(s)) status = s === this.def.start ? (this.def.id === 1 ? "STAGING AREA - SECURE" : "GATEWAY - SECURE") : "CONQUERED - SAFE TO DEPLOY";
     else {
       const left = progress.generatorCount(s);
       status = `${left} BLIGHT GENERATOR${left === 1 ? "" : "S"} ACTIVE`;
@@ -248,14 +333,14 @@ export class LabMap {
 }
 
 /** Paint one sector's thumbnail from the blueprint (blank until discovered). */
-function drawSectorThumb(canvas: HTMLCanvasElement, sector: number, discovered: boolean, conquered: boolean): void {
+function drawSectorThumb(canvas: HTMLCanvasElement, def: LabWorldDef, sector: number, discovered: boolean, conquered: boolean): void {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const img = ctx.createImageData(THUMB_PX, THUMB_PX);
-  const zone = zoneForSectorRing(sectorRing(sector));
-  const col0 = (sector % SECTORS_PER_SIDE) * SECTOR_CHARS;
-  const row0 = Math.floor(sector / SECTORS_PER_SIDE) * SECTOR_CHARS;
-  const lines = LAB_BLUEPRINT;
+  const zone = sectorZone(def, sector);
+  const col0 = (sector % def.sectors) * SECTOR_CHARS;
+  const row0 = Math.floor(sector / def.sectors) * SECTOR_CHARS;
+  const lines = def.blueprint;
   const at = (c: number, r: number): string => lines[r]?.[c] ?? ".";
   const isRoom = (ch: string): boolean => ch === "R" || ch === "G" || ch === "T";
   const joinsH = (ch: string): boolean => ch === "-" || ch === "+" || isRoom(ch);
@@ -267,7 +352,7 @@ function drawSectorThumb(canvas: HTMLCanvasElement, sector: number, discovered: 
     img.data[i + 2] = c[2] * m;
     img.data[i + 3] = 255;
   };
-  const rock = discovered ? ROCK[zone] : ([14, 17, 23] as RGB);
+  const rock = discovered ? (def.alien ? ALIEN_ROCK : ROCK)[zone] : ([14, 17, 23] as RGB);
   for (let y = 0; y < THUMB_PX; y++) {
     for (let x = 0; x < THUMB_PX; x++) {
       // A faint grain so blank rock still reads as stone.

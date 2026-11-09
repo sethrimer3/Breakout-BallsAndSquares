@@ -65,7 +65,7 @@ export function placeLabEquipment(world: PixelWorld, layout: LabLayout): void {
     if (world.subInBounds(sx, sy) && !inRoom[(sy >> 1) * world.width + (sx >> 1)]) putSub(world, sx, sy, k, tint);
   };
   for (const seg of layout.corridors) {
-    if (seg.rubble || seg.width < 3) continue;
+    if (seg.rubble || seg.width < 3 || seg.gate) continue;
     const near = rng.next() < 0.5;
     if (rng.next() < FACILITY.corridorFixtureChance) placeCorridorFixtures(world, seg, !near, rng, inRoom);
     if (rng.next() > FACILITY.corridorPipeChance) continue;

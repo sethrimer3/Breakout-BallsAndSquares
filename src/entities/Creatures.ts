@@ -115,6 +115,8 @@ const DY = [0, 0, 1, -1];
 
 export class CreatureSystem {
   flowers: Flower[] = [];
+  /** Flower spawn rate and caps multiplier (higher where the Blight has remade the lab). */
+  flowerMult = 1;
   worms: Worm[] = [];
   specimens: Specimen[] = [];
   spores: Spore[] = [];
@@ -189,13 +191,14 @@ export class CreatureSystem {
 
   private trySpawn(dt: number, growth: GrowthSystem): void {
     if (growth.rate <= 0) return;
-    const flowerCap = this.cap(CREATURES.flowerCap, CREATURES.flowerCapPerMinute, CREATURES.flowerCapMax);
+    const m = this.flowerMult;
+    const flowerCap = Math.round(this.cap(CREATURES.flowerCap * m, CREATURES.flowerCapPerMinute * m, CREATURES.flowerCapMax * m));
     const wormCap =
       this.runTime < CREATURES.wormStartSeconds ? 0 : this.cap(CREATURES.wormCap, CREATURES.wormCapPerMinute, CREATURES.wormCapMax);
     for (const c of growth.colonies.list) {
       if (!c.active || c.edges.length === 0) continue;
       if (this.flowers.length < flowerCap) {
-        const p = CREATURES.flowerSpawnPerSec * dt * Math.min(1, c.members.length / CREATURES.flowerColonySize);
+        const p = CREATURES.flowerSpawnPerSec * m * dt * Math.min(1, c.members.length / CREATURES.flowerColonySize);
         if (this.rng.next() < p) this.spawnFlower(c);
       }
       if (this.worms.length < wormCap && this.rng.next() < CREATURES.wormSpawnPerSec * dt) this.spawnWorm(c);
