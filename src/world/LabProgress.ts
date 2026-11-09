@@ -1,5 +1,5 @@
 import type { PixelWorld } from "./PixelWorld";
-import { CENTER_SECTOR, SECTORS_PER_SIDE, sectorAtCell, type LabFrame } from "./labMap";
+import { LAB_WORLDS, sectorAtCell, type LabFrame, type LabWorldDef } from "./labMap";
 
 /**
  * Tracks which sectors of the hand-made lab the squad has discovered and
@@ -14,16 +14,22 @@ export class LabProgress {
   private generators = new Map<number, { alive: boolean }[]>();
   private frame: LabFrame | null = null;
 
-  constructor(discovered: readonly number[] = [CENTER_SECTOR], conquered: readonly number[] = [CENTER_SECTOR]) {
+  constructor(
+    readonly def: LabWorldDef = LAB_WORLDS[1],
+    discovered: readonly number[] = [],
+    conquered: readonly number[] = [],
+  ) {
     for (const s of discovered) this.discovered.add(s);
     for (const s of conquered) this.conquered.add(s);
-    this.discovered.add(CENTER_SECTOR);
-    this.conquered.add(CENTER_SECTOR);
+    // The starting sector is always safe.
+    this.discovered.add(def.start);
+    this.conquered.add(def.start);
   }
 
   /** Index the freshly generated world's generators by sector. */
   attach(world: PixelWorld): void {
-    this.frame = world.labLayout?.frame ?? null;
+    const frame = world.labLayout?.frame ?? null;
+    this.frame = frame && frame.def === this.def ? frame : null;
     this.generators.clear();
     if (!this.frame) return;
     for (const core of world.blightCores) {
@@ -69,7 +75,7 @@ export class LabProgress {
     return changed;
   }
 
-  static get sectorCount(): number {
-    return SECTORS_PER_SIDE * SECTORS_PER_SIDE;
+  get sectorCount(): number {
+    return this.def.sectors * this.def.sectors;
   }
 }

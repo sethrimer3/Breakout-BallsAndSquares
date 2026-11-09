@@ -1,4 +1,5 @@
-import { blockHealthForTier, FACILITY, GROWTH, maxHealthForDistance, TERRAIN, wallHealthForZone } from "../config";
+import { blockHealthForTier, FACILITY, GROWTH, maxHealthForDistance, TERRAIN, tierHealth, tierWallHealth, wallHealthForZone, zoneForDepth } from "../config";
+import { nearestSector, SECTOR_CELLS, sectorZone } from "./labMap";
 import type { SolidQuery } from "../core/gridRaycast";
 import type { LabLayout } from "./WorldGenerator";
 
@@ -84,8 +85,13 @@ export interface RoomLight {
 
 export interface Door {
   id: number;
-  /** Keycard tier that opens it (1..3, the zone of the room it seals + 1). */
-  tier: 1 | 2 | 3;
+  /** Keycard tier that opens it (the tier of the room it seals). */
+  tier: number;
+  /**
+   * A world gate: a huge door on the lab's edge. It never breaks; only the
+   * keycard opens it. `to` is the world beyond (0 = sealed for good).
+   */
+  gate?: { to: number; side: "east" | "west" };
   cells: number[];
   open: boolean;
   /** Inclusive cell bounds. */
@@ -141,9 +147,17 @@ export class PixelWorld implements SolidQuery {
   readonly subHeight: number;
   readonly subCellSize: number;
   readonly roomSize: number;
-  /** Center cell coordinates (used for distance / depth). */
+  /** Center cell coordinates. */
   readonly centerX: number;
   readonly centerY: number;
+  /**
+   * Cell that distance and depth count from: the world center for small test
+   * worlds, the starting sector's landing spot in a hand-made lab world.
+   */
+  originX: number;
+  originY: number;
+  /** Tier of a lab world's first band minus one (zone 1: 0, zone 2: 3). */
+  tierBase = 0;
   /** Inclusive bounds of the starting room, in cells. */
   roomX0: number;
   roomY0: number;
@@ -191,6 +205,8 @@ export class PixelWorld implements SolidQuery {
   roomLights: RoomLight[] = [];
   /** Dormant sentry turret positions from generation. */
   sentrySpots: SentrySpot[] = [];
+  /** Placeholders for special upgrades (not collectable yet), from the lab world's definition. */
+  upgradeSpots: { id: string; cx: number; cy: number; sector: number }[] = [];
   /** Glass tanks holding a specimen instead of a small generator. */
   specimenSpots: SpecimenSpot[] = [];
   /** Highest keycard tier the squad holds (0 = none). */
@@ -216,6 +232,8 @@ export class PixelWorld implements SolidQuery {
     this.roomSize = dims.roomSize;
     this.centerX = Math.floor(dims.width / 2);
     this.centerY = Math.floor(dims.height / 2);
+    this.originX = this.centerX;
+    this.originY = this.centerY;
     const half = Math.floor(dims.roomSize / 2);
     this.roomX0 = this.centerX - half;
     this.roomY0 = this.centerY - half;
@@ -314,9 +332,50 @@ export class PixelWorld implements SolidQuery {
     );
   }
 
-  /** Chebyshev distance of a cell from the world center. */
+  /** Chebyshev distance of a cell from the origin (the world's start). */
   distanceOf(cx: number, cy: number): number {
-    return Math.max(Math.abs(cx - this.centerX), Math.abs(cy - this.centerY));
+    return Math.max(Math.abs(cx - this.originX), Math.abs(cy - this.originY));
+  }
+
+  /**
+   * Tier band (0..2) of a cell within this world. In a lab world it is the
+   * band of the cell's sector (rising with distance from the start sector);
+   * elsewhere it follows depth from the center.
+   */
+  zoneAt(cx: number, cy: number): 0 | 1 | 2 {
+    const frame = this.labLayout?.frame;
+    if (frame) return sectorZone(frame.def, nearestSector(frame, cx, cy));
+    return zoneForDepth(this.depthOf(cx, cy));
+  }
+
+  /** Terrain tier (1..6) of an ordinary block at a cell. */
+  fillTierAt(cx: number, cy: number): number {
+    return this.tierBase + this.zoneAt(cx, cy) + 1;
+  }
+
+  /**
+   * How far (0..1) a cell sits through its tier band, measured in sectors
+   * from the start sector, so blocks toughen toward the band's far edge.
+   */
+  tierProgress(cx: number, cy: number): number {
+    const frame = this.labLayout?.frame;
+    if (!frame) return 0;
+    const def = frame.def;
+    const sc = def.start % def.sectors;
+    const sr = (def.start - sc) / def.sectors;
+    const fx = (cx - frame.x0) / SECTOR_CELLS - (sc + 0.5);
+    const fy = (cy - frame.y0) / SECTOR_CELLS - (sr + 0.5);
+    const d = Math.max(Math.abs(fx), Math.abs(fy)) + 0.5;
+    const zone = sectorZone(def, nearestSector(frame, cx, cy));
+    const lo = zone === 0 ? 0 : def.bands[zone - 1];
+    const hi = zone === 2 ? Math.max(lo + 1, def.sectors) : def.bands[zone];
+    return Math.max(0, Math.min(1, (d - lo) / Math.max(1, hi - lo)));
+  }
+
+  /** Health of an ordinary block at a cell (no walls, doors or special materials). */
+  blockHealthAt(cx: number, cy: number): number {
+    if (this.labLayout?.frame) return tierHealth(this.fillTierAt(cx, cy), this.tierProgress(cx, cy));
+    return maxHealthForDistance(this.distanceOf(cx, cy));
   }
 
   /** Depth beyond the starting room (0 inside / at the room edge). */
@@ -325,6 +384,7 @@ export class PixelWorld implements SolidQuery {
   }
 
   maxHealthAt(cx: number, cy: number): number {
+    if (this.labLayout?.frame) return this.labMaxHealthAt(cx, cy);
     const dist = this.distanceOf(cx, cy);
     if (this.inBounds(cx, cy)) {
       const i = cy * this.width + cx;
@@ -332,7 +392,7 @@ export class PixelWorld implements SolidQuery {
       if (m === MAT.door) {
         const door = this.doors[this.doorId[i] - 1];
         // Doors break like ordinary blocks of their tier; a keycard just opens them in one hit.
-        return blockHealthForTier(door ? door.tier : 1, dist);
+        return blockHealthForTier(door ? (Math.max(1, Math.min(3, door.tier)) as 1 | 2 | 3) : 1, dist);
       }
       if (m === MAT.crystal) {
         const z = Math.min(2, Math.max(0, this.wall[i] - 1));
@@ -353,15 +413,34 @@ export class PixelWorld implements SolidQuery {
     return maxHealthForDistance(dist);
   }
 
+  /** `maxHealthAt` in a hand-made lab world: by the sector's tier, not raw distance. */
+  private labMaxHealthAt(cx: number, cy: number): number {
+    const t = this.tierProgress(cx, cy);
+    const fill = this.fillTierAt(cx, cy);
+    if (this.inBounds(cx, cy)) {
+      const i = cy * this.width + cx;
+      const m = this.mat[i];
+      if (m === MAT.door) {
+        const door = this.doors[this.doorId[i] - 1];
+        return tierHealth(door ? door.tier : fill, t);
+      }
+      if (m === MAT.crystal) return tierHealth(this.tierBase + Math.max(1, this.wall[i]), t);
+      if (m === MAT.glass) return Math.max(1, Math.ceil(tierHealth(fill, t) * FACILITY.glassHealthMult));
+      const w = this.wall[i];
+      if (w > 0) return tierWallHealth(this.tierBase + w, t);
+      if (this.coreId[i] > 0) return Math.min(65000, tierHealth(fill, t) + GROWTH.coreHealthBonus);
+    }
+    return tierHealth(fill, t);
+  }
+
   /**
    * Max health for a half-size sub-pixel at `(sx, sy)`: about a quarter of a
    * full-size block there, and half that again for lab decor.
    */
   maxSubHealthAt(sx: number, sy: number): number {
-    const dist = this.distanceOf(sx >> 1, sy >> 1);
     let mult = FACILITY.subHealthMult;
     if (this.subInBounds(sx, sy) && isDecorSub(this.subKind[sy * this.subWidth + sx])) mult *= FACILITY.decorHealthMult;
-    return Math.max(1, Math.round(maxHealthForDistance(dist) * mult));
+    return Math.max(1, Math.round(this.blockHealthAt(sx >> 1, sy >> 1) * mult));
   }
 
   /**
@@ -472,9 +551,10 @@ export class PixelWorld implements SolidQuery {
       }
       return bestRes;
     }
-    if (this.mat[i] === MAT.door && this.onDoorHit) {
+    if (this.mat[i] === MAT.door) {
       const door = this.doors[this.doorId[i] - 1];
-      if (door && !door.open && this.onDoorHit(door)) {
+      if (door && !door.open && (this.onDoorHit?.(door) || door.gate)) {
+        // Opened by a keycard, or a world gate shrugging off the hit.
         this.emit(cx, cy, "damaged");
         return 1;
       }

@@ -3,6 +3,8 @@ import type { Door, PixelWorld } from "./PixelWorld";
 
 export interface DoorEvents {
   onOpen?(door: Door): void;
+  /** A shot hit a world gate the squad has no keycard for. */
+  onGateLocked?(door: Door): void;
 }
 
 /**
@@ -30,7 +32,13 @@ export class DoorSystem {
 
   /** Open `door` if the squad's keycard covers its tier. */
   tryOpen(door: Door): boolean {
-    if (door.open || this.world.keycardTier < door.tier) return false;
+    if (door.open) return false;
+    // A sealed gate (the one the squad came through) never opens.
+    if (door.gate && door.gate.to === 0) return false;
+    if (this.world.keycardTier < door.tier) {
+      if (door.gate) this.events.onGateLocked?.(door);
+      return false;
+    }
     door.open = true;
     const w = this.world;
     const mx = (door.x0 + door.x1) / 2;

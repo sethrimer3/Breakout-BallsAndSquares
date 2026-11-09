@@ -2383,7 +2383,7 @@ button {
 
 /* ---------------------------------------------------------------- lab map */
 .labmap-panel {
-  --tile: max(22px, min(calc((100vw - 96px) / 9.6), calc((100vh - 190px) / 9.6), 64px));
+  --tile: max(14px, min(calc((100vw - 96px) / (var(--sectors, 9) + 0.6)), calc((100vh - 220px) / (var(--sectors, 9) + 0.6)), 64px));
   min-width: 0;
   max-width: none;
   padding: 14px 16px;
@@ -2391,8 +2391,8 @@ button {
 }
 .labmap-grid {
   display: grid;
-  grid-template-columns: 16px repeat(9, var(--tile)) 16px;
-  grid-template-rows: 14px repeat(9, var(--tile)) 14px;
+  grid-template-columns: 16px repeat(var(--sectors, 9), var(--tile)) 16px;
+  grid-template-rows: 14px repeat(var(--sectors, 9), var(--tile)) 14px;
   gap: 0;
   justify-content: center;
   margin: 10px 0 8px;
@@ -2437,6 +2437,33 @@ button {
 .labmap-tile.conquered[data-tier="3"]::after {
   background: #c27a2a;
 }
+.labmap-tile.conquered[data-tier="4"]::after {
+  background: #68508c;
+}
+.labmap-tile.conquered[data-tier="5"]::after {
+  background: #5c8438;
+}
+.labmap-tile.conquered[data-tier="6"]::after {
+  background: #b0a280;
+}
+.labmap-tabs {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 8px;
+}
+.labmap-tabs.hidden {
+  display: none;
+}
+.labmap-tab {
+  font-size: var(--f8);
+  padding: 4px 10px;
+  opacity: 0.6;
+}
+.labmap-tab.active {
+  opacity: 1;
+  outline: var(--px1) solid #e8e0cf;
+}
 .labmap-tile.selected {
   outline: var(--px2) solid #e8e0cf;
   outline-offset: calc(-1 * var(--px2));
@@ -2467,6 +2494,15 @@ button {
 }
 .labmap-tier.t3 {
   background: #a4601e;
+}
+.labmap-tier.t4 {
+  background: #68508c;
+}
+.labmap-tier.t5 {
+  background: #4e7430;
+}
+.labmap-tier.t6 {
+  background: #8c8064;
 }
 .btn:disabled {
   opacity: 0.4;

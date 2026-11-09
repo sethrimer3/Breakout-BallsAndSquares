@@ -13,6 +13,12 @@ import { LightRenderer } from "./LightRenderer";
 import { createSprites, soldierShapeSprite, type Sprites } from "./sprites";
 import { soldierShapeIndex } from "../entities/soldierShapes";
 import { TIER_PAINT } from "./materials";
+import { FACILITY } from "../config";
+import { paletteColor, SPRITES } from "../ui/pixelArt";
+import type { Door } from "../world/PixelWorld";
+
+/** Keycard colors by tier, as on the research-base upgrades. */
+const KEYCARD_COLORS = ["#3078ff", "#3078ff", "#ff2a2a", "#d65c12", "#8a6ad0", "#6aa040", "#d8c8a0"];
 
 /** Door core lightened toward the rim as it takes damage. */
 function doorCoreDamaged(d: number): string {
@@ -83,6 +89,7 @@ export class Renderer {
     game.terrain.drawFloor(ctx, cam);
     game.terrain.draw(ctx, cam, game.showChunkBorders);
     this.drawDoors();
+    this.drawUpgradeCaches();
 
     // Subtle starting-room frame so the spawn zone stays recognizable.
     const cs = game.world.cellSize;
@@ -141,6 +148,7 @@ export class Renderer {
     this.drawGrenades();
     this.drawTurrets();
     this.drawAimIndicator();
+    this.drawGateNotice();
 
     this.lightRenderer.renderVignette(ctx, w, h);
   }
@@ -286,6 +294,10 @@ export class Renderer {
     const rim = Math.max(1, sz * 0.1);
     for (const d of w.doors) {
       if (d.x1 < x0 || d.y1 < y0 || d.x0 > x1 || d.y0 > y1) continue;
+      if (d.gate) {
+        this.drawGate(d);
+        continue;
+      }
       for (const i of d.cells) {
         const hp = w.health[i];
         if (hp === 0) continue;
@@ -308,6 +320,141 @@ export class Renderer {
         }
       }
     }
+  }
+
+  /**
+   * A world gate: one huge slab of dark plate set into the lab's edge, with a
+   * heavy frame, a seam where its halves part, and bands of matte keycard paint.
+   * Drawn cell by cell, so it splits from the middle as it slides open.
+   */
+  private drawGate(d: Door): void {
+    const { ctx, game } = this;
+    const w = game.world;
+    const cam = game.camera;
+    const cs = w.cellSize;
+    const h = d.y1 - d.y0 + 1;
+    const mid = (d.y0 + d.y1) / 2;
+    const paint = TIER_PAINT[d.tier] ?? TIER_PAINT[1];
+    for (const i of d.cells) {
+      if (w.health[i] === 0) continue;
+      const cx = i % w.width;
+      const cy = (i - cx) / w.width;
+      const sx = Math.round(cam.worldToScreenX(cx * cs));
+      const sy = Math.round(cam.worldToScreenY(cy * cs));
+      const ex = Math.round(cam.worldToScreenX((cx + 1) * cs));
+      const ey = Math.round(cam.worldToScreenY((cy + 1) * cs));
+      const ry = cy - d.y0;
+      const edgeX = cx === d.x0 || cx === d.x1;
+      const edgeY = ry === 0 || ry === h - 1;
+      let col: string;
+      if (edgeX || edgeY) col = "#1c1e24";
+      else if (Math.abs(cy - mid) < 0.6) col = "#101115";
+      else if (ry === 2 || ry === h - 3) col = `rgb(${paint[0]},${paint[1]},${paint[2]})`;
+      else if ((ry === 3 || ry === h - 4) && ((cx + cy) & 1) === 0) col = `rgb(${paint[0] * 0.75 | 0},${paint[1] * 0.75 | 0},${paint[2] * 0.75 | 0})`;
+      else col = (ry >> 1) & 1 ? "#4a4e58" : "#585d68";
+      ctx.fillStyle = col;
+      ctx.fillRect(sx, sy, ex - sx, ey - sy);
+    }
+  }
+
+  /** Sealed caches marking where special upgrades will be: a dark plinth with a muted gold diamond. */
+  private drawUpgradeCaches(): void {
+    const { ctx, game } = this;
+    const w = game.world;
+    const cam = game.camera;
+    const cs = w.cellSize;
+    for (const spot of w.upgradeSpots) {
+      const x = cam.worldToScreenX((spot.cx + 0.5) * cs);
+      const y = cam.worldToScreenY((spot.cy + 0.5) * cs);
+      const r = cs * 1.5 * cam.zoom;
+      if (x < -r || y < -r || x > cam.viewW + r || y > cam.viewH + r) continue;
+      const u = Math.max(1, Math.round(r / 6));
+      ctx.fillStyle = "#101114";
+      ctx.fillRect(Math.round(x - r), Math.round(y - r), Math.round(r * 2), Math.round(r * 2));
+      ctx.fillStyle = "#2a2b30";
+      ctx.fillRect(Math.round(x - r + u), Math.round(y - r + u), Math.round(r * 2 - u * 2), Math.round(r * 2 - u * 2));
+      for (let k = -3; k <= 3; k++) {
+        const half = (3 - Math.abs(k)) * u + u / 2;
+        ctx.fillStyle = Math.abs(k) === 3 ? "#5e4a1e" : "#9c7a30";
+        ctx.fillRect(Math.round(x - half), Math.round(y + k * u - u / 2), Math.round(half * 2), u);
+      }
+      ctx.fillStyle = "#101114";
+      ctx.fillRect(Math.round(x - u / 2), Math.round(y - u / 2), u, u);
+    }
+  }
+
+  private keycardSprites = new Map<number, HTMLCanvasElement>();
+
+  /** The keycard sprite in a tier's color, at one canvas pixel per sprite pixel. */
+  private keycardSprite(tier: number): HTMLCanvasElement {
+    let c = this.keycardSprites.get(tier);
+    if (c) return c;
+    const grid = SPRITES.keycard;
+    c = document.createElement("canvas");
+    c.width = grid[0].length;
+    c.height = grid.length;
+    const g = c.getContext("2d")!;
+    const tint = KEYCARD_COLORS[tier] ?? KEYCARD_COLORS[1];
+    grid.forEach((row, y) => {
+      for (let x = 0; x < row.length; x++) {
+        const color = paletteColor(row[x], tint);
+        if (!color) continue;
+        g.fillStyle = color;
+        g.fillRect(x, y, 1, 1);
+      }
+    });
+    this.keycardSprites.set(tier, c);
+    return c;
+  }
+
+  /**
+   * "Tier N Access Needed" over a locked gate the squad keeps shooting: the
+   * keycard and its caption rise out of the middle of the wall fading in, hang
+   * for a second, then fade away.
+   */
+  private drawGateNotice(): void {
+    const { ctx, game } = this;
+    const n = game.gateNotice;
+    if (!n) return;
+    const t = game.runStats.time - n.t0;
+    const { gateNoticeRise: rise, gateNoticeHold: hold, gateNoticeFade: fade, gateNoticeLift: lift } = FACILITY;
+    if (t < 0 || t > rise + hold + fade) return;
+    let alpha: number;
+    let p: number;
+    if (t < rise) {
+      p = 1 - (1 - t / rise) ** 3;
+      alpha = t / rise;
+    } else {
+      p = 1;
+      alpha = t < rise + hold ? 1 : 1 - (t - rise - hold) / fade;
+    }
+    const cam = game.camera;
+    const cs = game.world.cellSize;
+    const d = n.door;
+    const bob = t > rise ? Math.sin((t - rise) * 3) * 0.15 : 0;
+    const wx = ((d.x0 + d.x1 + 1) / 2) * cs;
+    const wy = ((d.y0 + d.y1 + 1) / 2 - lift * p + bob) * cs;
+    const x = cam.worldToScreenX(wx);
+    const y = cam.worldToScreenY(wy);
+    const sprite = this.keycardSprite(d.tier);
+    const scale = Math.max(2, Math.round(3 * Math.min(1.5, Math.max(0.7, cam.zoom))));
+    const sw = sprite.width * scale;
+    const sh = sprite.height * scale;
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, Math.round(x - sw / 2), Math.round(y - sh / 2), sw, sh);
+    const fontPx = 8 * Math.max(1, Math.round(scale / 2));
+    ctx.font = `${fontPx}px Silkscreen, "Press Start 2P", monospace`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    const text = `Tier ${d.tier} Access Needed`;
+    const ty = Math.round(y - sh / 2 - scale * 2);
+    ctx.fillStyle = "#05070d";
+    ctx.fillText(text, Math.round(x) + scale, ty + scale);
+    ctx.fillStyle = "#f0e8d8";
+    ctx.fillText(text, Math.round(x), ty);
+    ctx.restore();
   }
 
   /** Research-base sentries: dark and slumped while dormant, red-eyed once awake. */

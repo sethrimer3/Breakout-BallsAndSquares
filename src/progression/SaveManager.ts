@@ -1,4 +1,5 @@
 import { clamp } from "../core/math";
+import { LAB_WORLD_COUNT, LAB_WORLDS } from "../world/labMap";
 import type { SecondaryWeaponType, WeaponType } from "../entities/Soldier";
 import { SOLDIER_UPGRADE_DEFS, type SoldierUpgradeLevels } from "./SoldierUpgrades";
 import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
@@ -104,21 +105,38 @@ export interface SaveData {
     autoMove: boolean;
     alwaysShootWhenAutoMoveOff: boolean;
   };
-  /** Progress through the hand-made lab, by sector index (see world/labMap.ts). */
+  /** Progress through the hand-made lab worlds (see world/labMap.ts). */
   lab: {
-    /** Sectors a soldier or turret has seen. */
-    discovered: number[];
-    /** Discovered sectors with every Blight generator destroyed: safe to deploy into. */
-    conquered: number[];
-    /** Sector the squad last deployed into. */
-    spawn: number;
+    /** World (zone) the squad deploys into. */
+    world: number;
+    /** Highest world the squad has reached through a gate. */
+    unlocked: number;
+    /** Per world (keyed "1", "2", ...), by sector index. */
+    worlds: Record<string, LabWorldProgress>;
   };
   lastSaved?: number;
 }
 
-/** Sector count of the hand-made lab (9 × 9) and its middle, kept here so saves stay valid. */
-const LAB_SECTORS = 81;
-export const LAB_START_SECTOR = 40;
+export interface LabWorldProgress {
+  /** Sectors a soldier or turret has seen. */
+  discovered: number[];
+  /** Discovered sectors with every Blight generator destroyed: safe to deploy into. */
+  conquered: number[];
+  /** Sector the squad last deployed into. */
+  spawn: number;
+}
+
+/** Fresh progress for lab world `id`: only its starting sector is known and safe. */
+export function freshLabWorld(id: number): LabWorldProgress {
+  const start = LAB_WORLDS[id].start;
+  return { discovered: [start], conquered: [start], spawn: start };
+}
+
+function defaultLab(): SaveData["lab"] {
+  const worlds: Record<string, LabWorldProgress> = {};
+  for (let id = 1; id <= LAB_WORLD_COUNT; id++) worlds[id] = freshLabWorld(id);
+  return { world: 1, unlocked: 1, worlds };
+}
 
 export function defaultSaveData(): SaveData {
   const upgrades = {} as Record<UpgradeId, number>;
@@ -147,16 +165,26 @@ export function defaultSaveData(): SaveData {
       autoMove: true,
       alwaysShootWhenAutoMoveOff: false,
     },
-    lab: { discovered: [LAB_START_SECTOR], conquered: [LAB_START_SECTOR], spawn: LAB_START_SECTOR },
+    lab: defaultLab(),
   };
 }
 
-function sectorList(v: unknown): number[] {
-  const out = new Set<number>([LAB_START_SECTOR]);
+function sectorList(v: unknown, id: number): number[] {
+  const def = LAB_WORLDS[id];
+  const out = new Set<number>([def.start]);
   if (Array.isArray(v)) {
-    for (const s of v) if (typeof s === "number" && Number.isInteger(s) && s >= 0 && s < LAB_SECTORS) out.add(s);
+    for (const s of v) if (typeof s === "number" && Number.isInteger(s) && s >= 0 && s < def.sectors * def.sectors) out.add(s);
   }
   return [...out].sort((a, b) => a - b);
+}
+
+function sanitizeLabWorld(v: unknown, id: number): LabWorldProgress {
+  if (!v || typeof v !== "object") return freshLabWorld(id);
+  const w = v as Record<string, unknown>;
+  const discovered = sectorList(w.discovered, id);
+  const conquered = sectorList(w.conquered, id).filter((s) => discovered.includes(s));
+  const spawn = typeof w.spawn === "number" && conquered.includes(w.spawn) ? w.spawn : LAB_WORLDS[id].start;
+  return { discovered, conquered, spawn };
 }
 
 function finiteNonNeg(v: unknown, fallback = 0, max = 1e12): number {
@@ -280,9 +308,13 @@ export function sanitizeSaveData(raw: unknown): SaveData {
 
   if (obj.lab && typeof obj.lab === "object") {
     const lab = obj.lab as Record<string, unknown>;
-    def.lab.discovered = sectorList(lab.discovered);
-    def.lab.conquered = sectorList(lab.conquered).filter((s) => def.lab.discovered.includes(s));
-    def.lab.spawn = typeof lab.spawn === "number" && def.lab.conquered.includes(lab.spawn) ? lab.spawn : LAB_START_SECTOR;
+    const worlds = lab.worlds && typeof lab.worlds === "object" ? (lab.worlds as Record<string, unknown>) : {};
+    for (let id = 1; id <= LAB_WORLD_COUNT; id++) def.lab.worlds[id] = sanitizeLabWorld(worlds[id], id);
+    // Saves from before zone 2 kept zone 1's progress at the top level.
+    if (!lab.worlds && "discovered" in lab) def.lab.worlds[1] = sanitizeLabWorld(lab, 1);
+    const int = (x: unknown, fallback: number): number => (typeof x === "number" && Number.isInteger(x) ? x : fallback);
+    def.lab.unlocked = clamp(int(lab.unlocked, 1), 1, LAB_WORLD_COUNT);
+    def.lab.world = clamp(int(lab.world, 1), 1, def.lab.unlocked);
   }
 
   if (typeof obj.lastSaved === "number" && Number.isFinite(obj.lastSaved)) {
