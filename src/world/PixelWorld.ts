@@ -453,8 +453,9 @@ export class PixelWorld implements SolidQuery {
    * Apply damage to a normal cell `(cx, cy)`. If the normal cell is empty (`hp === 0`)
    * and any of its 4 subcells are solid, damages those subcells instead.
    * Returns 0 if nothing happened, 1 if damaged, 2 if destroyed.
+   * `byPlayer` marks a hit the squad dealt itself (see `damageSub`).
    */
-  damage(cx: number, cy: number, amount: number): 0 | 1 | 2 {
+  damage(cx: number, cy: number, amount: number, byPlayer = false): 0 | 1 | 2 {
     if (!this.inBounds(cx, cy)) return 0;
     const i = cy * this.width + cx;
     const hp = this.health[i];
@@ -465,7 +466,7 @@ export class PixelWorld implements SolidQuery {
       let bestRes: 0 | 1 | 2 = 0;
       for (let dy = 0; dy < 2; dy++) {
         for (let dx = 0; dx < 2; dx++) {
-          const r = this.damageSub(sx0 + dx, sy0 + dy, amount);
+          const r = this.damageSub(sx0 + dx, sy0 + dy, amount, byPlayer);
           if (r > bestRes) bestRes = r;
         }
       }
@@ -493,14 +494,17 @@ export class PixelWorld implements SolidQuery {
    * Apply damage at subcell coordinates `(sx, sy)`.
    * If the parent normal cell `(sx >> 1, sy >> 1)` is solid, damages the parent normal cell.
    * Otherwise damages the 50% pink blight subcell at `(sx, sy)`.
+   * When the squad itself (`byPlayer`) breaks a rubble sub-pixel, the rubble
+   * orthogonally touching it crumbles too. Those knock-on breaks never spread
+   * further, so one shot clears a small patch, not a whole heap.
    */
-  damageSub(sx: number, sy: number, amount: number): 0 | 1 | 2 {
+  damageSub(sx: number, sy: number, amount: number, byPlayer = false): 0 | 1 | 2 {
     if (!this.subInBounds(sx, sy)) return 0;
     const cx = sx >> 1;
     const cy = sy >> 1;
     const i = cy * this.width + cx;
     if (this.health[i] > 0) {
-      return this.damage(cx, cy, amount);
+      return this.damage(cx, cy, amount, byPlayer);
     }
     const si = sy * this.subWidth + sx;
     const hp = this.subHealth[si];
@@ -508,11 +512,34 @@ export class PixelWorld implements SolidQuery {
     const next = Math.max(0, hp - amount);
     this.subHealth[si] = next;
     if (next === 0) {
+      const rubble = this.subKind[si] === SUB.rubble;
       this.emit(cx, cy, "destroyed");
+      if (rubble && byPlayer) this.crumbleRubbleAround(sx, sy);
       return 2;
     }
     this.emit(cx, cy, "damaged");
     return 1;
+  }
+
+  /** Called for each rubble sub-pixel that crumbles as a knock-on break (for debris effects). */
+  onRubbleCrumble: ((sx: number, sy: number) => void) | null = null;
+
+  /** Break the rubble orthogonally touching subcell `(sx, sy)`, without chaining further. */
+  private crumbleRubbleAround(sx: number, sy: number): void {
+    const near = [sx + 1, sy, sx - 1, sy, sx, sy + 1, sx, sy - 1];
+    for (let k = 0; k < near.length; k += 2) {
+      const nx = near[k];
+      const ny = near[k + 1];
+      if (!this.subInBounds(nx, ny)) continue;
+      const ncx = nx >> 1;
+      const ncy = ny >> 1;
+      if (this.health[ncy * this.width + ncx] > 0) continue;
+      const ni = ny * this.subWidth + nx;
+      if (this.subKind[ni] !== SUB.rubble || this.subHealth[ni] === 0) continue;
+      this.subHealth[ni] = 0;
+      this.emit(ncx, ncy, "destroyed");
+      this.onRubbleCrumble?.(nx, ny);
+    }
   }
 
   /**
