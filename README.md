@@ -6,6 +6,8 @@
 
 ## Quick Start
 
+Use Node.js 24 LTS (`nvm use` with the checked-in `.nvmrc`), matching the GitHub Pages deployment workflow. Vitest 5 supports Node 22.12+ and 24+; Node 20 is outside its supported runtime range.
+
 ```bash
 # Install dependencies
 npm install
