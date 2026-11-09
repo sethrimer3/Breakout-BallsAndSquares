@@ -1,3 +1,4 @@
+import { unlockTabs } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { FIRE, FLAMETHROWER } from "../src/config";
 import { Rng } from "../src/core/Rng";
@@ -33,6 +34,7 @@ function rubble(w: PixelWorld, sx: number, sy: number, hp = 6): number {
 describe("Flamethrower weapon", () => {
   it("gates its tree behind the unlock and applies upgrades", () => {
     const save = new SaveManager(new MemStorage());
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     save.data.bank = 100_000;
     save.data.crystals = 100_000;

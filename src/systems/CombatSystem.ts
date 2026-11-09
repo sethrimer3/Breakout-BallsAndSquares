@@ -344,7 +344,7 @@ export class CombatSystem {
     b.dx = dx;
     b.dy = dy;
     const mods = this.shooter?.mods;
-    b.speed = speed * this.stats.globalBulletSpeedMult;
+    b.speed = speed * this.stats.globalBulletSpeedMult * (mods?.bulletSpeedMult ?? 1);
     b.damage = damage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0);
     b.life = life;
     b.maxLife = life;
@@ -382,7 +382,7 @@ export class CombatSystem {
     b.dx = dx;
     b.dy = dy;
     const mods = this.shooter?.mods;
-    b.speed = speed * this.stats.globalBulletSpeedMult;
+    b.speed = speed * this.stats.globalBulletSpeedMult * (mods?.bulletSpeedMult ?? 1);
     b.damage = damage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0);
     b.life = life;
     b.maxLife = life;

@@ -632,6 +632,11 @@ button {
   min-width: 480px;
 }
 
+.main-overlay > .settings-panel {
+  position: relative;
+  z-index: 2;
+}
+
 .settings-tabs {
   display: flex;
   gap: 10px;
@@ -2266,7 +2271,7 @@ button {
 }
 .tree-overlay .tree-categories {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 .tree-overlay .tree-cat-btn {

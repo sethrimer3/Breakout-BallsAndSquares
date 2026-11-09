@@ -76,7 +76,7 @@ interface PanDrag {
   viewY: number;
 }
 
-export type UpgradeCategory = "systems" | "primary" | "secondary" | "soldiers";
+export type UpgradeCategory = "systems" | "primary" | "secondary" | "soldiers" | "formations";
 
 export interface CategoryInfo {
   id: UpgradeCategory;
@@ -108,6 +108,7 @@ export const CATEGORIES: readonly CategoryInfo[] = [
     color: "#ff9d3b",
     branches: ["grenade", "turret"],
   },
+  { id: "formations", name: "FORMATIONS", icon: "formationLine", color: UI_COLORS.soldier, branches: ["formations"] },
   {
     id: "soldiers",
     name: "SOLDIER TREES",
@@ -138,6 +139,7 @@ interface TreeSource {
 }
 
 export function categoryForBranch(b: UpgradeBranch): UpgradeCategory {
+  if (b === "formations") return "formations";
   if (b === "core" || b === "resources" || b === "blight" || b === "facility") return "systems";
   if (b === "grenade" || b === "turret") return "secondary";
   if (b === "soldier") return "soldiers";
@@ -145,6 +147,7 @@ export function categoryForBranch(b: UpgradeBranch): UpgradeCategory {
 }
 
 const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
+  formations: { icon: "formationLine", color: UI_COLORS.soldier },
   core: { icon: "soldier", color: UI_COLORS.soldier },
   resources: { icon: "gold", color: UI_COLORS.gold },
   blight: { icon: "warn", color: UI_COLORS.blight },
@@ -271,6 +274,10 @@ export class UpgradeTree {
                 <span class="tree-cat-name">SECONDARY WEAPONS</span>
                 <span class="cat-caret">▶</span>
               </button>
+              <button class="tree-cat-btn" data-cat="formations" title="FORMATIONS">
+                ${sprite("formationLine", { color: UI_COLORS.soldier, scale: 1 })}
+                <span class="tree-cat-name">FORMATIONS</span><span class="cat-caret">▶</span>
+              </button>
               <button class="tree-cat-btn" data-cat="soldiers" title="SOLDIER TREES">
                 ${sprite("soldierPlus", { color: UI_COLORS.soldier, scale: 1 })}
                 <span class="tree-cat-name">SOLDIER TREES</span>
@@ -297,6 +304,9 @@ export class UpgradeTree {
               <div class="tree-cat-panel hidden" data-cat="secondary">
                 <button class="tree-tab" data-tab="grenade"></button>
                 <button class="tree-tab" data-tab="turret"></button>
+              </div>
+              <div class="tree-cat-panel hidden" data-cat="formations">
+                <button class="tree-tab" data-tab="formations">${tabHtml("formations", "FORMATIONS & BEHAVIORS")}</button>
               </div>
               <div class="tree-cat-panel hidden" data-cat="soldiers">
                 <div class="soldier-slot-tabs"></div>
@@ -450,6 +460,7 @@ export class UpgradeTree {
   selectCategory(cat: UpgradeCategory): void {
     this.expandedCategory = cat;
     const catInfo = CATEGORIES.find((c) => c.id === cat)!;
+    if (!catInfo.branches.some((b) => this.game.upgrades.isBranchUnlocked(b))) return;
     if (!catInfo.branches.includes(this.activeTab)) {
       this.switchTab(catInfo.branches[0]);
     } else {
@@ -528,6 +539,7 @@ export class UpgradeTree {
   }
 
   switchTab(tab: UpgradeBranch): void {
+    if (!this.game.upgrades.isBranchUnlocked(tab)) return;
     this.inLoadoutScreen = false;
     this.activeTab = tab;
     this.expandedCategory = categoryForBranch(tab);
@@ -548,13 +560,15 @@ export class UpgradeTree {
         this.titleEl.textContent = `SOLDIER #${this.soldierSlot + 1} TREE`;
         this.subEl.textContent = "THIS SOLDIER ONLY — GOLD, THEN ORANGE, THEN GREEN CRYSTALS, ALL WITH BLIGHT ESSENCE";
       } else if (tab === "core") {
-        this.subEl.textContent = "CORE SQUAD ENHANCEMENTS — UPGRADES ALL SOLDIERS & WEAPONS";
+        this.subEl.textContent = "CORE PROGRESSION — FOLLOW THE PATH TO UNLOCK NEW SYSTEMS";
+      } else if (tab === "formations") {
+        this.subEl.textContent = "SQUAD FORMATIONS & INDIVIDUAL SOLDIER BEHAVIORS";
       } else if (tab === "resources") {
         this.subEl.textContent = "RESOURCE EXTRACTION — GOLD DROPS, TIER 2 ORANGE & TIER 3 GREEN CRYSTALS";
       } else if (tab === "blight") {
         this.subEl.textContent = "BLIGHT CONTAINMENT — REPLICATION DAMPENING & BLIGHT CORE PURGES";
       } else if (tab === "facility") {
-        this.subEl.textContent = "RESEARCH BASE SYSTEMS — KEYCARD ACCESS, DORMANT SENTRIES & FACILITY MAPPING";
+        this.subEl.textContent = "RESEARCH BASE SYSTEMS — DORMANT SENTRIES & FACILITY MAPPING";
       } else if (tab === "pistol") {
         this.subEl.textContent = "SIDEARM WEAPON TREE — STANDARD ISSUE (UNLOCKED)";
       } else if (tab === "shotgun") {
@@ -596,7 +610,7 @@ export class UpgradeTree {
       const to = nodePos(def.grid.col, def.grid.row);
       const btn = document.createElement("button");
       // The weapon-unlock node at the center of a tree gets a round frame.
-      const round = def.grid.col === 0 && def.grid.row === 0;
+      const round = branchOf(def) !== "core" && def.grid.col === 0 && def.grid.row === 0;
       btn.className = round ? "tree-node round" : "tree-node";
       btn.style.setProperty("--node-color", def.color);
       const ring = round
@@ -632,7 +646,7 @@ export class UpgradeTree {
       this.nodeEls.set(def.id, btn);
       this.bodies.set(def.id, {
         id: def.id,
-        parent: def.parent ?? (round ? null : HUB_ID),
+        parent: def.parent ?? (round || branchOf(def) === "core" ? null : HUB_ID),
         hx: to.x,
         hy: to.y,
         x: to.x,
@@ -763,7 +777,7 @@ export class UpgradeTree {
       },
       { passive: false },
     );
-    this.fitBtn.addEventListener("click", () => this.setView(fitView(this.bounds, this.stageW, this.stageH), false));
+    this.fitBtn.addEventListener("click", () => this.setView(this.fittedView(), false));
   }
 
   /** Two-finger pinch: one zoom step each time the spread changes by a quarter. */
@@ -812,13 +826,22 @@ export class UpgradeTree {
     this.fitBoxEl.style.height = `${Math.floor(h * s)}px`;
   }
 
+  private fittedView(): View {
+    const view = fitView(this.bounds, this.stageW, this.stageH);
+    if (this.activeTab === "core") {
+      view.x = Math.round(8 - this.bounds.x0 * view.s);
+      view.y = Math.round(8 - this.bounds.y0 * view.s);
+    }
+    return view;
+  }
+
   /** Give the tree a new stage size and fit it again. */
   private resizeStage(w: number, h: number): void {
     if (w === this.stageW && h === this.stageH) return;
     this.stageW = w;
     this.stageH = h;
     this.hideTooltip();
-    this.setView(fitView(this.bounds, w, h), false);
+    this.setView(this.fittedView(), false);
   }
 
   /** `steered`: the player moved the view away from the fit, so offer FIT. */
@@ -849,10 +872,10 @@ export class UpgradeTree {
     if (this.activeBodies.length > 0) {
       this.bounds = treeBounds(this.activeBodies.map((b) => ({ x: b.hx, y: b.hy })));
       this.sizeLinkCanvas();
-      this.setView(fitView(this.bounds, this.stageW, this.stageH), false);
+      this.setView(this.fittedView(), false);
     }
 
-    const grow = sprout && !reducedMotion();
+    const grow = sprout && this.activeTab !== "core" && !reducedMotion();
     const rootBody = this.activeBodies.find((b) => b.parent === null);
     for (const b of this.activeBodies) {
       b.x = grow && rootBody ? rootBody.hx : b.hx;
@@ -912,7 +935,7 @@ export class UpgradeTree {
     this.lastFrame = time;
     if (this.inLoadoutScreen) return;
     const heldId = this.drag?.moved ? this.drag.id : null;
-    if (reducedMotion()) {
+    if (reducedMotion() || this.activeTab === "core") {
       for (const b of this.activeBodies) {
         if (b.id === heldId) continue;
         b.x = b.hx;
@@ -1008,7 +1031,9 @@ export class UpgradeTree {
     const nextVal = def.formatValue(def.valueAt(Math.min(def.maxLevel, lvl + 1)));
 
     let bodyHtml: string;
-    if (!unlocked && "tier" in def) {
+    if (def.placeholder) {
+      bodyHtml = `<div class="tt-desc">${def.shortDesc}</div>`;
+    } else if (!unlocked && "tier" in def) {
       const parentName = def.parent ? SOLDIER_UPGRADE_BY_ID[def.parent].name : "";
       bodyHtml = `
         <div class="tt-desc">${def.shortDesc}</div>
@@ -1026,8 +1051,10 @@ export class UpgradeTree {
         (branch === "grenade" && def.id !== "grenade_unlock" && u.levelOf("grenade_unlock") === 0) ||
         (branch === "turret" && def.id !== "turret_unlock" && u.levelOf("turret_unlock") === 0);
       const rem = Math.max(0, def.unlockLifetimePixels - this.game.lifetimePixels);
+      let prerequisite = def.parent;
+      while (branch === "core" && prerequisite && treeDef(prerequisite).placeholder) prerequisite = treeDef(prerequisite).parent;
       const needParent =
-        branch === "facility" && def.parent !== null && u.levelOf(def.parent) === 0 ? treeDef(def.parent).name : "";
+        (branch === "facility" || branch === "core") && prerequisite !== null && u.levelOf(prerequisite) === 0 ? treeDef(prerequisite).name : "";
       const lockMsg =
         rem > 0
           ? `LOCKED — Destroy ${def.unlockLifetimePixels} lifetime pixels (${rem} more)`
@@ -1301,6 +1328,16 @@ export class UpgradeTree {
       if (btn) btn.innerHTML = tabHtml(tabId, label, !unlocked);
     }
 
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>(".tree-tab")) {
+      const branch = button.dataset.tab as UpgradeBranch;
+      button.disabled = !this.game.upgrades.isBranchUnlocked(branch);
+      button.title = button.disabled ? "Unlock this tab on the Core path" : "";
+    }
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>(".tree-cat-btn")) {
+      const category = CATEGORIES.find((c) => c.id === button.dataset.cat)!;
+      button.disabled = !category.branches.some((b) => this.game.upgrades.isBranchUnlocked(b));
+      button.title = button.disabled ? `${category.name} — Unlock on the Core path` : category.name;
+    }
     this.updateHeaderAndScreen();
 
     if (this.inLoadoutScreen) {
@@ -1311,6 +1348,7 @@ export class UpgradeTree {
     // Center hub ball is shown on Core, Resources, Blight & Pistol (where 0,0 has no upgrade node),
     // and hidden on weapon trees where their unlock node sits at (0,0).
     const hasCenterUnlockNode =
+      this.activeTab === "core" ||
       this.activeTab === "shotgun" ||
       this.activeTab === "assault_rifle" ||
       this.activeTab === "rocket_launcher" ||
@@ -1352,6 +1390,8 @@ export class UpgradeTree {
   }
 
   show(): void {
+    if (!this.game.upgrades.isBranchUnlocked(this.activeTab)) this.activeTab = "core";
+    this.expandedCategory = categoryForBranch(this.activeTab);
     this.inLoadoutScreen = false;
     this.activateBranch(true);
     this.refresh();

@@ -4,12 +4,13 @@ import type { TreeNodeDef } from "./UpgradeDefinitions";
 /**
  * Each soldier's own upgrade tree. Four arms grow out of the soldier: a Tier 1
  * node paid in gold, a Tier 2 node paid in orange crystals, and a Tier 3 node
- * paid in green crystals, the strongest of the three. Every node also costs
+ * paid in green crystals, the strongest of the three. Advanced nodes also cost
  * Blight Essence, more at each tier and each level. Levels live on the
  * soldier's loadout slot, so two soldiers can be built differently.
  */
 
 export type SoldierUpgradeId =
+  | "s_ballistics"
   | "s_marksman"
   | "s_rate"
   | "s_stride"
@@ -29,6 +30,7 @@ export type SoldierTier = 1 | 2 | 3;
 /** What one soldier's tree adds on top of the squad's shared stats. */
 export interface SoldierMods {
   speedMult: number;
+  bulletSpeedMult: number;
   fireRateMult: number;
   damageBonus: number;
   healthBonus: number;
@@ -48,6 +50,7 @@ export interface SoldierMods {
 export function baseSoldierMods(): SoldierMods {
   return {
     speedMult: 1,
+    bulletSpeedMult: 1,
     fireRateMult: 1,
     damageBonus: 0,
     healthBonus: 0,
@@ -118,27 +121,38 @@ const percent = (v: number): string => `${v}%`;
 const health = (v: number): string => `+${v} HP`;
 
 export const SOLDIER_UPGRADE_DEFS: readonly SoldierUpgradeDef[] = [
+  node({
+    id: "s_ballistics", tier: 1, col: -1, row: -1, parent: null, maxLevel: 8,
+    baseCost: 15, essenceCost: 0,
+    name: "Ballistics", shortDesc: "+8% projectile velocity for this soldier only", icon: "bulletFast",
+    valueAt: (l) => 100 + 8 * l, formatValue: percent, delta: "+8%",
+    apply: (m, l) => { m.bulletSpeedMult = 1 + 0.08 * l; },
+  }),
   // Tier 1: gold.
   node({
     id: "s_marksman", tier: 1, col: 0, row: -1, parent: null, maxLevel: 5,
+    baseCost: 25, essenceCost: 0,
     name: "Marksman", shortDesc: "+1 damage on this soldier's shots", icon: "impact",
     valueAt: (l) => l, formatValue: (v) => `+${v} DMG`, delta: "+1 DMG",
     apply: (m, l) => { m.damageBonus += l; },
   }),
   node({
     id: "s_rate", tier: 1, col: 1, row: 0, parent: null, maxLevel: 5,
+    baseCost: 15, essenceCost: 0,
     name: "Trigger Discipline", shortDesc: "+6% fire rate for this soldier", icon: "fireRate",
     valueAt: (l) => 100 + 6 * l, formatValue: percent, delta: "+6%",
     apply: (m, l) => { m.fireRateMult *= 1 + 0.06 * l; },
   }),
   node({
     id: "s_stride", tier: 1, col: -1, row: 0, parent: null, maxLevel: 5,
+    baseCost: 10, essenceCost: 0,
     name: "Long Stride", shortDesc: "+6% movement speed for this soldier", icon: "soldierDash",
     valueAt: (l) => 100 + 6 * l, formatValue: percent, delta: "+6%",
     apply: (m, l) => { m.speedMult *= 1 + 0.06 * l; },
   }),
   node({
     id: "s_vitality", tier: 1, col: 0, row: 1, parent: null, maxLevel: 5,
+    baseCost: 20, essenceCost: 0,
     name: "Hardened Shell", shortDesc: "+10 HP for this soldier, spent escaping Blight", icon: "soldierPlus",
     valueAt: (l) => 10 * l, formatValue: health, delta: "+10 HP",
     apply: (m, l) => { m.healthBonus += 10 * l; },

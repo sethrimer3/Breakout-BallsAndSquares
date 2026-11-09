@@ -1,3 +1,4 @@
+import { unlockTabs } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { LOOT } from "../src/config";
 import { Rng } from "../src/core/Rng";
@@ -23,6 +24,7 @@ class MemStorage implements StorageLike {
 function fresh(): { save: SaveManager; upg: UpgradeManager } {
   const save = new SaveManager(new MemStorage());
   save.data.lifetimePixels = 100_000;
+  unlockTabs(save);
   return { save, upg: new UpgradeManager(save) };
 }
 
@@ -72,26 +74,28 @@ describe("Soldier upgrade trees", () => {
     }
     const essenceAt = (tier: number): number => {
       const def = SOLDIER_UPGRADE_DEFS.find((d) => d.tier === tier)!;
-      return upgradePrices(def, 0).find((p) => p.currency === "essence")!.amount;
+      return upgradePrices(def, 0).find((p) => p.currency === "essence")?.amount ?? 0;
     };
     expect(essenceAt(2)).toBeGreaterThan(essenceAt(1));
     expect(essenceAt(3)).toBeGreaterThan(essenceAt(2));
-    const def = SOLDIER_UPGRADE_DEFS[0];
+    const def = SOLDIER_UPGRADE_DEFS.find((d) => d.id === "s_dynamo")!;
     expect(upgradePrices(def, 1)[1].amount).toBeGreaterThan(upgradePrices(def, 0)[1].amount);
   });
 
-  it("needs both the tier's resource and essence, and keeps soldiers separate", () => {
+  it("lets starter upgrades cost gold only and keeps soldiers separate", () => {
     const { save, upg } = fresh();
     save.data.bank = 100_000;
-    expect(upg.soldierBuy(0, "s_marksman")).toBe(false); // no essence
-    save.data.essence = 2;
     expect(upg.soldierBuy(0, "s_marksman")).toBe(true);
     expect(save.data.essence).toBe(0);
-    expect(save.data.bank).toBe(100_000 - 150);
+    expect(save.data.bank).toBe(100_000 - 25);
     expect(upg.soldierLevelOf(0, "s_marksman")).toBe(1);
     expect(upg.soldierLevelOf(1, "s_marksman")).toBe(0);
     expect(upg.soldierMods(0).damageBonus).toBe(1);
     expect(upg.soldierMods(1).damageBonus).toBe(0);
+    save.data.crystals = 1000;
+    expect(upg.soldierCanBuy(0, "s_penetrator")).toBe(false); // higher tiers still require essence
+    save.data.essence = 6;
+    expect(upg.soldierCanBuy(0, "s_penetrator")).toBe(true);
   });
 
   it("opens the next tier only once the arm's previous node is owned", () => {

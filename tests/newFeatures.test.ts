@@ -1,3 +1,4 @@
+import { SOLDIER_UPGRADE_BY_ID, baseSoldierMods } from "../src/progression/SoldierUpgrades";
 import { describe, expect, it } from "vitest";
 import { GROWTH, growthRateAt, maxHealthForDistance, SOLDIER, TERRAIN, WORLD } from "../src/config";
 import { Rng } from "../src/core/Rng";
@@ -56,19 +57,20 @@ describe("New Features & Upgrades", () => {
     expect(stats.blightRateMultiplier).toBeCloseTo(0.50, 3);
   });
 
-  it("Soldier base speed is cut in half, and has a core upgrade for +8% up to 10 times", () => {
+  it("Soldier base speed is cut in half, and has an individual speed upgrade", () => {
     expect(SOLDIER.speed).toBe(62.5);
-    const def = UPGRADE_BY_ID.ball_speed;
-    expect(def.branch).toBe("core");
-    expect(def.maxLevel).toBe(10);
+    const def = SOLDIER_UPGRADE_BY_ID.s_stride;
+    expect(def.tier).toBe(1);
+    expect(def.maxLevel).toBe(5);
     expect(def.valueAt(0)).toBe(100);
-    expect(def.valueAt(1)).toBe(108);
-    expect(def.valueAt(10)).toBe(180);
+    expect(def.valueAt(1)).toBe(106);
+    expect(def.valueAt(5)).toBe(130);
 
     const stats = baseSoldierStats();
     expect(stats.speed).toBe(62.5);
-    def.apply(stats, 10);
-    expect(stats.speed).toBeCloseTo(62.5 * 1.8, 3);
+    const mods = baseSoldierMods();
+    def.apply(mods, 5);
+    expect(stats.speed * mods.speedMult).toBeCloseTo(62.5 * 1.3, 3);
   });
 
   it("Explosive Blight: pink blight blocks have a chance to explode shortly after forming, damaging nearby blocks", () => {
@@ -118,16 +120,17 @@ describe("New Features & Upgrades", () => {
   });
 
   it("Soldier Health allows soldiers to survive being enclosed in blight, costing 1 HP per block traveled to safety", () => {
-    const hpDef = UPGRADE_BY_ID.soldier_health;
+    const hpDef = SOLDIER_UPGRADE_BY_ID.s_vitality;
     expect(hpDef).toBeDefined();
-    expect(hpDef.branch).toBe("core");
-    expect(hpDef.maxLevel).toBe(10);
+    expect(hpDef.tier).toBe(1);
+    expect(hpDef.maxLevel).toBe(5);
     expect(hpDef.valueAt(1)).toBe(10);
 
     const stats = baseSoldierStats();
     expect(stats.soldierHealth).toBe(0);
-    hpDef.apply(stats, 2);
-    expect(stats.soldierHealth).toBe(20);
+    const mods = baseSoldierMods();
+    hpDef.apply(mods, 2);
+    expect(mods.healthBonus).toBe(20);
 
     const world = new PixelWorld({ width: 32, height: 32, cellSize: 8, roomSize: 10 });
     const growth = new GrowthSystem(world, new Rng(1));

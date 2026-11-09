@@ -133,7 +133,7 @@ export class Game {
   /** Current screen-shake amplitude in CSS pixels; decays in real time. */
   private shakeAmp = 0;
   showChunkBorders = false;
-  debug = new URLSearchParams(location.search).has("debug") || import.meta.env.DEV;
+  debug = false;
   debugInfo = { fps: 0, frameMs: 0, simMs: 0, lightMs: 0 };
   private flashPolyPool: Float32Array[] = [];
   private flashLitPool: LitCells[] = [];
@@ -151,6 +151,7 @@ export class Game {
       console.warn("Soldier collision diameter >= cell size: soldiers cannot fit 1-cell tunnels.");
     }
     this.save = new SaveManager();
+    this.debug = this.save.data.settings.devMode;
     this.upgrades = new UpgradeManager(this.save);
     this.audio = new AudioSystem(this.save);
     this.stats = this.upgrades.getSoldierStats();
@@ -323,6 +324,11 @@ export class Game {
 
   /** Begin a fresh run (regenerates the world in place). */
   startRun(): void {
+    if (this.upgrades.levelOf("unlock_map") === 0) {
+      this.save.data.lab.world = 1;
+      this.labSave.spawn = 0;
+      this.loadLabProgress();
+    }
     this.mainMenu.hide();
     this.pauseMenu.hide();
     this.resultsScreen.hide();
@@ -413,7 +419,7 @@ export class Game {
   /**
    * Regenerate the world for a new run: the hand-made lab with conquered
    * sectors already cleared, and the starting room moved to the chosen
-   * spawn sector (the middle unless another conquered sector was picked).
+   * spawn sector (A1 until the Lab Map is unlocked).
    */
   private generateLab(): void {
     const def = this.labDef;
@@ -442,7 +448,7 @@ export class Game {
    * the hand-made lab, else straight into a run.
    */
   beginDeploy(): void {
-    if (!this.world.labLayout?.frame) {
+    if (!this.world.labLayout?.frame || this.upgrades.levelOf("unlock_map") === 0) {
       this.startRun();
       return;
     }
@@ -628,6 +634,9 @@ export class Game {
 
   selectSaveSlot(slot: number): void {
     this.save.selectSlot(slot);
+    this.debug = this.save.data.settings.devMode;
+    this.timeScale = 1;
+    this.showChunkBorders = false;
     this.loadLabProgress();
     this.applyUpgrades();
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
@@ -715,7 +724,7 @@ export class Game {
         this.audio.toggleMute();
         break;
       case "Backquote":
-        this.debug = !this.debug;
+        if (this.save.data.settings.devMode) this.debug = !this.debug;
         break;
     }
     this.hud.update(this, performance.now(), true);

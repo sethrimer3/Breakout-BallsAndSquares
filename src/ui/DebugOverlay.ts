@@ -3,7 +3,7 @@ import type { LightQuality } from "../systems/LightingSystem";
 
 /**
  * Developer / playtest instrumentation panel (toggled with backtick `).
- * Displays live telemetry and provides quick balancing/stress controls in DEV or `?debug`.
+ * Displays live telemetry and balancing controls when Dev mode is enabled in Settings.
  */
 export class DebugOverlay {
   readonly root: HTMLDivElement;

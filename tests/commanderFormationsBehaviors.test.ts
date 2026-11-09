@@ -168,8 +168,8 @@ describe("Squad Formations", () => {
   it("formation upgrades exist in UpgradeDefinitions", () => {
     expect(UPGRADE_BY_ID["formation_line"]).toBeDefined();
     expect(UPGRADE_BY_ID["formation_triangle"]).toBeDefined();
-    expect(UPGRADE_BY_ID["formation_line"].branch).toBe("core");
-    expect(UPGRADE_BY_ID["formation_triangle"].branch).toBe("core");
+    expect(UPGRADE_BY_ID["formation_line"].branch).toBe("formations");
+    expect(UPGRADE_BY_ID["formation_triangle"].branch).toBe("formations");
   });
 
   it("followers align behind commander in line formation", () => {

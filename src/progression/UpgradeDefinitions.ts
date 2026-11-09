@@ -18,6 +18,7 @@ import type { SpriteName } from "../ui/pixelArt";
 
 export type UpgradeBranch =
   | "core"
+  | "formations"
   | "resources"
   | "blight"
   | "pistol"
@@ -33,13 +34,11 @@ export type UpgradeBranch =
   | "soldier";
 
 export type UpgradeId =
-  // Core Matrix: Upgrades All Soldiers (#38d6ff)
-  | "ball_speed"
-  | "soldier_health"
+  | "unlock_map" | "unlock_resources" | "unlock_primary" | "unlock_blight"
+  | "unlock_formations" | "unlock_secondary" | "unlock_facility"
+  | `core_placeholder_${number}`
+  // Core progression milestones
   | "extra_soldier"
-  | "core_fire_rate"
-  | "core_damage"
-  | "core_velocity"
   // Formations & Tactical Behaviors (#38d6ff)
   | "formation_line"
   | "formation_triangle"
@@ -158,6 +157,7 @@ export interface TreeNodeDef<Id extends string = string> {
   grid: { col: number; row: number };
   /** Visual connector parent (null = connects to the central core node). */
   parent: Id | null;
+  placeholder?: boolean;
   maxLevel: number;
   /** What the node's main price is paid in (gold when unset). */
   currency?: Currency;
@@ -197,50 +197,10 @@ export function upgradePrices(def: TreeNodeDef, currentLevel: number): Price[] {
   return prices;
 }
 
-export const UPGRADE_DEFS: readonly UpgradeDef[] = [
+const EXISTING_DEFS: readonly UpgradeDef[] = [
   // =========================================================================
-  // 1) CORE MATRIX: UPGRADES ALL SOLDIERS (Cyan #38d6ff)
+  // 1) SQUAD CAPACITY, FORMATIONS AND BEHAVIORS
   // =========================================================================
-  {
-    id: "ball_speed",
-    branch: "core",
-    name: "Soldier Speed",
-    shortDesc: "+8% movement velocity for all soldiers per level",
-    color: "#38d6ff",
-    grid: { col: 0, row: -1 },
-    parent: null,
-    maxLevel: 10,
-    baseCost: 15,
-    costMultiplier: 1.55,
-    unlockLifetimePixels: 0,
-    valueAt: (lvl) => Math.round((1 + 0.08 * lvl) * 100),
-    formatValue: (v) => `${v}%`,
-    formatDelta: () => "+8%",
-    apply: (s, lvl) => {
-      s.speed = SOLDIER.speed * (1 + 0.08 * lvl);
-    },
-    icon: "soldierDash",
-  },
-  {
-    id: "soldier_health",
-    branch: "core",
-    name: "Soldier Health",
-    shortDesc: "+10 Soldier HP — survives being enclosed in Blight (costs 1 HP per block traveled to safety)",
-    color: "#38d6ff",
-    grid: { col: -1, row: -1 },
-    parent: "ball_speed",
-    maxLevel: 10,
-    baseCost: 30,
-    costMultiplier: 1.6,
-    unlockLifetimePixels: 30,
-    valueAt: (lvl) => lvl * 10,
-    formatValue: (v) => `${v} HP`,
-    formatDelta: () => "+10 HP",
-    apply: (s, lvl) => {
-      s.soldierHealth = lvl * 10;
-    },
-    icon: "soldierPlus",
-  },
   {
     id: "extra_soldier",
     branch: "core",
@@ -248,7 +208,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     shortDesc: "+1 deployable soldier per run & +1 Loadout slot",
     color: "#38d6ff",
     grid: { col: 1, row: -1 },
-    parent: "ball_speed",
+    parent: null,
     maxLevel: 7,
     baseCost: 85,
     costMultiplier: 1.95,
@@ -262,73 +222,13 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     icon: "soldierPlus",
   },
   {
-    id: "core_fire_rate",
-    branch: "core",
-    name: "Squad Overclock",
-    shortDesc: "+8% global fire rate across all soldiers & weapons",
-    color: "#38d6ff",
-    grid: { col: -1, row: 0 },
-    parent: null,
-    maxLevel: 10,
-    baseCost: 25,
-    costMultiplier: 1.6,
-    unlockLifetimePixels: 0,
-    valueAt: (lvl) => Math.round((1 + 0.08 * lvl) * 100),
-    formatValue: (v) => `${v}% RATE`,
-    formatDelta: () => "+8% ALL",
-    apply: (s, lvl) => {
-      s.globalFireRateMult = 1 + 0.08 * lvl;
-    },
-    icon: "fireRate",
-  },
-  {
-    id: "core_damage",
-    branch: "core",
-    name: "Squad Firepower",
-    shortDesc: "+1 global terrain damage bonus for all soldiers & weapons",
-    color: "#38d6ff",
-    grid: { col: 1, row: 0 },
-    parent: null,
-    maxLevel: 8,
-    baseCost: 45,
-    costMultiplier: 1.75,
-    unlockLifetimePixels: 25,
-    valueAt: (lvl) => lvl,
-    formatValue: (v) => `+${v} DMG`,
-    formatDelta: () => "+1 DMG ALL",
-    apply: (s, lvl) => {
-      s.globalDamageBonus = lvl;
-    },
-    icon: "impact",
-  },
-  {
-    id: "core_velocity",
-    branch: "core",
-    name: "Squad Ballistics",
-    shortDesc: "+8% global projectile velocity for all soldiers & weapons",
-    color: "#38d6ff",
-    grid: { col: 0, row: 1 },
-    parent: null,
-    maxLevel: 8,
-    baseCost: 20,
-    costMultiplier: 1.55,
-    unlockLifetimePixels: 0,
-    valueAt: (lvl) => Math.round((1 + 0.08 * lvl) * 100),
-    formatValue: (v) => `${v}% VEL`,
-    formatDelta: () => "+8% ALL",
-    apply: (s, lvl) => {
-      s.globalBulletSpeedMult = 1 + 0.08 * lvl;
-    },
-    icon: "bulletFast",
-  },
-  {
     id: "formation_line",
-    branch: "core",
+    branch: "formations",
     name: "Line Formation",
     shortDesc: "Tactical squad formation: all soldiers follow behind the commander in single file",
     color: "#38d6ff",
     grid: { col: -2, row: 0 },
-    parent: "core_fire_rate",
+    parent: null,
     maxLevel: 1,
     baseCost: 65,
     costMultiplier: 1,
@@ -341,7 +241,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
   {
     id: "formation_triangle",
-    branch: "core",
+    branch: "formations",
     name: "Triangle Formation",
     shortDesc: "Tactical squad formation: alive soldiers form a protective wedge behind the commander",
     color: "#38d6ff",
@@ -359,12 +259,12 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
   {
     id: "behavior_orthogonal",
-    branch: "core",
+    branch: "formations",
     name: "Orthogonal Protocol",
     shortDesc: "Unlocks Orthogonal behavior in Loadout: soldiers move strictly along cardinal axes",
     color: "#38d6ff",
     grid: { col: -2, row: -1 },
-    parent: "soldier_health",
+    parent: null,
     maxLevel: 1,
     baseCost: 40,
     costMultiplier: 1,
@@ -377,12 +277,12 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
   {
     id: "behavior_patrol",
-    branch: "core",
+    branch: "formations",
     name: "Patrol Protocols",
     shortDesc: "Unlocks Vertical and Horizontal patrol behaviors in Loadout: sweep corridors",
     color: "#38d6ff",
     grid: { col: 2, row: -1 },
-    parent: "extra_soldier",
+    parent: null,
     maxLevel: 1,
     baseCost: 60,
     costMultiplier: 1,
@@ -395,12 +295,12 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
   {
     id: "behavior_turns",
-    branch: "core",
+    branch: "formations",
     name: "Perimeter Routing",
     shortDesc: "Unlocks Left-Turn and Right-Turn behaviors in Loadout: soldiers hug and orbit walls",
     color: "#38d6ff",
     grid: { col: 2, row: 0 },
-    parent: "core_damage",
+    parent: null,
     maxLevel: 1,
     baseCost: 75,
     costMultiplier: 1,
@@ -413,12 +313,12 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   },
   {
     id: "behavior_sentry",
-    branch: "core",
+    branch: "formations",
     name: "Sentry Protocols",
     shortDesc: "Unlocks Slow Turret and Rapid Turret sentry behaviors in Loadout: stationary 360° fire",
     color: "#38d6ff",
     grid: { col: 1, row: 1 },
-    parent: "core_velocity",
+    parent: null,
     maxLevel: 1,
     baseCost: 90,
     costMultiplier: 1,
@@ -436,7 +336,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     shortDesc: "Automatically triggers secondary weapons as soon as full energy is charged",
     color: "#52f296",
     grid: { col: -1, row: 1 },
-    parent: "core_velocity",
+    parent: null,
     maxLevel: 1,
     currency: "greenCrystals",
     baseCost: 5,
@@ -1876,10 +1776,10 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "keycard_t2",
     branch: "facility",
     name: "Tier 2 Keycard",
-    shortDesc: "Tier 2 (red) doors in the second zone slide open when shot",
+    shortDesc: "Tier 2 (red) doors slide open when shot",
     color: "#ff2a2a",
     grid: { col: 1, row: -1 },
-    parent: "keycard_t1",
+    parent: null,
     maxLevel: 1,
     currency: "crystals",
     baseCost: 45,
@@ -1897,10 +1797,10 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     id: "keycard_t3",
     branch: "facility",
     name: "Tier 3 Keycard",
-    shortDesc: "Tier 3 (burnt orange) doors in the deepest zone slide open when shot",
+    shortDesc: "Tier 3 doors and the gate to the next zone open when shot",
     color: "#d65c12",
     grid: { col: 2, row: -1 },
-    parent: "keycard_t2",
+    parent: null,
     maxLevel: 1,
     currency: "greenCrystals",
     essenceCost: 6,
@@ -1999,6 +1899,58 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     icon: "range",
   },
 ];
+
+/** Milestones run left-to-right, right-to-left, then left-to-right. */
+export const CORE_PATH: readonly UpgradeId[] = [
+  "keycard_t1", "unlock_map", "core_placeholder_1", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
+  "core_placeholder_3", "unlock_blight", "keycard_t2", "core_placeholder_4", "unlock_formations", "core_placeholder_5", "unlock_secondary",
+  "core_placeholder_6", "unlock_facility", "auto_ability", "core_placeholder_7", "keycard_t3", "core_placeholder_8", "core_placeholder_9",
+];
+
+const MILESTONES: Partial<Record<UpgradeId, [string, string, number]>> = {
+  unlock_map: ["Lab Map", "Choose a conquered sector to deploy into. Before this, runs begin at A1.", 15],
+  unlock_resources: ["Resource Extraction", "Unlock the Resources upgrade tab.", 25],
+  unlock_primary: ["Primary Arsenal", "Unlock the Primary Weapons upgrade tabs.", 60],
+  unlock_blight: ["Blight Research", "Unlock the Blight upgrade tab.", 90],
+  unlock_formations: ["Tactical Command", "Unlock the Formations and soldier behaviors tab.", 120],
+  unlock_secondary: ["Secondary Arsenal", "Unlock the Secondary Weapons upgrade tabs.", 180],
+  unlock_facility: ["Research Base", "Unlock the Research Base upgrade tab.", 250],
+};
+
+const MILESTONE_ICONS: Partial<Record<UpgradeId, SpriteName>> = {
+  unlock_map: "behaviorGrid", unlock_resources: "goldDrop", unlock_primary: "rifle", unlock_blight: "blightCrack",
+  unlock_formations: "formationLine", unlock_secondary: "grenade", unlock_facility: "gear",
+};
+
+export const UPGRADE_DEFS: readonly UpgradeDef[] = [
+  ...CORE_PATH.map((id, index): UpgradeDef => {
+    const existing = EXISTING_DEFS.find((d) => d.id === id);
+    const milestone = MILESTONES[id];
+    const placeholder = id.startsWith("core_placeholder_");
+    const row = Math.floor(index / 7);
+    const col = row % 2 === 0 ? index % 7 : 6 - index % 7;
+    const base: UpgradeDef = existing ?? {
+      id, branch: "core", name: milestone?.[0] ?? "Unknown Upgrade",
+      shortDesc: milestone?.[1] ?? "Future upgrade slot. Continue along the path to the next milestone.",
+      color: "#38d6ff", grid: { col: 0, row: 0 }, parent: null,
+      maxLevel: 1, baseCost: milestone?.[2] ?? 0, costMultiplier: 1, unlockLifetimePixels: 0,
+      valueAt: (level) => level, formatValue: (v) => v > 0 ? "UNLOCKED" : "LOCKED",
+      formatDelta: () => "UNLOCK", apply: () => {}, icon: placeholder ? "question" : MILESTONE_ICONS[id] ?? "gear",
+    };
+    return { ...base, branch: "core", grid: { col: col - 3, row: row - 1 },
+      parent: index > 0 ? CORE_PATH[index - 1] : null, placeholder,
+      ...(id === "keycard_t1" ? { baseCost: 8 } : {}),
+    };
+  }),
+  ...EXISTING_DEFS.filter((d) => !CORE_PATH.includes(d.id)),
+];
+
+export const BRANCH_UNLOCK: Partial<Record<UpgradeBranch, UpgradeId>> = {
+  resources: "unlock_resources", blight: "unlock_blight", formations: "unlock_formations", facility: "unlock_facility",
+  pistol: "unlock_primary", shotgun: "unlock_primary", assault_rifle: "unlock_primary", rocket_launcher: "unlock_primary",
+  sniper_rifle: "unlock_primary", katana: "unlock_primary", flamethrower: "unlock_primary",
+  grenade: "unlock_secondary", turret: "unlock_secondary",
+};
 
 export const UPGRADE_BY_ID: Record<UpgradeId, UpgradeDef> = Object.fromEntries(
   UPGRADE_DEFS.map((d) => [d.id, d]),

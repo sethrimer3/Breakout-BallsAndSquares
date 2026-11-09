@@ -1,3 +1,4 @@
+import { unlockTabs } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { KATANA } from "../src/config";
 import { Rng } from "../src/core/Rng";
@@ -21,6 +22,7 @@ class MemStorage implements StorageLike {
 describe("Katana Weapon & Blight Damage Multiplier", () => {
   it("gates Katana unlock and scales upgrades through the UpgradeManager", () => {
     const save = new SaveManager(new MemStorage());
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     save.data.bank = 100_000; save.data.crystals = 100_000;
     save.data.lifetimePixels = 500;
@@ -69,6 +71,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
   it("fires slashes with visual style = 3, slash width, and alternating swing angles", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     const stats = upg.getSoldierStats();
     stats.katanaUnlocked = true;
@@ -101,6 +104,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
   it("deals normal damage to regular blocks, but applies the multiplier ONLY to Blight blocks", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     const stats = upg.getSoldierStats();
     stats.katanaUnlocked = true;
@@ -179,6 +183,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
   it("applies the damage multiplier to 50% pink sub-pixel blight", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     const stats = upg.getSoldierStats();
     stats.katanaUnlocked = true;
@@ -206,6 +211,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
   it("does not apply the blight multiplier when using non-katana weapons", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     const stats = upg.getSoldierStats();
     stats.damage = 3; // Pistol damage = 3
@@ -229,6 +235,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
   it("cleaves adjacent cells across the slash arc width", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     const stats = upg.getSoldierStats();
     stats.katanaUnlocked = true;
@@ -257,6 +264,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
   it("spawns a cross-slash when multishot triggers", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     const stats = upg.getSoldierStats();
     stats.katanaUnlocked = true;

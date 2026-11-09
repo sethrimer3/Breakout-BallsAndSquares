@@ -2,7 +2,7 @@ import type { Game } from "../Game";
 import { MUZZLE_FLASH_LEVELS, type MuzzleFlashLevel } from "../progression/SaveManager";
 import type { LightQuality } from "../systems/LightingSystem";
 
-export type SettingsTab = "gameplay" | "sound" | "visuals";
+export type SettingsTab = "gameplay" | "sound" | "visuals" | "dev";
 
 const FLASH_LABELS: Record<MuzzleFlashLevel, string> = {
   brightest: "BRIGHTEST",
@@ -36,6 +36,7 @@ export class SettingsModal {
         <button class="settings-tab" data-tab="gameplay">GAMEPLAY</button>
         <button class="settings-tab" data-tab="sound">SOUND</button>
         <button class="settings-tab" data-tab="visuals">VISUALS</button>
+        <button class="settings-tab" data-tab="dev">DEV</button>
       </div>
       <div class="settings-body"></div>
       <div class="panel-actions">
@@ -178,6 +179,35 @@ export class SettingsModal {
       });
       slider.addEventListener("change", () => {
         this.game.audio.playPickup();
+      });
+    } else if (this.activeTab === "dev") {
+      body.innerHTML = `
+        <div class="set-row"><div class="set-info"><div class="set-label">DEV MODE</div>
+          <div class="set-desc">Enable telemetry and backtick debug controls.</div></div>
+          <button class="btn" data-set="devmode">${set.devMode ? "ON" : "OFF"}</button></div>
+        <div class="set-row"><div class="set-info"><div class="set-label">TEST CURRENCY</div>
+          <div class="set-desc">Add 1,000 gold, orange crystals, green crystals and essence to this slot.</div></div>
+          <button class="btn" data-set="funds" ${set.devMode ? "" : "disabled"}>+1,000</button></div>
+        <div class="set-row"><div class="set-info"><div class="set-label">DELETE ALL GAME DATA</div>
+          <div class="set-desc">Permanently delete all three saves, upgrades, progress and settings, then reload at A1. Cannot be undone.</div></div>
+          <button class="btn btn-danger" data-set="reset-all">DELETE &amp; RESTART</button></div>
+        <div class="set-desc" role="status"></div>`;
+      body.querySelector('[data-set="devmode"]')!.addEventListener("click", () => {
+        set.devMode = !set.devMode;
+        this.game.debug = set.devMode;
+        if (!set.devMode) { this.game.timeScale = 1; this.game.showChunkBorders = false; }
+        this.game.save.save(); this.render();
+      });
+      body.querySelector('[data-set="funds"]')!.addEventListener("click", () => {
+        if (!set.devMode) return;
+        for (const key of ["bank", "crystals", "greenCrystals", "essence"] as const) this.game.save.data[key] += 1000;
+        this.game.save.save();
+        body.querySelector('[role="status"]')!.textContent = "Test currency added to this save slot.";
+      });
+      body.querySelector('[data-set="reset-all"]')!.addEventListener("click", () => {
+        if (!window.confirm("Delete ALL BREACH data? All 3 save slots, upgrades, progress and settings will be permanently erased. This cannot be undone.")) return;
+        try { this.game.save.deleteAllData(); window.location.reload(); }
+        catch { body.querySelector('[role="status"]')!.textContent = "Could not delete saved data. Check browser storage access and try again."; }
       });
     } else {
       // Visuals tab

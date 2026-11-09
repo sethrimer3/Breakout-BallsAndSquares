@@ -1,3 +1,4 @@
+import { CORE_PATH, UPGRADE_BY_ID } from "../src/progression/UpgradeDefinitions";
 import { describe, expect, it } from "vitest";
 import { FACILITY, WORLD } from "../src/config";
 import { Rng } from "../src/core/Rng";
@@ -119,7 +120,7 @@ describe("research base facility", () => {
     expect(sys.sentries[0].awake).toBe(true);
   });
 
-  it("gates the keycard chain in the research-base tree", () => {
+  it("gates keycards along the Core path", () => {
     const save = new SaveManager(new MemStorage());
     const upg = new UpgradeManager(save);
     save.data.lifetimePixels = 10000;
@@ -127,6 +128,10 @@ describe("research base facility", () => {
     save.data.crystals = 10000;
     expect(upg.isUnlocked("keycard_t2")).toBe(false);
     expect(upg.buy("keycard_t1")).toBe(true);
+    expect(upg.isUnlocked("keycard_t2")).toBe(false);
+    for (const id of CORE_PATH.slice(1, CORE_PATH.indexOf("keycard_t2"))) {
+      if (!UPGRADE_BY_ID[id].placeholder) expect(upg.buy(id)).toBe(true);
+    }
     expect(upg.isUnlocked("keycard_t2")).toBe(true);
     expect(upg.getSoldierStats().keycardTier).toBe(1);
     expect(upg.buy("keycard_t2")).toBe(true);

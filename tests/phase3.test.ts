@@ -1,3 +1,4 @@
+import { unlockTabs } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { SOLDIER, TERRAIN, zoneForDepth } from "../src/config";
 import { LootKind, LootSystem } from "../src/entities/LootSystem";
@@ -22,37 +23,38 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const s1 = new SaveManager(store);
     s1.data.bank = 250;
     s1.data.lifetimePixels = 120;
-    s1.data.upgrades.ball_speed = 3;
+    s1.data.upgrades.extra_soldier = 3;
     s1.save();
 
     const s2 = new SaveManager(store);
     expect(s2.data.bank).toBe(250);
     expect(s2.data.lifetimePixels).toBe(120);
-    expect(s2.data.upgrades.ball_speed).toBe(3);
+    expect(s2.data.upgrades.extra_soldier).toBe(3);
 
     // Corrupted JSON -> defaults without throwing.
     store.setItem(SAVE_KEY, "{not-valid-json");
     const s3 = new SaveManager(store);
     expect(s3.data.bank).toBe(0);
-    expect(s3.data.upgrades.ball_speed).toBe(0);
+    expect(s3.data.upgrades.extra_soldier).toBe(0);
 
     // Out-of-range / NaN fields -> clamped.
     store.setItem(
       SAVE_KEY,
-      JSON.stringify({ bank: -50, lifetimePixels: "bad", upgrades: { ball_speed: 999 } }),
+      JSON.stringify({ bank: -50, lifetimePixels: "bad", upgrades: { extra_soldier: 999 } }),
     );
     const s4 = new SaveManager(store);
     expect(s4.data.bank).toBe(0);
     expect(s4.data.lifetimePixels).toBe(0);
-    expect(s4.data.upgrades.ball_speed).toBe(UPGRADE_BY_ID.ball_speed.maxLevel);
+    expect(s4.data.upgrades.extra_soldier).toBe(UPGRADE_BY_ID.extra_soldier.maxLevel);
   });
 
   it("gates Multishot at 40 lifetime pixels and Additional Soldier at 100", () => {
     const save = new SaveManager(new MemStorage());
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     save.data.bank = 10_000; save.data.crystals = 10_000;
 
-    expect(upg.isUnlocked("ball_speed")).toBe(true);
+    expect(upg.isUnlocked("keycard_t1")).toBe(true);
     expect(upg.isUnlocked("fire_rate")).toBe(true);
     expect(upg.isUnlocked("bullet_speed")).toBe(true);
     expect(upg.isUnlocked("bullet_damage")).toBe(true);
@@ -74,27 +76,25 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
   it("scales costs exponentially, enforces level caps, and modifies soldier stats (completion test)", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     save.data.bank = 1_000_000; save.data.crystals = 1_000_000;
     save.data.lifetimePixels = 500;
 
-    const c0 = upg.costOf("ball_speed");
-    expect(c0).toBe(15);
-    expect(upg.buy("ball_speed")).toBe(true);
-    const c1 = upg.costOf("ball_speed");
-    expect(c1).toBeGreaterThan(c0);
-
-    // Buy up to the cap.
-    while (!upg.isMaxed("ball_speed")) {
-      expect(upg.buy("ball_speed")).toBe(true);
-    }
-    expect(upg.levelOf("ball_speed")).toBe(10);
-    expect(upg.buy("ball_speed")).toBe(false);
+    const c0 = upg.soldierPricesOf(0, "s_stride")[0].amount;
+    expect(c0).toBe(10);
+    expect(upg.soldierBuy(0, "s_stride")).toBe(true);
+    expect(upg.soldierPricesOf(0, "s_stride")[0].amount).toBeGreaterThan(c0);
+    while (!upg.soldierIsMaxed(0, "s_stride")) expect(upg.soldierBuy(0, "s_stride")).toBe(true);
+    expect(upg.soldierLevelOf(0, "s_stride")).toBe(5);
+    expect(upg.soldierBuy(0, "s_stride")).toBe(false);
+    expect(upg.soldierMods(0).speedMult).toBeCloseTo(1.3);
+    expect(upg.soldierMods(1).speedMult).toBe(1);
 
     upg.buy("bullet_damage");
     upg.buy("fire_rate");
     const st = upg.getSoldierStats();
-    expect(st.speed).toBeCloseTo(SOLDIER.speed * 1.8, 5);
+    expect(st.speed).toBeCloseTo(SOLDIER.speed, 5);
     expect(st.damage).toBe(SOLDIER.damage + 1);
     expect(st.fireRate).toBeCloseTo(SOLDIER.fireRate * 1.12, 5);
     expect(st.dropChance).toBeCloseTo(0.4, 5);
@@ -143,6 +143,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(loot.kind[0]).toBe(LootKind.Crystal);
 
     // Shotgun tree starts locked until shotgun_unlock is purchased; blight upgrades modify blight stats.
+    unlockTabs(s2);
     const upg = new UpgradeManager(s2);
     s2.data.bank = 10000;
     s2.data.lifetimePixels = 100;
@@ -173,6 +174,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
 
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     save.data.bank = 100_000; save.data.crystals = 100_000;
     save.data.lifetimePixels = 500;
@@ -244,7 +246,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(rocketDestroyed).toBeGreaterThan(5);
   });
 
-  it("organizes Core (all-soldier buffs), Resources (gold + Tier 2/3 placeholders), and Blight (Blight Core upgrades) into separate branches", async () => {
+  it("organizes Core milestones, Resources (gold + Tier 2/3 placeholders), and Blight (Blight Core upgrades) into separate branches", async () => {
     const { UPGRADE_DEFS } = await import("../src/progression/UpgradeDefinitions");
     const { PixelWorld } = await import("../src/world/PixelWorld");
     const { CombatSystem } = await import("../src/systems/CombatSystem");
@@ -256,7 +258,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const blightIds = UPGRADE_DEFS.filter((d) => d.branch === "blight").map((d) => d.id);
 
     expect(coreIds).toEqual(
-      expect.arrayContaining(["ball_speed", "extra_soldier", "core_fire_rate", "core_damage", "core_velocity"]),
+      expect.arrayContaining(["keycard_t1", "unlock_map", "extra_soldier", "unlock_primary"]),
     );
     expect(resourceIds).toEqual(
       expect.arrayContaining([
@@ -281,16 +283,15 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
       ]),
     );
 
-    // 2. Verify Core upgrades boost all soldiers & weapons, and Blight Core upgrades boost damage vs Blight Core cells.
+    // Individual damage combines with Blight Core research without global soldier buffs.
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
     save.data.bank = 500_000; save.data.crystals = 500_000;
     save.data.lifetimePixels = 1000;
 
-    expect(upg.buy("core_fire_rate")).toBe(true);
-    expect(upg.buy("core_damage")).toBe(true);
-    expect(upg.buy("core_velocity")).toBe(true);
+    expect(upg.soldierBuy(0, "s_marksman")).toBe(true);
     expect(upg.buy("core_time_drain")).toBe(true);
     expect(upg.buy("core_breaker")).toBe(true);
     expect(upg.buy("core_bounty")).toBe(true);
@@ -298,9 +299,9 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(upg.buy("tier3_dark_matter")).toBe(true);
 
     const st = upg.getSoldierStats();
-    expect(st.globalFireRateMult).toBeCloseTo(1.08, 5);
-    expect(st.globalDamageBonus).toBe(1);
-    expect(st.globalBulletSpeedMult).toBeCloseTo(1.08, 5);
+    expect(st.globalFireRateMult).toBe(1);
+    expect(st.globalDamageBonus).toBe(0);
+    expect(st.globalBulletSpeedMult).toBe(1);
     expect(st.coreTimeReduction).toBe(16);
     expect(st.coreDamageBonus).toBe(2);
     expect(st.coreLootBurst).toBe(12);
@@ -325,6 +326,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
 
     const combat = new CombatSystem(w, new Rng(99), st);
     const pistolSoldier = new Soldier(20, 55, 100, 0, 3, "pistol");
+    pistolSoldier.mods = upg.soldierMods(0);
     combat.fire(pistolSoldier);
     combat.updateBullets(0.2);
 

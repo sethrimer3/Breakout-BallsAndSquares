@@ -94,6 +94,7 @@ export interface SaveData {
     pixels: number;
   };
   settings: {
+    devMode: boolean;
     muted: boolean;
     volume: number;
     muzzleFlash: MuzzleFlashLevel;
@@ -156,6 +157,7 @@ export function defaultSaveData(): SaveData {
     loadouts,
     bests: { time: 0, depth: 0, pixels: 0 },
     settings: {
+      devMode: false,
       muted: false,
       volume: 0.6,
       muzzleFlash: "brightest",
@@ -209,6 +211,15 @@ export function sanitizeSaveData(raw: unknown): SaveData {
 
   if (obj.upgrades && typeof obj.upgrades === "object") {
     const u = obj.upgrades as Record<string, unknown>;
+    // Retired squad stat nodes no longer exist. Refund their gold once:
+    // sanitized saves omit these IDs, so a later load cannot refund them again.
+    for (const [id, cost, growth, cap] of [
+      ["ball_speed", 15, 1.55, 10], ["soldier_health", 30, 1.6, 10],
+      ["core_fire_rate", 25, 1.6, 10], ["core_damage", 45, 1.75, 8], ["core_velocity", 20, 1.55, 8],
+    ] as const) {
+      const level = Math.floor(finiteNonNeg(u[id], 0, cap));
+      for (let l = 0; l < level; l++) def.bank += Math.ceil(cost * growth ** l);
+    }
     for (const d of UPGRADE_DEFS) {
       const lvl = Math.floor(finiteNonNeg(u[d.id], 0, d.maxLevel));
       def.upgrades[d.id] = clamp(lvl, 0, d.maxLevel);
@@ -288,6 +299,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
 
   if (obj.settings && typeof obj.settings === "object") {
     const s = obj.settings as Record<string, unknown>;
+    def.settings.devMode = s.devMode === true;
     def.settings.muted = typeof s.muted === "boolean" ? s.muted : false;
     def.settings.volume = finiteNonNeg(s.volume, 0.6, 1);
     if (
@@ -347,6 +359,18 @@ export interface SlotSummary {
 export class SaveManager {
   data: SaveData;
   activeSlot: number;
+
+  /** Remove every BREACH save slot and setting, leaving other apps' storage alone. */
+  deleteAllData(): void {
+    if (this.storage) {
+      for (const key of [SAVE_KEY, getSlotKey(2), getSlotKey(3), ACTIVE_SLOT_KEY]) {
+        if (this.storage.removeItem) this.storage.removeItem(key);
+        else this.storage.setItem(key, "");
+      }
+    }
+    this.activeSlot = 1;
+    this.data = defaultSaveData();
+  }
 
   constructor(private storage: StorageLike | null = typeof localStorage !== "undefined" ? localStorage : null) {
     this.activeSlot = this.readActiveSlot();

@@ -9,12 +9,14 @@ import {
 import {
   UPGRADE_BY_ID,
   UPGRADE_DEFS,
+  BRANCH_UNLOCK,
   upgradeCost,
   upgradePrices,
   type Currency,
   type Price,
   type UpgradeDef,
   type UpgradeId,
+  type UpgradeBranch,
 } from "./UpgradeDefinitions";
 
 /** Where each currency is banked in the save. */
@@ -51,6 +53,12 @@ export class UpgradeManager {
 
   isUnlocked(id: UpgradeId): boolean {
     const def = UPGRADE_BY_ID[id];
+    if (!def || def.placeholder || !this.isBranchUnlocked(def.branch)) return false;
+    if (def.branch === "core") {
+      let parent = def.parent;
+      while (parent && UPGRADE_BY_ID[parent].placeholder) parent = UPGRADE_BY_ID[parent].parent;
+      if (parent && this.levelOf(parent) === 0) return false;
+    }
     if (this.save.data.lifetimePixels < def.unlockLifetimePixels) return false;
     if (def.branch === "shotgun" && def.id !== "shotgun_unlock") {
       if (this.levelOf("shotgun_unlock") === 0) return false;
@@ -79,6 +87,11 @@ export class UpgradeManager {
     // Research-base upgrades build on each other: buy the parent first.
     if (def.branch === "facility" && def.parent && this.levelOf(def.parent) === 0) return false;
     return true;
+  }
+
+  isBranchUnlocked(branch: UpgradeBranch): boolean {
+    const unlock = BRANCH_UNLOCK[branch];
+    return !unlock || this.levelOf(unlock) > 0;
   }
 
   /** The next level's cost in the node's main currency. */

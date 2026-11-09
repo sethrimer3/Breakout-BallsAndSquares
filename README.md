@@ -74,14 +74,15 @@ The layout scales down to fit small screens; the Upgrade Tree is easiest to read
 
 Destroyed blocks roll currency pickups that must be collected, and increment lifetime pixels destroyed. Progress is saved automatically in `localStorage` under `breach.save.v1` with schema validation and corruption recovery.
 
-| Upgrade | Effect / Level | Max Level | Base Cost | Cost Multiplier | Unlock Condition |
-|---|---|---|---|---|---|
-| **Ball Speed** | `+10%` movement speed | 10 | 15 | `1.55×` | Immediate |
-| **Fire Rate** | `+12%` shots/second | 12 | 20 | `1.58×` | Immediate |
-| **Bullet Speed** | `+8%` projectile speed | 8 | 15 | `1.55×` | Immediate |
-| **Bullet Damage** | `+1` damage per bullet | 8 | 40 | `1.75×` | Immediate |
-| **Multishot** | `+5%` chance to fire twin `±8°` side rounds | 10 | 60 | `1.70×` | Destroy **40** lifetime pixels |
-| **Additional Soldier** | `+1` deployable soldier per run (up to 8) | 7 | 100 | `2.00×` | Destroy **100** lifetime pixels |
+Core is a three-row snake: left to right, down, right to left, then down and left to right again. Buy a milestone to open the next one. Question-mark slots are reserved for future upgrades and do not block progression.
+
+The path starts with **Tier 1 Keycard (8 gold)**, then **Lab Map (15 gold)**. Until the map is purchased, deploying starts a run directly at **A1**. Later milestones unlock **Resources → Primary Weapons → Blight → Formations → Secondary Weapons → Research Base**, with squad capacity, the other keycards and future slots between them. All three keycards live on Core. Formations and soldier behaviors share their own Formations tab.
+
+Movement speed, fire rate, damage, health and projectile velocity are upgraded on each soldier's own tree. The basic nodes cost gold without an essence requirement, so they are available from the start; advanced tiers still require essence. Retired global Core stat upgrades are removed and their original gold costs refunded once when loading an existing save.
+
+### Dev settings and a fresh start
+
+Both main-menu and pause-menu Settings have a **Dev** tab. Dev mode enables telemetry/backtick controls and test currency. **Delete & Restart** asks for confirmation, deletes all three BREACH save slots and settings, then reloads the game with fresh A1 progress. It leaves unrelated browser storage alone. Canceling keeps every save.
 
 ### Currencies
 
@@ -94,7 +95,7 @@ Destroyed blocks roll currency pickups that must be collected, and increment lif
 
 ### Soldier Trees
 
-Every soldier has their own upgrade tree (**Soldier Trees** in the Matrix, or **Upgrade Tree** on a Loadout card), stored on their loadout slot. Four arms run gold → orange → green, each node opening the next: damage → pierce → twin fire; fire rate → Blight Hunter → Overdrive; speed → Scavenger → Deep Harvest; HP → Bulwark → Aegis. Essence costs `2 / 6 / 15` at the first level of each tier and rise by half of that per level. The definitions live in [`src/progression/SoldierUpgrades.ts`](src/progression/SoldierUpgrades.ts).
+Every soldier has their own upgrade tree (**Soldier Trees** in the Matrix, or **Upgrade Tree** on a Loadout card), stored on their loadout slot. Starter nodes use gold only; advanced tiers also cost essence. Four arms run gold → orange → green, each node opening the next: damage → pierce → twin fire; fire rate → Blight Hunter → Overdrive; speed → Scavenger → Deep Harvest; HP → Bulwark → Aegis. Essence costs `2 / 6 / 15` at the first level of each tier and rise by half of that per level. Ballistics adds individual projectile velocity. The definitions live in [`src/progression/SoldierUpgrades.ts`](src/progression/SoldierUpgrades.ts).
 
 All gameplay, physics, growth, lighting, and upgrade constants live in [`src/config.ts`](src/config.ts) and [`src/progression/UpgradeDefinitions.ts`](src/progression/UpgradeDefinitions.ts) for easy tuning.
 

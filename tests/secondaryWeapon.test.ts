@@ -1,3 +1,4 @@
+import { unlockTabs } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { GRENADE, TURRET, WORLD } from "../src/config";
 import { Rng } from "../src/core/Rng";
@@ -52,6 +53,7 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
   it("Gates Grenade child upgrades behind center unlock node and lifetime pixels", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const upg = new UpgradeManager(save);
 
     // Initial state: 0 pixels destroyed, 0 bank
@@ -100,7 +102,8 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
 
     expect(categoryForBranch("grenade")).toBe("secondary");
 
-    expect(CATEGORIES.length).toBe(4);
+    expect(CATEGORIES.length).toBe(5);
+    expect(categoryForBranch("formations")).toBe("formations");
     const systemsCat = CATEGORIES.find((c) => c.id === "systems")!;
     const primaryCat = CATEGORIES.find((c) => c.id === "primary")!;
     const secondaryCat = CATEGORIES.find((c) => c.id === "secondary")!;
@@ -308,6 +311,7 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
   it("Gates Turret child upgrades behind center unlock node and lifetime pixels", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
+    unlockTabs(save);
     const mgr = new UpgradeManager(save);
 
     // Lifetime pixels 0 -> unlock node locked
