@@ -337,8 +337,9 @@ export class LabMap {
     if (!progress.discovered.has(s)) status = "UNEXPLORED";
     else if (progress.conquered.has(s)) status = s === this.def.start ? (this.def.id === 1 ? "STAGING AREA - SECURE" : "GATEWAY - SECURE") : "CONQUERED - SAFE TO DEPLOY";
     else {
-      const left = progress.generatorCount(s);
-      status = `${left} BLIGHT GENERATOR${left === 1 ? "" : "S"} ACTIVE`;
+      const left = progress.generatorsLeft(s);
+      const label = this.def.framework ? "THREAT" : "BLIGHT GENERATOR";
+      status = `${left} ${label}${left === 1 ? "" : "S"} ACTIVE`;
     }
     this.info.innerHTML = `<b>${name}</b> <span class="labmap-tier t${tier}">TIER ${tier}</span> ${status}`;
     this.deployBtn.disabled = !this.game.canDeployInto(s);
