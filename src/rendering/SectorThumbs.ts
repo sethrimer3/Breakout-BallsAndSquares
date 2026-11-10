@@ -1,8 +1,9 @@
+import { sectorCount } from "../world/labMap";
 import { COLORS } from "../config";
 import { SECTOR_CELLS, sectorBounds, sectorTier, type LabFrame, type LabWorldDef } from "../world/labMap";
 import { LIGHT_KIND, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { hash2, valueNoise } from "../core/math";
-import { MATERIAL_BASE, TEX } from "./materials";
+import { materialColor, TEX } from "./materials";
 import type { TerrainRenderer } from "./TerrainRenderer";
 
 /** Edge of a sector picture in pixels: the terrain's own texels, one per quarter cell. */
@@ -32,7 +33,7 @@ export function renderSectorThumbs(world: PixelWorld, terrain: TerrainRenderer, 
   const out: HTMLCanvasElement[] = [];
   const light = makeCanvas();
   const lg = light.getContext("2d")!;
-  const sectors = frame.def.sectors * frame.def.sectors;
+  const sectors = sectorCount(frame.def);
   for (let s = 0; s < sectors; s++) {
     const canvas = makeCanvas();
     const g = canvas.getContext("2d")!;
@@ -126,7 +127,7 @@ export function renderUncharted(def: LabWorldDef, sector: number): HTMLCanvasEle
   const g = canvas.getContext("2d")!;
   const img = g.createImageData(THUMB_SIZE, THUMB_SIZE);
   const tier = sectorTier(def, sector);
-  const base = MATERIAL_BASE[tier];
+  const base = materialColor(tier, def.framework);
   const col = sector % def.sectors;
   const row = (sector - col) / def.sectors;
   for (let y = 0; y < THUMB_SIZE; y++) {

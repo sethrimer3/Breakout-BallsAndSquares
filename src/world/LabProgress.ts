@@ -1,3 +1,4 @@
+import { sectorCount } from "./labMap";
 import type { PixelWorld } from "./PixelWorld";
 import { LAB_WORLDS, sectorAtCell, type LabFrame, type LabWorldDef } from "./labMap";
 
@@ -76,6 +77,6 @@ export class LabProgress {
   }
 
   get sectorCount(): number {
-    return this.def.sectors * this.def.sectors;
+    return sectorCount(this.def);
   }
 }

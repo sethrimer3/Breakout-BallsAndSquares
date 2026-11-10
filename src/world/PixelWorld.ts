@@ -93,7 +93,7 @@ export interface Door {
    * A world gate: a huge door on the lab's edge. It never breaks; only the
    * keycard opens it. `to` is the world beyond (0 = sealed for good).
    */
-  gate?: { to: number; side: "east" | "west" };
+  gate?: { to: number; side: "east" | "west" | "north" | "south" };
   cells: number[];
   open: boolean;
   /** Inclusive cell bounds. */
@@ -350,7 +350,7 @@ export class PixelWorld implements SolidQuery {
     return zoneForDepth(this.depthOf(cx, cy));
   }
 
-  /** Terrain tier (1..6) of an ordinary block at a cell. */
+  /** Terrain tier (1..11) of an ordinary block at a cell. */
   fillTierAt(cx: number, cy: number): number {
     return this.tierBase + this.zoneAt(cx, cy) + 1;
   }

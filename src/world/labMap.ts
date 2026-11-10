@@ -6,7 +6,7 @@ import type { LabCorridorSegment, LabLayout, LabRoom } from "./WorldGenerator";
  * The hand-made research lab: fixed blueprints shared by every run, one per
  * world (zone). Zone 1 is the lab itself; a huge tier 3 gate on its east side
  * leads into zone 2, where the Blight has begun turning the lab into something
- * alien; a gate on zone 2's east side leads into zone 3 (not built yet).
+ * alien; onward lie the forest, fallen city and mothership framework worlds.
  *
  * Each world is a grid of sectors, named like a chess board: columns A.. left
  * to right, rows 1.. top to bottom. Each sector is drawn below as SECTOR_CHARS
@@ -181,24 +181,20 @@ export const ZONE2_BLUEPRINT: readonly string[] = [
 ];
 
 /**
- * Zone 3: 13 × 13 sectors, entered from the middle of the west side. Not
- * designed yet: only the arrival room exists.
+ * World 3: empty 13 × 13 forest framework, entered from A7 on the west.
  */
-export const ZONE3_BLUEPRINT: readonly string[] = emptyBlueprint(13, 6);
+export const ZONE3_BLUEPRINT: readonly string[] = frameworkBlueprint(13, 13);
 
-/** A blank blueprint with just an arrival room behind a west-side entry on sector row `row`. */
-function emptyBlueprint(sectors: number, row: number): string[] {
-  const chars = 7; // SECTOR_CHARS, which is declared below this call
-  const n = sectors * chars;
-  const lines = Array.from({ length: n }, () => ".".repeat(n));
-  const mid = row * chars + 3;
-  const put = (c: number, r: number, ch: string): void => {
-    lines[r] = lines[r].slice(0, c) + ch + lines[r].slice(c + 1);
-  };
-  put(0, mid, "-");
-  put(1, mid, "-");
-  for (let r = mid - 1; r <= mid + 1; r++) for (let c = 2; c <= 4; c++) put(c, r, "R");
-  return lines;
+/** Empty, linked placeholder rooms: one room per sector, no encounter content. */
+export function frameworkBlueprint(columns: number, rows: number): string[] {
+  const w = columns * 7, h = rows * 7;
+  return Array.from({ length: h }, (_, y) => Array.from({ length: w }, (_, x) => {
+    const cx = x % 7, cy = y % 7;
+    if (cx >= 2 && cx <= 4 && cy >= 2 && cy <= 4) return "R";
+    if (cy === 3) return "-";
+    if (cx === 3) return "|";
+    return ".";
+  }).join(""));
 }
 
 export const SECTOR_CHARS = 7;
@@ -210,10 +206,12 @@ export const LAB_SEED = 0x1ab5eed;
 
 /** A world gate: a huge locked door in the middle of one side of a world's lab. */
 export interface GateDef {
-  /** Side of the lab the gate sits on. East gates lead onward; west gates are where the squad arrived. */
-  side: "east" | "west";
+  /** Boundary occupied by the gate; either orientation may be an arrival or exit. */
+  side: "east" | "west" | "north" | "south";
   /** Sector row (0-based) whose middle character row the gate sits on. */
   row: number;
+  /** Sector column for a north/south gate. */
+  col?: number;
   /** Keycard tier that opens it. */
   tier: number;
   /** World the gate leads to, or 0 for a sealed arrival gate that never opens. */
@@ -229,12 +227,21 @@ export interface UpgradeSpotDef {
 }
 
 export interface LabWorldDef {
-  /** 1-based world (zone) number. */
+  /** 1-based world number; each world can contain one or more numbered zones. */
   id: number;
   name: string;
   blueprint: readonly string[];
-  /** Sectors per side. */
+  /** Sector columns (also rows for square worlds). */
   sectors: number;
+  /** Rows when the world is rectangular; otherwise equal to sectors (columns). */
+  rows?: number;
+  /** Empty framework worlds omit enemies, machinery, loot veins and Blight growth. */
+  framework?: boolean;
+  environment?: "forest" | "city" | "mothership";
+  /** Reserved region in sector coordinates, inclusive. */
+  facility?: { name: string; col0: number; row0: number; col1: number; row1: number; security: string };
+  teleporter?: { sector: number; to: number };
+
   /** Sector the squad starts in; tiers rise with distance from it. */
   start: number;
   /** Tier of the world's first band minus one: zone 1 has tiers 1-3, zone 2 tiers 4-6. */
@@ -293,24 +300,33 @@ export const LAB_WORLDS: Readonly<Record<number, LabWorldDef>> = {
     ],
   },
   3: {
-    id: 3,
-    name: "UNCHARTED",
-    blueprint: ZONE3_BLUEPRINT,
-    sectors: 13,
-    start: 78,
-    // Placeholder until zone 3 is designed: tier 6 throughout.
-    tierBase: 3,
-    bands: [0, 0],
-    freeform: true,
-    alien: true,
-    seed: 0x3c0de3,
-    gates: [{ side: "west", row: 6, tier: 6, to: 0 }],
+    id: 3, name: "CANOPY FOREST", blueprint: ZONE3_BLUEPRINT,
+    sectors: 13, start: 78, tierBase: 6, bands: [5, 9], freeform: false, alien: false,
+    framework: true, environment: "forest", seed: 0x3c0de3,
+    gates: [{ side: "west", row: 6, tier: 6, to: 0 }, { side: "south", row: 12, col: 11, tier: 9, to: 4 }],
     upgrades: [],
+  },
+  4: {
+    id: 4, name: "FALLEN CITY", blueprint: frameworkBlueprint(7, 7),
+    sectors: 7, start: 3, tierBase: 9, bands: [99, 99], freeform: false, alien: false,
+    framework: true, environment: "city", seed: 0x4c1710,
+    gates: [{ side: "north", row: 0, col: 3, tier: 9, to: 0 }], upgrades: [],
+    facility: { name: "AEROSPACE FACILITY", col0: 2, row0: 2, col1: 4, row1: 4,
+      security: "Extreme entry difficulty: Blight-hacked turrets and security systems (future encounters)." },
+    teleporter: { sector: 24, to: 5 },
+  },
+  5: {
+    id: 5, name: "BLIGHT MOTHERSHIP", blueprint: frameworkBlueprint(5, 3),
+    sectors: 5, rows: 3, start: 12, tierBase: 10, bands: [99, 99], freeform: false, alien: false,
+    framework: true, environment: "mothership", seed: 0x5b1197, gates: [], upgrades: [],
   },
 };
 
 /** Number of lab worlds that exist. */
-export const LAB_WORLD_COUNT = 3;
+export const LAB_WORLD_COUNT = 5;
+export const worldRows = (def: LabWorldDef): number => def.rows ?? def.sectors;
+export const sectorCount = (def: LabWorldDef): number => def.sectors * worldRows(def);
+export const worldZoneLabel = (def: LabWorldDef): string => def.id <= 3 ? `ZONES ${def.tierBase + 1}–${def.tierBase + 3}` : `ZONE ${def.tierBase + 1}`;
 
 /** The world definition for `id`, falling back to zone 1. */
 export function labWorld(id: number): LabWorldDef {
@@ -371,14 +387,15 @@ function joins(ch: string, axis: "h" | "v"): boolean {
  * cover it, and only the biggest square carries the room's core or tanks.
  */
 export function parseBlueprint(lines: readonly string[] = LAB_BLUEPRINT, freeform = false): Blueprint {
-  const n = lines.length;
-  const at = (c: number, r: number): string => (r >= 0 && r < n && c >= 0 && c < lines[r].length ? lines[r][c] : ".");
-  for (const l of lines) if (l.length !== n) throw new Error(`Blueprint must be square: a row has ${l.length} chars, expected ${n}`);
+  const n = lines[0]?.length ?? 0;
+  const rows = lines.length;
+  const at = (c: number, r: number): string => (r >= 0 && r < rows && c >= 0 && c < lines[r].length ? lines[r][c] : ".");
+  for (const l of lines) if (l.length !== n) throw new Error(`Blueprint must be rectangular: a row has ${l.length} chars, expected ${n}`);
 
   const rooms: BlueprintRoom[] = [];
-  const seen = new Uint8Array(n * n);
+  const seen = new Uint8Array(n * rows);
   let group = 0;
-  for (let r = 0; r < n; r++) {
+  for (let r = 0; r < rows; r++) {
     for (let c = 0; c < n; c++) {
       if (!isRoomChar(at(c, r)) || seen[r * n + c]) continue;
       // Flood the room so a non-square block is caught.
@@ -416,7 +433,7 @@ export function parseBlueprint(lines: readonly string[] = LAB_BLUEPRINT, freefor
   const halls: BlueprintHall[] = [];
   const link = (a: string, b: string, axis: "h" | "v"): boolean =>
     joins(a, axis) && joins(b, axis) && !(isRoomChar(a) && isRoomChar(b));
-  for (let r = 0; r < n; r++) {
+  for (let r = 0; r < rows; r++) {
     let start = -1;
     for (let c = 0; c < n; c++) {
       const linked = link(at(c, r), at(c + 1, r), "h");
@@ -429,7 +446,7 @@ export function parseBlueprint(lines: readonly string[] = LAB_BLUEPRINT, freefor
   }
   for (let c = 0; c < n; c++) {
     let start = -1;
-    for (let r = 0; r < n; r++) {
+    for (let r = 0; r < rows; r++) {
       const linked = link(at(c, r), at(c, r + 1), "v");
       if (linked && start < 0) start = r;
       if (!linked && start >= 0) {
@@ -492,7 +509,7 @@ export function sectorZone(def: LabWorldDef, index: number): 0 | 1 | 2 {
   return d < def.bands[0] ? 0 : d < def.bands[1] ? 1 : 2;
 }
 
-/** Terrain tier (1..6) of a sector's ordinary blocks. */
+/** Terrain tier (1..11) of a sector's ordinary blocks. */
 export function sectorTier(def: LabWorldDef, index: number): number {
   return def.tierBase + sectorZone(def, index) + 1;
 }
@@ -513,7 +530,7 @@ export interface LabFrame {
   def: LabWorldDef;
 }
 
-/** Edge length of a world's blueprint, in cells. */
+/** Width of a world's blueprint, in cells. */
 export function labCells(def: LabWorldDef): number {
   return def.sectors * SECTOR_CELLS;
 }
@@ -524,11 +541,12 @@ export function labCells(def: LabWorldDef): number {
  */
 export function labFrame(world: { width: number; height: number; centerX: number; centerY: number }, def: LabWorldDef = LAB_WORLDS[1]): LabFrame | null {
   const cells = labCells(def);
+  const height = worldRows(def) * SECTOR_CELLS;
   const half = (cells - 1) / 2;
   const x0 = Math.round(world.centerX - half);
-  const y0 = Math.round(world.centerY - half);
+  const y0 = Math.round(world.centerY - (height - 1) / 2);
   const margin = def.gates.length > 0 ? GATE_THICKNESS + GATE_POCKET + 4 : 4;
-  if (x0 < margin || y0 < 4 || x0 + cells + margin > world.width || y0 + cells + 4 > world.height) return null;
+  if (x0 < margin || y0 < margin || x0 + cells + margin > world.width || y0 + height + margin > world.height) return null;
   return { x0, y0, def };
 }
 
@@ -538,7 +556,7 @@ export function sectorAtCell(frame: LabFrame, cx: number, cy: number): number {
   const cells = n * SECTOR_CELLS;
   const lx = cx - frame.x0;
   const ly = cy - frame.y0;
-  if (lx < 0 || ly < 0 || lx >= cells || ly >= cells) return -1;
+  if (lx < 0 || ly < 0 || lx >= cells || ly >= worldRows(frame.def) * SECTOR_CELLS) return -1;
   return Math.floor(ly / SECTOR_CELLS) * n + Math.floor(lx / SECTOR_CELLS);
 }
 
@@ -546,7 +564,7 @@ export function sectorAtCell(frame: LabFrame, cx: number, cy: number): number {
 export function nearestSector(frame: LabFrame, cx: number, cy: number): number {
   const n = frame.def.sectors;
   const col = Math.max(0, Math.min(n - 1, Math.floor((cx - frame.x0) / SECTOR_CELLS)));
-  const row = Math.max(0, Math.min(n - 1, Math.floor((cy - frame.y0) / SECTOR_CELLS)));
+  const row = Math.max(0, Math.min(worldRows(frame.def) - 1, Math.floor((cy - frame.y0) / SECTOR_CELLS)));
   return row * n + col;
 }
 
@@ -617,25 +635,16 @@ export function buildAuthoredLayout(frame: LabFrame, blueprint: Blueprint = worl
   }
   // Gates: a wide vestibule from the edge character's hallway out through the
   // lab's edge, a huge door, and a short passage beyond it.
-  const cells = labCells(def);
   for (const g of def.gates) {
-    const cy = charY(g.row * SECTOR_CHARS + 3) + mid;
-    const east = g.side === "east";
-    const edge = east ? frame.x0 + cells : frame.x0 - 1;
-    const inner = east ? edge - CHAR_CELLS - 2 : edge + CHAR_CELLS + 2;
-    const outer = east ? edge + GATE_THICKNESS + GATE_POCKET - 1 : edge - GATE_THICKNESS - GATE_POCKET + 1;
-    corridors.push({
-      zone: zoneAt(edge, cy),
-      axis: "h",
-      x0: Math.min(inner, outer),
-      x1: Math.max(inner, outer),
-      y0: cy - GATE_HALF,
-      y1: cy + GATE_HALF,
-      width: GATE_HALF * 2 + 1,
-      wallThickness: 2,
-      rubble: false,
-      gate: true,
-    });
+    const { door, pocket } = gateGeometry(frame, g);
+    const vertical = g.side === "north" || g.side === "south";
+    const inner = g.side === "east" || g.side === "south" ? -CHAR_CELLS - 2 : CHAR_CELLS + 2;
+    corridors.push({ zone: zoneAt(door.x0, door.y0), axis: vertical ? "v" : "h",
+      x0: vertical ? pocket.x0 : Math.min(pocket.x0, door.x0 + inner),
+      x1: vertical ? pocket.x1 : Math.max(pocket.x1, door.x1 + inner),
+      y0: vertical ? Math.min(pocket.y0, door.y0 + inner) : pocket.y0,
+      y1: vertical ? Math.max(pocket.y1, door.y1 + inner) : pocket.y1,
+      width: GATE_HALF * 2 + 1, wallThickness: 2, rubble: false, gate: true });
   }
   return { seed: def.seed, rooms, corridors, frame };
 }
@@ -643,6 +652,14 @@ export function buildAuthoredLayout(frame: LabFrame, blueprint: Blueprint = worl
 /** Inclusive cell bounds of a gate's door and of the passage beyond it. */
 export function gateGeometry(frame: LabFrame, g: GateDef): { door: { x0: number; y0: number; x1: number; y1: number }; pocket: { x0: number; y0: number; x1: number; y1: number } } {
   const cells = labCells(frame.def);
+  if (g.side === "north" || g.side === "south") {
+    const cx = frame.x0 + ((g.col ?? 0) * SECTOR_CHARS + 3) * CHAR_CELLS + (CHAR_CELLS - 1) / 2;
+    const edge = g.side === "south" ? frame.y0 + worldRows(frame.def) * SECTOR_CELLS : frame.y0 - GATE_THICKNESS;
+    return { door: { x0: cx - GATE_HALF - 1, x1: cx + GATE_HALF + 1, y0: edge, y1: edge + GATE_THICKNESS - 1 },
+      pocket: { x0: cx - GATE_HALF, x1: cx + GATE_HALF,
+        y0: g.side === "south" ? edge + GATE_THICKNESS : edge - GATE_POCKET,
+        y1: g.side === "south" ? edge + GATE_THICKNESS + GATE_POCKET - 1 : edge - 1 } };
+  }
   const cy = frame.y0 + (g.row * SECTOR_CHARS + 3) * CHAR_CELLS + (CHAR_CELLS - 1) / 2;
   const y0 = cy - GATE_HALF - 1;
   const y1 = cy + GATE_HALF + 1;

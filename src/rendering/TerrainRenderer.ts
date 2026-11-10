@@ -4,7 +4,7 @@ import { paintPortal } from "./portalNoise";
 import type { CameraSystem } from "../systems/CameraSystem";
 import { hash2 } from "../core/math";
 import { DECOR } from "../world/LabDetails";
-import { MATERIAL_BASE, TEX, TIER_PAINT, crackTexelAt, materialShade } from "./materials";
+import { materialColor, TEX, TIER_PAINT, crackTexelAt, materialShade } from "./materials";
 import { LIGHT_KIND, MAT, SUB, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
 
@@ -642,7 +642,7 @@ export class TerrainRenderer {
         }
         const t = tint[i] / 255;
         const tier = this.materialTier(cx, cy);
-        const base = MATERIAL_BASE[tier];
+        const base = materialColor(tier, !!world.labLayout?.frame?.def.framework);
         const tone = 0.88 + t * 0.24;
         const detail = world.decor[i];
         const dc = COLORS.labDecor[detail];
@@ -656,7 +656,7 @@ export class TerrainRenderer {
         // Structural walls and doors carry a band of matte tier paint on their open faces.
         const painted = (world.wall[i] > 0 || material === MAT.door) && material !== MAT.crystal && world.blight[i] === 0 && world.coreId[i] === 0;
         const paintTier = painted ? this.tierAt(cx, cy) : 0;
-        const paint = TIER_PAINT[paintTier];
+        const paint = TIER_PAINT[paintTier] ?? materialColor(paintTier, true);
         for (let oy = 0; oy < TEX; oy++) {
           for (let ox = 0; ox < TEX; ox++) {
             const gx = cx * TEX + ox;

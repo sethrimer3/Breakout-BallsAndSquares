@@ -178,3 +178,11 @@ export function materialShade(tier: number, gx: number, gy: number): number {
     }
   }
 }
+
+/** Preview albedos only; later-world biome art/materials are still placeholders. */
+const FRAMEWORK_BASE: Readonly<Record<number, RGB>> = {
+  7: [55, 94, 43], 8: [80, 62, 37], 9: [24, 39, 28], 10: [86, 48, 29], 11: [44, 29, 61],
+};
+export function materialColor(tier: number, framework = false): RGB {
+  return (framework ? FRAMEWORK_BASE[tier] : undefined) ?? MATERIAL_BASE[tier] ?? MATERIAL_BASE[MATERIAL_BASE.length - 1];
+}

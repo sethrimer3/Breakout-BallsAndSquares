@@ -50,6 +50,7 @@ export class HUD {
     const bar = document.createElement("div");
     bar.className = "hud-bar";
     const items: [string, string, SpriteName, string][] = [
+      ["area", "AREA", "mapGrid", UI_COLORS.neutral],
       ["time", "TIME", "clock", UI_COLORS.neutral],
       ["pixels", "PIXELS", "pixelBits", UI_COLORS.neutral],
       ["currency", "GOLD", "gold", UI_COLORS.gold],
@@ -233,6 +234,9 @@ export class HUD {
     this.fields.currency.textContent = s.currency.toLocaleString();
 
     const totalCrystals = game.crystals + s.crystals;
+    const focus = game.getCommander();
+    const wx = focus?.x ?? game.world.roomCenterX, wy = focus?.y ?? game.world.roomCenterY;
+    this.fields.area.textContent = `W${game.labDef.id} · Z${game.world.fillTierAt(Math.floor(wx / game.world.cellSize), Math.floor(wy / game.world.cellSize))}`;
     const showCrystals = totalCrystals > 0 || s.maxDepth >= TERRAIN.zone2Depth || game.bests.depth >= TERRAIN.zone2Depth;
     this.boxes.crystals.classList.toggle("hidden", !showCrystals);
     this.fields.crystals.textContent = `${s.crystals} (${game.crystals})`;

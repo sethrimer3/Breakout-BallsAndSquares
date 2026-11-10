@@ -153,11 +153,11 @@ describe("hand-made lab", () => {
     expectAllRoomsReachable(a);
   });
 
-  it("builds an empty zone 3 with just its arrival room", () => {
+  it("builds the 13x13 forest framework with empty rooms", () => {
     const w = new PixelWorld(WORLD);
     generateWorld(w, 7, { labWorld: Z3 });
     expect(w.labLayout!.frame!.def).toBe(Z3);
-    expect(w.labLayout!.rooms.length).toBe(1);
+    expect(w.labLayout!.rooms.length).toBe(169);
     expect(w.blightCores.length).toBe(0);
     expect(sectorAtCell(w.labLayout!.frame!, w.roomX0 + 5, w.roomY0 + 5)).toBe(Z3.start);
   });

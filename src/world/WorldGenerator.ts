@@ -3,7 +3,7 @@ import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
 import { placeLabEquipment } from "./LabEquipment";
 import { decorateLab, ensureRoomFixtures } from "./LabDetails";
-import { buildAuthoredLayout, gateGeometry, labFrame, LAB_WORLDS, sectorAtCell, sectorBounds, sectorSpawnCell, sectorZone, upgradeSpotCell, upgradeSpotSector, type LabFrame, type LabWorldDef, type RoomKind } from "./labMap";
+import { buildAuthoredLayout, gateGeometry, sectorCount, labFrame, LAB_WORLDS, sectorAtCell, sectorBounds, sectorSpawnCell, sectorZone, upgradeSpotCell, upgradeSpotSector, type LabFrame, type LabWorldDef, type RoomKind } from "./labMap";
 import { MAT, SUB, type PixelWorld } from "./PixelWorld";
 import { DECOR } from "./LabDetails";
 import { corridorCaveIns, placeCaveIns, roomCaveIns, type CaveIn } from "./CaveIns";
@@ -143,6 +143,25 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
   }
   const layout = frame ? buildAuthoredLayout(frame) : buildLabLayout(world, seed);
   world.labLayout = layout;
+  if (frame && def.framework) {
+    // Layout scaffold only: no lab props, cores, enemies, cave-ins or crystal veins.
+    world.roomLights = []; world.blightCores = []; world.sentrySpots = []; world.specimenSpots = [];
+    health.fill(500); tint.fill(96);
+    const clear = (i: number): void => { health[i] = 0; wall[i] = 0; world.decor[i] = DECOR.cleanFloor; };
+    for (const room of layout.rooms) forRect(world, room.x, room.y, room.x + room.size - 1, room.y + room.size - 1, clear);
+    for (const hall of layout.corridors) forRect(world, hall.x0, hall.y0, hall.x1, hall.y1, clear);
+    buildGates(world, frame);
+    for (const door of world.doors) {
+      // Framework onward exits are traversable without inventing late-game keycards.
+      door.open = !!door.gate?.to;
+      for (const i of door.cells) {
+        if (door.open) { clear(i); world.mat[i] = MAT.none; }
+        else health[i] = 65000;
+      }
+    }
+    forRect(world, world.roomX0, world.roomY0, world.roomX1, world.roomY1, clear);
+    return;
+  }
   const runSeed = seed;
   if (frame) seed = def.seed;
 
@@ -280,7 +299,7 @@ export function placeCrystalVeins(world: PixelWorld, frame: LabFrame, runSeed: n
     const i = y * width + x;
     return wall[i] > 0 && health[i] > 0 && mat[i] === MAT.none && world.coreId[i] === 0 && world.blight[i] === 0;
   };
-  const sectors = frame.def.sectors * frame.def.sectors;
+  const sectors = sectorCount(frame.def);
   for (let s = 0; s < sectors; s++) {
     if (sectorZone(frame.def, s) < 1) continue;
     const b = sectorBounds(frame, s);

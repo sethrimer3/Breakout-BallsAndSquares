@@ -1,3 +1,4 @@
+import { worldAtmosphere } from "../world/worldAtmosphere";
 import { GROWTH, LIGHT } from "../config";
 import type { Game } from "../Game";
 import type { LitCells } from "../systems/LightingSystem";
@@ -177,7 +178,7 @@ export class LightRenderer {
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // 1) Fill with dark ambient illumination.
-    const [ar, ag, ab] = LIGHT.ambientRgb;
+    const [ar, ag, ab] = worldAtmosphere(game.world, cam.x, cam.y)?.ambient ?? LIGHT.ambientRgb;
     g.globalCompositeOperation = "source-over";
     g.globalAlpha = 1;
     g.fillStyle = `rgb(${ar}, ${ag}, ${ab})`;

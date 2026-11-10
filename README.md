@@ -126,3 +126,7 @@ The project is configured with `base: "./"` in [`vite.config.ts`](vite.config.ts
 1. In your GitHub repository, open **Settings → Pages**.
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
 3. Push to the `main` branch (or trigger **Build and deploy to GitHub Pages** manually from the **Actions** tab). The workflow in [`.github/workflows/static.yml`](.github/workflows/static.yml) runs `npm ci`, `npm test`, `npm run build`, and deploys `./dist`.
+
+## Later worlds
+
+The empty-room framework now covers the 13×13 forest (zones 7–9), 7×7 fallen city (zone 10) and 5×3 Blight mother ship (zone 11). See [the world roadmap](docs/WORLD_ROADMAP.md) for exact exits, the central city facility/teleporter, atmosphere profiles, and the scenery/encounters reserved for later work.

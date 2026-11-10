@@ -37,7 +37,7 @@ import { generateWorld } from "./world/WorldGenerator";
 import { LabMap } from "./ui/LabMap";
 import { renderSectorThumbs } from "./rendering/SectorThumbs";
 import { LabProgress } from "./world/LabProgress";
-import { gateGeometry, labWorld, LAB_WORLD_COUNT, type LabWorldDef } from "./world/labMap";
+import { gateGeometry, labWorld, LAB_WORLD_COUNT, sectorSpawnCell, type LabWorldDef } from "./world/labMap";
 import type { Door } from "./world/PixelWorld";
 import type { LabWorldProgress } from "./progression/SaveManager";
 
@@ -522,6 +522,13 @@ export class Game {
   private updateGates(): void {
     const frame = this.world.labLayout?.frame;
     if (!frame || this.traveling || this.runOver) return;
+    const portal = frame.def.teleporter;
+    if (portal) {
+      const at = sectorSpawnCell(frame, portal.sector), cs = this.world.cellSize;
+      if (this.soldiers.some((s) => s.alive && Math.hypot(s.x - at.cx * cs, s.y - at.cy * cs) < cs * 2)) {
+        this.travelToWorld(portal.to); return;
+      }
+    }
     for (const door of this.world.doors) {
       if (!door.gate || !door.open || door.gate.to < 1 || door.gate.to > LAB_WORLD_COUNT) continue;
       const g = frame.def.gates.find((x) => x.to === door.gate!.to);
@@ -547,7 +554,7 @@ export class Game {
    * run (its earnings and reserves) carries on.
    */
   travelToWorld(id: number): void {
-    if (this.traveling) return;
+    if (this.traveling || id < 1 || id > LAB_WORLD_COUNT || !Number.isInteger(id)) return;
     this.traveling = true;
     const lab = this.save.data.lab;
     lab.unlocked = Math.max(lab.unlocked, id);
@@ -1692,7 +1699,7 @@ export class Game {
     this.doors.update(dt);
     this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
     this.updateFog(dt);
-    this.growth.update(dt, this.runStats.time, this.soldiers);
+    if (!this.labDef.framework) this.growth.update(dt, this.runStats.time, this.soldiers);
     this.growthRate = this.growth.rate;
     this.runStats.recordSampleIfDue(this.growthRate);
     this.particles.update(dt);

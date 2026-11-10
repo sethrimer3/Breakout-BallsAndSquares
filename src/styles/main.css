@@ -2513,3 +2513,11 @@ button {
   opacity: 0.4;
   cursor: default;
 }
+
+/* Later-world framework labels: full biome art and encounters come later. */
+.labmap-tier.t7 { color: #79d86c; }
+.labmap-tier.t8 { color: #d6a66c; }
+.labmap-tier.t9 { color: #92a27b; }
+.labmap-tier.t10 { color: #ef9b4f; }
+.labmap-tier.t11 { color: #b88cda; }
+.labmap-panel > .panel-title { line-height: 1.6; overflow-wrap: anywhere; }

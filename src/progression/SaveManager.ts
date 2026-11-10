@@ -1,3 +1,4 @@
+import { sectorCount } from "../world/labMap";
 import { clamp } from "../core/math";
 import { LAB_WORLD_COUNT, LAB_WORLDS } from "../world/labMap";
 import type { SecondaryWeaponType, WeaponType } from "../entities/Soldier";
@@ -175,7 +176,7 @@ function sectorList(v: unknown, id: number): number[] {
   const def = LAB_WORLDS[id];
   const out = new Set<number>([def.start]);
   if (Array.isArray(v)) {
-    for (const s of v) if (typeof s === "number" && Number.isInteger(s) && s >= 0 && s < def.sectors * def.sectors) out.add(s);
+    for (const s of v) if (typeof s === "number" && Number.isInteger(s) && s >= 0 && s < sectorCount(def)) out.add(s);
   }
   return [...out].sort((a, b) => a - b);
 }

@@ -3,6 +3,7 @@ import { THUMB_SIZE, renderUncharted } from "../rendering/SectorThumbs";
 import { TIER_PAINT } from "../rendering/materials";
 import {
   LAB_WORLDS,
+  worldRows, worldZoneLabel,
   SECTOR_CHARS,
   gateGeometry,
   sectorAtCell,
@@ -97,6 +98,7 @@ export class LabMap {
 
   show(): void {
     this.def = this.game.labDef;
+    this.root.querySelector(".panel-title")!.textContent = `WORLD ${this.def.id} — ${this.def.name} · ${worldZoneLabel(this.def)} · ${this.def.sectors}×${worldRows(this.def)}`;
     this.buildGrid();
     const spawn = this.game.labSave.spawn;
     this.selected = this.game.canDeployInto(spawn) ? spawn : this.def.start;
@@ -113,7 +115,7 @@ export class LabMap {
       const def = LAB_WORLDS[id];
       const b = document.createElement("button");
       b.className = `btn labmap-tab${id === this.def.id ? " active" : ""}`;
-      b.textContent = `ZONE ${id}`;
+      b.textContent = `WORLD ${id}`;
       b.title = def.name;
       b.addEventListener("click", () => this.switchWorld(id));
       this.tabs.append(b);
@@ -144,7 +146,7 @@ export class LabMap {
       if (!d) return;
       const n = this.def.sectors;
       const col = Math.max(0, Math.min(n - 1, (this.selected % n) + d[0]));
-      const row = Math.max(0, Math.min(n - 1, Math.floor(this.selected / n) + d[1]));
+      const row = Math.max(0, Math.min(worldRows(this.def) - 1, Math.floor(this.selected / n) + d[1]));
       this.select(row * n + col);
     }
   }
@@ -185,7 +187,7 @@ export class LabMap {
       this.grid.append(label(""));
     };
     edgeRow();
-    for (let r = 0; r < n; r++) {
+    for (let r = 0; r < worldRows(this.def); r++) {
       this.grid.append(label(String(r + 1)));
       for (let c = 0; c < n; c++) {
         const s = r * n + c;
@@ -230,7 +232,7 @@ export class LabMap {
       const col = s % n;
       const row = (s - col) / n;
       const hidden = (c: number, r: number): boolean =>
-        c >= 0 && r >= 0 && c < n && r < n && !this.game.labProgress.discovered.has(r * n + c);
+        c >= 0 && r >= 0 && c < n && r < worldRows(this.def) && !this.game.labProgress.discovered.has(r * n + c);
       const sides = [hidden(col, row - 1), hidden(col + 1, row), hidden(col, row + 1), hidden(col - 1, row)];
       const step = 6;
       const alphas = [0.6, 0.38, 0.18];
@@ -275,18 +277,26 @@ export class LabMap {
     const u = Math.round(THUMB_SIZE / 28);
     for (const gate of this.def.gates) {
       const { door } = gateGeometry(frame, gate);
-      const inside = gate.side === "east" ? door.x0 - 1 : door.x1 + 1;
-      if (sectorAtCell(frame, inside, (door.y0 + door.y1) >> 1) !== s) continue;
-      const y0 = Math.round((door.y0 - b.y0) * k);
-      const y1 = Math.round((door.y1 + 1 - b.y0) * k);
-      const x = gate.side === "east" ? THUMB_SIZE - u * 4 : 0;
-      g.fillStyle = "#05070d";
-      g.fillRect(x, y0 - u, u * 4, y1 - y0 + u * 2);
-      g.fillStyle = "#3a3d46";
-      g.fillRect(x + u, y0, u * 2, y1 - y0);
+      const vertical = gate.side === "north" || gate.side === "south";
+      const ix = vertical ? (door.x0 + door.x1) / 2 : gate.side === "east" ? door.x0 - 1 : door.x1 + 1;
+      const iy = vertical ? gate.side === "south" ? door.y0 - 1 : door.y1 + 1 : (door.y0 + door.y1) / 2;
+      if (sectorAtCell(frame, ix, iy) !== s) continue;
+      const along0 = Math.round(((vertical ? door.x0 - b.x0 : door.y0 - b.y0)) * k);
+      const along1 = Math.round(((vertical ? door.x1 + 1 - b.x0 : door.y1 + 1 - b.y0)) * k);
+      const edge = gate.side === "east" || gate.side === "south" ? THUMB_SIZE - u * 4 : 0;
       const c = TIER_PAINT[gate.tier] ?? TIER_PAINT[1];
       g.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-      for (let y = y0 + u; y < y1 - u; y += u * 3) g.fillRect(x + u, y, u * 2, u);
+      if (vertical) g.fillRect(along0, edge, along1 - along0, u * 4);
+      else g.fillRect(edge, along0, u * 4, along1 - along0);
+
+    }
+    const region = this.def.facility;
+    const col = s % this.def.sectors, row = Math.floor(s / this.def.sectors);
+    if (region && col >= region.col0 && col <= region.col1 && row >= region.row0 && row <= region.row1) {
+      g.strokeStyle = "#ffb65c"; g.lineWidth = u; g.strokeRect(u, u, THUMB_SIZE - 2*u, THUMB_SIZE - 2*u);
+    }
+    if (this.def.teleporter?.sector === s) {
+      g.fillStyle = "#6bfff0"; g.fillRect(THUMB_SIZE/2-u*2, THUMB_SIZE/2-u*2, u*4, u*4);
     }
     for (const spot of this.def.upgrades) {
       if (upgradeSpotSector(this.def, spot) !== s) continue;
@@ -319,7 +329,10 @@ export class LabMap {
     }
     const s = this.selected;
     const tier = sectorTier(this.def, s);
-    const name = `Z${this.def.id} ${sectorName(s, this.def.sectors)}`;
+    const region = this.def.facility;
+    const col = s % this.def.sectors, row = Math.floor(s / this.def.sectors);
+    const facility = region && col >= region.col0 && col <= region.col1 && row >= region.row0 && row <= region.row1;
+    const name = `W${this.def.id} ${sectorName(s, this.def.sectors)} · ZONE ${tier}${facility ? ` · ${region.name}` : ""}${this.def.teleporter?.sector === s ? " · TELEPORTER → WORLD 5" : ""}`;
     let status: string;
     if (!progress.discovered.has(s)) status = "UNEXPLORED";
     else if (progress.conquered.has(s)) status = s === this.def.start ? (this.def.id === 1 ? "STAGING AREA - SECURE" : "GATEWAY - SECURE") : "CONQUERED - SAFE TO DEPLOY";

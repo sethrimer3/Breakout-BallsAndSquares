@@ -1,3 +1,5 @@
+import { worldAtmosphere } from "../world/worldAtmosphere";
+import { sectorSpawnCell } from "../world/labMap";
 import { LootKind } from "../entities/LootSystem";
 import { ESSENCE_FPS, ESSENCE_SIZE, essenceFrame, essencePixels, paintPixels } from "./blightEssence";
 import { ART_PIXEL, BULLET, COLORS, GROWTH, SOLDIER } from "../config";
@@ -75,7 +77,8 @@ export class Renderer {
 
     // 1) Albedo pass: dark navy cavity background, terrain chunks, casings,
     //    and debris/smoke.
-    ctx.fillStyle = COLORS.background;
+    const atmosphere = worldAtmosphere(game.world, cam.x, cam.y);
+    ctx.fillStyle = atmosphere ? `rgb(${atmosphere.background.join(",")})` : COLORS.background;
     ctx.fillRect(0, 0, w, h);
     // The spawn room's bare concrete slab.
     {
@@ -91,6 +94,15 @@ export class Renderer {
     game.terrain.draw(ctx, cam, game.showChunkBorders);
     this.drawDoors();
     this.drawUpgradeCaches();
+    const portal = game.labDef.teleporter, frame = game.world.labLayout?.frame;
+    if (portal && frame) {
+      const at = sectorSpawnCell(frame, portal.sector);
+      const x = cam.worldToScreenX(at.cx * game.world.cellSize), y = cam.worldToScreenY(at.cy * game.world.cellSize);
+      const r = game.world.cellSize * 2 * cam.zoom;
+      ctx.strokeStyle = "#65fff0"; ctx.lineWidth = Math.max(1, cam.zoom * 2);
+      ctx.strokeRect(x - r, y - r, 2 * r, 2 * r);
+      ctx.fillStyle = "rgba(60,255,225,0.25)"; ctx.fillRect(x - r, y - r, 2*r, 2*r);
+    }
 
     // Subtle starting-room frame so the spawn zone stays recognizable.
     const cs = game.world.cellSize;
