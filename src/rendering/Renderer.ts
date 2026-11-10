@@ -500,13 +500,11 @@ export class Renderer {
       ctx.fillStyle = live ? "#6c859e" : "#2f3a48";
       ctx.fillRect(0, -barrelW / 2, barrelLen, barrelW);
       ctx.fillStyle = live ? "#2c3b4d" : "#1c242f";
-      ctx.beginPath();
-      ctx.arc(0, 0, baseR * 0.7, 0, Math.PI * 2);
-      ctx.fill();
+      const domeR = Math.round(baseR * 0.7);
+      ctx.fillRect(-domeR, -domeR, domeR * 2, domeR * 2);
       ctx.fillStyle = live ? (t.hasTarget ? "#ff4040" : "#ff9a3b") : "#3a2a2a";
-      ctx.beginPath();
-      ctx.arc(baseR * 0.3, 0, Math.max(0.8, 1.1 * z), 0, Math.PI * 2);
-      ctx.fill();
+      const eyeR = Math.max(1, Math.round(1.1 * z));
+      ctx.fillRect(Math.round(baseR * 0.3) - eyeR / 2, -eyeR / 2, eyeR, eyeR);
       ctx.restore();
     }
   }
@@ -1258,86 +1256,135 @@ export class Renderer {
     }
   }
 
-  /** Draw temporary deployable autoturrets. */
+  /** Draw temporary deployable autoturrets with crisp pixel-art geometry. */
   private drawTurrets(): void {
     const { ctx, game } = this;
     const cam = game.camera;
     const items = game.combat.turrets.items;
+    const z = cam.zoom;
+    const px = Math.max(1, Math.round(z));
 
     for (let i = 0; i < items.length; i++) {
       const t = items[i];
       if (!t.active) continue;
 
-      const sx = cam.worldToScreenX(t.x);
-      const sy = cam.worldToScreenY(t.y);
+      const sx = Math.round(cam.worldToScreenX(t.x));
+      const sy = Math.round(cam.worldToScreenY(t.y));
       if (sx < -40 || sy < -40 || sx > cam.viewW + 40 || sy > cam.viewH + 40) continue;
 
       ctx.save();
       ctx.translate(sx, sy);
 
-      const baseR = Math.max(3, 5 * cam.zoom);
-
-      // Tripod / Base mount (3 legs)
-      ctx.strokeStyle = "#1b2533";
-      ctx.lineWidth = Math.max(1.5, 2 * cam.zoom);
+      // --- Pixel-Art Tripod Legs (snapped along 3 diagonal angles) ---
+      ctx.fillStyle = "#16202c";
+      const legReach = 5;
       for (let leg = 0; leg < 3; leg++) {
         const la = (leg * Math.PI * 2) / 3 + Math.PI / 6;
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(Math.cos(la) * (baseR + 2 * cam.zoom), Math.sin(la) * (baseR + 2 * cam.zoom));
-        ctx.stroke();
+        const cosA = Math.cos(la);
+        const sinA = Math.sin(la);
+        for (let step = 2; step <= legReach; step++) {
+          const lx = Math.round(cosA * step) * px;
+          const ly = Math.round(sinA * step) * px;
+          ctx.fillRect(lx - px / 2, ly - px / 2, px, px);
+        }
+        // Foot pad
+        const fx = Math.round(cosA * legReach) * px;
+        const fy = Math.round(sinA * legReach) * px;
+        ctx.fillStyle = "#0c1219";
+        ctx.fillRect(fx - px, fy - px, px * 2, px * 2);
+        ctx.fillStyle = "#16202c";
       }
 
-      // Circular base hub
-      ctx.fillStyle = "#2c3b4d";
-      ctx.beginPath();
-      ctx.arc(0, 0, baseR, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "#3e526a";
-      ctx.lineWidth = 1;
-      ctx.stroke();
+      // --- Stepped Octagonal Base Mount ---
+      // Outer border / rim (octagonal silhouette: 7x7 with corners cut)
+      ctx.fillStyle = "#1f2a38";
+      ctx.fillRect(-3 * px, -2 * px, 6 * px, 4 * px);
+      ctx.fillRect(-2 * px, -3 * px, 4 * px, 6 * px);
 
-      // Swiveling turret head & barrel
+      // Base top plate (chiseled dark gunmetal)
+      ctx.fillStyle = "#2c3b4d";
+      ctx.fillRect(-2 * px, -1 * px, 4 * px, 2 * px);
+      ctx.fillRect(-1 * px, -2 * px, 2 * px, 4 * px);
+
+      // Corner rivets / bolts (4 small dots on base plate)
+      ctx.fillStyle = "#4a637d";
+      ctx.fillRect(-2 * px, -2 * px, px, px);
+      ctx.fillRect(px, -2 * px, px, px);
+      ctx.fillRect(-2 * px, px, px, px);
+      ctx.fillRect(px, px, px, px);
+
+      // --- Swiveling Turret Head ---
       ctx.save();
       ctx.rotate(t.angle);
 
-      // Gun barrel extending forward
-      const barrelLen = Math.max(5, 8 * cam.zoom);
-      const barrelW = Math.max(1.5, 2 * cam.zoom);
-      ctx.fillStyle = "#5a7288";
-      ctx.fillRect(0, -barrelW * 0.9, barrelLen, barrelW * 1.8);
-      // Muzzle tips
+      // Heavy Twin-Gun Barrel Assembly
+      // Recoil housing / mantlet mount
+      ctx.fillStyle = "#1e2936";
+      ctx.fillRect(0, -2 * px, 2 * px, 4 * px);
+
+      // Twin gun barrels extending forward
+      ctx.fillStyle = "#4d6275";
+      ctx.fillRect(2 * px, -2 * px, 6 * px, px); // Top barrel
+      ctx.fillRect(2 * px, px, 6 * px, px);      // Bottom barrel
+
+      // Barrel vents / fluting
+      ctx.fillStyle = "#334352";
+      ctx.fillRect(4 * px, -2 * px, px, px);
+      ctx.fillRect(4 * px, px, px, px);
+
+      // Flashed muzzle compensators
       ctx.fillStyle = "#8ec3eb";
-      ctx.fillRect(barrelLen - 1.5, -barrelW * 0.9, 1.5, barrelW * 1.8);
+      ctx.fillRect(7 * px, -2 * px, px, px);
+      ctx.fillRect(7 * px, px, px, px);
 
-      // Turret dome
-      ctx.fillStyle = "#34495e";
-      ctx.beginPath();
-      ctx.arc(0, 0, baseR * 0.75, 0, Math.PI * 2);
-      ctx.fill();
+      // Armored Turret Housing (Stepped beveled cupola)
+      ctx.fillStyle = "#253342"; // Deep shadow outline
+      ctx.fillRect(-3 * px, -2 * px, 4 * px, 4 * px);
+      ctx.fillRect(-2 * px, -3 * px, 3 * px, 6 * px);
 
-      // Sensor optic eye (cyan glowing dot)
-      ctx.fillStyle = t.hasTarget ? "#38d6ff" : "#567994";
-      ctx.beginPath();
-      ctx.arc(baseR * 0.35, 0, Math.max(1, 1.4 * cam.zoom), 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillStyle = "#3a4d61"; // Main armor plate
+      ctx.fillRect(-2 * px, -1 * px, 3 * px, 2 * px);
+      ctx.fillRect(-1 * px, -2 * px, 2 * px, 4 * px);
+
+      // Top-left light reflection facet (matches game lighting)
+      ctx.fillStyle = "#5c7996";
+      ctx.fillRect(-2 * px, -2 * px, px, px);
+      ctx.fillRect(-1 * px, -1 * px, px, px);
+
+      // Sensor Optic Visor / Targeter Lens (crisp square pixel lens)
+      ctx.fillStyle = t.hasTarget ? "#38d6ff" : "#456782";
+      ctx.fillRect(0, -px / 2, px, px);
+      if (t.hasTarget) {
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, -px / 2, Math.max(1, Math.round(px / 2)), Math.max(1, Math.round(px / 2)));
+      }
 
       ctx.restore();
 
-      // Remaining lifetime ring around turret base
+      // --- Lifetime Indicator (Chunky Pixel Gauge) ---
       if (t.maxLife > 0) {
         const lifePct = Math.max(0, Math.min(1, t.life / t.maxLife));
-        const ringR = baseR + 3 * cam.zoom;
-        ctx.strokeStyle = "rgba(56, 214, 255, 0.25)";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(0, 0, ringR, 0, Math.PI * 2);
-        ctx.stroke();
+        const totalBars = 6;
+        const filledBars = Math.ceil(lifePct * totalBars);
+        const barW = Math.max(1, Math.round(px * 0.9));
+        const barH = Math.max(1, Math.round(px * 1.2));
+        const startX = -((totalBars * (barW + 1) - 1) / 2);
+        const gaugeY = 4 * px + 1;
 
-        ctx.strokeStyle = lifePct < 0.25 ? "#ff4d6d" : "#38d6ff";
-        ctx.beginPath();
-        ctx.arc(0, 0, ringR, -Math.PI / 2, -Math.PI / 2 + lifePct * Math.PI * 2);
-        ctx.stroke();
+        // Background backing
+        ctx.fillStyle = "#0c1219";
+        ctx.fillRect(startX - 1, gaugeY - 1, totalBars * (barW + 1) + 1, barH + 2);
+
+        // Individual segmented pixel pips
+        for (let b = 0; b < totalBars; b++) {
+          const bx = startX + b * (barW + 1);
+          if (b < filledBars) {
+            ctx.fillStyle = lifePct < 0.25 ? "#ff4060" : "#38d6ff";
+          } else {
+            ctx.fillStyle = "#1e2936";
+          }
+          ctx.fillRect(bx, gaugeY, barW, barH);
+        }
       }
 
       ctx.restore();
