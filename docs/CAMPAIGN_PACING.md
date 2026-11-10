@@ -43,19 +43,39 @@ World encounter spaces use distinct spatial archetypes rather than uniform rooms
 
 ### Checkpoint Breach Times & Hits
 
-Checkpoint bulkheads are 3 cells deep (e.g., City Facility perimeter = 45,000 HP/cell; Mothership bulkheads = 65,000 HP/cell). Mining damage is strictly separated from weapon damage.
+Checkpoint bulkheads defend key corridor bottlenecks:
+- **World 4 Aerospace Facility:** 3 cells deep at 45,000 HP per cell (135,000 HP total).
+- **World 5 Mothership Checkpoints:** Reinforced 5 cells deep at 65,000 HP per cell (325,000 HP total).
+Mining damage is strictly separated from weapon damage.
 
-| Siege Drill Level | Terrain Damage Bonus | Total Terrain Dmg / Hit | Hits per Cell (City 45k) | Total Hits (3-cell City) | Hits per Cell (Ship 65k) | Total Hits (3-cell Ship) | Time to Breach (1 soldier @ 5 rps) | Time to Breach (4-soldier squad @ 20 rps) |
+| Siege Drill Level | Terrain Damage Bonus | Total Terrain Dmg / Hit | Hits per Cell (City 45k) | Total Hits (3-cell City) | Hits per Cell (Ship 65k) | Total Hits (5-cell Ship) | Time to Breach (1 soldier @ 5 rps) | Time to Breach (4-soldier squad @ 20 rps) |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|
-| 0 (No Drill) | +0 | 1 | 45,000 | 135,000 | 65,000 | 195,000 | ~10.8 hours | ~2.7 hours |
-| 1 (+2k) | +2,000 | 2,001 | 23 | 69 | 33 | 99 | 19.8 s | 5.0 s |
-| 2 (+4k) | +4,000 | 4,001 | 12 | 36 | 17 | 51 | 10.2 s | 2.6 s |
-| 3 (+6k) | +6,000 | 6,001 | 8 | 24 | 11 | 33 | 6.6 s | 1.7 s |
-| 4 (+8k) | +8,000 | 8,001 | 6 | 18 | 9 | 27 | 5.4 s | 1.4 s |
-| 5 (+10k) | +10,000 | 10,001 | 5 | 15 | 7 | 21 | 4.2 s | 1.1 s |
-| 6 (+12k) | +12,000 | 12,001 | 4 | 12 | 6 | 18 | 3.6 s | 0.9 s |
+| 0 (No Drill) | +0 | 1 | 45,000 | 135,000 | 65,000 | 325,000 | ~18.1 hours | ~4.5 hours |
+| 1 (+2k) | +2,000 | 2,001 | 23 | 69 | 33 | 165 | 33.0 s | 8.3 s |
+| 2 (+4k) | +4,000 | 4,001 | 12 | 36 | 17 | 85 | 17.0 s | 4.3 s |
+| 3 (+6k) | +6,000 | 6,001 | 8 | 24 | 11 | 55 | 11.0 s | 2.8 s |
+| 4 (+8k) | +8,000 | 8,001 | 6 | 18 | 9 | 45 | 9.0 s | 2.3 s |
+| 5 (+10k) | +10,000 | 10,001 | 5 | 15 | 7 | 35 | 7.0 s | 1.8 s |
+| 6 (+12k) | +12,000 | 12,001 | 4 | 12 | 6 | 30 | 6.0 s | 1.5 s |
 
-*Note: Breach times assume sustained direct fire without interruptions. Armed turrets and patrols defending checkpoints force tactical retreat or cover usage behind barricades.*
+*Note: Breach times assume sustained direct fire without interruptions. In practice, defending turrets (65–100 damage) and patrolling brutes disrupt squads attempting to breach bulkheads, making deep 5-cell bulkheads in World 5 require high-level drill investment or strategic cover management.*
+
+## Measured Progression & Loadout Verification
+
+- **End-of-World-2 Squad Baseline:** Tested with four soldiers equipped with unlocked tier 1–3 weapons (e.g. Pistol/Assault Rifle/Shotgun) and prerequisite Tier 1–3 individual nodes (`s_marksman` Lv 1, `s_penetrator` Lv 1, `s_twin_fire` Lv 1) costing 55 gold, 30 orange crystals, and 30 green crystals.
+- **Peaceful Tier 7 Exploration:** 36 outdoor sectors in Canopy Forest World 3 contain 6 biomass groves each (25 biomass + 100 gold cache per grove), yielding 150 biomass and 600 gold per sector without enemy risk. Fully sweeping tier 7 provides up to 5,400 biomass and 21,600 gold—far more than needed for initial fourth-tier unlock prerequisites.
+- **First Combat Specialization (Tier 8):** Tier 8 sectors feature 2 Blight rifle soldiers (220 HP, 24 dmg) and 1 brute (440 HP, 36 melee dmg) plus 3 groves (40 biomass each). Defeating a single tier 8 sector awards 800 essence (200/soldier, 400/brute) and 120 biomass.
+- **Upgrade Costs:**
+  - *Level 1 Executioner (`s_predator`):* 40 biomass + 1,000 essence (+80 weapon damage). Requires clearing 2 tier-8 sectors (1,600 essence earned, 600 remaining).
+  - *Level 1 Bastion Shell (`s_bastion`):* 40 biomass + 1,000 essence (+100 soldier HP).
+  - *Level 1 Siege Drill (`s_siege`):* 50 biomass + 1,500 essence (+2,000 terrain damage). Clearing 2 tier-8 sectors comfortably covers this cost.
+- **Recovery & Anti-Softlock:** Persistent drops spawned on kill are swept into `runStats` and banked upon squad wipe, run reset, or world gate transition (`sweepUncollectedDrops()`). Earned essence and biomass cannot be lost or double-counted.
+
+## Remaining tuning uncertainties
+
+- Exact squad attrition rate in World 4 city crossfires against combined turret and mine arrangements.
+- Player preference between high-power single-soldier carry loadout vs uniform 4-soldier squad upgrading.
+- Complete 5-world campaign playthrough to measure whole-game completion time.
 
 ## Individual preparation
 

@@ -21,7 +21,7 @@ import { CombinedTargets, RoomFixtures } from "./systems/RoomFixtures";
 import { FireSystem } from "./systems/FireSystem";
 import { Input } from "./systems/Input";
 import { LightingSystem, makeLitCells, type LitCells, type MuzzleLight } from "./systems/LightingSystem";
-import { PhysicsSystem, findClearDeployPoint, findSpawnPoint } from "./systems/PhysicsSystem";
+import { PhysicsSystem, circleIsClear, findClearDeployPoint, findSpawnPoint } from "./systems/PhysicsSystem";
 import { RunStats } from "./systems/RunStats";
 import { HUD } from "./ui/HUD";
 import { DebugOverlay } from "./ui/DebugOverlay";
@@ -235,12 +235,11 @@ export class Game {
       if (list.includes(a.id)) return;
       list.push(a.id);
       this.save.save();
-      // Drop physical pickup for collection, but also guarantee that if the run ends
-      // or soldiers wipe before reaching distant/offscreen drops, persistent encounter
-      // earnings cannot be permanently lost to the void.
+      // Drop physical pickup for in-world player collection.
+      // Drops are collected into runStats when touched by soldiers.
+      // If the squad wipes or transitions before touching them, sweepUncollectedDrops()
+      // ensures persistent encounter loot is swept and safely banked.
       this.loot.spawnOne(a.x, a.y, Math.max(90, this.stats.pickupLifetime), this.rng, kind, value);
-      if (kind === LootKind.Biomass) this.runStats.biomass += value;
-      else if (kind === LootKind.Essence) this.runStats.essence += value;
       if (a.kind === "grove") {
         const reward = lateBlockReward(a.tier);
         this.loot.spawnOne(a.x, a.y, 90, this.rng, reward.kind, reward.value * 10);
@@ -584,6 +583,7 @@ export class Game {
     lab.unlocked = Math.max(lab.unlocked, id);
     this.save.save();
     this.transition.close(0.6, () => {
+      this.sweepUncollectedDrops();
       lab.world = id;
       this.labSave.spawn = this.labDef.start;
       this.save.save();
@@ -640,8 +640,27 @@ export class Game {
     this.save.save();
   }
 
+  /**
+   * Sweep uncollected floor drops into runStats before banking or world transition,
+   * guaranteeing earned persistent drops (biomass, essence) are never lost.
+   */
+  private sweepUncollectedDrops(): void {
+    const loot = this.loot;
+    for (let i = 0; i < loot.count; i++) {
+      const k = loot.kind[i];
+      const v = loot.value[i];
+      if (k === LootKind.Biomass) this.runStats.biomass += v;
+      else if (k === LootKind.Essence) this.runStats.essence += v;
+      else if (k === LootKind.Crystal) this.runStats.crystals += v;
+      else if (k === LootKind.GreenCrystal) this.runStats.greenCrystals += v;
+      else this.runStats.currency += v;
+    }
+    loot.clear();
+  }
+
   /** Bank currency & lifetime pixels earned in the current run (idempotent per run). */
   bankCurrentRun(): { time: boolean; depth: boolean; pixels: boolean } {
+    this.sweepUncollectedDrops();
     const r = this.runStats;
     const b = this.save.data.bests;
     const newBests = {
@@ -1690,9 +1709,23 @@ export class Game {
           const row = Math.floor(i / 2) + 1;
           const side = i % 2 === 0 ? -1 : 1;
           const backDist = row * spacing;
-          const sideDist = side * row * 14;
-          tx = commander.x - cdx * backDist - cdy * sideDist;
-          ty = commander.y - cdy * backDist + cdx * sideDist;
+          let sideDist = side * row * 14;
+          let candX = commander.x - cdx * backDist - cdy * sideDist;
+          let candY = commander.y - cdy * backDist + cdx * sideDist;
+          // Compression: if the flank target is obstructed by walls or cover,
+          // compress inward toward the center line to fit through narrow passages.
+          if (!circleIsClear(this.world, candX, candY, f.radius)) {
+            sideDist *= 0.4;
+            candX = commander.x - cdx * backDist - cdy * sideDist;
+            candY = commander.y - cdy * backDist + cdx * sideDist;
+            if (!circleIsClear(this.world, candX, candY, f.radius)) {
+              // Full collapse to single-file trail behind commander
+              candX = commander.x - cdx * spacing * (i + 1);
+              candY = commander.y - cdy * spacing * (i + 1);
+            }
+          }
+          tx = candX;
+          ty = candY;
         }
 
         const fdx = tx - f.x;
@@ -1720,6 +1753,32 @@ export class Game {
       s.age += dt;
       this.physics.step(s, dt);
       this.combat.updateSoldier(s, dt);
+    }
+    // Soldier-to-soldier soft separation to prevent clustering, jamming, or stacking
+    const livingSoldiers = this.soldiers.filter((s) => s.alive);
+    for (let i = 0; i < livingSoldiers.length; i++) {
+      const a = livingSoldiers[i];
+      for (let j = i + 1; j < livingSoldiers.length; j++) {
+        const b = livingSoldiers[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const minDist = a.radius + b.radius + 1;
+        const dist2 = dx * dx + dy * dy;
+        if (dist2 < minDist * minDist && dist2 > 1e-4) {
+          const dist = Math.sqrt(dist2);
+          const push = (minDist - dist) * 0.5;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          if (circleIsClear(this.world, a.x - nx * push, a.y - ny * push, a.radius)) {
+            a.x -= nx * push;
+            a.y -= ny * push;
+          }
+          if (circleIsClear(this.world, b.x + nx * push, b.y + ny * push, b.radius)) {
+            b.x += nx * push;
+            b.y += ny * push;
+          }
+        }
+      }
     }
     this.combat.updateBullets(dt);
     this.fire.update(dt, this.combat.bullets.items);

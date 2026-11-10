@@ -162,6 +162,7 @@ export class Renderer {
     this.drawSoldiers();
     this.drawGrenades();
     this.drawTurrets();
+    game.late.drawOverlay(ctx, cam);
     this.drawAimIndicator();
     this.drawGateNotice();
 

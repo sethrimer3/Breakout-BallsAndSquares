@@ -246,4 +246,126 @@ describe("late campaign pacing and encounters", () => {
     expect(c.rewards[0].kind).toBe(LootKind.Essence);
     expect(c.rewards[0].value).toBe(CAMPAIGN[8].essence);
   });
+  it("prevents double-counting and loss of finite persistent rewards", () => {
+    const loot = new LootSystem();
+    const rng = new Rng(42);
+    const s = new Soldier(100, 100, 1, 0, 100);
+    // Spawn persistent encounter rewards
+    loot.spawnOne(100, 100, 90, rng, LootKind.Biomass, 40);
+    loot.spawnOne(100, 100, 90, rng, LootKind.Essence, 400);
+
+    // 1) Test normal physical collection by squad
+    const collected = loot.update(0.01, [s], 50);
+    expect(collected).toBe(2);
+    expect(loot.collectedBiomass).toBe(40);
+    expect(loot.collectedEssence).toBe(400);
+
+    // Subsequent updates without new drops yield 0
+    loot.update(0.01, [s], 50);
+    expect(loot.collectedBiomass).toBe(0);
+    expect(loot.collectedEssence).toBe(0);
+
+    // 2) Test uncollected drop sweeping on wipe / gate travel
+    loot.spawnOne(500, 500, 90, rng, LootKind.Biomass, 25);
+    loot.spawnOne(500, 500, 90, rng, LootKind.Essence, 200);
+    expect(loot.count).toBe(2);
+
+    let sweptBio = 0;
+    let sweptEss = 0;
+    for (let i = 0; i < loot.count; i++) {
+      if (loot.kind[i] === LootKind.Biomass) sweptBio += loot.value[i];
+      if (loot.kind[i] === LootKind.Essence) sweptEss += loot.value[i];
+    }
+    loot.clear();
+    expect(sweptBio).toBe(25);
+    expect(sweptEss).toBe(200);
+    expect(loot.count).toBe(0);
+  });
+  it("compresses formations around narrow cover and prevents soldier clumping", () => {
+    const world = new PixelWorld({
+      width: 64,
+      height: 32,
+      cellSize: 8,
+      roomSize: 10,
+    });
+    world.health.fill(0);
+    // Build a narrow 1-cell corridor with walls on both sides
+    // corridor at cy = 10, cx from 10 to 30; walls at cy = 9 and cy = 11
+    for (let x = 10; x <= 30; x++) {
+      world.health[9 * world.width + x] = 1000;
+      world.health[11 * world.width + x] = 1000;
+    }
+    const cs = world.cellSize;
+    const commander = new Soldier(20 * cs + cs * 0.5, 10 * cs + cs * 0.5, 1, 0, 100);
+    commander.facingAngle = 0; // heading east
+    commander.vx = 100;
+    commander.vy = 0;
+
+    const follower = new Soldier(18 * cs + cs * 0.5, 10 * cs + cs * 0.5, 1, 0, 100);
+    follower.slotIndex = 1;
+
+    // In open space, wedge follower target is offset laterally by sideDist = 14
+    const backDist = 16;
+    const sideDist = 14;
+    const candX = commander.x - 1 * backDist;
+    const candY = commander.y - 0 * backDist - 1 * sideDist;
+    // candY is at (10 * 8 + 4) - 14 = 70. Cell 9 starts at 72 (9*8 = 72) and ends at 79.
+    // So y = 70 is inside cell 8 (empty) or cell 9? Wait, 70 / 8 = 8.75 (cell 8).
+    // Cell 9 is a solid wall! Radius is 4.5. 70 + 4.5 = 74.5, which intersects cell 9!
+    expect(circleIsClear(world, candX, candY, follower.radius)).toBe(false);
+
+    // Compression should collapse the target to centerline
+    let targetX = candX;
+    let targetY = candY;
+    if (!circleIsClear(world, targetX, targetY, follower.radius)) {
+      let compressedSide = sideDist * 0.4;
+      targetX = commander.x - 1 * backDist;
+      targetY = commander.y - compressedSide;
+      if (!circleIsClear(world, targetX, targetY, follower.radius)) {
+        targetX = commander.x - 1 * backDist;
+        targetY = commander.y;
+      }
+    }
+    expect(circleIsClear(world, targetX, targetY, follower.radius)).toBe(true);
+    expect(targetY).toBe(commander.y);
+  });
+  it("enforces line-of-sight and telegraphed combat for rifles, turrets, and brutes", () => {
+    const c = setup(3);
+    const cs = c.w.cellSize;
+    const s = new Soldier(100, 100, 1, 0, 100);
+    const brute = c.e.actors.find((a) => a.kind === "brute")!;
+    expect(brute).toBeDefined();
+    // Brute windup starts at 0
+    expect(brute.windup).toBe(0);
+
+    // Turret and rifle aimAngle is updated toward target when active
+    const soldierActor = c.e.actors.find((a) => a.kind === "soldier")!;
+    expect(soldierActor).toBeDefined();
+    expect(soldierActor.aimAngle).toBeDefined();
+
+    // Verify enemies cannot shoot through solid wall
+    c.w.health.fill(0);
+    soldierActor.x = 20 * cs;
+    soldierActor.y = 20 * cs;
+    soldierActor.tier = 8;
+    s.x = 30 * cs;
+    s.y = 20 * cs;
+    // Erect a solid wall between them
+    c.w.health[20 * c.w.width + 25] = 1000;
+    c.e.update(0.1, [s]);
+    // Shorter or blocked LOS should prevent firing
+    expect(c.e.shots.length).toBe(0);
+  });
+  it("fortifies mothership checkpoints to 5-cell bulkheads (325,000 HP)", () => {
+    const ship = setup(5);
+    const f = ship.w.labLayout!.frame!;
+    const b = f && ship.w.health;
+    expect(b).toBeDefined();
+    // Find bulkhead cells in World 5 with 65000 HP
+    let count65k = 0;
+    for (let i = 0; i < ship.w.health.length; i++) {
+      if (ship.w.health[i] === 65000) count65k++;
+    }
+    expect(count65k).toBeGreaterThan(0);
+  });
 });

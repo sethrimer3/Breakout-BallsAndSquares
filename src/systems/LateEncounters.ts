@@ -21,6 +21,8 @@ export interface Encounter {
   cooldown: number;
   charge: number;
   phase: number;
+  aimAngle: number;
+  windup: number;
 }
 interface Shot {
   x: number;
@@ -89,6 +91,8 @@ export class LateEncounters implements BulletTargets {
           cooldown: 1 + j * 0.3,
           charge: 0,
           phase: j + s,
+          aimAngle: 0,
+          windup: 0,
         });
       };
       kinds.forEach((k, j) =>
@@ -152,6 +156,9 @@ export class LateEncounters implements BulletTargets {
         dist < cs * 35 &&
         targetTier >= 8 &&
         this.los(a.x, a.y, target.x, target.y);
+      if (active) {
+        a.aimAngle = Math.atan2(target.y - a.y, target.x - a.x);
+      }
       a.cooldown -= dt;
       if (a.kind === "trap") {
         if (active && dist < cs * 6) a.charge += dt;
@@ -182,12 +189,22 @@ export class LateEncounters implements BulletTargets {
           if (circleIsClear(this.world, a.x, ny, cs * 0.65)) a.y = ny;
         }
       }
-      if (active && a.cooldown <= 0) {
-        a.cooldown = a.kind === "turret" ? 0.8 : a.kind === "brute" ? 1.2 : 1.7;
+      if (a.kind === "brute") {
+        if (active && dist < cs * 3.5) {
+          a.windup += dt;
+          if (a.windup >= 0.45 && a.cooldown <= 0) {
+            a.windup = 0;
+            a.cooldown = 1.2;
+            const damage = CAMPAIGN[campaignTier(a.tier)].damage;
+            if (dist < cs * 3) this.hurt(target, damage * 1.5, a.x, a.y);
+          }
+        } else {
+          a.windup = Math.max(0, a.windup - dt * 2);
+        }
+      } else if (active && a.cooldown <= 0) {
+        a.cooldown = a.kind === "turret" ? 0.8 : 1.7;
         const damage = CAMPAIGN[campaignTier(a.tier)].damage;
-        if (a.kind === "brute") {
-          if (dist < cs * 3) this.hurt(target, damage * 1.5, a.x, a.y);
-        } else if (this.shots.length < 256) {
+        if (this.shots.length < 256) {
           this.shots.push({
             x: a.x,
             y: a.y,
@@ -292,11 +309,24 @@ export class LateEncounters implements BulletTargets {
             : "#e85a98";
       ctx.fillRect(x - r, y - r, r * 2, r * 2);
       if (a.kind === "soldier" || a.kind === "turret") {
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(a.aimAngle);
         ctx.fillStyle = "#ffddaa";
-        ctx.fillRect(x, y - r * 0.3, r * 1.8, r * 0.6);
+        ctx.fillRect(0, -r * 0.3, r * 1.8, r * 0.6);
+        ctx.restore();
+      } else if (a.kind === "brute") {
+        // Brute windup telegraph: flashes yellow-white when preparing melee strike
+        if (a.windup > 0) {
+          const t = a.windup / 0.45;
+          ctx.strokeStyle = t > 0.7 ? "#ffffff" : "#ffd84d";
+          ctx.lineWidth = Math.max(1, 2 * cam.zoom);
+          ctx.strokeRect(x - r - 2, y - r - 2, (r + 2) * 2, (r + 2) * 2);
+        }
       }
       if (a.kind === "trap" && a.charge > 0) {
         ctx.strokeStyle = "#ffb347";
+        ctx.lineWidth = Math.max(1.5, 2 * cam.zoom);
         ctx.beginPath();
         ctx.arc(x, y, (r * 6 * a.charge) / 0.9, 0, Math.PI * 2);
         ctx.stroke();
@@ -316,5 +346,41 @@ export class LateEncounters implements BulletTargets {
         4,
         4,
       );
+  }
+
+  /** Post-fog overlay rendering so critical warnings (mine warning rings, brute windup) remain readable. */
+  drawOverlay(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
+    for (const a of this.actors) {
+      if (!a.alive) continue;
+      const x = cam.worldToScreenX(a.x),
+        y = cam.worldToScreenY(a.y),
+        r = this.world.cellSize * cam.zoom;
+      if (
+        x < -r * 6 ||
+        y < -r * 6 ||
+        x > cam.viewW + r * 6 ||
+        y > cam.viewH + r * 6
+      )
+        continue;
+      if (a.kind === "trap" && a.charge > 0) {
+        const pulse = 0.8 + 0.2 * Math.sin(performance.now() * 0.02);
+        ctx.save();
+        ctx.strokeStyle = a.charge > 0.6 ? "#ff4040" : "#ffb347";
+        ctx.lineWidth = Math.max(2, 2.5 * cam.zoom);
+        ctx.beginPath();
+        ctx.arc(x, y, (r * 6 * a.charge) / 0.9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = a.charge > 0.6 ? `rgba(255, 64, 64, ${0.15 * pulse})` : `rgba(255, 179, 71, ${0.12 * pulse})`;
+        ctx.fill();
+        ctx.restore();
+      } else if (a.kind === "brute" && a.windup > 0) {
+        const t = a.windup / 0.45;
+        ctx.save();
+        ctx.strokeStyle = t > 0.7 ? "#ff3366" : "#ffcc00";
+        ctx.lineWidth = Math.max(1.5, 2 * cam.zoom);
+        ctx.strokeRect(x - r - 3, y - r - 3, (r + 3) * 2, (r + 3) * 2);
+        ctx.restore();
+      }
+    }
   }
 }

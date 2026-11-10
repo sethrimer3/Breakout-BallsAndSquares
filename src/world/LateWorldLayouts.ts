@@ -139,11 +139,13 @@ export function fortifyLateSpaces(w: PixelWorld, f: LabFrame): void {
       Math.floor(s / 7) >= 2 &&
       Math.floor(s / 7) <= 4;
     if (!facility && f.def.id !== 5) continue;
-    // A three-cell-deep bulkhead crosses each hall. It can be mined through or
-    // bypassed through the surrounding, equally durable material.
+    // Checkpoints across corridors: World 4 city facility uses 3-cell bulkheads (45,000 HP/cell).
+    // World 5 mothership uses deep 5-cell reinforced bulkheads (65,000 HP/cell, 325,000 HP total)
+    // requiring high-level Siege Drills or sustained squad breaches under pressure.
+    const bulkheadDepth = f.def.id === 5 ? 5 : 3;
     for (const edge of [-18, 18])
       for (let d = -3; d <= 3; d++)
-        for (let depth = 0; depth < 3; depth++)
+        for (let depth = 0; depth < bulkheadDepth; depth++)
           for (const [x, y] of [
             [cx + d, cy + edge + depth],
             [cx + edge + depth, cy + d],
