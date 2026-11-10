@@ -67,7 +67,7 @@ describe("Currencies on the Upgrade Matrix", () => {
 describe("Soldier upgrade trees", () => {
   it("keeps every arm in tier order, with the essence price rising each tier", () => {
     for (const def of SOLDIER_UPGRADE_DEFS) {
-      const expected = { 1: "gold", 2: "crystals", 3: "greenCrystals" }[def.tier];
+      const expected = { 1: "gold", 2: "crystals", 3: "greenCrystals", 4: "biomass" }[def.tier];
       expect(def.currency, def.id).toBe(expected);
       if (def.tier === 1) expect(def.parent, def.id).toBeNull();
       else expect(SOLDIER_UPGRADE_DEFS.find((d) => d.id === def.parent)?.tier, def.id).toBe(def.tier - 1);

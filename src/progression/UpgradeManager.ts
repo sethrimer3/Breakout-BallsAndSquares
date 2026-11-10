@@ -20,11 +20,12 @@ import {
 } from "./UpgradeDefinitions";
 
 /** Where each currency is banked in the save. */
-const WALLET: Record<Currency, keyof Pick<SaveData, "bank" | "crystals" | "greenCrystals" | "essence">> = {
+const WALLET: Record<Currency, keyof Pick<SaveData, "bank" | "crystals" | "greenCrystals" | "essence" | "biomass">> = {
   gold: "bank",
   crystals: "crystals",
   greenCrystals: "greenCrystals",
   essence: "essence",
+  biomass: "biomass",
 };
 
 export class UpgradeManager {

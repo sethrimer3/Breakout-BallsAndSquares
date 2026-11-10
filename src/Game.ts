@@ -1,3 +1,5 @@
+import { LateEncounters } from "./systems/LateEncounters";
+import { lateBlockReward } from "./world/campaignBalance";
 import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
 import { fireAmbienceMix } from "./audio/fireAmbience";
@@ -69,6 +71,7 @@ export class Game {
   readonly physics: PhysicsSystem;
   readonly combat: CombatSystem;
   readonly fixtures: RoomFixtures;
+  readonly late: LateEncounters;
   /** Flamethrower flames and burning rubble. */
   readonly fire: FireSystem;
   readonly growth: GrowthSystem;
@@ -176,7 +179,7 @@ export class Game {
       onShot: (s, dx, dy, mx, my) => this.onShot(s, dx, dy, mx, my),
       onImpact: (x, y, nx, ny, cx, cy, result, sub, ownerId) =>
         this.onImpact(x, y, nx, ny, cx, cy, result, sub, ownerId),
-      onExplosion: (x, y, rad) => this.onExplosion(x, y, rad),
+      onExplosion: (x, y, rad, damage) => this.onExplosion(x, y, rad, damage),
       onGrenadeThrow: (s, x, y, dx, dy) => this.onGrenadeThrow(s, x, y, dx, dy),
       onGrenadeStick: (x, y, nx, ny) => this.onGrenadeStick(x, y, nx, ny),
       onGrenadeBeep: (x, y, pct) => this.onGrenadeBeep(x, y, pct),
@@ -227,7 +230,19 @@ export class Game {
       }
       this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.1, 8, 0xffdf9a, 1);
     });
-    this.combat.targets = new CombinedTargets([this.creatures, this.fixtures]);
+    this.late = new LateEncounters(this.world, (a, kind, value) => {
+      const list = a.kind === "grove" ? this.labSave.gathered : this.labSave.cleared;
+      if (list.includes(a.id)) return;
+      list.push(a.id);
+      this.save.save();
+      this.loot.spawnOne(a.x, a.y, Math.max(90, this.stats.pickupLifetime), this.rng, kind, value);
+      if (a.kind === "grove") {
+        const reward = lateBlockReward(a.tier);
+        this.loot.spawnOne(a.x, a.y, 90, this.rng, reward.kind, reward.value * 10);
+      }
+      this.audio.playDestroy(a.x, a.y);
+    }, (soldier, damage, x, y) => this.hurtSoldier(soldier, damage, x, y), (x, y) => this.audio.playSpore(x, y));
+    this.combat.targets = new CombinedTargets([this.creatures, this.fixtures, this.late]);
     this.camera = new CameraSystem(this.world);
     this.audio.setCamera(this.camera);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
@@ -294,6 +309,10 @@ export class Game {
 
   get greenCrystals(): number {
     return this.save.data.greenCrystals;
+  }
+
+  get biomass(): number {
+    return this.save.data.biomass;
   }
 
   get essence(): number {
@@ -631,6 +650,7 @@ export class Game {
       this.save.data.crystals += r.crystals;
       this.save.data.greenCrystals += r.greenCrystals;
       this.save.data.essence += r.essence;
+      this.save.data.biomass += r.biomass;
       this.save.data.lifetimePixels += r.pixelsDestroyed;
       if (r.time > b.time) b.time = r.time;
       if (r.maxDepth > b.depth) b.depth = r.maxDepth;
@@ -1163,7 +1183,10 @@ export class Game {
       const zone = this.world.zoneAt(cx, cy);
       const lootKind = lootKindForZone(this.blockLootZone(zone));
       const ci = cy * this.world.width + cx;
-      if (this.world.mat[ci] === MAT.crystal) {
+      if (this.labDef.framework) {
+        const reward = lateBlockReward(this.world.fillTierAt(cx, cy));
+        this.loot.spawnDropsForBlock(ccx, ccy, 0.12, this.stats.pickupLifetime, this.rng, reward.kind, reward.value);
+      } else if (this.world.mat[ci] === MAT.crystal) {
         // A crystal vein: the lab's only source of crystals.
         this.world.mat[ci] = MAT.none;
         const veinZone = Math.max(1, Math.min(2, this.world.wall[ci] - 1));
@@ -1226,9 +1249,10 @@ export class Game {
     }
   }
 
-  private onExplosion(x: number, y: number, radiusWorld: number): void {
+  private onExplosion(x: number, y: number, radiusWorld: number, damage = 6 + this.stats.globalDamageBonus): void {
     this.creatures.explode(x, y, radiusWorld, 6 + this.stats.globalDamageBonus);
     this.fixtures.explode(x, y, radiusWorld);
+    this.late.explode(x, y, radiusWorld, damage);
     this.audio.playDestroy(x, y);
     this.shakeForExplosion(x, y, radiusWorld);
     const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
@@ -1490,6 +1514,8 @@ export class Game {
 
   /** Fresh doors, glass and dormant sentries for a newly generated facility. */
   private resetFacility(): void {
+    this.late.reset(this.labSave.cleared, this.labSave.gathered);
+    this.labProgress.attachThreats(this.late.actors);
     this.fixtures.reset();
     this.glass.reset();
     this.doors.reset();
@@ -1695,6 +1721,7 @@ export class Game {
     this.combat.updateGrenades(dt);
     this.combat.updateTurrets(dt);
     this.glass.update(dt);
+    this.late.update(dt, this.soldiers);
     this.creatures.update(dt, this.runStats.time, this.soldiers, this.growth);
     this.doors.update(dt);
     this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
@@ -1710,6 +1737,7 @@ export class Game {
       this.runStats.crystals += this.loot.collectedCrystals;
       this.runStats.greenCrystals += this.loot.collectedGreenCrystals;
       this.runStats.essence += this.loot.collectedEssence;
+      this.runStats.biomass += this.loot.collectedBiomass;
     }
     for (let i = this.flashes.length - 1; i >= 0; i--) {
       if ((this.flashes[i].life -= dt) <= 0) {

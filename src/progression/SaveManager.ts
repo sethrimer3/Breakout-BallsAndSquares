@@ -86,6 +86,7 @@ export interface SaveData {
   greenCrystals: number;
   /** Blight Essence, dropped by Blight Cores. */
   essence: number;
+  biomass: number;
   lifetimePixels: number;
   upgrades: Record<UpgradeId, number>;
   loadouts: SoldierLoadout[];
@@ -126,12 +127,14 @@ export interface LabWorldProgress {
   conquered: number[];
   /** Sector the squad last deployed into. */
   spawn: number;
+  cleared: string[];
+  gathered: string[];
 }
 
 /** Fresh progress for lab world `id`: only its starting sector is known and safe. */
 export function freshLabWorld(id: number): LabWorldProgress {
   const start = LAB_WORLDS[id].start;
-  return { discovered: [start], conquered: [start], spawn: start };
+  return { discovered: [start], conquered: [start], spawn: start, cleared: [], gathered: [] };
 }
 
 function defaultLab(): SaveData["lab"] {
@@ -153,6 +156,7 @@ export function defaultSaveData(): SaveData {
     crystals: 0,
     greenCrystals: 0,
     essence: 0,
+    biomass: 0,
     lifetimePixels: 0,
     upgrades,
     loadouts,
@@ -187,7 +191,8 @@ function sanitizeLabWorld(v: unknown, id: number): LabWorldProgress {
   const discovered = sectorList(w.discovered, id);
   const conquered = sectorList(w.conquered, id).filter((s) => discovered.includes(s));
   const spawn = typeof w.spawn === "number" && conquered.includes(w.spawn) ? w.spawn : LAB_WORLDS[id].start;
-  return { discovered, conquered, spawn };
+  const ids = (v: unknown): string[] => Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && x.length < 80))].slice(0,5000) : [];
+  return { discovered, conquered, spawn, cleared: ids(w.cleared), gathered: ids(w.gathered) };
 }
 
 function finiteNonNeg(v: unknown, fallback = 0, max = 1e12): number {
@@ -208,6 +213,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
   def.crystals = Math.floor(finiteNonNeg(obj.crystals, 0));
   def.greenCrystals = Math.floor(finiteNonNeg(obj.greenCrystals, 0));
   def.essence = Math.floor(finiteNonNeg(obj.essence, 0));
+  def.biomass = Math.floor(finiteNonNeg(obj.biomass, 0));
   def.lifetimePixels = Math.floor(finiteNonNeg(obj.lifetimePixels, 0));
 
   if (obj.upgrades && typeof obj.upgrades === "object") {
@@ -350,6 +356,7 @@ export interface SlotSummary {
   crystals: number;
   greenCrystals: number;
   essence: number;
+  biomass: number;
   lifetimePixels: number;
   upgradesCount: number;
   bestDepth: number;
@@ -494,6 +501,7 @@ export class SaveManager {
         crystals: 0,
         greenCrystals: 0,
         essence: 0,
+        biomass: 0,
         lifetimePixels: 0,
         upgradesCount: 0,
         bestDepth: 0,
@@ -517,6 +525,7 @@ export class SaveManager {
       crystals: data.crystals,
       greenCrystals: data.greenCrystals,
       essence: data.essence,
+      biomass: data.biomass,
       lifetimePixels: data.lifetimePixels,
       upgradesCount,
       bestDepth: data.bests?.depth ?? 0,

@@ -6,6 +6,7 @@ export class Bullet {
   dx = 0;
   dy = 0;
   speed = 0;
+  terrainDamageBonus = 0;
   damage = 1;
   life = 0;
   /** Number of additional solid blocks this projectile can penetrate before expiring. */

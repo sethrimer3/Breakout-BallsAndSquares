@@ -15,6 +15,7 @@ export class StickyGrenade {
   fuse = 0;
   maxFuse = 0;
   radiusCells = 2.8;
+  terrainDamageBonus = 0;
   damage = 8;
   shrapnelCount = 0;
   blightMultiplier = 2.0;

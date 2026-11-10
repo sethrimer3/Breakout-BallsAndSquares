@@ -7,6 +7,7 @@ export const LootKind = {
   Crystal: 1,
   GreenCrystal: 2,
   Essence: 3,
+  Biomass: 4,
 } as const;
 export type LootKind = (typeof LootKind)[keyof typeof LootKind];
 
@@ -32,12 +33,14 @@ export class LootSystem {
   readonly life: Float32Array;
   readonly maxLife: Float32Array;
   readonly kind: Uint8Array;
+  readonly value: Uint16Array;
 
   /** Per-step collection counters populated by `update()`. */
   collectedGold = 0;
   collectedCrystals = 0;
   collectedGreenCrystals = 0;
   collectedEssence = 0;
+  collectedBiomass = 0;
 
   constructor(cap = LOOT.poolSize) {
     this.cap = cap;
@@ -48,6 +51,7 @@ export class LootSystem {
     this.life = new Float32Array(cap);
     this.maxLife = new Float32Array(cap);
     this.kind = new Uint8Array(cap);
+    this.value = new Uint16Array(cap);
   }
 
   /**
@@ -62,12 +66,13 @@ export class LootSystem {
     lifetime: number,
     rng: Rng,
     kind: LootKind = LootKind.Gold,
+    value = 1,
   ): number {
     let guaranteed = Math.floor(dropChance);
     const rem = dropChance - guaranteed;
     if (rem > 0 && rng.next() < rem) guaranteed++;
     for (let i = 0; i < guaranteed; i++) {
-      this.spawnOne(x, y, lifetime, rng, kind);
+      this.spawnOne(x, y, lifetime, rng, kind, value);
     }
     return guaranteed;
   }
@@ -78,6 +83,7 @@ export class LootSystem {
     lifetime: number,
     rng: Rng,
     kind: LootKind = LootKind.Gold,
+    value = 1,
   ): void {
     let i: number;
     if (this.count < this.cap) {
@@ -94,6 +100,7 @@ export class LootSystem {
     this.life[i] = lifetime;
     this.maxLife[i] = lifetime;
     this.kind[i] = kind;
+    this.value[i] = Math.max(1,Math.min(65535,Math.floor(value)));
   }
 
   /**
@@ -113,6 +120,7 @@ export class LootSystem {
     this.collectedCrystals = 0;
     this.collectedGreenCrystals = 0;
     this.collectedEssence = 0;
+    this.collectedBiomass = 0;
     if (this.count === 0) return 0;
     const damp = Math.exp(-LOOT.drag * dt);
     const magR2 = magnetRange * magnetRange;
@@ -164,7 +172,7 @@ export class LootSystem {
 
       if (pickedUp) {
         collected++;
-        this.tally(k);
+        this.tally(k, this.value[i]);
         onCollect?.(px, py, k);
         this.removeAt(i);
         continue;
@@ -202,7 +210,7 @@ export class LootSystem {
 
       if (pickedUp) {
         collected++;
-        this.tally(k);
+        this.tally(k, this.value[i]);
         onCollect?.(px, py, k);
         this.removeAt(i);
         continue;
@@ -217,11 +225,12 @@ export class LootSystem {
     return collected;
   }
 
-  private tally(kind: LootKind): void {
-    if (kind === LootKind.Crystal) this.collectedCrystals++;
-    else if (kind === LootKind.GreenCrystal) this.collectedGreenCrystals++;
-    else if (kind === LootKind.Essence) this.collectedEssence++;
-    else this.collectedGold++;
+  private tally(kind: LootKind, value: number): void {
+    if (kind === LootKind.Crystal) this.collectedCrystals += value;
+    else if (kind === LootKind.GreenCrystal) this.collectedGreenCrystals += value;
+    else if (kind === LootKind.Essence) this.collectedEssence += value;
+    else if (kind === LootKind.Biomass) this.collectedBiomass += value;
+    else this.collectedGold += value;
   }
 
   private removeAt(i: number): void {
@@ -234,6 +243,7 @@ export class LootSystem {
     this.life[i] = this.life[j];
     this.maxLife[i] = this.maxLife[j];
     this.kind[i] = this.kind[j];
+    this.value[i] = this.value[j];
   }
 
   clear(): void {
@@ -242,5 +252,6 @@ export class LootSystem {
     this.collectedCrystals = 0;
     this.collectedGreenCrystals = 0;
     this.collectedEssence = 0;
+    this.collectedBiomass = 0;
   }
 }

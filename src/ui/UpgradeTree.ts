@@ -166,6 +166,7 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
 
 /** An icon for a currency, in tooltips and on the footer. */
 function currencyIcon(c: Currency, scale: 1 | 2 = 2): string {
+  if (c === "biomass") return `<span style="color:#7fe39a">◆</span>`;
   if (c === "essence") return essenceIcon(scale);
   if (c === "gold") return sprite("gold", { color: UI_COLORS.gold, scale });
   return sprite("crystal", { color: c === "crystals" ? UI_COLORS.crystal : UI_COLORS.greenCrystal, scale });
@@ -336,6 +337,7 @@ export class UpgradeTree {
             ${goldIcon()} <span class="bank-num">0</span>
             <span class="crys-wrap wallet-item hidden">${sprite("crystal", { color: UI_COLORS.crystal })} <span class="crys-num">0</span></span>
             <span class="green-wrap wallet-item hidden">${sprite("crystal", { color: UI_COLORS.greenCrystal })} <span class="green-num">0</span></span>
+            <span class="biomass-wrap wallet-item" style="color:#7fe39a">◆ <span class="biomass-num">0</span></span>
             <span class="essence-wrap wallet-item hidden">${essenceIcon()} <span class="essence-num">0</span></span>
           </div>
           <div class="tree-life">LIFETIME EXCAVATED: <span class="life-num">0</span> PX</div>
@@ -1291,6 +1293,7 @@ export class UpgradeTree {
     this.bankValEl.textContent = this.game.bank.toLocaleString();
     this.crysValEl.textContent = this.game.crystals.toLocaleString();
     this.greenValEl.textContent = this.game.greenCrystals.toLocaleString();
+    (this.root.querySelector(".biomass-num") as HTMLElement).textContent = this.game.biomass.toLocaleString();
     this.essenceValEl.textContent = this.game.essence.toLocaleString();
     // A currency shows once it's owned, reachable, or priced on this tree.
     const defs = this.activeDefs();

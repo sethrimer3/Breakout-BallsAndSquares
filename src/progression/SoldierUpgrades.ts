@@ -4,12 +4,15 @@ import type { TreeNodeDef } from "./UpgradeDefinitions";
 /**
  * Each soldier's own upgrade tree. Four arms grow out of the soldier: a Tier 1
  * node paid in gold, a Tier 2 node paid in orange crystals, and a Tier 3 node
- * paid in green crystals, the strongest of the three. Advanced nodes also cost
+ * paid in green crystals. Tier 4 specializations use outdoor biomass. Advanced nodes also cost
  * Blight Essence, more at each tier and each level. Levels live on the
  * soldier's loadout slot, so two soldiers can be built differently.
  */
 
 export type SoldierUpgradeId =
+  | "s_siege"
+  | "s_predator"
+  | "s_bastion"
   | "s_ballistics"
   | "s_marksman"
   | "s_rate"
@@ -25,7 +28,7 @@ export type SoldierUpgradeId =
   | "s_deep_harvest"
   | "s_aegis";
 
-export type SoldierTier = 1 | 2 | 3;
+export type SoldierTier = 1 | 2 | 3 | 4;
 
 /** What one soldier's tree adds on top of the squad's shared stats. */
 export interface SoldierMods {
@@ -33,6 +36,7 @@ export interface SoldierMods {
   bulletSpeedMult: number;
   fireRateMult: number;
   damageBonus: number;
+  terrainDamageBonus: number;
   healthBonus: number;
   /** Extra blocks pierced by bullets and slashes (not explosives). */
   pierce: number;
@@ -53,6 +57,7 @@ export function baseSoldierMods(): SoldierMods {
     bulletSpeedMult: 1,
     fireRateMult: 1,
     damageBonus: 0,
+    terrainDamageBonus: 0,
     healthBonus: 0,
     pierce: 0,
     blightMult: 1,
@@ -69,9 +74,34 @@ export interface SoldierUpgradeDef extends TreeNodeDef<SoldierUpgradeId> {
 }
 
 const TIERS = {
-  1: { currency: "gold", color: "#ffd84d", baseCost: 150, costMultiplier: 1.6, essenceCost: 2 },
-  2: { currency: "crystals", color: "#ff8c2e", baseCost: 40, costMultiplier: 1.6, essenceCost: 6 },
-  3: { currency: "greenCrystals", color: "#52f296", baseCost: 30, costMultiplier: 1.7, essenceCost: 15 },
+  4: {
+    currency: "biomass",
+    color: "#80db78",
+    baseCost: 50,
+    costMultiplier: 1.4,
+    essenceCost: 1000,
+  },
+  1: {
+    currency: "gold",
+    color: "#ffd84d",
+    baseCost: 150,
+    costMultiplier: 1.6,
+    essenceCost: 2,
+  },
+  2: {
+    currency: "crystals",
+    color: "#ff8c2e",
+    baseCost: 40,
+    costMultiplier: 1.6,
+    essenceCost: 6,
+  },
+  3: {
+    currency: "greenCrystals",
+    color: "#52f296",
+    baseCost: 30,
+    costMultiplier: 1.7,
+    essenceCost: 15,
+  },
 } as const;
 
 interface NodeSpec {
@@ -122,111 +152,339 @@ const health = (v: number): string => `+${v} HP`;
 
 export const SOLDIER_UPGRADE_DEFS: readonly SoldierUpgradeDef[] = [
   node({
-    id: "s_ballistics", tier: 1, col: -1, row: -1, parent: null, maxLevel: 8,
-    baseCost: 15, essenceCost: 0,
-    name: "Ballistics", shortDesc: "+8% projectile velocity for this soldier only", icon: "bulletFast",
-    valueAt: (l) => 100 + 8 * l, formatValue: percent, delta: "+8%",
-    apply: (m, l) => { m.bulletSpeedMult = 1 + 0.08 * l; },
+    id: "s_siege",
+    tier: 4,
+    col: 3,
+    row: -1,
+    parent: "s_twin_fire",
+    maxLevel: 6,
+    baseCost: 50,
+    costMultiplier: 1.25,
+    essenceCost: 1500,
+    name: "Siege Drill",
+    shortDesc:
+      "+2,000 terrain damage per level for this soldier; does not boost damage against enemies.",
+    icon: "impact",
+    valueAt: (l) => 2000 * l,
+    formatValue: (v) => `+${v} TERRAIN`,
+    delta: "+2,000 TERRAIN",
+    apply: (m, l) => {
+      m.terrainDamageBonus = 2000 * l;
+    },
+  }),
+  node({
+    id: "s_predator",
+    tier: 4,
+    col: 3,
+    row: 1,
+    parent: "s_overdrive",
+    maxLevel: 5,
+    baseCost: 40,
+    costMultiplier: 1.3,
+    essenceCost: 1000,
+    name: "Blight Executioner",
+    shortDesc: "+80 damage to this soldier's weapons per level.",
+    icon: "pierce",
+    valueAt: (l) => 80 * l,
+    formatValue: (v) => `+${v} DMG`,
+    delta: "+80 DMG",
+    apply: (m, l) => {
+      m.damageBonus += 80 * l;
+    },
+  }),
+  node({
+    id: "s_bastion",
+    tier: 4,
+    col: -3,
+    row: 1,
+    parent: "s_aegis",
+    maxLevel: 5,
+    baseCost: 40,
+    costMultiplier: 1.25,
+    essenceCost: 1000,
+    name: "Bastion Shell",
+    shortDesc:
+      "+100 HP per level for this soldier against hostile fire and traps.",
+    icon: "soldierPlus",
+    valueAt: (l) => 100 * l,
+    formatValue: (v) => `+${v} HP`,
+    delta: "+100 HP",
+    apply: (m, l) => {
+      m.healthBonus += 100 * l;
+    },
+  }),
+  node({
+    id: "s_ballistics",
+    tier: 1,
+    col: -1,
+    row: -1,
+    parent: null,
+    maxLevel: 8,
+    baseCost: 15,
+    essenceCost: 0,
+    name: "Ballistics",
+    shortDesc: "+8% projectile velocity for this soldier only",
+    icon: "bulletFast",
+    valueAt: (l) => 100 + 8 * l,
+    formatValue: percent,
+    delta: "+8%",
+    apply: (m, l) => {
+      m.bulletSpeedMult = 1 + 0.08 * l;
+    },
   }),
   // Tier 1: gold.
   node({
-    id: "s_marksman", tier: 1, col: 0, row: -1, parent: null, maxLevel: 5,
-    baseCost: 25, essenceCost: 0,
-    name: "Marksman", shortDesc: "+1 damage on this soldier's shots", icon: "impact",
-    valueAt: (l) => l, formatValue: (v) => `+${v} DMG`, delta: "+1 DMG",
-    apply: (m, l) => { m.damageBonus += l; },
+    id: "s_marksman",
+    tier: 1,
+    col: 0,
+    row: -1,
+    parent: null,
+    maxLevel: 5,
+    baseCost: 25,
+    essenceCost: 0,
+    name: "Marksman",
+    shortDesc: "+1 damage on this soldier's shots",
+    icon: "impact",
+    valueAt: (l) => l,
+    formatValue: (v) => `+${v} DMG`,
+    delta: "+1 DMG",
+    apply: (m, l) => {
+      m.damageBonus += l;
+    },
   }),
   node({
-    id: "s_rate", tier: 1, col: 1, row: 0, parent: null, maxLevel: 5,
-    baseCost: 15, essenceCost: 0,
-    name: "Trigger Discipline", shortDesc: "+6% fire rate for this soldier", icon: "fireRate",
-    valueAt: (l) => 100 + 6 * l, formatValue: percent, delta: "+6%",
-    apply: (m, l) => { m.fireRateMult *= 1 + 0.06 * l; },
+    id: "s_rate",
+    tier: 1,
+    col: 1,
+    row: 0,
+    parent: null,
+    maxLevel: 5,
+    baseCost: 15,
+    essenceCost: 0,
+    name: "Trigger Discipline",
+    shortDesc: "+6% fire rate for this soldier",
+    icon: "fireRate",
+    valueAt: (l) => 100 + 6 * l,
+    formatValue: percent,
+    delta: "+6%",
+    apply: (m, l) => {
+      m.fireRateMult *= 1 + 0.06 * l;
+    },
   }),
   node({
-    id: "s_stride", tier: 1, col: -1, row: 0, parent: null, maxLevel: 5,
-    baseCost: 10, essenceCost: 0,
-    name: "Long Stride", shortDesc: "+6% movement speed for this soldier", icon: "soldierDash",
-    valueAt: (l) => 100 + 6 * l, formatValue: percent, delta: "+6%",
-    apply: (m, l) => { m.speedMult *= 1 + 0.06 * l; },
+    id: "s_stride",
+    tier: 1,
+    col: -1,
+    row: 0,
+    parent: null,
+    maxLevel: 5,
+    baseCost: 10,
+    essenceCost: 0,
+    name: "Long Stride",
+    shortDesc: "+6% movement speed for this soldier",
+    icon: "soldierDash",
+    valueAt: (l) => 100 + 6 * l,
+    formatValue: percent,
+    delta: "+6%",
+    apply: (m, l) => {
+      m.speedMult *= 1 + 0.06 * l;
+    },
   }),
   node({
-    id: "s_vitality", tier: 1, col: 0, row: 1, parent: null, maxLevel: 5,
-    baseCost: 20, essenceCost: 0,
-    name: "Hardened Shell", shortDesc: "+10 HP for this soldier, spent escaping Blight", icon: "soldierPlus",
-    valueAt: (l) => 10 * l, formatValue: health, delta: "+10 HP",
-    apply: (m, l) => { m.healthBonus += 10 * l; },
+    id: "s_vitality",
+    tier: 1,
+    col: 0,
+    row: 1,
+    parent: null,
+    maxLevel: 5,
+    baseCost: 20,
+    essenceCost: 0,
+    name: "Hardened Shell",
+    shortDesc: "+10 HP for this soldier, spent escaping Blight",
+    icon: "soldierPlus",
+    valueAt: (l) => 10 * l,
+    formatValue: health,
+    delta: "+10 HP",
+    apply: (m, l) => {
+      m.healthBonus += 10 * l;
+    },
   }),
   node({
-    id: "s_dynamo", tier: 1, col: 1, row: 1, parent: null, maxLevel: 19,
-    baseCost: 50, costMultiplier: 1.15, essenceCost: 1,
-    name: "Kinetic Dynamo", shortDesc: "+0.1 secondary ability energy per block destroyed", icon: "crystal",
+    id: "s_dynamo",
+    tier: 1,
+    col: 1,
+    row: 1,
+    parent: null,
+    maxLevel: 19,
+    baseCost: 50,
+    costMultiplier: 1.15,
+    essenceCost: 1,
+    name: "Kinetic Dynamo",
+    shortDesc: "+0.1 secondary ability energy per block destroyed",
+    icon: "crystal",
     valueAt: (l) => Math.round((0.1 + 0.1 * l) * 10) / 10,
-    formatValue: (v) => `${v.toFixed(1)} / BLK`, delta: "+0.1 / BLK",
-    apply: (m, l) => { m.energyPerBlock = Math.round((0.1 + 0.1 * l) * 10) / 10; },
+    formatValue: (v) => `${v.toFixed(1)} / BLK`,
+    delta: "+0.1 / BLK",
+    apply: (m, l) => {
+      m.energyPerBlock = Math.round((0.1 + 0.1 * l) * 10) / 10;
+    },
   }),
 
   // Tier 2: orange crystals.
   node({
-    id: "s_penetrator", tier: 2, col: 1, row: -1, parent: "s_marksman", maxLevel: 3,
-    name: "Penetrator Drill", shortDesc: "+1 block pierce on this soldier's bullets and slashes", icon: "pierce",
-    valueAt: (l) => l, formatValue: (v) => `+${v} PIERCE`, delta: "+1 PIERCE",
-    apply: (m, l) => { m.pierce += l; },
+    id: "s_penetrator",
+    tier: 2,
+    col: 1,
+    row: -1,
+    parent: "s_marksman",
+    maxLevel: 3,
+    name: "Penetrator Drill",
+    shortDesc: "+1 block pierce on this soldier's bullets and slashes",
+    icon: "pierce",
+    valueAt: (l) => l,
+    formatValue: (v) => `+${v} PIERCE`,
+    delta: "+1 PIERCE",
+    apply: (m, l) => {
+      m.pierce += l;
+    },
   }),
   node({
-    id: "s_blight_hunter", tier: 2, col: 2, row: 0, parent: "s_rate", maxLevel: 4,
-    name: "Blight Hunter", shortDesc: "+25% damage against Blight blocks", icon: "blightCrack",
-    valueAt: (l) => 100 + 25 * l, formatValue: percent, delta: "+25%",
-    apply: (m, l) => { m.blightMult *= 1 + 0.25 * l; },
+    id: "s_blight_hunter",
+    tier: 2,
+    col: 2,
+    row: 0,
+    parent: "s_rate",
+    maxLevel: 4,
+    name: "Blight Hunter",
+    shortDesc: "+25% damage against Blight blocks",
+    icon: "blightCrack",
+    valueAt: (l) => 100 + 25 * l,
+    formatValue: percent,
+    delta: "+25%",
+    apply: (m, l) => {
+      m.blightMult *= 1 + 0.25 * l;
+    },
   }),
   node({
-    id: "s_scavenger", tier: 2, col: -2, row: 0, parent: "s_stride", maxLevel: 4,
-    name: "Scavenger", shortDesc: "+30% magnet range around this soldier", icon: "magnet",
-    valueAt: (l) => 100 + 30 * l, formatValue: percent, delta: "+30%",
-    apply: (m, l) => { m.magnetMult *= 1 + 0.3 * l; },
+    id: "s_scavenger",
+    tier: 2,
+    col: -2,
+    row: 0,
+    parent: "s_stride",
+    maxLevel: 4,
+    name: "Scavenger",
+    shortDesc: "+30% magnet range around this soldier",
+    icon: "magnet",
+    valueAt: (l) => 100 + 30 * l,
+    formatValue: percent,
+    delta: "+30%",
+    apply: (m, l) => {
+      m.magnetMult *= 1 + 0.3 * l;
+    },
   }),
   node({
-    id: "s_bulwark", tier: 2, col: -1, row: 1, parent: "s_vitality", maxLevel: 4,
-    name: "Bulwark Plating", shortDesc: "+25 HP for this soldier", icon: "blightShield",
-    valueAt: (l) => 25 * l, formatValue: health, delta: "+25 HP",
-    apply: (m, l) => { m.healthBonus += 25 * l; },
+    id: "s_bulwark",
+    tier: 2,
+    col: -1,
+    row: 1,
+    parent: "s_vitality",
+    maxLevel: 4,
+    name: "Bulwark Plating",
+    shortDesc: "+25 HP for this soldier",
+    icon: "blightShield",
+    valueAt: (l) => 25 * l,
+    formatValue: health,
+    delta: "+25 HP",
+    apply: (m, l) => {
+      m.healthBonus += 25 * l;
+    },
   }),
 
   // Tier 3: green crystals.
   node({
-    id: "s_twin_fire", tier: 3, col: 2, row: -1, parent: "s_penetrator", maxLevel: 3,
-    name: "Twin Fire", shortDesc: "+12% chance each shot fires a second time", icon: "fan",
-    valueAt: (l) => 12 * l, formatValue: percent, delta: "+12%",
-    apply: (m, l) => { m.twinChance += 0.12 * l; },
+    id: "s_twin_fire",
+    tier: 3,
+    col: 2,
+    row: -1,
+    parent: "s_penetrator",
+    maxLevel: 3,
+    name: "Twin Fire",
+    shortDesc: "+12% chance each shot fires a second time",
+    icon: "fan",
+    valueAt: (l) => 12 * l,
+    formatValue: percent,
+    delta: "+12%",
+    apply: (m, l) => {
+      m.twinChance += 0.12 * l;
+    },
   }),
   node({
-    id: "s_overdrive", tier: 3, col: 2, row: 1, parent: "s_blight_hunter", maxLevel: 3,
-    name: "Overdrive", shortDesc: "+20% fire rate on top of everything else", icon: "cluster",
-    valueAt: (l) => 100 + 20 * l, formatValue: percent, delta: "+20%",
-    apply: (m, l) => { m.fireRateMult *= 1 + 0.2 * l; },
+    id: "s_overdrive",
+    tier: 3,
+    col: 2,
+    row: 1,
+    parent: "s_blight_hunter",
+    maxLevel: 3,
+    name: "Overdrive",
+    shortDesc: "+20% fire rate on top of everything else",
+    icon: "cluster",
+    valueAt: (l) => 100 + 20 * l,
+    formatValue: percent,
+    delta: "+20%",
+    apply: (m, l) => {
+      m.fireRateMult *= 1 + 0.2 * l;
+    },
   }),
   node({
-    id: "s_deep_harvest", tier: 3, col: -2, row: -1, parent: "s_scavenger", maxLevel: 3,
-    name: "Deep Harvest", shortDesc: "+25% drop chance on blocks this soldier destroys", icon: "goldStack",
-    valueAt: (l) => 100 + 25 * l, formatValue: percent, delta: "+25%",
-    apply: (m, l) => { m.dropMult *= 1 + 0.25 * l; },
+    id: "s_deep_harvest",
+    tier: 3,
+    col: -2,
+    row: -1,
+    parent: "s_scavenger",
+    maxLevel: 3,
+    name: "Deep Harvest",
+    shortDesc: "+25% drop chance on blocks this soldier destroys",
+    icon: "goldStack",
+    valueAt: (l) => 100 + 25 * l,
+    formatValue: percent,
+    delta: "+25%",
+    apply: (m, l) => {
+      m.dropMult *= 1 + 0.25 * l;
+    },
   }),
   node({
-    id: "s_aegis", tier: 3, col: -2, row: 1, parent: "s_bulwark", maxLevel: 3,
-    name: "Aegis Protocol", shortDesc: "+60 HP for this soldier", icon: "stabilizer",
-    valueAt: (l) => 60 * l, formatValue: health, delta: "+60 HP",
-    apply: (m, l) => { m.healthBonus += 60 * l; },
+    id: "s_aegis",
+    tier: 3,
+    col: -2,
+    row: 1,
+    parent: "s_bulwark",
+    maxLevel: 3,
+    name: "Aegis Protocol",
+    shortDesc: "+60 HP for this soldier",
+    icon: "stabilizer",
+    valueAt: (l) => 60 * l,
+    formatValue: health,
+    delta: "+60 HP",
+    apply: (m, l) => {
+      m.healthBonus += 60 * l;
+    },
   }),
 ];
 
-export const SOLDIER_UPGRADE_BY_ID: Record<SoldierUpgradeId, SoldierUpgradeDef> = Object.fromEntries(
-  SOLDIER_UPGRADE_DEFS.map((d) => [d.id, d]),
-) as Record<SoldierUpgradeId, SoldierUpgradeDef>;
+export const SOLDIER_UPGRADE_BY_ID: Record<
+  SoldierUpgradeId,
+  SoldierUpgradeDef
+> = Object.fromEntries(SOLDIER_UPGRADE_DEFS.map((d) => [d.id, d])) as Record<
+  SoldierUpgradeId,
+  SoldierUpgradeDef
+>;
 
 /** A soldier's levels: only the nodes they have bought. */
 export type SoldierUpgradeLevels = Partial<Record<SoldierUpgradeId, number>>;
 
-export function soldierModsFor(levels: SoldierUpgradeLevels | undefined): SoldierMods {
+export function soldierModsFor(
+  levels: SoldierUpgradeLevels | undefined,
+): SoldierMods {
   const mods = baseSoldierMods();
   if (!levels) return mods;
   for (const def of SOLDIER_UPGRADE_DEFS) {

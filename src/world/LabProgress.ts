@@ -42,6 +42,13 @@ export class LabProgress {
     }
   }
 
+  attachThreats(actors: readonly {sector:number;alive:boolean;kind:string}[]): void {
+    for(const a of actors) { if(a.kind === "grove") continue;
+      const list=this.generators.get(a.sector) ?? []; list.push(a); this.generators.set(a.sector,list);
+      if(a.alive) this.conquered.delete(a.sector);
+    }
+  }
+
   /** Living generators left in sector `s` this run. */
   generatorsLeft(s: number): number {
     let n = 0;

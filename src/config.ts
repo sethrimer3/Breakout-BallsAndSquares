@@ -110,6 +110,11 @@ export const TIER_HEALTH: readonly (readonly [number, number])[] = [
   [800, 2400],
   [3000, 9000],
   [12000, 30000],
+  [800, 2400],
+  [3000, 9000],
+  [12000, 30000],
+  [24000, 45000],
+  [50000, 65000],
 ];
 
 /** Highest terrain tier with stats. */

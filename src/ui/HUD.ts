@@ -56,6 +56,7 @@ export class HUD {
       ["currency", "GOLD", "gold", UI_COLORS.gold],
       ["crystals", "CRYS", "crystal", UI_COLORS.crystal],
       ["greenCrystals", "GREEN", "crystal", UI_COLORS.greenCrystal],
+      ["biomass", "BIOMASS", "crystal", "#7fe39a"],
       ["essence", "ESSENCE", "gold", UI_COLORS.essence],
       ["bank", "BANK", "gold", UI_COLORS.gold],
       ["depth", "DEPTH", "depth", UI_COLORS.neutral],
@@ -197,7 +198,7 @@ export class HUD {
         <div class="help-touch"><b>TWO-FINGER PINCH/DRAG</b> Pan camera around &amp; zoom in/out</div>
         <div class="help-touch"><b>${sprite("follow", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Follow soldier #1, tap again to cycle in order</div>
         <div class="help-touch"><b>${sprite("pause", { color: UI_COLORS.white, scale: 1 })} BUTTON</b> Pause, restart, upgrades &amp; settings</div>
-        <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}, Zone 2 orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}, Zone 3 green crystals ${sprite("crystal", { color: UI_COLORS.greenCrystal, scale: 1 })}, and Blight Cores leave Blight Essence ${essenceIcon(1)}. Soldiers must touch them to collect!</div>
+        <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}, Zone 2 orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}, Zone 3 green crystals ${sprite("crystal", { color: UI_COLORS.greenCrystal, scale: 1 })}, and Blight Cores leave Blight Essence ${essenceIcon(1)}. Forest groves provide outdoor-only biomass ◆. Later terrain drops larger resource stacks; enemy essence rewards are fixed. Soldiers must touch pickups to collect!</div>
         <div class="help-keys"><b>1 / 2</b> Toggle Line / Triangle formation</div>
         <div class="help-keys"><b>F / TAB</b> Follow / Cycle soldiers in order (#1, #2, ...)</div>
         <div class="help-keys"><b>U</b> Open Upgrade Matrix</div>
@@ -245,6 +246,8 @@ export class HUD {
     this.boxes.greenCrystals.classList.toggle("hidden", !showGreen);
     this.fields.greenCrystals.textContent = `${s.greenCrystals} (${game.greenCrystals})`;
     this.boxes.essence.classList.toggle("hidden", game.essence + s.essence <= 0);
+    this.boxes.biomass.classList.toggle("hidden", game.biomass + s.biomass <= 0);
+    this.fields.biomass.textContent = `${s.biomass} (${game.biomass})`;
     this.fields.essence.textContent = `${s.essence} (${game.essence})`;
 
     this.fields.bank.textContent = game.bank.toLocaleString();

@@ -17,7 +17,7 @@ class Storage implements StorageLike {
 function setup() {
   const storage = new Storage();
   const save = new SaveManager(storage);
-  save.data.bank = save.data.crystals = save.data.greenCrystals = save.data.essence = 1e6;
+  save.data.biomass = save.data.bank = save.data.crystals = save.data.greenCrystals = save.data.essence = 1e6;
   save.data.lifetimePixels = 1e6;
   return { storage, save, upg: new UpgradeManager(save) };
 }
@@ -40,7 +40,7 @@ describe("Core progression", () => {
     }
     expect(opened).toEqual(["unlock_resources", "unlock_primary", "unlock_blight", "unlock_formations", "unlock_secondary", "unlock_facility"]);
     expect(upg.canBuy("fire_rate")).toBe(true);
-    expect(upg.getSoldierStats().keycardTier).toBe(3);
+    expect(upg.getSoldierStats().keycardTier).toBe(9);
   });
 
   it("fills three rows in alternating directions with only orthogonally adjacent steps", () => {

@@ -6,7 +6,7 @@ import type { LabCorridorSegment, LabLayout, LabRoom } from "./WorldGenerator";
  * The hand-made research lab: fixed blueprints shared by every run, one per
  * world (zone). Zone 1 is the lab itself; a huge tier 3 gate on its east side
  * leads into zone 2, where the Blight has begun turning the lab into something
- * alien; onward lie the forest, fallen city and mothership framework worlds.
+ * alien; onward lie the forest, fallen city and mothership campaign worlds.
  *
  * Each world is a grid of sectors, named like a chess board: columns A.. left
  * to right, rows 1.. top to bottom. Each sector is drawn below as SECTOR_CHARS
@@ -181,7 +181,7 @@ export const ZONE2_BLUEPRINT: readonly string[] = [
 ];
 
 /**
- * World 3: empty 13 × 13 forest framework, entered from A7 on the west.
+ * World 3: 13 × 13 forest clearing lattice, entered from A7 on the west.
  */
 export const ZONE3_BLUEPRINT: readonly string[] = frameworkBlueprint(13, 13);
 
@@ -235,7 +235,7 @@ export interface LabWorldDef {
   sectors: number;
   /** Rows when the world is rectangular; otherwise equal to sectors (columns). */
   rows?: number;
-  /** Empty framework worlds omit enemies, machinery, loot veins and Blight growth. */
+  /** Later campaign layout family: omits lab machinery and cellular Blight growth. */
   framework?: boolean;
   environment?: "forest" | "city" | "mothership";
   /** Reserved region in sector coordinates, inclusive. */
@@ -312,7 +312,7 @@ export const LAB_WORLDS: Readonly<Record<number, LabWorldDef>> = {
     framework: true, environment: "city", seed: 0x4c1710,
     gates: [{ side: "north", row: 0, col: 3, tier: 9, to: 0 }], upgrades: [],
     facility: { name: "AEROSPACE FACILITY", col0: 2, row0: 2, col1: 4, row1: 4,
-      security: "Extreme entry difficulty: Blight-hacked turrets and security systems (future encounters)." },
+      security: "Extreme entry difficulty: Blight-hacked turrets and security systems with active crossfire and mines." },
     teleporter: { sector: 24, to: 5 },
   },
   5: {

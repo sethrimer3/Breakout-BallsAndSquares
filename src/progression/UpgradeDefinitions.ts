@@ -34,6 +34,7 @@ export type UpgradeBranch =
   | "soldier";
 
 export type UpgradeId =
+  | "keycard_t6" | "keycard_t9"
   | "connected_air_mapping"
   | "unlock_map" | "unlock_resources" | "unlock_primary" | "unlock_blight"
   | "unlock_formations" | "unlock_secondary" | "unlock_facility"
@@ -135,8 +136,8 @@ export type UpgradeId =
   // Blight research: dormant colonies decay
   | "necrosis_protocol";
 
-/** The four things upgrades are bought with. */
-export type Currency = "gold" | "crystals" | "greenCrystals" | "essence";
+/** Resources used to buy upgrades. */
+export type Currency = "gold" | "crystals" | "greenCrystals" | "essence" | "biomass";
 
 export interface Price {
   currency: Currency;
@@ -1905,10 +1906,12 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
 export const CORE_PATH: readonly UpgradeId[] = [
   "keycard_t1", "unlock_map", "connected_air_mapping", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
   "core_placeholder_3", "unlock_blight", "keycard_t2", "core_placeholder_4", "unlock_formations", "core_placeholder_5", "unlock_secondary",
-  "core_placeholder_6", "unlock_facility", "auto_ability", "core_placeholder_7", "keycard_t3", "core_placeholder_8", "core_placeholder_9",
+  "core_placeholder_6", "unlock_facility", "auto_ability", "core_placeholder_7", "keycard_t3", "keycard_t6", "keycard_t9",
 ];
 
 const MILESTONES: Partial<Record<UpgradeId, [string, string, number]>> = {
+  keycard_t6: ["Tier 6 Keycard", "Opens the gate from the Blighted Wards to the forest.", 150],
+  keycard_t9: ["Tier 9 Keycard", "Opens the dark forest exit into the Fallen City.", 250],
   connected_air_mapping: ["Airspace Mapping", "Smoothly reveals air connected to living soldiers, around corners and through opened doors or breached walls.", 30],
   unlock_map: ["Lab Map", "Choose a conquered sector to deploy into. Before this, runs begin at A1.", 15],
   unlock_resources: ["Resource Extraction", "Unlock the Resources upgrade tab.", 25],
@@ -1942,6 +1945,10 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     };
     return { ...base, branch: "core", grid: { col: col - 3, row: row - 1 },
       parent: index > 0 ? CORE_PATH[index - 1] : null, placeholder,
+      ...(id === "keycard_t6" ? { currency: "greenCrystals" as const, essenceCost: 100, icon: "keycard" as const,
+        apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,6); } } : {}),
+      ...(id === "keycard_t9" ? { currency: "biomass" as const, essenceCost: 2000, icon: "keycard" as const,
+        apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,9); } } : {}),
       ...(id === "keycard_t1" ? { baseCost: 8 } : {}),
       ...(id === "connected_air_mapping" ? { apply: (s: SoldierStats, level: number) => { s.connectedAirMapping = level > 0; } } : {}),
     };

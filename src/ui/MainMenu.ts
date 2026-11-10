@@ -59,6 +59,7 @@ export class MainMenu {
         <div>BANK ${sprite("gold", { color: UI_COLORS.gold })} <b class="m-bank">0</b></div>
         <div>CRYSTALS ${sprite("crystal", { color: UI_COLORS.crystal })} <b class="m-crystals">0</b></div>
         <div>GREEN ${sprite("crystal", { color: UI_COLORS.greenCrystal })} <b class="m-green">0</b></div>
+        <div>BIOMASS ◆ <b class="m-biomass">0</b></div>
         <div>ESSENCE ${essenceIcon()} <b class="m-essence">0</b></div>
         <div>LIFETIME ${sprite("pixelBits", { color: UI_COLORS.soldier })} <b class="m-life">0</b></div>
       </div>
@@ -278,6 +279,7 @@ export class MainMenu {
     if (this.crystalsEl) {
       this.crystalsEl.textContent = this.game.crystals.toLocaleString();
       (this.mainPanel.querySelector(".m-green") as HTMLElement).textContent = this.game.greenCrystals.toLocaleString();
+      (this.mainPanel.querySelector(".m-biomass") as HTMLElement).textContent = this.game.biomass.toLocaleString();
       (this.mainPanel.querySelector(".m-essence") as HTMLElement).textContent = this.game.essence.toLocaleString();
     }
   }

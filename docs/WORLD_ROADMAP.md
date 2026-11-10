@@ -1,8 +1,8 @@
-# World 3–5 framework and design brief
+# World 3–5 encounter layouts and design brief
 
 ## Scope of this change
 
-Correct footprints, named zones, connected empty rooms, gateway orientation, a usable city teleporter, save validation and map labeling are implemented. World 3–5 are deliberately framework worlds: no enemies, Blight growth, machines, loot veins or encounter balancing are populated yet. Their 500-HP filler barriers are scaffolding, not tier 7–11 balance.
+Worlds 3–5 now have functional encounter spaces and an initial economy pass. Forest clearings and trails lead through peaceful gathering, rifle patrols and heavy melee enemies. City street crossfire and proximity mines defend armored facility checkpoints. Ship halls have 65,000-HP bulkheads. Shapes and colors are functional placeholders for the later art pass. See [CAMPAIGN_PACING.md](CAMPAIGN_PACING.md) for measurable budgets and tuning targets.
 
 World and zone are different concepts: worlds 1/2 each contain three terrain zones; worlds 3/4/5 contain zones 7–9/10/11 respectively. The HUD displays both.
 
@@ -14,14 +14,14 @@ World and zone are different concepts: worlds 1/2 each contain three terrain zon
 - **Zone/tier 9:** a dark Blight forest. Overhead tree canopy should cast shadows and let distinct beams of sunlight reach the ground.
 - Atmosphere and environment must blend smoothly between the three zones, rather than changing at a hard seam. The current atmosphere module blends daylight/ambient colors and stores sunlight, canopy, beam and haze parameters for the future biome renderer.
 - Current band boundaries are distance 5 and 9 sectors from A7; atmosphere blends span 1.5 sectors around those boundaries. These are tunable layout values, not final pacing.
-- Exit **south from L13**, one column left of the east edge (M13). This leads to World 4. The framework exit is already open; final late-game gating remains to be designed.
+- Exit **south from L13**, one column left of the east edge (M13). This leads to World 4. The exit requires the Tier 9 core keycard (250 biomass + 2,000 essence).
 
 ## World 4: Blight-overrun city — 7 × 7, zone/tier 10
 
 - This is the **penultimate zone**.
 - Apocalyptic orange haze; city overrun with Blight.
 - Reserve the center **3 × 3 sectors, C3 through E5**, for a NASA-like aerospace facility.
-- Breaking into that facility should eventually be extremely difficult: Blight has hacked its turrets and security measures. No turrets or security encounters are populated in this empty framework.
+- Breaking into that facility should eventually be extremely difficult: Blight has hacked its turrets and security measures. Active hacked turrets, rifle patrols, heavy melee guards and warning mines defend the streets; the central facility adds 45,000-HP mining checkpoints.
 - The facility's center, **D4**, holds a teleporter. Walking a surviving soldier onto the portal carries the surviving team to World 5 without ending/banking the run.
 - The city arrival is **D1**, on the north edge. This is an implementation default for the forest's southward exit, since a city arrival sector was not specified.
 
@@ -46,7 +46,7 @@ World and zone are different concepts: worlds 1/2 each contain three terrain zon
 ## Implementation contracts
 
 - `labMap.ts` owns footprints, start sectors, zones, region reservations and destinations. `sectors` is the column count; `worldRows()` supplies row count for rectangular maps.
-- World 2's existing Tier 6 gate to World 3 remains unchanged. Its final access progression still needs a design; this change does not invent additional keycards.
+- World 2's Tier 6 gate uses the new Tier 6 core keycard (150 green crystals + 100 essence). The Tier 9 card follows it along the core snake.
 - `worldAtmosphere.ts` owns the design profiles and continuous forest blending. Background/ambient preview lighting is active. Finished trees, canopy geometry, sunlight shadow casters/volumetric shafts, city scenery and mothership art are future work.
-- Framework generation intentionally suppresses all lab/Blight population and growth, including in zones 8–11. The intended harder encounters are recorded above, not silently spawned as placeholder enemies.
+- Later generation suppresses old lab machinery and cellular Blight growth. Tier 7 remains completely peaceful. Tiers 8–11 use persistent authored encounter populations; killed enemies and gathered groves do not respawn when the map is reopened.
 - The south gate and teleporter use the existing squad-transfer machinery: health, loadouts, energy, reserves, run time and earnings survive travel. New worlds are unlocked/persisted when reached.

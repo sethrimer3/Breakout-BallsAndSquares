@@ -1,3 +1,4 @@
+import { designLateSpaces, fortifyLateSpaces } from "./LateWorldLayouts";
 import { FACILITY, TERRAIN, zoneForDepth } from "../config";
 import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
@@ -144,16 +145,18 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
   const layout = frame ? buildAuthoredLayout(frame) : buildLabLayout(world, seed);
   world.labLayout = layout;
   if (frame && def.framework) {
-    // Layout scaffold only: no lab props, cores, enemies, cave-ins or crystal veins.
+    // Later campaign uses outdoor clearings, city defenses and ship checkpoints.
     world.roomLights = []; world.blightCores = []; world.sentrySpots = []; world.specimenSpots = [];
     health.fill(500); tint.fill(96);
+    designLateSpaces(world, frame);
     const clear = (i: number): void => { health[i] = 0; wall[i] = 0; world.decor[i] = DECOR.cleanFloor; };
     for (const room of layout.rooms) forRect(world, room.x, room.y, room.x + room.size - 1, room.y + room.size - 1, clear);
     for (const hall of layout.corridors) forRect(world, hall.x0, hall.y0, hall.x1, hall.y1, clear);
+    fortifyLateSpaces(world, frame);
     buildGates(world, frame);
     for (const door of world.doors) {
-      // Framework onward exits are traversable without inventing late-game keycards.
-      door.open = !!door.gate?.to;
+      // Onward gates require their corresponding core keycard.
+      door.open = false;
       for (const i of door.cells) {
         if (door.open) { clear(i); world.mat[i] = MAT.none; }
         else health[i] = 65000;

@@ -69,6 +69,7 @@ export class ResultsScreen {
       crystalsRow +
       greenRow +
       essenceRow +
+      (r.biomass > 0 || g.biomass > 0 ? row("BIOMASS", `◆ ${r.biomass.toLocaleString()}`, `BANK ◆ ${g.biomass.toLocaleString()}`) : "") +
       row("TIME SURVIVED", fmtTime(r.time), fmtTime(b.time), newBests.time) +
       row("MAX DEPTH REACHED", `${r.maxDepth} cells`, `${b.depth} cells`, newBests.depth) +
       row("SOLDIERS DEPLOYED", `${r.soldiersDeployed}`, `PEAK GROWTH ${g.growth.rate.toFixed(1)}/s`) +

@@ -200,7 +200,7 @@ export class SettingsModal {
       });
       body.querySelector('[data-set="funds"]')!.addEventListener("click", () => {
         if (!set.devMode) return;
-        for (const key of ["bank", "crystals", "greenCrystals", "essence"] as const) this.game.save.data[key] += 1000;
+        for (const key of ["bank", "crystals", "greenCrystals", "essence", "biomass"] as const) this.game.save.data[key] += 1000;
         this.game.save.save();
         body.querySelector('[role="status"]')!.textContent = "Test currency added to this save slot.";
       });

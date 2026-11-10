@@ -8,7 +8,7 @@ import { LAB_WORLDS, LAB_WORLD_COUNT, sectorCount, worldRows, worldBlueprint, ga
 import { atmosphereAt } from "../src/world/worldAtmosphere";
 
 describe("later-world framework", () => {
-  it.each([[3,13,13,169],[4,7,7,49],[5,5,3,15]])("builds world %i as %ix%i with %i empty rooms", (id,columns,rows,count) => {
+  it.each([[3,13,13,169],[4,7,7,49],[5,5,3,15]])("builds world %i as %ix%i with %i encounter rooms", (id,columns,rows,count) => {
     const def = LAB_WORLDS[id];
     expect(def.sectors).toBe(columns); expect(worldRows(def)).toBe(rows); expect(sectorCount(def)).toBe(count);
     expect(worldBlueprint(def).rooms).toHaveLength(count);
@@ -36,7 +36,10 @@ describe("later-world framework", () => {
       const at = sectorSpawnCell(frame, i);
       expect(sectorAtCell(frame, at.cx, at.cy)).toBe(i);
       expect(world.solidAt(at.cx, at.cy)).toBe(false);
-      expect(visited[at.cy * world.width + at.cx]).toBe(1);
+      if(id===3) expect(visited[at.cy * world.width + at.cx]).toBe(1);
+      if ((id === 5 && i !== def.start) || (id === 4 && i === 24)) {
+        expect(visited[at.cy * world.width + at.cx], "armored checkpoints require mining").toBe(0);
+      }
     }
     const outside = frame.y0 + rows * SECTOR_CELLS;
     expect(sectorAtCell(frame, frame.x0, outside)).toBe(-1);

@@ -12,6 +12,7 @@ export class RunStats {
   crystals = 0;
   greenCrystals = 0;
   essence = 0;
+  biomass = 0;
   /** Max depth (cells beyond the room edge) of any destroyed pixel. */
   maxDepth = 0;
   soldiersDeployed = 0;
@@ -28,6 +29,7 @@ export class RunStats {
     this.crystals = 0;
     this.greenCrystals = 0;
     this.essence = 0;
+    this.biomass = 0;
     this.maxDepth = 0;
     this.soldiersDeployed = 0;
     this.shotsFired = 0;

@@ -24,7 +24,7 @@ export interface CombatEvents {
     ownerId?: number,
   ): void;
   /** A rocket or cluster bomb detonated at (x, y) with radius (world units). */
-  onExplosion?(x: number, y: number, radiusWorld: number): void;
+  onExplosion?(x: number, y: number, radiusWorld: number, damage?: number): void;
   /** A bullet struck a creature. */
   onCreatureHit?(x: number, y: number, nx: number, ny: number): void;
   /** A sticky grenade was thrown. */
@@ -345,6 +345,7 @@ export class CombatSystem {
     b.dy = dy;
     const mods = this.shooter?.mods;
     b.speed = speed * this.stats.globalBulletSpeedMult * (mods?.bulletSpeedMult ?? 1);
+    b.terrainDamageBonus = mods?.terrainDamageBonus ?? 0;
     b.damage = damage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0);
     b.life = life;
     b.maxLife = life;
@@ -383,6 +384,7 @@ export class CombatSystem {
     b.dy = dy;
     const mods = this.shooter?.mods;
     b.speed = speed * this.stats.globalBulletSpeedMult * (mods?.bulletSpeedMult ?? 1);
+    b.terrainDamageBonus = mods?.terrainDamageBonus ?? 0;
     b.damage = damage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0);
     b.life = life;
     b.maxLife = life;
@@ -467,7 +469,7 @@ export class CombatSystem {
         }
         const isCore = inside && !isSub && w.coreId[cellIdx] > 0;
         const isBlight = isSub ? w.isBlightSubAt(hit.cx, hit.cy) : w.isBlightAt(hcx, hcy);
-        let hitDmg = b.damage + (isCore ? this.stats.coreDamageBonus : 0);
+        let hitDmg = b.damage + b.terrainDamageBonus + (isCore ? this.stats.coreDamageBonus : 0);
         if (isBlight && b.blightMultiplier > 1) {
           hitDmg = Math.round(hitDmg * b.blightMultiplier);
         }
@@ -567,7 +569,7 @@ export class CombatSystem {
         const isCore = !isSub && w.coreId[cellIdx] > 0;
         const isBlight = isSub ? w.isBlightSubAt(sx, sy) : w.isBlightAt(hcx, hcy);
 
-        let dmg = b.damage + (isCore ? this.stats.coreDamageBonus : 0);
+        let dmg = b.damage + b.terrainDamageBonus + (isCore ? this.stats.coreDamageBonus : 0);
         if (isBlight && b.blightMultiplier > 1) {
           dmg = Math.round(dmg * b.blightMultiplier);
         }
@@ -609,7 +611,7 @@ export class CombatSystem {
         const idx = cy * w.width + cx;
         const wasSub = w.health[idx] === 0;
         const isCore = !wasSub && w.coreId[idx] > 0;
-        let dmg = Math.max(1, Math.round(b.damage * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
+        let dmg = Math.max(1, Math.round((b.damage + b.terrainDamageBonus) * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
         if (b.blightMultiplier > 1 && w.isBlightAt(cx, cy)) dmg = Math.round(dmg * b.blightMultiplier);
         const res = w.damage(cx, cy, dmg, true);
         if (res > 0) {
@@ -620,7 +622,7 @@ export class CombatSystem {
       }
     }
 
-    this.events.onExplosion?.(ix, iy, radCells * cs);
+    this.events.onExplosion?.(ix, iy, radCells * cs, b.damage);
 
     // Spawn secondary cluster mini-bombs if upgraded.
     if (b.clusterCount > 0) {
@@ -695,7 +697,8 @@ export class CombatSystem {
     g.fuse = GRENADE.fuseSeconds;
     g.maxFuse = GRENADE.fuseSeconds;
     g.radiusCells = blastRadius;
-    g.damage = damage + this.stats.globalDamageBonus;
+    g.terrainDamageBonus = s.mods.terrainDamageBonus;
+    g.damage = damage + this.stats.globalDamageBonus + s.mods.damageBonus;
     g.shrapnelCount = shrapnelCount;
     g.blightMultiplier = blightMult;
     g.ownerId = s.id;
@@ -784,7 +787,7 @@ export class CombatSystem {
         const isCore = !wasSub && w.coreId[idx] > 0;
         const isBlight = wasSub ? w.isBlightSubAt(cx * 2, cy * 2) : w.isBlightAt(cx, cy);
 
-        let dmg = Math.max(1, Math.round(g.damage * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
+        let dmg = Math.max(1, Math.round((g.damage + g.terrainDamageBonus) * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
         if (isBlight && g.blightMultiplier > 1) {
           dmg = Math.round(dmg * g.blightMultiplier);
         }
@@ -798,7 +801,7 @@ export class CombatSystem {
       }
     }
 
-    this.events.onExplosion?.(g.x, g.y, radCells * cs);
+    this.events.onExplosion?.(g.x, g.y, radCells * cs, g.damage);
 
     // Expel shrapnel fragments if upgraded
     if (g.shrapnelCount > 0) {

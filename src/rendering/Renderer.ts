@@ -123,6 +123,7 @@ export class Renderer {
     game.terrain.drawPanels(ctx, cam, performance.now() / 1000);
     game.terrain.drawLabLights(ctx, cam, performance.now() / 1000, this.motion.matches);
     this.drawSentries();
+    game.late.draw(ctx, cam);
     this.creatureRenderer.draw(ctx, cam, game.creatures, this.motion.matches ? 0 : performance.now() / 1000);
     const wallClockMs = performance.now();
     const still = this.motion.matches;
@@ -189,7 +190,6 @@ export class Renderer {
     const crystalSprite = this.sprites.orangeCrystal;
     const greenSprite = this.sprites.greenCrystal;
     const sz = Math.max(6, 5.2 * zoom);
-    const half = sz * 0.5;
     const xs = loot.x;
     const ys = loot.y;
     const lives = loot.life;
@@ -210,7 +210,10 @@ export class Renderer {
         lastAlpha = a;
       }
       const sprite = kinds[i] === LootKind.Crystal ? crystalSprite : kinds[i] === LootKind.GreenCrystal ? greenSprite : goldSprite;
-      ctx.drawImage(sprite, sx - half, sy - half, sz, sz);
+      const size = sz * (loot.value[i] > 1 ? 1.7 : 1);
+      if(kinds[i] === LootKind.Biomass) {ctx.fillStyle="#7fe39a";ctx.fillRect(sx-size/2,sy-size/2,size,size);}
+      else ctx.drawImage(sprite, sx-size/2, sy-size/2, size, size);
+      if(loot.value[i]>1){ctx.fillStyle="#e4f4e9";ctx.font="9px monospace";ctx.fillText(`×${loot.value[i]}`,sx+size/2,sy);}
     }
     if (lastAlpha !== 1) ctx.globalAlpha = 1;
   }
