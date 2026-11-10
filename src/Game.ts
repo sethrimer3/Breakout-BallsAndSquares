@@ -235,7 +235,12 @@ export class Game {
       if (list.includes(a.id)) return;
       list.push(a.id);
       this.save.save();
+      // Drop physical pickup for collection, but also guarantee that if the run ends
+      // or soldiers wipe before reaching distant/offscreen drops, persistent encounter
+      // earnings cannot be permanently lost to the void.
       this.loot.spawnOne(a.x, a.y, Math.max(90, this.stats.pickupLifetime), this.rng, kind, value);
+      if (kind === LootKind.Biomass) this.runStats.biomass += value;
+      else if (kind === LootKind.Essence) this.runStats.essence += value;
       if (a.kind === "grove") {
         const reward = lateBlockReward(a.tier);
         this.loot.spawnOne(a.x, a.y, 90, this.rng, reward.kind, reward.value * 10);

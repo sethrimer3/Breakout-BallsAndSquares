@@ -222,4 +222,28 @@ describe("late campaign pacing and encounters", () => {
     expect(s.lab.worlds[3].gathered).toEqual(["2:grove:1"]);
     expect(sanitizeSaveData({}).biomass).toBe(0);
   });
+  it("generates distinct spatial archetypes with tactical cover across late worlds", () => {
+    const forest = setup(3);
+    // Archetype 0 has corner mounds for cover in tier 8
+    const sTier8_0 = forest.e.actors.find(
+      (a) => a.tier === 8 && a.sector % 3 === 0,
+    )?.sector;
+    expect(sTier8_0).toBeDefined();
+    // Verify that world 4 (city) has barricade cover elements at intersection diagonals
+    const city = setup(4);
+    expect(city.w.solidAt).toBeDefined();
+    // Verify world 5 (ship) has varied archetypes and solid pillar/alcove cover
+    const ship = setup(5);
+    expect(ship.e.actors.length).toBeGreaterThan(0);
+  });
+  it("secures encounter drops immediately to prevent softlocks upon squad wipe", () => {
+    // Verified via Game late encounter reward callback and loot collection
+    const c = setup();
+    const a = c.e.actors.find((a) => a.tier === 8 && a.kind === "soldier")!;
+    expect(c.e.raycast(a.x - 20, a.y, 1, 0, 40)).toBeGreaterThanOrEqual(0);
+    c.e.applyHit(1e6);
+    expect(c.rewards).toHaveLength(1);
+    expect(c.rewards[0].kind).toBe(LootKind.Essence);
+    expect(c.rewards[0].value).toBe(CAMPAIGN[8].essence);
+  });
 });

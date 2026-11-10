@@ -20,25 +20,78 @@ export function designLateSpaces(w: PixelWorld, f: LabFrame): void {
       cx = (b.x0 + b.x1) / 2,
       cy = (b.y0 + b.y1) / 2;
     const forest = f.def.id === 3;
+    const tier = sectorTier(f.def, s);
+    const archetype = s % 3;
+
     for (let y = b.y0 + 4; y < b.y1 - 3; y++)
       for (let x = b.x0 + 4; x < b.x1 - 3; x++) {
         const dx = x - cx,
           dy = y - cy;
-        // Forest: irregular clearings and winding trails. City: street grid and
-        // crossfire islands. Ship: narrow armored halls and a central guard bay.
-        const radius = 15 + 3 * Math.sin(Math.atan2(dy, dx) * 3 + s);
-        const open = forest
-          ? dx * dx + dy * dy < radius * radius
-          : f.def.id === 4
-            ? Math.abs(dx) < 4 ||
+        let open = false;
+
+        if (forest) {
+          // Forest has 3 spatial archetypes:
+          // 0: Wide open glade with natural rock/tree cover mounds on diagonals.
+          // 1: Winding serpentine glade with a central cover cluster.
+          // 2: Tactical flanking groves with split avenues and cover bluffs.
+          if (archetype === 0) {
+            const baseR = 16 + 2 * Math.cos(dy * 0.4);
+            const inGlade = dx * dx + dy * dy < baseR * baseR;
+            // Place diagonal cover mounds in tiers 8 and 9 to allow flanking/cover from patrols
+            const inMound =
+              tier > 7 &&
+              ((Math.abs(dx - 7) < 3 && Math.abs(dy - 7) < 3) ||
+                (Math.abs(dx + 7) < 3 && Math.abs(dy + 7) < 3));
+            open = inGlade && !inMound;
+          } else if (archetype === 1) {
+            const r = 14 + 4 * Math.sin(Math.atan2(dy, dx) * 4 + s);
+            const inClearing = dx * dx + dy * dy < r * r;
+            // Center natural obstacle creating circular flanking combat lanes
+            const inCenterIsle =
+              tier > 7 && dx * dx + dy * dy < 16 && dx * dx + dy * dy >= 4;
+            open = inClearing && !inCenterIsle;
+          } else {
+            // Twin flanking clearings connected through center
+            const leftLobe = (dx + 6) * (dx + 6) + dy * dy < 100;
+            const rightLobe = (dx - 6) * (dx - 6) + dy * dy < 100;
+            const bridge = Math.abs(dy) < 5 && Math.abs(dx) < 8;
+            open = leftLobe || rightLobe || bridge;
+          }
+        } else if (f.def.id === 4) {
+          // City: Street grids with crossfire corners, barricade ruins, and perimeter approaches.
+          const inBoulevard = Math.abs(dx) < 4 || Math.abs(dy) < 4;
+          const inRingAlley =
+            Math.abs(dx) < 15 &&
+            Math.abs(dy) < 15 &&
+            Math.abs(dx) > 7 &&
+            Math.abs(dy) > 7;
+          // Tactical barricade ruins in the intersection to duck behind turret fire
+          const inCornerBarricade =
+            (dx === 5 || dx === -5) && (dy === 5 || dy === -5);
+          open = (inBoulevard || inRingAlley) && !inCornerBarricade;
+        } else {
+          // Ship (World 5): Armored chambers, guard plazas, and maintenance service conduits.
+          if (archetype === 0) {
+            // Central command bay with flanking side alcoves
+            open =
+              Math.abs(dx) < 11 &&
+              Math.abs(dy) < 10 &&
+              !(Math.abs(dx) > 5 && Math.abs(dy) > 4 && Math.abs(dx) < 8);
+          } else if (archetype === 1) {
+            // Cross corridor with dual security bunkers
+            open =
+              Math.abs(dx) < 4 ||
               Math.abs(dy) < 4 ||
-              (Math.abs(dx) < 14 &&
-                Math.abs(dy) < 14 &&
-                Math.abs(dx) > 7 &&
-                Math.abs(dy) > 7)
-            : Math.abs(dx) < 3 ||
-              Math.abs(dy) < 3 ||
-              (Math.abs(dx) < 10 && Math.abs(dy) < 9);
+              (Math.abs(dx) < 12 && Math.abs(dy) < 8 && Math.abs(dx) > 5);
+          } else {
+            // Wide hangar bay with dual pillar cover
+            const inHangar = Math.abs(dx) < 13 && Math.abs(dy) < 9;
+            const inPillar =
+              (Math.abs(dx - 5) <= 1 || Math.abs(dx + 5) <= 1) &&
+              Math.abs(dy) <= 2;
+            open = inHangar && !inPillar;
+          }
+        }
         if (open) clear(x, y);
       }
     // Join every clearing to the authored corridors; leave cover on diagonals.
