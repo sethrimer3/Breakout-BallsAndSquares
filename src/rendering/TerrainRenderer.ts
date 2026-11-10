@@ -4,7 +4,7 @@ import { paintPortal } from "./portalNoise";
 import type { CameraSystem } from "../systems/CameraSystem";
 import { hash2 } from "../core/math";
 import { DECOR } from "../world/LabDetails";
-import { MATERIAL_BASE, TEX, TIER_PAINT, materialShade } from "./materials";
+import { MATERIAL_BASE, TEX, TIER_PAINT, crackTexelAt, materialShade } from "./materials";
 import { LIGHT_KIND, MAT, SUB, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
 
@@ -694,6 +694,14 @@ export class TerrainRenderer {
               col[0] += (150 - col[0]) * dmg;
               col[1] += (140 - col[1]) * dmg;
               col[2] += (128 - col[2]) * dmg;
+              // Subtle pixel-art cracks that spread the more the block is damaged
+              const crack = crackTexelAt(cx, cy, ox, oy, 1 - hp / maxHp);
+              if (crack > 0) {
+                const dark = crack === 2 ? 0.38 : 0.62;
+                col[0] *= dark;
+                col[1] *= dark;
+                col[2] *= dark;
+              }
             }
             // Matte relief: a pale lip on faces toward the upper left, shadow on the rest.
             let m = 1;
@@ -817,6 +825,13 @@ export class TerrainRenderer {
           r += (150 - r) * dmg;
           g += (140 - g) * dmg;
           b += (128 - b) * dmg;
+          const crack = crackTexelAt(cx, cy, ox, oy, 1 - hp / maxHp);
+          if (crack > 0) {
+            const dark = crack === 2 ? 0.38 : 0.62;
+            r *= dark;
+            g *= dark;
+            b *= dark;
+          }
         }
         put(tx0 + ox, ty0 + oy, r, g, b, 255);
       }

@@ -12,6 +12,7 @@ import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
 import { createSprites, soldierShapeSprite, type Sprites } from "./sprites";
 import { soldierShapeIndex } from "../entities/soldierShapes";
+import { CRACK_PATTERNS } from "./materials";
 import { TIER_PAINT } from "./materials";
 import { FACILITY } from "../config";
 import { paletteColor, SPRITES } from "../ui/pixelArt";
@@ -118,6 +119,7 @@ export class Renderer {
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
     this.drawCellFlashes();
+    this.drawDoorFlashes();
 
     // Fiery mode: soft flames via a blurred low-res light buffer (screen blend),
     // drawn before tracers/sparks so those stay crisp on top.
@@ -317,6 +319,22 @@ export class Renderer {
           const c = TIER_PAINT[d.tier] ?? TIER_PAINT[1];
           ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
           ctx.fillRect(sx + rim * 2, sy + rim * 2, ex - sx - rim * 4, ey - sy - rim * 4);
+        }
+        // Pixel-art cracks on damaged doors
+        if (hp < maxHp) {
+          const dmgRatio = 1 - hp / maxHp;
+          if (dmgRatio >= 0.25) {
+            const stage = dmgRatio >= 0.75 ? 2 : dmgRatio >= 0.5 ? 1 : 0;
+            const v = (cx * 11 + cy * 17) % CRACK_PATTERNS.length;
+            const pattern = CRACK_PATTERNS[v][stage];
+            const pw = (ex - sx) / 4;
+            const ph = (ey - sy) / 4;
+            ctx.fillStyle = "rgba(10, 8, 12, 0.65)";
+            for (let ptIdx = 0; ptIdx < pattern.length; ptIdx++) {
+              const pt = pattern[ptIdx];
+              ctx.fillRect(Math.floor(sx + pt[0] * pw), Math.floor(sy + pt[1] * ph), Math.ceil(pw), Math.ceil(ph));
+            }
+          }
         }
       }
     }
@@ -536,6 +554,36 @@ export class Renderer {
       ctx.fillStyle = f.destroyed
         ? `rgba(255, 195, 115, ${a * 0.42})`
         : `rgba(255, 225, 165, ${a * 0.52})`;
+      ctx.fillRect(sx, sy, sz, sz);
+    }
+  }
+
+  /**
+   * Gently flashing soft glow as each door tile individually lights up and disappears.
+   */
+  private drawDoorFlashes(): void {
+    const { ctx, game } = this;
+    const cam = game.camera;
+    const cs = game.world.cellSize;
+    const sz = cs * cam.zoom;
+    if (game.doorFlashes.length === 0) return;
+    for (const f of game.doorFlashes) {
+      if (f.delay > 0) continue;
+      const progress = 1 - Math.max(0, f.life / f.maxLife); // 0 -> 1
+      // Soft gentle pulse: rises softly, then fades away smoothly
+      const glow = Math.sin(progress * Math.PI);
+      const sx = cam.worldToScreenX(f.cx * cs);
+      const sy = cam.worldToScreenY(f.cy * cs);
+      if (sx + sz < 0 || sy + sz < 0 || sx > cam.viewW || sy > cam.viewH) continue;
+      const paint = TIER_PAINT[f.tier] ?? TIER_PAINT[1];
+
+      // Soft outer ambient aura
+      const halo = sz * 0.6;
+      ctx.fillStyle = `rgba(${paint[0]}, ${paint[1]}, ${paint[2]}, ${glow * 0.28})`;
+      ctx.fillRect(sx - halo, sy - halo, sz + halo * 2, sz + halo * 2);
+
+      // Warm bright inner core flash
+      ctx.fillStyle = `rgba(255, 248, 220, ${glow * 0.65})`;
       ctx.fillRect(sx, sy, sz, sz);
     }
   }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MATERIAL_BASE, TIER_PAINT, materialShade } from "../src/rendering/materials";
+import { CRACK_PATTERNS, MATERIAL_BASE, TIER_PAINT, crackTexelAt, materialShade } from "../src/rendering/materials";
 
 describe("matte tier materials", () => {
   it("gives every tier its own base color and paint", () => {
@@ -44,5 +44,45 @@ describe("inside-corner paint", () => {
     expect(painted(false, false, false, true)).toBe("2,2 2,3 3,2");
     expect(innerCornerBand(0, 0, true, false, false, false, 0)).toBe(true);
     expect(innerCornerBand(1, 1, true, false, false, false, 0)).toBe(false);
+  });
+});
+
+describe("pixel-art cracked block overlay", () => {
+  it("provides multiple distinct crack pattern variants", () => {
+    expect(CRACK_PATTERNS.length).toBeGreaterThanOrEqual(4);
+    // Ensure all variants have 3 progressive damage stages
+    for (const variant of CRACK_PATTERNS) {
+      expect(variant.length).toBe(3);
+      const [stage1, stage2, stage3] = variant;
+      expect(stage1.length).toBeLessThan(stage2.length);
+      expect(stage2.length).toBeLessThan(stage3.length);
+    }
+  });
+
+  it("shows no cracks on pristine or lightly grazed blocks (< 25% damage)", () => {
+    for (let ox = 0; ox < 4; ox++) {
+      for (let oy = 0; oy < 4; oy++) {
+        expect(crackTexelAt(5, 5, ox, oy, 0)).toBe(0);
+        expect(crackTexelAt(5, 5, ox, oy, 0.24)).toBe(0);
+      }
+    }
+  });
+
+  it("progressively increases cracks as damage increases", () => {
+    let cracksStage1 = 0;
+    let cracksStage2 = 0;
+    let cracksStage3 = 0;
+
+    for (let ox = 0; ox < 4; ox++) {
+      for (let oy = 0; oy < 4; oy++) {
+        if (crackTexelAt(10, 10, ox, oy, 0.35) > 0) cracksStage1++;
+        if (crackTexelAt(10, 10, ox, oy, 0.6) > 0) cracksStage2++;
+        if (crackTexelAt(10, 10, ox, oy, 0.85) > 0) cracksStage3++;
+      }
+    }
+
+    expect(cracksStage1).toBeGreaterThan(0);
+    expect(cracksStage2).toBeGreaterThan(cracksStage1);
+    expect(cracksStage3).toBeGreaterThan(cracksStage2);
   });
 });

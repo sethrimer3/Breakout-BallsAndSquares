@@ -52,6 +52,16 @@ export interface CellFlash {
   destroyed: boolean;
 }
 
+/** Soft glow flash when a door cell is opening. */
+export interface DoorFlash {
+  cx: number;
+  cy: number;
+  delay: number;
+  life: number;
+  maxLife: number;
+  tier: number;
+}
+
 export class Game {
   readonly canvas: HTMLCanvasElement;
   readonly world: PixelWorld;
@@ -95,6 +105,7 @@ export class Game {
   soldiers: Soldier[] = [];
   flashes: Flash[] = [];
   cellFlashes: CellFlash[] = [];
+  doorFlashes: DoorFlash[] = [];
   reserves = 0;
   canDeploy = true;
   growthRate = 0;
@@ -191,6 +202,10 @@ export class Game {
     this.glass = new GlassSystem(this.world, { onShatter: (cx, cy) => this.onGlassShatter(cx, cy) });
     this.doors = new DoorSystem(this.world, {
       onOpen: (door) => this.audio.playDoorOpen((door.x0 + door.x1 + 1) * this.world.cellSize / 2, (door.y0 + door.y1 + 1) * this.world.cellSize / 2),
+      onCellOpen: (cx, cy, delay, tier) => {
+        const dur = 0.22;
+        this.doorFlashes.push({ cx, cy, delay, life: dur, maxLife: dur, tier });
+      },
       onGateLocked: (door) => this.onGateLocked(door),
     });
     this.sentries = new SentrySystem(this.world, (s) => this.audio.playSentryWake(s.x, s.y));
@@ -377,6 +392,7 @@ export class Game {
     }
     this.flashes = [];
     this.cellFlashes = [];
+    this.doorFlashes = [];
     this.combat.bullets.clear();
     this.combat.grenades.clear();
     this.combat.turrets.clear();
@@ -553,6 +569,7 @@ export class Game {
       }
       this.flashes = [];
       this.cellFlashes = [];
+    this.doorFlashes = [];
       this.combat.bullets.clear();
       this.combat.grenades.clear();
       this.combat.turrets.clear();
@@ -1698,6 +1715,15 @@ export class Game {
       if ((this.cellFlashes[i].life -= dt) <= 0) this.cellFlashes.splice(i, 1);
     }
     if (this.cellFlashes.length > 512) this.cellFlashes.splice(0, this.cellFlashes.length - 512);
+    for (let i = this.doorFlashes.length - 1; i >= 0; i--) {
+      const df = this.doorFlashes[i];
+      if (df.delay > 0) {
+        df.delay -= dt;
+        continue;
+      }
+      if ((df.life -= dt) <= 0) this.doorFlashes.splice(i, 1);
+    }
+    if (this.doorFlashes.length > 256) this.doorFlashes.splice(0, this.doorFlashes.length - 256);
     this.canDeploy = this.reserves > 0;
 
     // Run ends once at least one soldier has been deployed and no living or deployable soldiers remain.

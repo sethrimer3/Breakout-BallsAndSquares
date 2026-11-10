@@ -19,6 +19,67 @@ import { hash2, valueNoise } from "../core/math";
 /** Texels per world cell edge in the terrain and floor canvases. */
 export const TEX = 4;
 
+/**
+ * Pixel-art crack patterns for damaged blocks at 4x4 texels per cell.
+ * Subtle hairline fractures that spread as damage increases (like Minecraft's break stages).
+ * 4 unique variants to avoid repetitive tiling.
+ *
+ * Each variant has:
+ * - stage 1 (light damage, ~25-50%): 2-3 hairline crack texels
+ * - stage 2 (moderate damage, ~50-75%): 4-6 branching crack texels
+ * - stage 3 (heavy damage, ~75%+): 7-9 deep branching fracture texels
+ */
+export const CRACK_PATTERNS: readonly (readonly [
+  readonly [number, number][], // stage 1
+  readonly [number, number][], // stage 2
+  readonly [number, number][], // stage 3
+])[] = [
+  // Variant 0: diagonal fracture upper-left to bottom-right
+  [
+    [[1, 1], [2, 2]],
+    [[1, 1], [2, 2], [1, 2], [2, 3], [0, 1]],
+    [[0, 0], [1, 1], [2, 2], [1, 2], [2, 3], [3, 3], [0, 1], [2, 1]],
+  ],
+  // Variant 1: cross / star split from center
+  [
+    [[2, 1], [2, 2]],
+    [[2, 1], [2, 2], [1, 2], [3, 2], [2, 3]],
+    [[2, 0], [2, 1], [2, 2], [1, 2], [0, 2], [3, 2], [2, 3], [3, 1]],
+  ],
+  // Variant 2: jagged zig-zag descending from top-right
+  [
+    [[2, 1], [1, 2]],
+    [[3, 0], [2, 1], [1, 2], [1, 3], [2, 2]],
+    [[3, 0], [2, 1], [1, 2], [1, 3], [0, 3], [2, 2], [3, 1], [1, 1]],
+  ],
+  // Variant 3: fork splitting near bottom-left
+  [
+    [[1, 2], [2, 1]],
+    [[0, 3], [1, 2], [2, 1], [3, 1], [2, 3]],
+    [[0, 3], [1, 2], [2, 1], [3, 1], [3, 0], [2, 3], [3, 3], [1, 1]],
+  ],
+];
+
+/**
+ * Returns crack texel intensity (0 = none, 1 = hairline, 2 = deep crack)
+ * for a texel (ox, oy) within a cell (cx, cy) at damage fraction d (0..1).
+ */
+export function crackTexelAt(cx: number, cy: number, ox: number, oy: number, d: number): number {
+  if (d < 0.25) return 0;
+  const stage = d >= 0.75 ? 2 : d >= 0.5 ? 1 : 0;
+  // Pick variant pseudo-randomly per cell coordinates
+  const v = Math.floor(hash2(cx, cy, 337) * CRACK_PATTERNS.length) % CRACK_PATTERNS.length;
+  const pattern = CRACK_PATTERNS[v][stage];
+  for (let i = 0; i < pattern.length; i++) {
+    const pt = pattern[i];
+    if (pt[0] === ox && pt[1] === oy) {
+      // First 2 points are the main fissures, later points are branches
+      return i < 3 ? 2 : 1;
+    }
+  }
+  return 0;
+}
+
 type RGB = readonly [number, number, number];
 
 /** Base albedo of each tier's material (index = tier; 0 unused). */

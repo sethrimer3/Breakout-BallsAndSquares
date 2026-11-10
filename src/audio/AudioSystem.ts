@@ -358,38 +358,77 @@ export class AudioSystem {
     osc.stop(t + 0.13);
   }
 
-  /** Short pneumatic hiss with a soft mechanical clunk as a blast door slides open. */
+  /**
+   * Distinctive airlock unseal sound: high-tech electronic chime/tone release,
+   * sweeping pneumatic decompression whoosh, and a heavy hydraulic release thud.
+   */
   playDoorOpen(x?: number, y?: number): void {
     if (!this.audible(x, y)) return;
     const ctx = this.ensure();
     if (!ctx || !this.noiseBuf) return;
     const output = this.output(ctx, x, y);
     const t = ctx.currentTime;
+
+    // 1. Electronic access chime / resonant tone (ascending two-tone beep: 523Hz C5 -> 659Hz E5)
+    const chime1 = ctx.createOscillator();
+    chime1.type = "sine";
+    chime1.frequency.setValueAtTime(523.25, t);
+    const cg1 = ctx.createGain();
+    cg1.gain.setValueAtTime(this.vol(0.08), t);
+    cg1.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    chime1.connect(cg1).connect(output);
+    chime1.start(t);
+    chime1.stop(t + 0.13);
+
+    const chime2 = ctx.createOscillator();
+    chime2.type = "sine";
+    chime2.frequency.setValueAtTime(659.25, t + 0.08);
+    const cg2 = ctx.createGain();
+    cg2.gain.setValueAtTime(this.vol(0.09), t + 0.08);
+    cg2.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+    chime2.connect(cg2).connect(output);
+    chime2.start(t + 0.08);
+    chime2.stop(t + 0.25);
+
+    // 2. High-pressure pneumatic seal release whoosh (sweeping lowpass-filtered noise)
     const src = ctx.createBufferSource();
     src.buffer = this.noiseBuf;
     const filter = ctx.createBiquadFilter();
     filter.type = "bandpass";
-    filter.frequency.setValueAtTime(900, t);
-    filter.frequency.exponentialRampToValueAtTime(2400, t + 0.18);
-    filter.Q.value = 0.9;
+    filter.frequency.setValueAtTime(600, t);
+    filter.frequency.exponentialRampToValueAtTime(2800, t + 0.16);
+    filter.frequency.exponentialRampToValueAtTime(800, t + 0.35);
+    filter.Q.value = 1.2;
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(this.vol(0.001), t);
-    gain.gain.exponentialRampToValueAtTime(this.vol(0.12), t + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+    gain.gain.exponentialRampToValueAtTime(this.vol(0.15), t + 0.06);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.38);
     src.connect(filter).connect(gain).connect(output);
     src.start(t);
-    src.stop(t + 0.23);
+    src.stop(t + 0.4);
 
-    const osc = ctx.createOscillator();
-    osc.type = "square";
-    osc.frequency.setValueAtTime(140, t);
-    osc.frequency.exponentialRampToValueAtTime(70, t + 0.08);
-    const og = ctx.createGain();
-    og.gain.setValueAtTime(this.vol(0.06), t);
-    og.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
-    osc.connect(og).connect(output);
-    osc.start(t);
-    osc.stop(t + 0.1);
+    // 3. Mechanical clunk & hydraulic servo thud (dual punch)
+    const clunk = ctx.createOscillator();
+    clunk.type = "square";
+    clunk.frequency.setValueAtTime(160, t + 0.04);
+    clunk.frequency.exponentialRampToValueAtTime(60, t + 0.16);
+    const clunkGain = ctx.createGain();
+    clunkGain.gain.setValueAtTime(this.vol(0.07), t + 0.04);
+    clunkGain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    clunk.connect(clunkGain).connect(output);
+    clunk.start(t + 0.04);
+    clunk.stop(t + 0.19);
+
+    const thud = ctx.createOscillator();
+    thud.type = "triangle";
+    thud.frequency.setValueAtTime(95, t + 0.1);
+    thud.frequency.exponentialRampToValueAtTime(40, t + 0.32);
+    const thudGain = ctx.createGain();
+    thudGain.gain.setValueAtTime(this.vol(0.12), t + 0.1);
+    thudGain.gain.exponentialRampToValueAtTime(0.001, t + 0.34);
+    thud.connect(thudGain).connect(output);
+    thud.start(t + 0.1);
+    thud.stop(t + 0.35);
   }
 
   /** Bright tinkle of a glass pane bursting (throttled, so a chain sounds like a cascade). */

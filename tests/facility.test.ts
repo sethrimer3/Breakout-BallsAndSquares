@@ -55,9 +55,12 @@ describe("research base facility", () => {
     expect(w.solidAt(15, 21)).toBe(true);
   });
 
-  it("opens doors when shot only with the matching keycard tier", () => {
+  it("opens doors when shot only with the matching keycard tier and triggers cell flashes", () => {
     const w = small();
-    const doors = new DoorSystem(w);
+    const cellOpenEvents: { cx: number; cy: number; delay: number; tier: number }[] = [];
+    const doors = new DoorSystem(w, {
+      onCellOpen: (cx, cy, delay, tier) => cellOpenEvents.push({ cx, cy, delay, tier }),
+    });
     const cells = [20 * w.width + 10, 20 * w.width + 11, 21 * w.width + 10, 21 * w.width + 11];
     w.doors = [{ id: 1, tier: 2, cells, open: false, x0: 10, y0: 20, x1: 11, y1: 21 }];
     for (const i of cells) {
@@ -70,10 +73,16 @@ describe("research base facility", () => {
     expect(w.damage(10, 20, 1)).toBe(1);
     expect(w.health[cells[0]]).toBe(hp - 1);
     expect(w.doors[0].open).toBe(false);
+    expect(cellOpenEvents.length).toBe(0);
 
     w.keycardTier = 2;
     expect(w.damage(10, 20, 1)).toBe(1);
     expect(w.doors[0].open).toBe(true);
+    expect(cellOpenEvents.length).toBe(cells.length);
+    for (const evt of cellOpenEvents) {
+      expect(evt.tier).toBe(2);
+      expect(evt.delay).toBeGreaterThanOrEqual(0);
+    }
     doors.update(1);
     for (const i of cells) expect(w.health[i]).toBe(0);
   });

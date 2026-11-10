@@ -3,6 +3,8 @@ import type { Door, PixelWorld } from "./PixelWorld";
 
 export interface DoorEvents {
   onOpen?(door: Door): void;
+  /** Each cell of a door individually opening/disappearing, with its delay before opening. */
+  onCellOpen?(cx: number, cy: number, delay: number, tier: number): void;
   /** A shot hit a world gate the squad has no keycard for. */
   onGateLocked?(door: Door): void;
 }
@@ -47,8 +49,10 @@ export class DoorSystem {
       const cx = i % w.width;
       const cy = (i - cx) / w.width;
       const step = Math.round(Math.max(Math.abs(cx - mx), Math.abs(cy - my)));
+      const delay = step * FACILITY.doorOpenStep;
       this.pendingCell.push(i);
-      this.pendingAt.push(this.time + step * FACILITY.doorOpenStep);
+      this.pendingAt.push(this.time + delay);
+      this.events.onCellOpen?.(cx, cy, delay, door.tier);
     }
     this.events.onOpen?.(door);
     return true;
