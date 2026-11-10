@@ -103,6 +103,7 @@ export interface SoldierStats {
   autoAbility: boolean;
   /** Explored areas stay mapped instead of fading back into darkness (Cartography Uplink). */
   permanentMapping: boolean;
+  connectedAirMapping: boolean;
   /** Soldier sight radius in the fog of war, in cells (Recon Optics). */
   sightCells: number;
   /** Highest research-base keycard held (0 = none): doors of this tier or lower open when shot. */
@@ -198,6 +199,7 @@ export function baseSoldierStats(): SoldierStats {
     turretTurnSpeed: TURRET.baseTurnSpeed,
     autoAbility: false,
     permanentMapping: false,
+    connectedAirMapping: false,
     sightCells: FOG.soldierSightCells,
     keycardTier: 0,
     sentryUplink: false,

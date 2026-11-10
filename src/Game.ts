@@ -15,6 +15,7 @@ import { ScreenTransition } from "./rendering/ScreenTransition";
 import { TerrainRenderer } from "./rendering/TerrainRenderer";
 import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
+import { CombinedTargets, RoomFixtures } from "./systems/RoomFixtures";
 import { FireSystem } from "./systems/FireSystem";
 import { Input } from "./systems/Input";
 import { LightingSystem, makeLitCells, type LitCells, type MuzzleLight } from "./systems/LightingSystem";
@@ -57,6 +58,7 @@ export class Game {
   readonly rng = new Rng();
   readonly physics: PhysicsSystem;
   readonly combat: CombatSystem;
+  readonly fixtures: RoomFixtures;
   /** Flamethrower flames and burning rubble. */
   readonly fire: FireSystem;
   readonly growth: GrowthSystem;
@@ -199,7 +201,18 @@ export class Game {
       onCreatureKilled: (c, x, y) => this.onCreatureKilled(c, x, y),
       onSpecimenFreed: (s) => this.audio.playSpore(s.x, s.y),
     });
-    this.combat.targets = this.creatures;
+    this.fixtures = new RoomFixtures(this.world, (l) => {
+      this.terrain.darkenFixture(l);
+      const x = (l.x0 + l.x1 + 1) * this.world.cellSize / 2;
+      const y = (l.y0 + l.y1 + 1) * this.world.cellSize / 2;
+      this.audio.playGlassShatter(x, y);
+      for (let i = 0; i < 14; i++) {
+        const a = this.rng.range(0, Math.PI * 2), speed = this.rng.range(35, 115);
+        this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * speed, Math.sin(a) * speed, this.rng.range(0.1, 0.3), 1, i % 2 ? 0xffce70 : 0xb7e6ff, 6);
+      }
+      this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.1, 8, 0xffdf9a, 1);
+    });
+    this.combat.targets = new CombinedTargets([this.creatures, this.fixtures]);
     this.camera = new CameraSystem(this.world);
     this.audio.setCamera(this.camera);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
@@ -297,6 +310,7 @@ export class Game {
   applyUpgrades(): void {
     this.stats = this.upgrades.getSoldierStats();
     this.fog.permanent = this.stats.permanentMapping;
+    this.fog.connectedAir = this.stats.connectedAirMapping;
     this.applyFacilityStats();
     this.combat.stats = this.stats;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
@@ -1190,6 +1204,7 @@ export class Game {
 
   private onExplosion(x: number, y: number, radiusWorld: number): void {
     this.creatures.explode(x, y, radiusWorld, 6 + this.stats.globalDamageBonus);
+    this.fixtures.explode(x, y, radiusWorld);
     this.audio.playDestroy(x, y);
     this.shakeForExplosion(x, y, radiusWorld);
     const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
@@ -1451,6 +1466,7 @@ export class Game {
 
   /** Fresh doors, glass and dormant sentries for a newly generated facility. */
   private resetFacility(): void {
+    this.fixtures.reset();
     this.glass.reset();
     this.doors.reset();
     this.sentries.reset();
@@ -1485,6 +1501,7 @@ export class Game {
   private resetFog(): void {
     this.fog.reset(this.rng.int(1 << 30));
     this.fog.permanent = this.stats.permanentMapping;
+    this.fog.connectedAir = this.stats.connectedAirMapping;
     for (let i = 0; i < 40; i++) this.updateFog(0.1, true);
   }
 
@@ -1496,6 +1513,7 @@ export class Game {
       if (n === src.length) src.push({ x: 0, y: 0, radiusCells: 0 });
       const source = src[n++];
       source.facingAngle = undefined;
+      source.airSeed = false;
       return source;
     };
     const w = this.world;
@@ -1511,6 +1529,7 @@ export class Game {
         e.y = s.y;
         e.radiusCells = this.stats.sightCells;
         e.facingAngle = s.facingAngle;
+        e.airSeed = true;
       }
       for (const t of this.combat.turrets.items) {
         if (!t.active) continue;

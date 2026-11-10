@@ -534,3 +534,34 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
     for (let x = world.roomX0; x <= world.roomX1; x++) setDecor(world, x, y, DECOR.none);
   }
 }
+
+/** Keep at least one working, shootable ceiling fixture in rooms with open floor. */
+export function ensureRoomFixtures(world: PixelWorld, layout: LabLayout): void {
+  for (const room of layout.rooms) {
+    const existing = world.roomLights.some((l) => l.kind !== LIGHT_KIND.wash && l.kind !== LIGHT_KIND.blight
+      && l.x0 >= room.x && l.y0 >= room.y && l.x1 < room.x + room.size && l.y1 < room.y + room.size
+      && world.decor[l.y0 * world.width + l.x0] === DECOR.lightPanel && !world.solidAt(l.x0, l.y0));
+    if (existing) continue;
+    let placed = false;
+    for (let y = room.y + 1; y < room.y + room.size - 1 && !placed; y++) {
+      for (let x = room.x + 1; x < room.x + room.size - 1; x++) {
+        if (!world.inBounds(x, y) || world.solidAt(x, y)) continue;
+        if (x >= world.roomX0 && x <= world.roomX1 && y >= world.roomY0 && y <= world.roomY1) continue;
+        const i = y * world.width + x;
+        if (world.mat[i] !== MAT.none || world.decor[i] === DECOR.none || world.decor[i] === DECOR.deadPanel) continue;
+        // Don't hide a ceiling tube behind half-size consoles or rubble.
+        let blocked = false;
+        for (let sy = y * 2; sy <= y * 2 + 1; sy++) for (let sx = x * 2; sx <= x * 2 + 1; sx++) {
+          if (world.subSolidAt(sx, sy)) blocked = true;
+        }
+        if (blocked) continue;
+        setDecor(world, x, y, DECOR.lightPanel);
+        const kind = room.state === ROOM_STATE.decayed || room.state === ROOM_STATE.overrun ? LIGHT_KIND.flicker : LIGHT_KIND.dim;
+        world.roomLights.push({ kind, x0: x, y0: y, x1: x, y1: y,
+          cx0: room.x, cy0: room.y, cx1: room.x + room.size - 1, cy1: room.y + room.size - 1,
+          phase: hash2(x, y, layout.seed) });
+        placed = true; break;
+      }
+    }
+  }
+}

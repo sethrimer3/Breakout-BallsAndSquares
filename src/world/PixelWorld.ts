@@ -66,6 +66,8 @@ export const LIGHT_KIND = {
 } as const;
 
 export interface RoomLight {
+  /** Shot-out ceiling fixtures stay dark until the next world generation. */
+  destroyed?: boolean;
   kind: (typeof LIGHT_KIND)[keyof typeof LIGHT_KIND];
   /** Panel bounds in cells (inclusive); for a wash or blight glow, the area lit. */
   x0: number;

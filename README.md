@@ -78,11 +78,15 @@ Destroyed blocks roll currency pickups that must be collected, and increment lif
 
 Core is a three-row snake: left to right, down, right to left, then down and left to right again. Buy a milestone to open the next one. Question-mark slots are reserved for future upgrades and do not block progression.
 
-The path starts with **Tier 1 Keycard (8 gold)**, then **Lab Map (15 gold)**. Until the map is purchased, deploying starts a run directly at **A1**. Later milestones unlock **Resources → Primary Weapons → Blight → Formations → Secondary Weapons → Research Base**, with squad capacity, the other keycards and future slots between them. All three keycards live on Core. Formations and soldier behaviors share their own Formations tab.
+The path starts with **Tier 1 Keycard (8 gold)**, then **Lab Map (15 gold)** and **Airspace Mapping (30 gold)**. Until the map is purchased, deploying starts a run directly at **A1**. Later milestones unlock **Resources → Primary Weapons → Blight → Formations → Secondary Weapons → Research Base**, with squad capacity, the other keycards and future slots between them. All three keycards live on Core. Formations and soldier behaviors share their own Formations tab.
 
 Movement speed, fire rate, damage, health and projectile velocity are upgraded on each soldier's own tree. The basic nodes cost gold without an essence requirement, so they are available from the start; advanced tiers still require essence. Retired global Core stat upgrades are removed and their original gold costs refunded once when loading an existing save.
 
 In-world audio is spatial: each sound plays at its configured volume in the screen center, fades linearly to 25% at every edge and corner, then continues to zero one-sixth of a viewport beyond the edge. Left/right stereo panning follows screen position. Fire crackle keeps its quiet base volume and separate fire-size damping. Menu confirmations and global alerts remain centered.
+
+**Airspace Mapping** gradually reveals open air connected to living soldiers, including passages around corners beyond their usual sight range. Opening doors or breaking walls, glass, or half-size barriers gives the reveal front new paths. Sealed spaces stay hidden; regrowth can disconnect them again. The upgrade is the third milestone on Core, immediately after the Lab Map.
+
+Most rooms with open floor have working ceiling fixtures. Bullets and explosions can break them: the panel goes dark with a small spark burst and a spatial glass-break sound. Fixtures do not obstruct soldiers or airflow, award no terrain loot, and return when a new world is generated.
 
 ### Dev settings and a fresh start
 

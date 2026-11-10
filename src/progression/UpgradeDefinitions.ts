@@ -34,6 +34,7 @@ export type UpgradeBranch =
   | "soldier";
 
 export type UpgradeId =
+  | "connected_air_mapping"
   | "unlock_map" | "unlock_resources" | "unlock_primary" | "unlock_blight"
   | "unlock_formations" | "unlock_secondary" | "unlock_facility"
   | `core_placeholder_${number}`
@@ -1902,12 +1903,13 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
 
 /** Milestones run left-to-right, right-to-left, then left-to-right. */
 export const CORE_PATH: readonly UpgradeId[] = [
-  "keycard_t1", "unlock_map", "core_placeholder_1", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
+  "keycard_t1", "unlock_map", "connected_air_mapping", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
   "core_placeholder_3", "unlock_blight", "keycard_t2", "core_placeholder_4", "unlock_formations", "core_placeholder_5", "unlock_secondary",
   "core_placeholder_6", "unlock_facility", "auto_ability", "core_placeholder_7", "keycard_t3", "core_placeholder_8", "core_placeholder_9",
 ];
 
 const MILESTONES: Partial<Record<UpgradeId, [string, string, number]>> = {
+  connected_air_mapping: ["Airspace Mapping", "Smoothly reveals air connected to living soldiers, around corners and through opened doors or breached walls.", 30],
   unlock_map: ["Lab Map", "Choose a conquered sector to deploy into. Before this, runs begin at A1.", 15],
   unlock_resources: ["Resource Extraction", "Unlock the Resources upgrade tab.", 25],
   unlock_primary: ["Primary Arsenal", "Unlock the Primary Weapons upgrade tabs.", 60],
@@ -1918,6 +1920,7 @@ const MILESTONES: Partial<Record<UpgradeId, [string, string, number]>> = {
 };
 
 const MILESTONE_ICONS: Partial<Record<UpgradeId, SpriteName>> = {
+  connected_air_mapping: "mapGrid",
   unlock_map: "behaviorGrid", unlock_resources: "goldDrop", unlock_primary: "rifle", unlock_blight: "blightCrack",
   unlock_formations: "formationLine", unlock_secondary: "grenade", unlock_facility: "gear",
 };
@@ -1940,6 +1943,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     return { ...base, branch: "core", grid: { col: col - 3, row: row - 1 },
       parent: index > 0 ? CORE_PATH[index - 1] : null, placeholder,
       ...(id === "keycard_t1" ? { baseCost: 8 } : {}),
+      ...(id === "connected_air_mapping" ? { apply: (s: SoldierStats, level: number) => { s.connectedAirMapping = level > 0; } } : {}),
     };
   }),
   ...EXISTING_DEFS.filter((d) => !CORE_PATH.includes(d.id)),

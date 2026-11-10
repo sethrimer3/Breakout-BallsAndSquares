@@ -2,7 +2,7 @@ import { FACILITY, TERRAIN, zoneForDepth } from "../config";
 import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
 import { placeLabEquipment } from "./LabEquipment";
-import { decorateLab } from "./LabDetails";
+import { decorateLab, ensureRoomFixtures } from "./LabDetails";
 import { buildAuthoredLayout, gateGeometry, labFrame, LAB_WORLDS, sectorAtCell, sectorBounds, sectorSpawnCell, sectorZone, upgradeSpotCell, upgradeSpotSector, type LabFrame, type LabWorldDef, type RoomKind } from "./labMap";
 import { MAT, SUB, type PixelWorld } from "./PixelWorld";
 import { DECOR } from "./LabDetails";
@@ -261,6 +261,7 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     placeCrystalVeins(world, frame, runSeed);
     if (options.conquered) clearConqueredSectors(world, frame, options.conquered);
   }
+  ensureRoomFixtures(world, layout);
 }
 
 /**

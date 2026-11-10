@@ -1,4 +1,5 @@
 import { FOG } from "../config";
+import { ConnectedAir } from "./ConnectedAir";
 
 /** What `FogOfWar` needs from the terrain: is a cell opaque to sight? */
 export interface SightQuery {
@@ -18,6 +19,8 @@ export interface SightSource {
   radiusCells: number;
   /** Soldiers look forward; room lights and turrets keep circular sight. */
   facingAngle?: number;
+  /** Only living soldiers seed connected-air mapping. */
+  airSeed?: boolean;
 }
 
 /**
@@ -58,6 +61,8 @@ export class FogOfWar {
   by1 = 0;
   /** Explored areas keep a dim memory instead of going black. */
   permanent = false;
+  connectedAir = false;
+  private air: ConnectedAir | null = null;
 
   constructor(
     private readonly world: SightQuery,
@@ -81,6 +86,7 @@ export class FogOfWar {
 
   /** Back to total darkness (new run / new map). */
   reset(seed = 1): void {
+    this.air?.reset();
     this.light.fill(0);
     this.next.fill(0);
     this.explored.fill(0);
@@ -220,6 +226,15 @@ export class FogOfWar {
     for (const s of sources) {
       const reach = s.facingAngle === undefined ? 1 : FOG.forwardSightMult;
       this.trace(s, Math.max(16, Math.round((rays * s.radiusCells * reach) / FOG.soldierSightCells)));
+    }
+    if (this.connectedAir) {
+      this.air ??= new ConnectedAir(this.world, this.tileCells);
+      for (const tile of this.air.update(dt, sources)) {
+        this.revealBoost[tile] = this.seenStamp[tile] === this.stamp ? Math.max(1.5, this.revealBoost[tile]) : 1.5;
+        this.seenStamp[tile] = this.stamp;
+        const x = tile % this.tw, y = (tile - x) / this.tw;
+        this.grow(x, y, x, y);
+      }
     }
     if (this.bx0 > this.bx1) return;
 

@@ -308,6 +308,7 @@ export class TerrainRenderer {
 
   /** Brightness (0..1) of a room light at wall-clock `t`; 0 when it is off or gone. */
   lightLevel(l: RoomLight, t: number, still = this.reducedMotion?.matches ?? false): number {
+    if (l.destroyed) return 0;
     const w = this.world;
     if (l.kind === LIGHT_KIND.blight) {
       const core = l.coreId ? w.blightCores[l.coreId - 1] : undefined;
@@ -321,6 +322,11 @@ export class TerrainRenderer {
     }
     if (l.kind === LIGHT_KIND.flicker) return still ? 0.35 : flickerLevel(t, l.phase);
     return 1;
+  }
+
+  /** Repaint a shot-out panel without rebuilding the whole floor texture. */
+  darkenFixture(light: RoomLight): void {
+    this.paintFloor(light.x0, light.y0, light.x1, light.y1);
   }
 
   /**
