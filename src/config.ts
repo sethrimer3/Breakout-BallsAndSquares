@@ -288,7 +288,7 @@ export const CREATURES = {
   sporeDamage: 1,
 
   /** Worms appear after this many seconds of run time. */
-  wormStartSeconds: 55,
+  wormStartSeconds: 19,
   /** Chance per second, per exposed living colony, that a worm crawls out. */
   wormSpawnPerSec: 0.035,
   wormCap: 2,
@@ -558,8 +558,8 @@ export const GROWTH = {
   /** Initial successful copy events per second right after the grace period. */
   baseRate: 1.0,
   /** Exponential base per elapsed second after the grace period. */
-  expBase: 1.055,
-  /** Hard cap on copy events per second. */
+  expBase: 1.2,
+  /** Soft threshold on exponential rise; after this rate is reached, rate grows linearly by +1/s every 1s forever. */
   maxRate: 150,
   /** Max copy events executed in a single fixed step (bounds frame spikes). */
   maxEventsPerStep: 12,
@@ -602,14 +602,27 @@ export const GROWTH = {
 /** Wall replication rate after `overdriveSeconds` of overdrive. */
 export function overdriveWallRate(overdriveSeconds: number): number {
   if (overdriveSeconds <= 0) return 0;
-  return Math.min(GROWTH.maxRate, GROWTH.overdriveWallBase + Math.pow(GROWTH.overdriveExpBase, overdriveSeconds) - 1);
+  const baseRate = GROWTH.overdriveWallBase + Math.pow(GROWTH.overdriveExpBase, overdriveSeconds) - 1;
+  if (baseRate <= GROWTH.maxRate) return baseRate;
+  const targetExp = Math.max(1, GROWTH.maxRate - GROWTH.overdriveWallBase + 1);
+  const tMax = Math.log(targetExp) / Math.log(GROWTH.overdriveExpBase);
+  const extraSeconds = Math.max(0, overdriveSeconds - tMax);
+  return GROWTH.maxRate + extraSeconds * 1.0;
 }
 
 /** Growth rate (copy events / second) at `runTime` seconds into the run (spec §7). */
-export function growthRateAt(runTime: number, startRate = GROWTH.baseRate): number {
+export function growthRateAt(runTime: number, startRate = GROWTH.baseRate, expBase = GROWTH.expBase): number {
   if (runTime < GROWTH.graceSeconds) return 0;
   const elapsed = Math.max(0, runTime - GROWTH.graceSeconds);
-  return Math.min(GROWTH.maxRate, Math.max(0, startRate + Math.pow(GROWTH.expBase, elapsed) - 1));
+  const baseRateTerm = Math.max(0, startRate + Math.pow(expBase, elapsed) - 1);
+  if (baseRateTerm <= GROWTH.maxRate) {
+    return baseRateTerm;
+  }
+  // Once the exponential formula reaches maxRate, it grows by a flat rate of 1 more every 1 second forever
+  const targetExp = Math.max(1, GROWTH.maxRate - startRate + 1);
+  const tMax = Math.log(targetExp) / Math.log(expBase);
+  const extraSeconds = Math.max(0, elapsed - tMax);
+  return GROWTH.maxRate + extraSeconds * 1.0;
 }
 
 export const LIGHT = {

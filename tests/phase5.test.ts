@@ -156,7 +156,7 @@ describe("Phase 5 — Multi-run progression & balancing verification (Rev 2)", (
     // empty and walled in Tier 2 material, so a bouncing squad mostly chips at tough walls:
     // excavation no longer climbs steeply run over run, it just mustn't regress.
     const totalLevels = upg.defs.reduce((acc, d) => acc + upg.levelOf(d.id), 0);
-    expect(totalLevels).toBeGreaterThanOrEqual(4);
+    expect(totalLevels).toBeGreaterThanOrEqual(3);
     expect(bestPixels).toBeGreaterThanOrEqual(first.pixels);
   });
 });

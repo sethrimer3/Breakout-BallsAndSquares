@@ -375,6 +375,7 @@ export class Game {
     this.combat.stats = this.stats;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
     this.growth.startRate = this.stats.blightStartRate;
+    this.growth.expBase = this.stats.blightExpBase;
     this.growth.rateMultiplier = this.stats.blightRateMultiplier;
     this.growth.weakenChance = this.stats.blightWeakenChance;
     this.growth.decayRate = this.stats.blightNecrosisRate;
@@ -427,6 +428,7 @@ export class Game {
     this.combat.stats = this.stats;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
     this.growth.startRate = this.stats.blightStartRate;
+    this.growth.expBase = this.stats.blightExpBase;
     this.growth.rateMultiplier = this.stats.blightRateMultiplier;
     this.growth.weakenChance = this.stats.blightWeakenChance;
     this.growth.decayRate = this.stats.blightNecrosisRate;

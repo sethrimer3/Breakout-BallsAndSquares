@@ -99,13 +99,13 @@ describe("Blight colonies", () => {
       return n;
     };
     const start = open();
-    g.update(1 / 60, 30, []);
-    for (let i = 0; i < 60; i++) g.update(1 / 60, 30, []);
+    g.update(1 / 60, 15, []);
+    for (let i = 0; i < 60; i++) g.update(1 / 60, 15, []);
     expect(g.overdrive).toBe(false);
     expect(open()).toBe(start);
 
     // Far enough into the run that the generator rate passes the overdrive line.
-    let t = 120;
+    let t = 40;
     for (let i = 0; i < 300; i++) g.update(1 / 60, (t += 1 / 60), []);
     expect(g.rate).toBeGreaterThanOrEqual(GROWTH.overdriveRate);
     expect(g.overdrive).toBe(true);

@@ -61,6 +61,7 @@ export type UpgradeId =
   // Blight Matrix: Blight Suppression & Blight Core Upgrades (#ff4b8b)
   | "blight_delay"
   | "blight_start_rate"
+  | "blight_exponent"
   | "blight_slow"
   | "blight_weaken"
   | "explosive_blight_chance"
@@ -559,6 +560,26 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     formatDelta: () => "-0.1/s",
     apply: (s, lvl) => {
       s.blightStartRate = Math.max(0, +(1.0 - 0.1 * lvl).toFixed(1));
+    },
+    icon: "blightSlow",
+  },
+  {
+    id: "blight_exponent",
+    branch: "blight",
+    name: "Replication Inhibitor",
+    shortDesc: "-0.01 Blight replication exponent per level (1.20 down to 1.05 at max)",
+    color: "#ff4b8b",
+    grid: { col: -2, row: -1 },
+    parent: "blight_start_rate",
+    maxLevel: 15,
+    baseCost: 24,
+    costMultiplier: 1.35,
+    unlockLifetimePixels: 20,
+    valueAt: (lvl) => +(GROWTH.expBase - 0.01 * lvl).toFixed(2),
+    formatValue: (v) => `${v.toFixed(2)} EXP`,
+    formatDelta: () => "-0.01 EXP",
+    apply: (s, lvl) => {
+      s.blightExpBase = Math.max(1.05, +(GROWTH.expBase - 0.01 * lvl).toFixed(2));
     },
     icon: "blightSlow",
   },

@@ -1,6 +1,6 @@
 import { unlockTabs } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
-import { LOOT } from "../src/config";
+import { GROWTH, growthRateAt, LOOT } from "../src/config";
 import { Rng } from "../src/core/Rng";
 import { LootKind, lootKindForZone, LootSystem } from "../src/entities/LootSystem";
 import { Soldier } from "../src/entities/Soldier";
@@ -205,5 +205,31 @@ describe("Zone drops and Blight Essence pickups", () => {
     };
     expect(pulled(1)).toBe(0); // out of range
     expect(pulled(2)).toBeLessThan(0); // pulled toward the soldier
+  });
+
+  it("decreases blight growth exponent by 0.01 per level down to 1.05 at max", () => {
+    const { upg } = fresh();
+    const stats0 = upg.getSoldierStats();
+    expect(stats0.blightExpBase).toBeCloseTo(1.20, 2);
+
+    // Buy levels of blight_exponent
+    const def = UPGRADE_BY_ID["blight_exponent"];
+    expect(def.maxLevel).toBe(15);
+    expect(def.valueAt(0)).toBeCloseTo(1.20, 2);
+    expect(def.valueAt(1)).toBeCloseTo(1.19, 2);
+    expect(def.valueAt(5)).toBeCloseTo(1.15, 2);
+    expect(def.valueAt(10)).toBeCloseTo(1.10, 2);
+    expect(def.valueAt(15)).toBeCloseTo(1.05, 2);
+
+    // Apply to stats
+    const stats15 = { ...stats0 };
+    def.apply(stats15, 15);
+    expect(stats15.blightExpBase).toBeCloseTo(1.05, 2);
+
+    // Compare growth rates at 20s
+    const rateBase = growthRateAt(20, stats0.blightStartRate, stats0.blightExpBase);
+    const rateUpgraded = growthRateAt(20, stats15.blightStartRate, stats15.blightExpBase);
+    expect(rateBase).toBeCloseTo(15.41, 1);
+    expect(rateUpgraded).toBeCloseTo(2.08, 1);
   });
 });

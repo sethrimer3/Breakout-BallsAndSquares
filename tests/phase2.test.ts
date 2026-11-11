@@ -34,12 +34,15 @@ describe("Phase 2 — Frontier O(1) indexed set", () => {
 });
 
 describe("Phase 2 — GrowthSystem rules & escalation", () => {
-  it("honors the grace period, exponential rise and 150/s cap", () => {
+  it("honors the grace period, exponential rise and infinite post-cap scaling (+1/s per second)", () => {
     expect(growthRateAt(0)).toBe(0);
     expect(growthRateAt(GROWTH.graceSeconds - 0.01)).toBe(0);
     expect(growthRateAt(GROWTH.graceSeconds)).toBeCloseTo(GROWTH.baseRate, 5);
     expect(growthRateAt(30)).toBeGreaterThan(growthRateAt(15));
-    expect(growthRateAt(1000)).toBe(GROWTH.maxRate);
+    const tMax = GROWTH.graceSeconds + Math.log(GROWTH.maxRate) / Math.log(GROWTH.expBase);
+    expect(growthRateAt(tMax)).toBeCloseTo(GROWTH.maxRate, 1);
+    expect(growthRateAt(tMax + 10)).toBeCloseTo(GROWTH.maxRate + 10, 1);
+    expect(growthRateAt(1000)).toBeGreaterThan(GROWTH.maxRate);
   });
 
   it("reproduces only into cardinal neighbors and gives full location health", () => {
@@ -243,12 +246,12 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
     const g = new GrowthSystem(w, new Rng(1234));
     g.reset();
 
-    // At runTime = 38s, growth rate is ~6 sub-pixels per second.
+    // At runTime = 15s (10s elapsed with 1.20 exp), growth rate is ~6.2 sub-pixels per second.
     // In 1 second, Core 1 alone produces ~6 sub-pixels.
     core2.alive = false;
     // Step 1 second (60 dt steps)
     for (let step = 0; step < 60; step++) {
-      g.update(1 / 60, 38, []);
+      g.update(1 / 60, 15, []);
     }
 
     let pinkCountCore1Only = 0;
@@ -273,7 +276,7 @@ describe("Phase 2 — GrowthSystem rules & escalation", () => {
 
     // Step 1 second with compounding connected cores
     for (let step = 0; step < 60; step++) {
-      g.update(1 / 60, 38, []);
+      g.update(1 / 60, 15, []);
     }
 
     let pinkCountCompounded = 0;

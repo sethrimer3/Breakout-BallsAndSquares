@@ -47,6 +47,7 @@ export class GrowthSystem {
   exposedCoresCount = 0;
   graceSeconds = GROWTH.graceSeconds;
   startRate = GROWTH.baseRate;
+  expBase = GROWTH.expBase;
   rateMultiplier = 1;
   weakenChance = 0;
   explosiveChance = 0;
@@ -135,7 +136,7 @@ export class GrowthSystem {
     this.coresDestroyed++;
     this.acc = 0;
     const shiftedTime = runTime - (this.graceSeconds - GROWTH.graceSeconds) - this.timeOffset;
-    this.rate = growthRateAt(shiftedTime, this.startRate) * this.rateMultiplier;
+    this.rate = growthRateAt(shiftedTime, this.startRate, this.expBase) * this.rateMultiplier;
   }
 
   /** Rolling percentage (0..100) of growth events within `nearRadiusCells` of a living soldier. */
@@ -172,7 +173,7 @@ export class GrowthSystem {
     }
 
     const shiftedTime = runTime - (this.graceSeconds - GROWTH.graceSeconds) - this.timeOffset;
-    this.rate = growthRateAt(shiftedTime, this.startRate) * this.rateMultiplier;
+    this.rate = growthRateAt(shiftedTime, this.startRate, this.expBase) * this.rateMultiplier;
     this.updateOverdrive(dt);
 
     // 1) Wall replication: only in overdrive do the facility's walls turn to Blight.
@@ -249,7 +250,7 @@ export class GrowthSystem {
       exposed += living;
       c.acc += rate * dt * gens;
       if (c.acc < 1) continue;
-      const cap = GROWTH.maxEventsPerStep * Math.max(1, living);
+      const cap = Math.max(GROWTH.maxEventsPerStep, Math.ceil(rate * dt * 2)) * Math.max(1, living);
       let n = Math.min(Math.floor(c.acc), cap);
       c.acc -= n;
       if (c.acc > cap) c.acc = cap;
