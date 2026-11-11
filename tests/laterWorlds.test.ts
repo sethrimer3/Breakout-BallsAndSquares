@@ -36,7 +36,7 @@ describe("later-world framework", () => {
       const at = sectorSpawnCell(frame, i);
       expect(sectorAtCell(frame, at.cx, at.cy)).toBe(i);
       expect(world.solidAt(at.cx, at.cy)).toBe(false);
-      if(id===3) expect(visited[at.cy * world.width + at.cx]).toBe(1);
+      if(id===3) expect(visited[at.cy * world.width + at.cx], `sector ${i}`).toBe(1);
       if ((id === 5 && i !== def.start) || (id === 4 && i === 24)) {
         expect(visited[at.cy * world.width + at.cx], "armored checkpoints require mining").toBe(0);
       }

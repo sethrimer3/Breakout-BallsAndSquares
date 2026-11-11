@@ -150,8 +150,6 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     health.fill(500); tint.fill(96);
     designLateSpaces(world, frame);
     const clear = (i: number): void => { health[i] = 0; wall[i] = 0; world.decor[i] = DECOR.cleanFloor; };
-    for (const room of layout.rooms) forRect(world, room.x, room.y, room.x + room.size - 1, room.y + room.size - 1, clear);
-    for (const hall of layout.corridors) forRect(world, hall.x0, hall.y0, hall.x1, hall.y1, clear);
     fortifyLateSpaces(world, frame);
     buildGates(world, frame);
     for (const door of world.doors) {
