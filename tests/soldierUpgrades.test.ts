@@ -1,6 +1,6 @@
 import { unlockTabs } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
-import { GROWTH, growthRateAt, LOOT } from "../src/config";
+import { growthRateAt, LOOT } from "../src/config";
 import { Rng } from "../src/core/Rng";
 import { LootKind, lootKindForZone, LootSystem } from "../src/entities/LootSystem";
 import { Soldier } from "../src/entities/Soldier";
