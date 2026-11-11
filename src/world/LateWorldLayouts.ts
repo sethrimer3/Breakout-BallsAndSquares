@@ -95,10 +95,13 @@ export function designLateSpaces(w: PixelWorld, f: LabFrame): void {
         if (open) clear(x, y);
       }
     // Join every clearing to the authored corridors; leave cover on diagonals.
+    // In World 5 hangar bays (archetype 2), preserve the authored pillars (dx = +-5, dy = -2..2)
     for (let d = -25; d <= 25; d++)
       for (let q = -2; q <= 2; q++) {
-        clear(Math.round(cx + d), Math.round(cy + q));
-        clear(Math.round(cx + q), Math.round(cy + d));
+        const isShipPillarH = f.def.id === 5 && archetype === 2 && (Math.abs(d - 5) <= 1 || Math.abs(d + 5) <= 1) && Math.abs(q) <= 2;
+        const isShipPillarV = f.def.id === 5 && archetype === 2 && (Math.abs(q - 5) <= 1 || Math.abs(q + 5) <= 1) && Math.abs(d) <= 2;
+        if (!isShipPillarH) clear(Math.round(cx + d), Math.round(cy + q));
+        if (!isShipPillarV) clear(Math.round(cx + q), Math.round(cy + d));
       }
     if (
       f.def.id === 4 &&

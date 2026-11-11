@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { WORLD, tierHealth } from "../src/config";
 import { PixelWorld } from "../src/world/PixelWorld";
 import { generateWorld } from "../src/world/WorldGenerator";
-import { LAB_WORLDS, sectorTier } from "../src/world/labMap";
+import { LAB_WORLDS, sectorBounds, sectorTier } from "../src/world/labMap";
 import { LateEncounters, type Encounter } from "../src/systems/LateEncounters";
 import { LootKind, LootSystem } from "../src/entities/LootSystem";
 import { Rng } from "../src/core/Rng";
@@ -229,12 +229,43 @@ describe("late campaign pacing and encounters", () => {
       (a) => a.tier === 8 && a.sector % 3 === 0,
     )?.sector;
     expect(sTier8_0).toBeDefined();
+    // Verify forest mound cell has non-zero health (archetype 0)
+    const fFrame = forest.w.labLayout!.frame!;
+    const fb = sectorBounds(fFrame, sTier8_0!);
+    const fcx = Math.round((fb.x0 + fb.x1) / 2);
+    const fcy = Math.round((fb.y0 + fb.y1) / 2);
+    expect(forest.w.health[(fcy + 7) * forest.w.width + (fcx + 7)]).toBeGreaterThan(0);
+
+    // Verify forest central bluff (archetype 1)
+    const sTier8_1 = forest.e.actors.find(
+      (a) => a.tier === 8 && a.sector % 3 === 1,
+    )?.sector;
+    expect(sTier8_1).toBeDefined();
+    const fb1 = sectorBounds(fFrame, sTier8_1!);
+    const fcx1 = Math.round((fb1.x0 + fb1.x1) / 2);
+    const fcy1 = Math.round((fb1.y0 + fb1.y1) / 2);
+    // dx=0, dy=3 has dx^2+dy^2 = 9 (between 4 and 16)
+    expect(forest.w.health[(fcy1 + 3) * forest.w.width + fcx1]).toBeGreaterThan(0);
+
     // Verify that world 4 (city) has barricade cover elements at intersection diagonals
     const city = setup(4);
     expect(city.w.solidAt).toBeDefined();
+    const cFrame = city.w.labLayout!.frame!;
+    const cb = sectorBounds(cFrame, 0);
+    const ccx = Math.round((cb.x0 + cb.x1) / 2);
+    const ccy = Math.round((cb.y0 + cb.y1) / 2);
+    expect(city.w.health[(ccy + 5) * city.w.width + (ccx + 5)]).toBeGreaterThan(0);
+
     // Verify world 5 (ship) has varied archetypes and solid pillar/alcove cover
     const ship = setup(5);
     expect(ship.e.actors.length).toBeGreaterThan(0);
+    const sFrame = ship.w.labLayout!.frame!;
+    // Sector 2 is archetype 2 (hangar bay with dual pillars at cx +- 5, cy)
+    const sb = sectorBounds(sFrame, 2);
+    const scx = Math.round((sb.x0 + sb.x1) / 2);
+    const scy = Math.round((sb.y0 + sb.y1) / 2);
+    expect(ship.w.health[scy * ship.w.width + (scx + 5)]).toBeGreaterThan(0);
+    expect(ship.w.health[scy * ship.w.width + (scx - 5)]).toBeGreaterThan(0);
   });
   it("secures encounter drops immediately to prevent softlocks upon squad wipe", () => {
     // Verified via Game late encounter reward callback and loot collection
