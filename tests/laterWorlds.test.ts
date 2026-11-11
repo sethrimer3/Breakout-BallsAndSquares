@@ -8,7 +8,7 @@ import { LAB_WORLDS, LAB_WORLD_COUNT, sectorCount, worldRows, worldBlueprint, ga
 import { atmosphereAt } from "../src/world/worldAtmosphere";
 
 describe("later-world framework", () => {
-  it.each([[3,13,13,169],[4,7,7,49],[5,5,3,15]])("builds world %i as %ix%i with %i encounter rooms", (id,columns,rows,count) => {
+  it.each([[3,13,13,169],[4,7,7,49],[5,3,7,21]])("builds world %i as %ix%i with %i encounter rooms", (id,columns,rows,count) => {
     const def = LAB_WORLDS[id];
     expect(def.sectors).toBe(columns); expect(worldRows(def)).toBe(rows); expect(sectorCount(def)).toBe(count);
     expect(worldBlueprint(def).rooms).toHaveLength(count);
@@ -68,7 +68,8 @@ describe("later-world framework", () => {
     const city = LAB_WORLDS[4];
     expect(city.facility).toMatchObject({col0:2,row0:2,col1:4,row1:4});
     expect(city.teleporter).toEqual({sector:24,to:5});
-    expect(city.start).toBe(3); expect(LAB_WORLDS[5].start).toBe(12);
+    expect(city.start).toBe(3); expect(LAB_WORLDS[5].start).toBe(19);
+    expect(LAB_WORLDS[5].sectors).toBe(3); expect(LAB_WORLDS[5].rows).toBe(7);
   });
 
   it("blends forest atmosphere continuously from lush daylight to dusk and canopy beams", () => {
@@ -85,8 +86,8 @@ describe("later-world framework", () => {
 
   it("migrates earlier saves and rejects phantom rows in the rectangular final world", () => {
     const fresh=sanitizeSaveData({lab:{world:5,unlocked:5,worlds:{5:{discovered:[12,14,15,24],conquered:[12,14,24],spawn:24}}}});
-    expect(fresh.lab.world).toBe(5); expect(fresh.lab.worlds[5].discovered).toEqual([12,14]);
-    expect(fresh.lab.worlds[5].spawn).toBe(12);
+    expect(fresh.lab.world).toBe(5); expect(fresh.lab.worlds[5].discovered).toEqual([12,14,15,19]);
+    expect(fresh.lab.worlds[5].spawn).toBe(19);
     const legacy=sanitizeSaveData({lab:{world:3,unlocked:3}});
     expect(legacy.lab.unlocked).toBe(3); expect(legacy.lab.worlds[4]).toBeDefined(); expect(legacy.lab.worlds[5]).toBeDefined();
   });

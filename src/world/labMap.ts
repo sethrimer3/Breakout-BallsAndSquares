@@ -316,9 +316,14 @@ export const LAB_WORLDS: Readonly<Record<number, LabWorldDef>> = {
     teleporter: { sector: 24, to: 5 },
   },
   5: {
-    id: 5, name: "BLIGHT MOTHERSHIP", blueprint: frameworkBlueprint(5, 3),
-    sectors: 5, rows: 3, start: 12, tierBase: 10, bands: [99, 99], freeform: false, alien: false,
+    id: 5, name: "BLIGHT MOTHERSHIP", blueprint: frameworkBlueprint(3, 7),
+    sectors: 3, rows: 7, start: 19, tierBase: 10, bands: [99, 99], freeform: false, alien: false,
     framework: true, environment: "mothership", seed: 0x5b1197, gates: [], upgrades: [],
+    facility: {
+      name: "MOTHERSHIP COMMAND SANCTUM",
+      col0: 1, row0: 1, col1: 1, row1: 1,
+      security: "Final Blight Boss Chamber: Leviathan Core protected by armored blast bulkheads.",
+    },
   },
 };
 

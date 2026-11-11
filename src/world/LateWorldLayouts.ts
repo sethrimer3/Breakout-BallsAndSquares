@@ -74,7 +74,19 @@ export function designLateSpaces(w: PixelWorld, f: LabFrame): void {
           open = (inBoulevard || inRingAlley) && !inCornerBarricade;
         } else {
           // Ship (World 5): Armored chambers, guard plazas, and maintenance service conduits.
-          if (archetype === 0) {
+          if (s === 4) {
+            // Boss Arena (Sector 4: Top middle, second row down, col 1, row 1)
+            // Grand octagonal sanctum chamber with 4 defensive blast pillars for tactical cover
+            const inChamber = dx * dx + dy * dy < 18 * 18;
+            const inPillar =
+              (Math.abs(dx - 7) <= 1 || Math.abs(dx + 7) <= 1) &&
+              (Math.abs(dy - 7) <= 1 || Math.abs(dy + 7) <= 1);
+            open = inChamber && !inPillar;
+          } else if (s === 19) {
+            // Player spawn (Sector 19: Bottom middle, col 1, row 6)
+            // Staging airlock & arrival hangar
+            open = Math.abs(dx) < 14 && Math.abs(dy) < 12;
+          } else if (archetype === 0) {
             // Central command bay with flanking side alcoves
             open =
               Math.abs(dx) < 11 &&

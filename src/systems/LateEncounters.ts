@@ -16,7 +16,7 @@ export interface Encounter {
   hp: number;
   maxHp: number;
   alive: boolean;
-  kind: "soldier" | "brute" | "turret" | "trap" | "grove";
+  kind: "soldier" | "brute" | "turret" | "trap" | "grove" | "boss";
   tier: number;
   cooldown: number;
   charge: number;
@@ -58,12 +58,15 @@ export class LateEncounters implements BulletTargets {
         b = sectorBounds(f, s),
         cx = ((b.x0 + b.x1 + 1) / 2) * this.world.cellSize,
         cy = ((b.y0 + b.y1 + 1) / 2) * this.world.cellSize;
+      const isMothershipBossSector = f.def.id === 5 && s === 4;
       const kinds: Encounter["kind"][] =
         tier === 7
           ? []
-          : tier < 10
-            ? ["soldier", "soldier", "brute"]
-            : ["turret", "turret", "trap", "soldier", "brute"];
+          : isMothershipBossSector
+            ? ["turret", "turret", "boss"]
+            : tier < 10
+              ? ["soldier", "soldier", "brute"]
+              : ["turret", "turret", "trap", "soldier", "brute"];
       if (s === f.def.start) kinds.length = 0;
       const add = (
         kind: Encounter["kind"],
@@ -75,7 +78,9 @@ export class LateEncounters implements BulletTargets {
         const hp =
           kind === "grove"
             ? 1
-            : p.enemyHp * (kind === "brute" ? 2 : kind === "trap" ? 0.3 : 1);
+            : kind === "boss"
+              ? 50000
+              : p.enemyHp * (kind === "brute" ? 2 : kind === "trap" ? 0.3 : 1);
         this.actors.push({
           id,
           sector: s,
@@ -95,14 +100,15 @@ export class LateEncounters implements BulletTargets {
           windup: 0,
         });
       };
-      kinds.forEach((k, j) =>
-        add(
-          k,
-          j,
-          cx + (j < 2 ? (j % 2 ? 1 : -1) * 10 : 0) * this.world.cellSize,
-          cy + (j < 2 ? 0 : (j - 1) * 5 * this.world.cellSize),
-        ),
-      );
+      kinds.forEach((k, j) => {
+        let ex = cx + (j < 2 ? (j % 2 ? 1 : -1) * 10 : 0) * this.world.cellSize;
+        let ey = cy + (j < 2 ? 0 : (j - 1) * 5 * this.world.cellSize);
+        if (k === "boss") {
+          ex = cx;
+          ey = cy;
+        }
+        add(k, j, ex, ey);
+      });
       if (f.def.id === 3)
         for (let j = 0; j < p.nodes; j++)
           add(
@@ -160,6 +166,46 @@ export class LateEncounters implements BulletTargets {
         a.aimAngle = Math.atan2(target.y - a.y, target.x - a.x);
       }
       a.cooldown -= dt;
+      if (a.kind === "boss") {
+        a.phase += dt;
+        const active = dist < cs * 45 && this.los(a.x, a.y, target.x, target.y);
+        if (active) a.aimAngle = Math.atan2(target.y - a.y, target.x - a.x);
+        const healthPct = a.hp / a.maxHp;
+        const enraged = healthPct <= 0.3;
+        const phase2 = healthPct <= 0.6;
+        const hoverSpeed = cs * (enraged ? 2.5 : 1.4);
+        const tx = active ? a.homeX + (target.x - a.homeX) * 0.35 + Math.cos(a.phase * 0.8) * cs * 4 : a.homeX;
+        const ty = active ? a.homeY + (target.y - a.homeY) * 0.35 + Math.sin(a.phase * 0.8) * cs * 4 : a.homeY;
+        const d = Math.hypot(tx - a.x, ty - a.y) || 1;
+        if (d > cs) {
+          const nx = a.x + ((tx - a.x) / d) * hoverSpeed * dt;
+          const ny = a.y + ((ty - a.y) / d) * hoverSpeed * dt;
+          if (circleIsClear(this.world, nx, a.y, cs * 1.5)) a.x = nx;
+          if (circleIsClear(this.world, a.x, ny, cs * 1.5)) a.y = ny;
+        }
+        if (active && a.cooldown <= 0) {
+          a.cooldown = enraged ? 0.75 : phase2 ? 1.05 : 1.45;
+          const damage = CAMPAIGN[campaignTier(a.tier)].damage;
+          const fanCount = enraged ? 5 : phase2 ? 4 : 3;
+          const spreadArc = 0.55;
+          const baseAngle = a.aimAngle;
+          for (let k = 0; k < fanCount; k++) {
+            const angle = baseAngle - spreadArc / 2 + (k / Math.max(1, fanCount - 1)) * spreadArc;
+            if (this.shots.length < 256) {
+              this.shots.push({
+                x: a.x + Math.cos(angle) * cs * 2.5,
+                y: a.y + Math.sin(angle) * cs * 2.5,
+                vx: Math.cos(angle) * cs * (enraged ? 32 : 26),
+                vy: Math.sin(angle) * cs * (enraged ? 32 : 26),
+                life: 2.5,
+                damage,
+              });
+            }
+          }
+          this.sound(a.x, a.y);
+        }
+        continue;
+      }
       if (a.kind === "trap") {
         if (active && dist < cs * 6) a.charge += dt;
         else a.charge = Math.max(0, a.charge - dt);
@@ -252,7 +298,7 @@ export class LateEncounters implements BulletTargets {
       const ox = a.x - x,
         oy = a.y - y,
         t = ox * dx + oy * dy,
-        r = this.world.cellSize * (a.kind === "brute" ? 1.2 : 0.8);
+        r = this.world.cellSize * (a.kind === "boss" ? 2.8 : a.kind === "brute" ? 1.2 : 0.8);
       if (t < 0 || t > best || ox * ox + oy * oy - t * t > r * r) continue;
       const hit = Math.max(
         0,
@@ -282,10 +328,16 @@ export class LateEncounters implements BulletTargets {
     if (!a.alive) return;
     a.alive = false;
     const p = CAMPAIGN[campaignTier(a.tier)];
+    const rewardValue =
+      a.kind === "grove"
+        ? p.biomass
+        : a.kind === "boss"
+          ? 10000
+          : p.essence * (a.kind === "brute" ? 2 : 1);
     this.reward(
       a,
       a.kind === "grove" ? LootKind.Biomass : LootKind.Essence,
-      a.kind === "grove" ? p.biomass : p.essence * (a.kind === "brute" ? 2 : 1),
+      rewardValue,
     );
   }
   draw(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
@@ -295,12 +347,45 @@ export class LateEncounters implements BulletTargets {
         y = cam.worldToScreenY(a.y),
         r = this.world.cellSize * cam.zoom;
       if (
-        x < -r * 2 ||
-        y < -r * 2 ||
-        x > cam.viewW + r * 2 ||
-        y > cam.viewH + r * 2
+        x < -r * 6 ||
+        y < -r * 6 ||
+        x > cam.viewW + r * 6 ||
+        y > cam.viewH + r * 6
       )
         continue;
+      if (a.kind === "boss") {
+        const br = r * 2.8;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(a.aimAngle);
+        // Outer dark carapace
+        ctx.fillStyle = a.hp / a.maxHp <= 0.3 ? "#ff1a53" : "#800e3b";
+        ctx.fillRect(-br, -br, br * 2, br * 2);
+        // Inner core
+        ctx.fillStyle = "#ff66a3";
+        ctx.fillRect(-br * 0.6, -br * 0.6, br * 1.2, br * 1.2);
+        // Central matrix eye
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(-br * 0.25, -br * 0.25, br * 0.5, br * 0.5);
+        // Front cannons
+        ctx.fillStyle = "#ffd84d";
+        ctx.fillRect(br * 0.5, -br * 0.3, br * 0.7, br * 0.2);
+        ctx.fillRect(br * 0.5, br * 0.1, br * 0.7, br * 0.2);
+        ctx.restore();
+
+        // Big Boss Health Bar above boss
+        const barW = br * 2.5;
+        const barH = Math.max(4, 5 * cam.zoom);
+        const barY = y - br - 12 * cam.zoom;
+        ctx.fillStyle = "#15151d";
+        ctx.fillRect(x - barW / 2, barY, barW, barH);
+        ctx.fillStyle = a.hp / a.maxHp <= 0.3 ? "#ff0055" : "#ff3377";
+        ctx.fillRect(x - barW / 2, barY, (barW * Math.max(0, a.hp)) / a.maxHp, barH);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = Math.max(1, cam.zoom);
+        ctx.strokeRect(x - barW / 2, barY, barW, barH);
+        continue;
+      }
       ctx.fillStyle =
         a.kind === "grove"
           ? "#7fe39a"
@@ -362,6 +447,15 @@ export class LateEncounters implements BulletTargets {
         y > cam.viewH + r * 6
       )
         continue;
+      if (a.kind === "boss") {
+        const br = r * 2.8;
+        ctx.save();
+        ctx.strokeStyle = a.hp / a.maxHp <= 0.3 ? "#ff0055" : "#ff4081";
+        ctx.lineWidth = Math.max(2, 2.5 * cam.zoom);
+        ctx.strokeRect(x - br - 2, y - br - 2, (br + 2) * 2, (br + 2) * 2);
+        ctx.restore();
+        continue;
+      }
       if (a.kind === "trap" && a.charge > 0) {
         const pulse = 0.8 + 0.2 * Math.sin(performance.now() * 0.02);
         ctx.save();

@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { WORLD, tierHealth } from "../src/config";
 import { PixelWorld } from "../src/world/PixelWorld";
 import { generateWorld } from "../src/world/WorldGenerator";
-import { LAB_WORLDS, sectorBounds, sectorTier } from "../src/world/labMap";
+import { LAB_WORLDS, sectorBounds, sectorCount, sectorTier, worldRows } from "../src/world/labMap";
 import { LateEncounters, type Encounter } from "../src/systems/LateEncounters";
 import { LootKind, LootSystem } from "../src/entities/LootSystem";
 import { Rng } from "../src/core/Rng";
@@ -490,5 +490,54 @@ describe("late campaign pacing and encounters", () => {
       expect(f.x).toBeGreaterThan(360);
       expect(Math.hypot(f.x - commander.x, f.y - commander.y)).toBeLessThan(50);
     }
+  });
+
+  it("structures mothership (world 5) as 3 wide by 7 high, spawning at bottom with boss at top middle", () => {
+    const ship = setup(5);
+    const def = LAB_WORLDS[5];
+    expect(def.sectors).toBe(3);
+    expect(worldRows(def)).toBe(7);
+    expect(sectorCount(def)).toBe(21);
+    expect(def.start).toBe(19); // Row 6, col 1 (bottom middle)
+
+    // Verify arrival sector 19 is combat-free
+    const arrivalEncounters = ship.e.actors.filter((a) => a.sector === 19);
+    expect(arrivalEncounters).toHaveLength(0);
+
+    // Verify final blight boss is in sector 4 (Row 1, col 1: second row down, middle column)
+    const boss = ship.e.actors.find((a) => a.kind === "boss");
+    expect(boss).toBeDefined();
+    expect(boss!.sector).toBe(4);
+    expect(boss!.hp).toBe(50000);
+    expect(boss!.maxHp).toBe(50000);
+    expect(boss!.tier).toBe(11);
+
+    // Check sector 4 tactical arena cover (4 blast pillars at +-7, +-7)
+    const f = ship.w.labLayout!.frame!;
+    const sb = sectorBounds(f, 4);
+    const scx = Math.round((sb.x0 + sb.x1) / 2);
+    const scy = Math.round((sb.y0 + sb.y1) / 2);
+    expect(ship.w.health[(scy + 7) * ship.w.width + (scx + 7)]).toBeGreaterThan(0);
+    expect(ship.w.health[(scy + 7) * ship.w.width + (scx - 7)]).toBeGreaterThan(0);
+    expect(ship.w.health[(scy - 7) * ship.w.width + (scx + 7)]).toBeGreaterThan(0);
+    expect(ship.w.health[(scy - 7) * ship.w.width + (scx - 7)]).toBeGreaterThan(0);
+
+    // Verify boss combat: multi-projectile spread and 10,000 essence reward
+    const s = new Soldier(boss!.x, boss!.y + 8 * ship.w.cellSize, 1, 0, 100);
+    boss!.cooldown = 0;
+    ship.e.update(0.1, [s]);
+    expect(ship.e.shots.length).toBeGreaterThanOrEqual(3); // 3-projectile spread volley in phase 1
+
+    // Raycast and hit boss
+    const rayDist = ship.e.raycast(boss!.x, boss!.y + 10 * ship.w.cellSize, 0, -1, 100 * ship.w.cellSize);
+    expect(rayDist).toBeGreaterThan(0);
+
+    // Kill boss and verify reward
+    ship.e.applyHit(1e6);
+    expect(boss!.alive).toBe(false);
+    const bossReward = ship.rewards.find((r) => r.a.id === boss!.id);
+    expect(bossReward).toBeDefined();
+    expect(bossReward!.kind).toBe(LootKind.Essence);
+    expect(bossReward!.value).toBe(10000);
   });
 });
