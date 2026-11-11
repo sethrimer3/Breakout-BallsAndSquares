@@ -27,20 +27,25 @@ export class ScreenTransition {
   private onDone: (() => void) | null = null;
   private lastDrawnKey = "";
 
-  constructor(parent: HTMLElement = document.body) {
-    this.canvas = document.createElement("canvas");
-    this.canvas.className = "screen-transition";
-    const s = this.canvas.style;
-    s.position = "fixed";
-    s.inset = "0";
-    s.width = "100%";
-    s.height = "100%";
-    s.pointerEvents = "none";
-    s.zIndex = "1000";
-    s.imageRendering = "pixelated";
-    s.display = "none";
-    parent.append(this.canvas);
-    this.ctx = this.canvas.getContext("2d")!;
+  constructor(parent?: HTMLElement) {
+    if (typeof document !== "undefined") {
+      this.canvas = document.createElement("canvas");
+      this.canvas.className = "screen-transition";
+      const s = this.canvas.style;
+      s.position = "fixed";
+      s.inset = "0";
+      s.width = "100%";
+      s.height = "100%";
+      s.pointerEvents = "none";
+      s.zIndex = "1000";
+      s.imageRendering = "pixelated";
+      s.display = "none";
+      (parent ?? document.body)?.append(this.canvas);
+      this.ctx = this.canvas.getContext("2d")!;
+    } else {
+      this.canvas = {} as HTMLCanvasElement;
+      this.ctx = {} as CanvasRenderingContext2D;
+    }
   }
 
   get active(): boolean {

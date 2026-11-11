@@ -203,9 +203,11 @@ describe("late campaign pacing and encounters", () => {
     const grenade = combat.throwGrenade(s, 3, 10, 0, 1)!;
     expect(grenade.terrainDamageBonus).toBe(12000);
   });
-  it("migrates old saves and sanitizes encounter progress and biomass", () => {
+  it("migrates old saves and recovers uncredited finite rewards atomically", () => {
+    // If a player had cleared enemies/groves but had 0 biomass and 0 essence due to pickup loss
     const s = sanitizeSaveData({
-      biomass: 125.8,
+      biomass: 0,
+      essence: 0,
       lab: {
         world: 3,
         unlocked: 3,
@@ -217,7 +219,10 @@ describe("late campaign pacing and encounters", () => {
         },
       },
     });
-    expect(s.biomass).toBe(125);
+    // Sector 1 in World 3: tier is determined by sectorTier(LAB_WORLDS[3], 1).
+    // Grove gathered in sector 2: awards tier's biomass.
+    expect(s.biomass).toBeGreaterThanOrEqual(25);
+    expect(s.essence).toBeGreaterThanOrEqual(200);
     expect(s.lab.worlds[3].cleared).toEqual(["1:soldier:0"]);
     expect(s.lab.worlds[3].gathered).toEqual(["2:grove:1"]);
     expect(sanitizeSaveData({}).biomass).toBe(0);
@@ -236,7 +241,7 @@ describe("late campaign pacing and encounters", () => {
     const fcy = Math.round((fb.y0 + fb.y1) / 2);
     expect(forest.w.health[(fcy + 7) * forest.w.width + (fcx + 7)]).toBeGreaterThan(0);
 
-    // Verify forest central bluff (archetype 1)
+    // Verify forest central bluff (archetype 1): diagonal offset dx=3, dy=3 (dx^2+dy^2 = 18)
     const sTier8_1 = forest.e.actors.find(
       (a) => a.tier === 8 && a.sector % 3 === 1,
     )?.sector;
@@ -244,8 +249,7 @@ describe("late campaign pacing and encounters", () => {
     const fb1 = sectorBounds(fFrame, sTier8_1!);
     const fcx1 = Math.round((fb1.x0 + fb1.x1) / 2);
     const fcy1 = Math.round((fb1.y0 + fb1.y1) / 2);
-    // dx=0, dy=3 has dx^2+dy^2 = 9 (between 4 and 16)
-    expect(forest.w.health[(fcy1 + 3) * forest.w.width + fcx1]).toBeGreaterThan(0);
+    expect(forest.w.health[(fcy1 + 3) * forest.w.width + (fcx1 + 3)]).toBeGreaterThan(0);
 
     // Verify that world 4 (city) has barricade cover elements at intersection diagonals
     const city = setup(4);
@@ -277,40 +281,27 @@ describe("late campaign pacing and encounters", () => {
     expect(c.rewards[0].kind).toBe(LootKind.Essence);
     expect(c.rewards[0].value).toBe(CAMPAIGN[8].essence);
   });
-  it("prevents double-counting and loss of finite persistent rewards", () => {
+  it("prevents double-counting and loss of finite persistent rewards with feedback drops", () => {
     const loot = new LootSystem();
     const rng = new Rng(42);
     const s = new Soldier(100, 100, 1, 0, 100);
-    // Spawn persistent encounter rewards
-    loot.spawnOne(100, 100, 90, rng, LootKind.Biomass, 40);
-    loot.spawnOne(100, 100, 90, rng, LootKind.Essence, 400);
+    // Spawn feedback drops for an encounter clear (wallet was already atomically credited)
+    loot.spawnOne(100, 100, 90, rng, LootKind.Biomass, 40, true);
+    loot.spawnOne(100, 100, 90, rng, LootKind.Essence, 400, true);
 
-    // 1) Test normal physical collection by squad
-    const collected = loot.update(0.01, [s], 50);
+    // 1) Test physical pickup by soldier: plays audio/collects but does NOT double-tally
+    let audioPlayed = 0;
+    const collected = loot.update(0.01, [s], 50, () => { audioPlayed++; });
     expect(collected).toBe(2);
-    expect(loot.collectedBiomass).toBe(40);
-    expect(loot.collectedEssence).toBe(400);
-
-    // Subsequent updates without new drops yield 0
-    loot.update(0.01, [s], 50);
+    expect(audioPlayed).toBe(2);
     expect(loot.collectedBiomass).toBe(0);
     expect(loot.collectedEssence).toBe(0);
-
-    // 2) Test uncollected drop sweeping on wipe / gate travel
-    loot.spawnOne(500, 500, 90, rng, LootKind.Biomass, 25);
-    loot.spawnOne(500, 500, 90, rng, LootKind.Essence, 200);
-    expect(loot.count).toBe(2);
-
-    let sweptBio = 0;
-    let sweptEss = 0;
-    for (let i = 0; i < loot.count; i++) {
-      if (loot.kind[i] === LootKind.Biomass) sweptBio += loot.value[i];
-      if (loot.kind[i] === LootKind.Essence) sweptEss += loot.value[i];
-    }
-    loot.clear();
-    expect(sweptBio).toBe(25);
-    expect(sweptEss).toBe(200);
     expect(loot.count).toBe(0);
+
+    // 2) Ordinary drops (not feedback) still tally into collected* counters normally
+    loot.spawnOne(100, 100, 90, rng, LootKind.Gold, 10, false);
+    loot.update(0.01, [s], 50);
+    expect(loot.collectedGold).toBe(10);
   });
   it("compresses formations around narrow cover and prevents soldier clumping", () => {
     const world = new PixelWorld({
@@ -398,5 +389,57 @@ describe("late campaign pacing and encounters", () => {
       if (ship.w.health[i] === 65000) count65k++;
     }
     expect(count65k).toBeGreaterThan(0);
+  });
+  it("navigates squad followers around obstacles to reach commander in formation", async () => {
+    // Cell size: 8
+    const world = new PixelWorld({
+      width: 64,
+      height: 64,
+      cellSize: 8,
+      roomSize: 10,
+    });
+    world.health.fill(0);
+    // Solid rectangular obstacle: cells x=43..45, y=46..54
+    for (let cy = 46; cy <= 54; cy++) {
+      for (let cx = 43; cx <= 45; cx++) {
+        world.health[cy * world.width + cx] = 10000;
+      }
+    }
+    // Commander at (432, 400), facing east, manual movement stopped
+    const commander = new Soldier(432, 400, 0, 0, 60, "pistol", "free", 0);
+    commander.facingAngle = 0;
+    commander.vx = 0;
+    commander.vy = 0;
+
+    // Three followers at (300, 392), (300, 400), and (300, 408)
+    const f1 = new Soldier(300, 392, 0, 0, 60, "pistol", "free", 1);
+    const f2 = new Soldier(300, 400, 0, 0, 60, "pistol", "free", 2);
+    const f3 = new Soldier(300, 408, 0, 0, 60, "pistol", "free", 3);
+
+    // Setup Game instance simulation
+    const fakeCanvas = { clientWidth: 800, clientHeight: 600, style: {} } as unknown as HTMLCanvasElement;
+    const fakeUi = { appendChild: () => {}, querySelector: () => null } as unknown as HTMLElement;
+    // @ts-expect-error test harness
+    const { Game } = await import("../src/Game");
+    const game = new Game(fakeCanvas, fakeUi);
+    // Replace world & soldiers with our test scenario
+    // @ts-expect-error access private/readonly for deterministic test
+    game.world = world;
+    game.physics = new (await import("../src/systems/PhysicsSystem")).PhysicsSystem(world, game.rng);
+    game.soldiers = [commander, f1, f2, f3];
+    game.autoMove = false;
+    game.activeFormation = "triangle";
+
+    // Simulate 20 seconds of game steps (dt = 0.05)
+    for (let t = 0; t < 400; t++) {
+      game.step(0.05);
+    }
+
+    // Followers should have navigated around the obstacle past x=360 towards commander (432, 400)
+    // rather than staying stuck against the wall at x=340.8
+    for (const f of [f1, f2, f3]) {
+      expect(f.x).toBeGreaterThan(360);
+      expect(Math.hypot(f.x - commander.x, f.y - commander.y)).toBeLessThan(50);
+    }
   });
 });

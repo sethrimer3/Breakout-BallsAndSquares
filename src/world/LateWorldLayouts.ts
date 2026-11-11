@@ -46,9 +46,12 @@ export function designLateSpaces(w: PixelWorld, f: LabFrame): void {
           } else if (archetype === 1) {
             const r = 14 + 4 * Math.sin(Math.atan2(dy, dx) * 4 + s);
             const inClearing = dx * dx + dy * dy < r * r;
-            // Center natural obstacle creating circular flanking combat lanes
+            // Center natural obstacle on diagonals creating circular flanking combat lanes
             const inCenterIsle =
-              tier > 7 && dx * dx + dy * dy < 16 && dx * dx + dy * dy >= 4;
+              tier > 7 &&
+              dx * dx + dy * dy < 25 &&
+              dx * dx + dy * dy >= 8 &&
+              Math.abs(Math.abs(dx) - Math.abs(dy)) <= 2;
             open = inClearing && !inCenterIsle;
           } else {
             // Twin flanking clearings connected through center

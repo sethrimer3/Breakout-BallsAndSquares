@@ -1,6 +1,7 @@
-import { sectorCount } from "../world/labMap";
+import { sectorCount, sectorTier } from "../world/labMap";
 import { clamp } from "../core/math";
 import { LAB_WORLD_COUNT, LAB_WORLDS } from "../world/labMap";
+import { CAMPAIGN, campaignTier } from "../world/campaignBalance";
 import type { SecondaryWeaponType, WeaponType } from "../entities/Soldier";
 import { SOLDIER_UPGRADE_DEFS, type SoldierUpgradeLevels } from "./SoldierUpgrades";
 import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
@@ -334,6 +335,60 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     const int = (x: unknown, fallback: number): number => (typeof x === "number" && Number.isInteger(x) ? x : fallback);
     def.lab.unlocked = clamp(int(lab.unlocked, 1), 1, LAB_WORLD_COUNT);
     def.lab.world = clamp(int(lab.world, 1), 1, def.lab.unlocked);
+
+    // Migration recovery for finite rewards lost due to previous drop expiration/refresh bugs:
+    // If a save already cleared encounters or gathered groves, ensure wallet biomass and essence
+    // are at least the sum of their fixed entitlements (less any spent on soldier upgrades).
+    let minBiomass = 0;
+    let minEssence = 0;
+    for (let id = 3; id <= LAB_WORLD_COUNT; id++) {
+      const wProg = def.lab.worlds[id];
+      const worldDef = LAB_WORLDS[id];
+      if (!wProg || !worldDef) continue;
+      for (const idStr of wProg.gathered) {
+        const parts = idStr.split(":");
+        const s = parseInt(parts[0], 10);
+        if (Number.isFinite(s)) {
+          const t = sectorTier(worldDef, s);
+          const p = CAMPAIGN[campaignTier(t)];
+          minBiomass += p.biomass;
+        }
+      }
+      for (const idStr of wProg.cleared) {
+        const parts = idStr.split(":");
+        const s = parseInt(parts[0], 10);
+        const kind = parts[1];
+        if (Number.isFinite(s)) {
+          const t = sectorTier(worldDef, s);
+          const p = CAMPAIGN[campaignTier(t)];
+          minEssence += p.essence * (kind === "brute" ? 2 : 1);
+        }
+      }
+    }
+    // Account for essence/biomass legitimately spent on existing soldier upgrades:
+    // Note: If player already spent resources on upgrades, minBiomass/minEssence represents
+    // total earned. Ensure current wallet >= (earned - spent).
+    let spentBiomass = 0;
+    let spentEssence = 0;
+    for (const ld of def.loadouts) {
+      if (!ld.upgrades) continue;
+      for (const d of SOLDIER_UPGRADE_DEFS) {
+        const lvl = ld.upgrades[d.id] ?? 0;
+        for (let l = 0; l < lvl; l++) {
+          if (d.tier === 4) {
+            spentBiomass += Math.ceil(d.baseCost * (d.costMultiplier ?? 1.25) ** l);
+          }
+          const ess = d.essenceCost ?? 0;
+          if (ess > 0) {
+            spentEssence += Math.round(ess * (1 + 0.5 * l));
+          }
+        }
+      }
+    }
+    const targetBiomass = Math.max(0, minBiomass - spentBiomass);
+    const targetEssence = Math.max(0, minEssence - spentEssence);
+    if (def.biomass < targetBiomass) def.biomass = targetBiomass;
+    if (def.essence < targetEssence) def.essence = targetEssence;
   }
 
   if (typeof obj.lastSaved === "number" && Number.isFinite(obj.lastSaved)) {

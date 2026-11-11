@@ -21,7 +21,7 @@ import { CombinedTargets, RoomFixtures } from "./systems/RoomFixtures";
 import { FireSystem } from "./systems/FireSystem";
 import { Input } from "./systems/Input";
 import { LightingSystem, makeLitCells, type LitCells, type MuzzleLight } from "./systems/LightingSystem";
-import { PhysicsSystem, circleIsClear, findClearDeployPoint, findSpawnPoint } from "./systems/PhysicsSystem";
+import { PhysicsSystem, circleIsClear, findClearDeployPoint, findSpawnPoint, hasLineOfSight } from "./systems/PhysicsSystem";
 import { RunStats } from "./systems/RunStats";
 import { HUD } from "./ui/HUD";
 import { DebugOverlay } from "./ui/DebugOverlay";
@@ -155,6 +155,8 @@ export class Game {
   private flashPolyPool: Float32Array[] = [];
   private flashLitPool: LitCells[] = [];
   private lightOverBudgetFrames = 0;
+  /** Historical trail of commander positions for obstacle-aware squad navigation. */
+  private commanderTrail: { x: number; y: number }[] = [];
 
   private acc = 0;
   private last = 0;
@@ -234,15 +236,30 @@ export class Game {
       const list = a.kind === "grove" ? this.labSave.gathered : this.labSave.cleared;
       if (list.includes(a.id)) return;
       list.push(a.id);
-      this.save.save();
-      // Drop physical pickup for in-world player collection.
-      // Drops are collected into runStats when touched by soldiers.
-      // If the squad wipes or transitions before touching them, sweepUncollectedDrops()
-      // ensures persistent encounter loot is swept and safely banked.
-      this.loot.spawnOne(a.x, a.y, Math.max(90, this.stats.pickupLifetime), this.rng, kind, value);
+      // Authoritative durable reward: credit persistent resources atomically into wallet immediately upon clear.
+      if (kind === LootKind.Biomass) {
+        this.save.data.biomass += value;
+      } else if (kind === LootKind.Essence) {
+        this.save.data.essence += value;
+      }
+      let cacheRewardKind: LootKind = LootKind.Gold;
+      let cacheRewardVal = 0;
       if (a.kind === "grove") {
         const reward = lateBlockReward(a.tier);
-        this.loot.spawnOne(a.x, a.y, 90, this.rng, reward.kind, reward.value * 10);
+        cacheRewardKind = reward.kind;
+        cacheRewardVal = reward.value * 10;
+        if (cacheRewardKind === LootKind.Crystal) this.save.data.crystals += cacheRewardVal;
+        else if (cacheRewardKind === LootKind.GreenCrystal) this.save.data.greenCrystals += cacheRewardVal;
+        else this.save.data.bank += cacheRewardVal;
+      }
+      this.save.save();
+
+      // Drop physical pickups for in-world player audiovisual gratification.
+      // Flagged as feedback drops so physical collection produces effects/sounds
+      // but does NOT double-credit the authoritative wallet balance.
+      this.loot.spawnOne(a.x, a.y, Math.max(90, this.stats.pickupLifetime), this.rng, kind, value, true);
+      if (a.kind === "grove") {
+        this.loot.spawnOne(a.x, a.y, 90, this.rng, cacheRewardKind, cacheRewardVal, true);
       }
       this.audio.playDestroy(a.x, a.y);
     }, (soldier, damage, x, y) => this.hurtSoldier(soldier, damage, x, y), (x, y) => this.audio.playSpore(x, y));
@@ -583,7 +600,7 @@ export class Game {
     lab.unlocked = Math.max(lab.unlocked, id);
     this.save.save();
     this.transition.close(0.6, () => {
-      this.sweepUncollectedDrops();
+      this.loot.clear();
       lab.world = id;
       this.labSave.spawn = this.labDef.start;
       this.save.save();
@@ -640,27 +657,9 @@ export class Game {
     this.save.save();
   }
 
-  /**
-   * Sweep uncollected floor drops into runStats before banking or world transition,
-   * guaranteeing earned persistent drops (biomass, essence) are never lost.
-   */
-  private sweepUncollectedDrops(): void {
-    const loot = this.loot;
-    for (let i = 0; i < loot.count; i++) {
-      const k = loot.kind[i];
-      const v = loot.value[i];
-      if (k === LootKind.Biomass) this.runStats.biomass += v;
-      else if (k === LootKind.Essence) this.runStats.essence += v;
-      else if (k === LootKind.Crystal) this.runStats.crystals += v;
-      else if (k === LootKind.GreenCrystal) this.runStats.greenCrystals += v;
-      else this.runStats.currency += v;
-    }
-    loot.clear();
-  }
-
   /** Bank currency & lifetime pixels earned in the current run (idempotent per run). */
   bankCurrentRun(): { time: boolean; depth: boolean; pixels: boolean } {
-    this.sweepUncollectedDrops();
+    this.loot.clear();
     const r = this.runStats;
     const b = this.save.data.bests;
     const newBests = {
@@ -1681,72 +1680,141 @@ export class Game {
       for (const s of this.soldiers) s.isManual = false;
     }
 
-    // 2. Formations (Override individual behaviors)
-    if (this.activeFormation !== "none" && commander) {
-      const followers = this.soldiers
-        .filter((s) => s.alive && s !== commander)
-        .sort((a, b) => a.slotIndex - b.slotIndex || a.id - b.id);
-
-      let cdx = Math.cos(commander.facingAngle);
-      let cdy = Math.sin(commander.facingAngle);
-      const cvLen = Math.hypot(commander.vx, commander.vy);
-      if (cvLen > 10) {
-        cdx = commander.vx / cvLen;
-        cdy = commander.vy / cvLen;
-      }
-
-      const spacing = 16;
-      for (let i = 0; i < followers.length; i++) {
-        const f = followers[i];
-        f.isInFormation = true;
-        let tx = 0;
-        let ty = 0;
-        if (this.activeFormation === "line") {
-          tx = commander.x - cdx * spacing * (i + 1);
-          ty = commander.y - cdy * spacing * (i + 1);
-        } else {
-          // Triangle formation (wedge)
-          const row = Math.floor(i / 2) + 1;
-          const side = i % 2 === 0 ? -1 : 1;
-          const backDist = row * spacing;
-          let sideDist = side * row * 14;
-          let candX = commander.x - cdx * backDist - cdy * sideDist;
-          let candY = commander.y - cdy * backDist + cdx * sideDist;
-          // Compression: if the flank target is obstructed by walls or cover,
-          // compress inward toward the center line to fit through narrow passages.
-          if (!circleIsClear(this.world, candX, candY, f.radius)) {
-            sideDist *= 0.4;
-            candX = commander.x - cdx * backDist - cdy * sideDist;
-            candY = commander.y - cdy * backDist + cdx * sideDist;
-            if (!circleIsClear(this.world, candX, candY, f.radius)) {
-              // Full collapse to single-file trail behind commander
-              candX = commander.x - cdx * spacing * (i + 1);
-              candY = commander.y - cdy * spacing * (i + 1);
-            }
-          }
-          tx = candX;
-          ty = candY;
-        }
-
-        const fdx = tx - f.x;
-        const fdy = ty - f.y;
-        const fdist = Math.hypot(fdx, fdy);
-        if (fdist > 3) {
-          const fsp = Math.min(f.speed * 1.6, Math.max(f.speed, fdist * 3.5));
-          f.vx = (fdx / fdist) * fsp;
-          f.vy = (fdy / fdist) * fsp;
-          f.facingAngle = Math.atan2(f.vy, f.vx);
-        } else {
-          f.vx = commander.vx;
-          f.vy = commander.vy;
-          f.facingAngle = commander.facingAngle;
-        }
-      }
-    } else {
-      for (const s of this.soldiers) s.isInFormation = false;
-    }
+    if (commander) this.stepFormation(dt, commander);
 
     this.dualStick.update();
+  }
+
+  stepFormation(dt: number, commander: Soldier): void {
+    if (this.activeFormation === "none" || !commander) {
+      this.commanderTrail.length = 0;
+      for (const s of this.soldiers) s.isInFormation = false;
+      return;
+    }
+
+    // Maintain breadcrumb trail of commander positions
+    if (
+      this.commanderTrail.length === 0 ||
+      Math.hypot(
+        commander.x - this.commanderTrail[this.commanderTrail.length - 1].x,
+        commander.y - this.commanderTrail[this.commanderTrail.length - 1].y,
+      ) >= 8
+    ) {
+      this.commanderTrail.push({ x: commander.x, y: commander.y });
+      if (this.commanderTrail.length > 50) this.commanderTrail.shift();
+    }
+
+    const followers = this.soldiers
+      .filter((s) => s.alive && s !== commander)
+      .sort((a, b) => a.slotIndex - b.slotIndex || a.id - b.id);
+
+    let cdx = Math.cos(commander.facingAngle);
+    let cdy = Math.sin(commander.facingAngle);
+    const cvLen = Math.hypot(commander.vx, commander.vy);
+    if (cvLen > 10) {
+      cdx = commander.vx / cvLen;
+      cdy = commander.vy / cvLen;
+    }
+
+    const spacing = 16;
+    for (let i = 0; i < followers.length; i++) {
+      const f = followers[i];
+      f.isInFormation = true;
+      let tx = 0;
+      let ty = 0;
+      if (this.activeFormation === "line") {
+        tx = commander.x - cdx * spacing * (i + 1);
+        ty = commander.y - cdy * spacing * (i + 1);
+      } else {
+        // Triangle formation (wedge)
+        const row = Math.floor(i / 2) + 1;
+        const side = i % 2 === 0 ? -1 : 1;
+        const backDist = row * spacing;
+        let sideDist = side * row * 14;
+        let candX = commander.x - cdx * backDist - cdy * sideDist;
+        let candY = commander.y - cdy * backDist + cdx * sideDist;
+        // Compression: if the flank target is obstructed by walls or cover,
+        // compress inward toward the center line to fit through narrow passages.
+        if (!circleIsClear(this.world, candX, candY, f.radius)) {
+          sideDist *= 0.4;
+          candX = commander.x - cdx * backDist - cdy * sideDist;
+          candY = commander.y - cdy * backDist + cdx * sideDist;
+          if (!circleIsClear(this.world, candX, candY, f.radius)) {
+            // Full collapse to single-file trail behind commander
+            candX = commander.x - cdx * spacing * (i + 1);
+            candY = commander.y - cdy * spacing * (i + 1);
+          }
+        }
+        tx = candX;
+        ty = candY;
+      }
+
+      // Obstacle-aware navigation: check direct line-of-sight to target
+      let steerX = tx;
+      let steerY = ty;
+      if (!hasLineOfSight(this.world, f.x, f.y, tx, ty)) {
+        // 1) Search breadcrumbs from newest to oldest for one visible to follower
+        let foundBreadcrumb = false;
+        for (let bIdx = this.commanderTrail.length - 1; bIdx >= 0; bIdx--) {
+          const pt = this.commanderTrail[bIdx];
+          if (
+            Math.hypot(pt.x - f.x, pt.y - f.y) > 4 &&
+            hasLineOfSight(this.world, f.x, f.y, pt.x, pt.y)
+          ) {
+            steerX = pt.x;
+            steerY = pt.y;
+            foundBreadcrumb = true;
+            break;
+          }
+        }
+        // 2) If no breadcrumb is visible (e.g. commander stopped or jumped),
+        // probe tangential flanking rays around obstacle contour
+        if (!foundBreadcrumb) {
+          const directDx = tx - f.x;
+          const directDy = ty - f.y;
+          const directDist = Math.hypot(directDx, directDy) || 1;
+          const nx = directDx / directDist;
+          const ny = directDy / directDist;
+          // Test lateral angles on both sides
+          let bestAngDist = Infinity;
+          for (const sign of [-1, 1]) {
+            for (const deg of [30, 60, 85]) {
+              const rad = (deg * Math.PI) / 180 * sign;
+              const cosA = Math.cos(rad);
+              const sinA = Math.sin(rad);
+              const probeX = f.x + (nx * cosA - ny * sinA) * Math.min(24, directDist);
+              const probeY = f.y + (nx * sinA + ny * cosA) * Math.min(24, directDist);
+              if (
+                circleIsClear(this.world, probeX, probeY, f.radius) &&
+                hasLineOfSight(this.world, f.x, f.y, probeX, probeY)
+              ) {
+                const toGoal = Math.hypot(tx - probeX, ty - probeY);
+                if (toGoal < bestAngDist) {
+                  bestAngDist = toGoal;
+                  steerX = probeX;
+                  steerY = probeY;
+                }
+              }
+            }
+          }
+        }
+      }
+
+      const fdx = steerX - f.x;
+      const fdy = steerY - f.y;
+      const fdist = Math.hypot(fdx, fdy);
+      if (fdist > 3) {
+        const fsp = Math.min(f.speed * 1.6, Math.max(f.speed, fdist * 3.5));
+        f.vx = (fdx / fdist) * fsp;
+        f.vy = (fdy / fdist) * fsp;
+        f.facingAngle = Math.atan2(f.vy, f.vx);
+      } else {
+        f.vx = commander.vx;
+        f.vy = commander.vy;
+        f.facingAngle = commander.facingAngle;
+      }
+    }
+  }
 
     for (const s of this.soldiers) {
       if (!s.alive) continue;

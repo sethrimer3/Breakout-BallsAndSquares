@@ -34,6 +34,7 @@ export class LootSystem {
   readonly maxLife: Float32Array;
   readonly kind: Uint8Array;
   readonly value: Uint16Array;
+  readonly isFeedback: Uint8Array;
 
   /** Per-step collection counters populated by `update()`. */
   collectedGold = 0;
@@ -52,6 +53,7 @@ export class LootSystem {
     this.maxLife = new Float32Array(cap);
     this.kind = new Uint8Array(cap);
     this.value = new Uint16Array(cap);
+    this.isFeedback = new Uint8Array(cap);
   }
 
   /**
@@ -84,6 +86,7 @@ export class LootSystem {
     rng: Rng,
     kind: LootKind = LootKind.Gold,
     value = 1,
+    feedback = false,
   ): void {
     let i: number;
     if (this.count < this.cap) {
@@ -101,6 +104,7 @@ export class LootSystem {
     this.maxLife[i] = lifetime;
     this.kind[i] = kind;
     this.value[i] = Math.max(1,Math.min(65535,Math.floor(value)));
+    this.isFeedback[i] = feedback ? 1 : 0;
   }
 
   /**
@@ -172,7 +176,9 @@ export class LootSystem {
 
       if (pickedUp) {
         collected++;
-        this.tally(k, this.value[i]);
+        if (!this.isFeedback[i]) {
+          this.tally(k, this.value[i]);
+        }
         onCollect?.(px, py, k);
         this.removeAt(i);
         continue;
@@ -210,7 +216,9 @@ export class LootSystem {
 
       if (pickedUp) {
         collected++;
-        this.tally(k, this.value[i]);
+        if (!this.isFeedback[i]) {
+          this.tally(k, this.value[i]);
+        }
         onCollect?.(px, py, k);
         this.removeAt(i);
         continue;
@@ -244,6 +252,7 @@ export class LootSystem {
     this.maxLife[i] = this.maxLife[j];
     this.kind[i] = this.kind[j];
     this.value[i] = this.value[j];
+    this.isFeedback[i] = this.isFeedback[j];
   }
 
   clear(): void {
