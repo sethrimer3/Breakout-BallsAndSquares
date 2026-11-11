@@ -1107,7 +1107,7 @@ export class TerrainRenderer {
   /** Thin exposed-surface rims stay readable after lighting, but underneath fog. */
   drawSurfaceOutlines(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
     ctx.save();
-    ctx.fillStyle = "rgba(205, 221, 230, 0.72)";
+    ctx.fillStyle = "#000000";
     const size = this.chunks.chunkSize;
     this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
       const outline = this.surfaceOutlines[ky * this.chunks.cols + kx];

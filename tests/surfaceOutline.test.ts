@@ -31,11 +31,11 @@ function scene(): PixelWorld {
 }
 
 describe("air-exposed surface outlines", () => {
-  it("outlines all four faces at one eighth of a full pixel without filling interiors", () => {
+  it("outlines all four faces at one sixteenth of a full pixel without filling interiors", () => {
     const w = scene();
     w.setCell(3, 3, 10);
     const r = outline(w);
-    expect(SURFACE_OUTLINE_WIDTH).toBe(0.125);
+    expect(SURFACE_OUTLINE_WIDTH).toBe(0.0625);
     for (const [x, y] of [
       [3.05, 3.5],
       [3.95, 3.5],

@@ -1,5 +1,5 @@
 /** Width in full terrain cells, including outlines on half-size equipment and Blight. */
-export const SURFACE_OUTLINE_WIDTH = 1 / 8;
+export const SURFACE_OUTLINE_WIDTH = 1 / 16;
 
 interface SurfaceGrid {
   subSolidAt(sx: number, sy: number): boolean;
