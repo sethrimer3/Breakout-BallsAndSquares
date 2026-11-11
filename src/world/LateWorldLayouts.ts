@@ -95,7 +95,7 @@ export function designLateSpaces(w: PixelWorld, f: LabFrame): void {
         if (open) clear(x, y);
       }
     // Join every clearing to the authored corridors; leave cover on diagonals.
-    for (let d = -23; d <= 23; d++)
+    for (let d = -25; d <= 25; d++)
       for (let q = -2; q <= 2; q++) {
         clear(Math.round(cx + d), Math.round(cy + q));
         clear(Math.round(cx + q), Math.round(cy + d));
