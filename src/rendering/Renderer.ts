@@ -156,7 +156,7 @@ export class Renderer {
     ctx.restore();
 
     // 4) Fog of war over the whole world; the aim indicator stays readable on top.
-    this.fogRenderer.draw(ctx, cam);
+    if (!game.devMapAccess) this.fogRenderer.draw(ctx, cam);
     // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
     // its full palette even when it outruns the light creeping after it.
     this.drawSoldiers();

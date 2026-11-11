@@ -98,6 +98,7 @@ export interface SaveData {
   };
   settings: {
     devMode: boolean;
+    devMapAccess: boolean;
     muted: boolean;
     volume: number;
     muzzleFlash: MuzzleFlashLevel;
@@ -164,6 +165,7 @@ export function defaultSaveData(): SaveData {
     bests: { time: 0, depth: 0, pixels: 0 },
     settings: {
       devMode: false,
+      devMapAccess: false,
       muted: false,
       volume: 0.6,
       muzzleFlash: "brightest",
@@ -308,6 +310,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
   if (obj.settings && typeof obj.settings === "object") {
     const s = obj.settings as Record<string, unknown>;
     def.settings.devMode = s.devMode === true;
+    def.settings.devMapAccess = s.devMapAccess === true;
     def.settings.muted = typeof s.muted === "boolean" ? s.muted : false;
     def.settings.volume = finiteNonNeg(s.volume, 0.6, 1);
     if (

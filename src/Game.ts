@@ -39,7 +39,7 @@ import { generateWorld } from "./world/WorldGenerator";
 import { LabMap } from "./ui/LabMap";
 import { renderSectorThumbs } from "./rendering/SectorThumbs";
 import { LabProgress } from "./world/LabProgress";
-import { gateGeometry, labWorld, LAB_WORLD_COUNT, sectorSpawnCell, type LabWorldDef } from "./world/labMap";
+import { gateGeometry, labWorld, LAB_WORLD_COUNT, sectorCount, sectorSpawnCell, type LabWorldDef } from "./world/labMap";
 import type { Door } from "./world/PixelWorld";
 import type { LabWorldProgress } from "./progression/SaveManager";
 
@@ -332,6 +332,11 @@ export class Game {
     return this.save.data.greenCrystals;
   }
 
+  get devMapAccess(): boolean {
+    const settings = this.save.data.settings;
+    return settings.devMode && settings.devMapAccess;
+  }
+
   get biomass(): number {
     return this.save.data.biomass;
   }
@@ -395,10 +400,13 @@ export class Game {
 
   /** Begin a fresh run (regenerates the world in place). */
   startRun(): void {
-    if (this.upgrades.levelOf("unlock_map") === 0) {
+    if (!this.devMapAccess && this.upgrades.levelOf("unlock_map") === 0) {
       this.save.data.lab.world = 1;
       this.labSave.spawn = 0;
       this.loadLabProgress();
+    }
+    if (!this.devMapAccess && this.save.data.lab.world > this.save.data.lab.unlocked) {
+      this.selectLabWorld(this.save.data.lab.unlocked);
     }
     this.mainMenu.hide();
     this.pauseMenu.hide();
@@ -479,7 +487,7 @@ export class Game {
   /** Show another reached world on the lab map (rebuilds the world behind it). */
   selectLabWorld(id: number): void {
     const lab = this.save.data.lab;
-    if (id < 1 || id > lab.unlocked || id === lab.world) return;
+    if (!Number.isInteger(id) || id < 1 || id > (this.devMapAccess ? LAB_WORLD_COUNT : lab.unlocked) || id === lab.world) return;
     lab.world = id;
     this.save.save();
     this.loadLabProgress();
@@ -496,7 +504,7 @@ export class Game {
   private generateLab(): void {
     const def = this.labDef;
     const lab = this.labSave;
-    if (!this.labProgress.conquered.has(lab.spawn)) lab.spawn = def.start;
+    if (!this.canDeployInto(lab.spawn)) lab.spawn = def.start;
     generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30), { conquered: this.labProgress.conquered, labWorld: def, spawn: lab.spawn });
     this.labProgress.attach(this.world);
     this.creatures.flowerMult = def.alien ? FACILITY.alienFlowerMult : 1;
@@ -510,9 +518,10 @@ export class Game {
     if (frame && this.labMap) this.labMap.setThumbs(renderSectorThumbs(this.world, this.terrain, frame));
   }
 
-  /** Sectors a squad may deploy into: conquered ones. */
+  /** Normal deployments require conquest; the dev override allows any valid sector. */
   canDeployInto(sector: number): boolean {
-    return this.labProgress.conquered.has(sector);
+    return Number.isInteger(sector) && sector >= 0 && sector < sectorCount(this.labDef)
+      && (this.devMapAccess || this.labProgress.conquered.has(sector));
   }
 
   /**
@@ -520,7 +529,8 @@ export class Game {
    * the hand-made lab, else straight into a run.
    */
   beginDeploy(): void {
-    if (!this.world.labLayout?.frame || this.upgrades.levelOf("unlock_map") === 0) {
+    if (!this.devMapAccess && this.save.data.lab.world > this.save.data.lab.unlocked) this.selectLabWorld(this.save.data.lab.unlocked);
+    if (!this.world.labLayout?.frame || (!this.devMapAccess && this.upgrades.levelOf("unlock_map") === 0)) {
       this.startRun();
       return;
     }

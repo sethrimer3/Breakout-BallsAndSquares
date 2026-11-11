@@ -2,7 +2,7 @@ import type { Game } from "../Game";
 import { THUMB_SIZE, renderUncharted } from "../rendering/SectorThumbs";
 import { TIER_PAINT } from "../rendering/materials";
 import {
-  LAB_WORLDS,
+  LAB_WORLDS, LAB_WORLD_COUNT,
   worldRows, worldZoneLabel,
   SECTOR_CHARS,
   gateGeometry,
@@ -110,8 +110,9 @@ export class LabMap {
   private buildTabs(): void {
     const lab = this.game.save.data.lab;
     this.tabs.innerHTML = "";
-    this.tabs.classList.toggle("hidden", lab.unlocked < 2);
-    for (let id = 1; id <= lab.unlocked; id++) {
+    const available = this.game.devMapAccess ? LAB_WORLD_COUNT : lab.unlocked;
+    this.tabs.classList.toggle("hidden", available < 2);
+    for (let id = 1; id <= available; id++) {
       const def = LAB_WORLDS[id];
       const b = document.createElement("button");
       b.className = `btn labmap-tab${id === this.def.id ? " active" : ""}`;
@@ -232,7 +233,7 @@ export class LabMap {
       const col = s % n;
       const row = (s - col) / n;
       const hidden = (c: number, r: number): boolean =>
-        c >= 0 && r >= 0 && c < n && r < worldRows(this.def) && !this.game.labProgress.discovered.has(r * n + c);
+        !this.game.devMapAccess && c >= 0 && r >= 0 && c < n && r < worldRows(this.def) && !this.game.labProgress.discovered.has(r * n + c);
       const sides = [hidden(col, row - 1), hidden(col + 1, row), hidden(col, row + 1), hidden(col - 1, row)];
       const step = 6;
       const alphas = [0.6, 0.38, 0.18];
@@ -317,7 +318,7 @@ export class LabMap {
   private render(): void {
     const progress = this.game.labProgress;
     for (let s = 0; s < this.tiles.length; s++) {
-      const discovered = progress.discovered.has(s);
+      const discovered = this.game.devMapAccess || progress.discovered.has(s);
       const conquered = progress.conquered.has(s);
       const tier = sectorTier(this.def, s);
       const tile = this.tiles[s];
@@ -334,7 +335,8 @@ export class LabMap {
     const facility = region && col >= region.col0 && col <= region.col1 && row >= region.row0 && row <= region.row1;
     const name = `W${this.def.id} ${sectorName(s, this.def.sectors)} · ZONE ${tier}${facility ? ` · ${region.name}` : ""}${this.def.teleporter?.sector === s ? " · TELEPORTER → WORLD 5" : ""}`;
     let status: string;
-    if (!progress.discovered.has(s)) status = "UNEXPLORED";
+    if (this.game.devMapAccess) status = "DEV — DEPLOY ANYWHERE";
+    else if (!progress.discovered.has(s)) status = "UNEXPLORED";
     else if (progress.conquered.has(s)) status = s === this.def.start ? (this.def.id === 1 ? "STAGING AREA - SECURE" : "GATEWAY - SECURE") : "CONQUERED - SAFE TO DEPLOY";
     else {
       const left = progress.generatorsLeft(s);
