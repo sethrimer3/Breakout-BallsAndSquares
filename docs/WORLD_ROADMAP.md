@@ -36,12 +36,27 @@ World and zone are different concepts: worlds 1/2 each contain three terrain zon
     7  . . . . . . .
 ```
 
-## World 5: Blight mother ship in space — 5 columns × 3 rows, zone/tier 11
+## World 5: Blight mother ship in space — 3 columns × 7 rows, zone/tier 11
 
 - The final zone, aboard the Blight mother ship in space.
-- Exactly 15 sectors, A1 through E3; no phantom fourth or fifth row.
-- The current arrival is **C3**, the middle of the bottom row. Arrival positioning was unspecified and can be moved independently of the footprint.
-- No exit or finale/boss encounter has been invented for this framework.
+- Exactly 21 sectors, A1 through C7 (3 wide by 7 high).
+- The player arrival/spawn is **B7** (Sector 19: row 6, col 1), the middle of the bottom row. Arrival sector is completely combat-free.
+- The **Final Blight Boss** (Leviathan Core) is located at **B2** (Sector 4: row 1, col 1, top middle — second row down, middle column).
+- Sector 4 is a grand octagonal Command Sanctum arena with 4 reinforced blast cover pillars (65,000 HP) allowing tactical firefights.
+- The boss has 50,000 HP, multi-phase spreading plasma volleys, enraged overdrive attacks below 30% HP, and awards a 10,000 essence bounty upon defeat.
+- Row 0 (A1–C1) forms the ship's apex observation deck and primary core conduits.
+- Checkpoint bulkheads (5 cells deep at 65,000 HP per cell, 325,000 HP total) defend corridor throats between ship decks.
+
+```
+       A   B   C
+    1  .   .   .     Row 1 (Top: Apex conduits)
+    2  .   ★   .     Row 2 (★ = Final Blight Boss arena at B2, Sector 4)
+    3  .   .   .     Row 3 (Inner sanctum checkpoints)
+    4  .   .   .     Row 4 (Reactor corridors)
+    5  .   .   .     Row 5 (Hangar staging deck)
+    6  .   .   .     Row 6 (Lower defense tier)
+    7  .   A   .     Row 7 (A = Player arrival at B7, Sector 19)
+```
 
 ## Implementation contracts
 

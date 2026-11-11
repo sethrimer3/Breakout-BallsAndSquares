@@ -40,6 +40,7 @@ World encounter spaces use distinct spatial archetypes rather than uniform rooms
 | Tier 10 Brute | 3,600 | 3,600 shots | 300 shots | 40 shots | 9 shots |
 | Tier 11 Turret / Soldier | 3,600 | 3,600 shots | 300 shots | 40 shots | 9 shots |
 | Tier 11 Brute | 7,200 | 7,200 shots | 600 shots | 79 shots | 18 shots |
+| **Tier 11 Mother Boss** | **50,000** | 50,000 shots | 4,167 shots | 544 shots | 122 shots |
 
 ### Checkpoint Breach Times & Hits
 
