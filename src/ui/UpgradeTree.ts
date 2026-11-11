@@ -612,7 +612,7 @@ export class UpgradeTree {
       const to = nodePos(def.grid.col, def.grid.row);
       const btn = document.createElement("button");
       // The weapon-unlock node at the center of a tree gets a round frame.
-      const round = branchOf(def) !== "core" && def.grid.col === 0 && def.grid.row === 0;
+      const round = def.id === "keycard_t1" || (branchOf(def) !== "core" && def.grid.col === 0 && def.grid.row === 0);
       btn.className = round ? "tree-node round" : "tree-node";
       btn.style.setProperty("--node-color", def.color);
       const ring = round
@@ -829,12 +829,7 @@ export class UpgradeTree {
   }
 
   private fittedView(): View {
-    const view = fitView(this.bounds, this.stageW, this.stageH);
-    if (this.activeTab === "core") {
-      view.x = Math.round(8 - this.bounds.x0 * view.s);
-      view.y = Math.round(8 - this.bounds.y0 * view.s);
-    }
-    return view;
+    return fitView(this.bounds, this.stageW, this.stageH);
   }
 
   /** Give the tree a new stage size and fit it again. */
@@ -859,7 +854,7 @@ export class UpgradeTree {
     this.cycles.reset();
     const defs = this.activeDefs();
     const ids = defs.map((d) => d.id as string);
-    if (defs.length > 0 && !defs.some((d) => d.grid.col === 0 && d.grid.row === 0)) ids.push(HUB_ID);
+    if (this.activeTab !== "core" && defs.length > 0 && !defs.some((d) => d.grid.col === 0 && d.grid.row === 0)) ids.push(HUB_ID);
     this.activeBodies = ids.map((id) => this.bodies.get(id)!);
 
     const neighbors = new Map<string, string[]>(ids.map((id) => [id, []]));
@@ -1326,20 +1321,24 @@ export class UpgradeTree {
       ["grenade", "GRENADE", st.grenadeUnlocked],
       ["turret", "TURRET", st.turretUnlocked],
     ];
-    for (const [tabId, label, unlocked] of tabLocks) {
-      const btn = this.root.querySelector(`[data-tab="${tabId}"]`) as HTMLButtonElement | null;
-      if (btn) btn.innerHTML = tabHtml(tabId, label, !unlocked);
-    }
-
-    for (const button of this.root.querySelectorAll<HTMLButtonElement>(".tree-tab")) {
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>(".tree-tab[data-tab]")) {
       const branch = button.dataset.tab as UpgradeBranch;
+      const label = button.dataset.label ?? button.textContent!.trim();
+      button.dataset.label = label;
+      const weapon = tabLocks.find(([id]) => id === branch);
       button.disabled = !this.game.upgrades.isBranchUnlocked(branch);
-      button.title = button.disabled ? "Unlock this tab on the Core path" : "";
+      button.innerHTML = button.disabled ? `${lockIcon()} ???` : tabHtml(branch, weapon?.[1] ?? label, weapon ? !weapon[2] : false);
+      button.title = button.disabled ? "Locked — unlock on the Core path" : "";
+      button.setAttribute("aria-label", button.disabled ? "Locked category" : weapon?.[1] ?? label);
     }
     for (const button of this.root.querySelectorAll<HTMLButtonElement>(".tree-cat-btn")) {
       const category = CATEGORIES.find((c) => c.id === button.dataset.cat)!;
       button.disabled = !category.branches.some((b) => this.game.upgrades.isBranchUnlocked(b));
-      button.title = button.disabled ? `${category.name} — Unlock on the Core path` : category.name;
+      button.innerHTML = button.disabled
+        ? `${lockIcon()}<span class="tree-cat-name">???</span>`
+        : `${sprite(category.icon, { color: category.color, scale: 1 })}<span class="tree-cat-name">${category.name}</span><span class="cat-caret">${category.id === this.expandedCategory ? "▼" : "▶"}</span>`;
+      button.title = button.disabled ? "Locked — unlock on the Core path" : category.name;
+      button.setAttribute("aria-label", button.disabled ? "Locked category" : category.name);
     }
     this.updateHeaderAndScreen();
 

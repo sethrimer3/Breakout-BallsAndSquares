@@ -50,7 +50,7 @@ describe("tree fit", () => {
       homes.push(nodePos(0, 0)); // the center hub or unlock node
       const b = treeBounds(homes);
       const v = fitView(b);
-      expect(v.s, branch).toBe(branch === "core" ? 0.875 : 1);
+      expect(v.s, branch).toBe(branch === "core" ? 0.625 : 1);
       expect(shows(v, b), branch).toBe(true);
     }
   });

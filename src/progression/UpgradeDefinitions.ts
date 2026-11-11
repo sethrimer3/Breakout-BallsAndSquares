@@ -1954,8 +1954,9 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     const existing = EXISTING_DEFS.find((d) => d.id === id);
     const milestone = MILESTONES[id];
     const placeholder = id.startsWith("core_placeholder_");
-    const row = Math.floor(index / 7);
-    const col = row % 2 === 0 ? index % 7 : 6 - index % 7;
+    const columns = 6;
+    const row = Math.floor(index / columns);
+    const col = row % 2 === 0 ? index % columns : columns - 1 - index % columns;
     const base: UpgradeDef = existing ?? {
       id, branch: "core", name: milestone?.[0] ?? "Unknown Upgrade",
       shortDesc: milestone?.[1] ?? "Future upgrade slot. Continue along the path to the next milestone.",
@@ -1964,13 +1965,13 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       valueAt: (level) => level, formatValue: (v) => v > 0 ? "UNLOCKED" : "LOCKED",
       formatDelta: () => "UNLOCK", apply: () => {}, icon: placeholder ? "question" : MILESTONE_ICONS[id] ?? "gear",
     };
-    return { ...base, branch: "core", grid: { col: col - 3, row: row - 1 },
+    return { ...base, branch: "core", grid: { col: col - (columns - 1) / 2, row: row - (Math.ceil(CORE_PATH.length / columns) - 1) / 2 },
       parent: index > 0 ? CORE_PATH[index - 1] : null, placeholder,
       ...(id === "keycard_t6" ? { currency: "greenCrystals" as const, essenceCost: 100, icon: "keycard" as const,
         apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,6); } } : {}),
       ...(id === "keycard_t9" ? { currency: "biomass" as const, essenceCost: 2000, icon: "keycard" as const,
         apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,9); } } : {}),
-      ...(id === "keycard_t1" ? { baseCost: 8 } : {}),
+      ...(id === "keycard_t1" ? { baseCost: 8, icon: "coreOrb" as const, color: "#38d6ff" } : {}),
       ...(id === "connected_air_mapping" ? { apply: (s: SoldierStats, level: number) => { s.connectedAirMapping = level > 0; } } : {}),
     };
   }),

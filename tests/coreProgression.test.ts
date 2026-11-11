@@ -43,14 +43,16 @@ describe("Core progression", () => {
     expect(upg.getSoldierStats().keycardTier).toBe(9);
   });
 
-  it("fills three rows in alternating directions with only orthogonally adjacent steps", () => {
+  it("snakes through six centered columns and continues onto a fourth row", () => {
     const positions = CORE_PATH.map((id) => UPGRADE_BY_ID[id].grid);
-    expect(positions[0]).toEqual({ col: -3, row: -1 });
-    expect(positions[6]).toEqual({ col: 3, row: -1 });
-    expect(positions[7]).toEqual({ col: 3, row: 0 });
-    expect(positions[13]).toEqual({ col: -3, row: 0 });
-    expect(positions[14]).toEqual({ col: -3, row: 1 });
-    expect(positions[20]).toEqual({ col: 3, row: 1 });
+    expect(positions[0]).toEqual({ col: -2.5, row: -1.5 });
+    expect(positions[5]).toEqual({ col: 2.5, row: -1.5 });
+    expect(positions[6]).toEqual({ col: 2.5, row: -0.5 });
+    expect(positions[11]).toEqual({ col: -2.5, row: -0.5 });
+    expect(positions[12]).toEqual({ col: -2.5, row: 0.5 });
+    expect(positions[17]).toEqual({ col: 2.5, row: 0.5 });
+    expect(positions[18]).toEqual({ col: 2.5, row: 1.5 });
+    expect(positions[20]).toEqual({ col: 0.5, row: 1.5 });
     for (let i = 1; i < positions.length; i++) {
       expect(Math.abs(positions[i].col - positions[i - 1].col) + Math.abs(positions[i].row - positions[i - 1].row)).toBe(1);
     }

@@ -2276,7 +2276,7 @@ button {
 }
 .tree-overlay .tree-cat-btn {
   justify-content: center;
-  min-height: 36px;
+  min-height: 72px;
   padding: 4px;
 }
 .tree-overlay .tree-cat-btn .px {
@@ -2305,7 +2305,7 @@ button {
   grid-column: 1 / -1;
 }
 .tree-overlay .tree-tab {
-  min-height: 28px;
+  min-height: 56px;
   padding: 2px 8px;
   white-space: nowrap;
   overflow: hidden;
@@ -2521,3 +2521,12 @@ button {
 .labmap-tier.t10 { color: #ef9b4f; }
 .labmap-tier.t11 { color: #b88cda; }
 .labmap-panel > .panel-title { line-height: 1.6; overflow-wrap: anywhere; }
+
+/* Hidden categories retain large touch targets without revealing their identities. */
+.tree-overlay .tree-cat-btn:disabled {
+  flex-direction: column;
+  gap: 4px;
+}
+.tree-overlay .tree-cat-btn:disabled .tree-cat-name {
+  display: block !important;
+}
