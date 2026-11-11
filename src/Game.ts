@@ -1683,9 +1683,93 @@ export class Game {
     if (commander) this.stepFormation(dt, commander);
 
     this.dualStick.update();
+
+    for (const s of this.soldiers) {
+      if (!s.alive) continue;
+      s.age += dt;
+      this.physics.step(s, dt);
+      this.combat.updateSoldier(s, dt);
+    }
+    // Soldier-to-soldier soft separation to prevent clustering, jamming, or stacking
+    const livingSoldiers = this.soldiers.filter((s) => s.alive);
+    for (let i = 0; i < livingSoldiers.length; i++) {
+      const a = livingSoldiers[i];
+      for (let j = i + 1; j < livingSoldiers.length; j++) {
+        const b = livingSoldiers[j];
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const minDist = a.radius + b.radius + 1;
+        const dist2 = dx * dx + dy * dy;
+        if (dist2 < minDist * minDist && dist2 > 1e-4) {
+          const dist = Math.sqrt(dist2);
+          const push = (minDist - dist) * 0.5;
+          const nx = dx / dist;
+          const ny = dy / dist;
+          if (circleIsClear(this.world, a.x - nx * push, a.y - ny * push, a.radius)) {
+            a.x -= nx * push;
+            a.y -= ny * push;
+          }
+          if (circleIsClear(this.world, b.x + nx * push, b.y + ny * push, b.radius)) {
+            b.x += nx * push;
+            b.y += ny * push;
+          }
+        }
+      }
+    }
+    this.combat.updateBullets(dt);
+    this.fire.update(dt, this.combat.bullets.items);
+    this.combat.updateGrenades(dt);
+    this.combat.updateTurrets(dt);
+    this.glass.update(dt);
+    this.late.update(dt, this.soldiers);
+    this.creatures.update(dt, this.runStats.time, this.soldiers, this.growth);
+    this.doors.update(dt);
+    this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
+    this.updateFog(dt);
+    if (!this.labDef.framework) this.growth.update(dt, this.runStats.time, this.soldiers);
+    this.growthRate = this.growth.rate;
+    this.runStats.recordSampleIfDue(this.growthRate);
+    this.particles.update(dt);
+    this.casings.update(dt, this.world);
+    const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
+    if (collected > 0) {
+      this.runStats.currency += this.loot.collectedGold;
+      this.runStats.crystals += this.loot.collectedCrystals;
+      this.runStats.greenCrystals += this.loot.collectedGreenCrystals;
+      this.runStats.essence += this.loot.collectedEssence;
+      this.runStats.biomass += this.loot.collectedBiomass;
+    }
+    for (let i = this.flashes.length - 1; i >= 0; i--) {
+      if ((this.flashes[i].life -= dt) <= 0) {
+        this.flashPolyPool.push(this.flashes[i].poly);
+        this.flashLitPool.push(this.flashes[i].lit);
+        this.flashes.splice(i, 1);
+      }
+    }
+    for (let i = this.cellFlashes.length - 1; i >= 0; i--) {
+      if ((this.cellFlashes[i].life -= dt) <= 0) this.cellFlashes.splice(i, 1);
+    }
+    if (this.cellFlashes.length > 512) this.cellFlashes.splice(0, this.cellFlashes.length - 512);
+    for (let i = this.doorFlashes.length - 1; i >= 0; i--) {
+      const df = this.doorFlashes[i];
+      if (df.delay > 0) {
+        df.delay -= dt;
+        continue;
+      }
+      if ((df.life -= dt) <= 0) this.doorFlashes.splice(i, 1);
+    }
+    if (this.doorFlashes.length > 256) this.doorFlashes.splice(0, this.doorFlashes.length - 256);
+    this.canDeploy = this.reserves > 0;
+
+    // Run ends once at least one soldier has been deployed and no living or deployable soldiers remain.
+    const alive = this.soldiers.some((s) => s.alive);
+    const canStillDeploy = this.reserves > 0 && this.canDeploy;
+    if (!alive && !canStillDeploy && this.runStats.soldiersDeployed > 0) {
+      this.endRun();
+    }
   }
 
-  stepFormation(dt: number, commander: Soldier): void {
+  stepFormation(_dt: number, commander: Soldier): void {
     if (this.activeFormation === "none" || !commander) {
       this.commanderTrail.length = 0;
       for (const s of this.soldiers) s.isInFormation = false;
@@ -1813,91 +1897,6 @@ export class Game {
         f.vy = commander.vy;
         f.facingAngle = commander.facingAngle;
       }
-    }
-  }
-
-    for (const s of this.soldiers) {
-      if (!s.alive) continue;
-      s.age += dt;
-      this.physics.step(s, dt);
-      this.combat.updateSoldier(s, dt);
-    }
-    // Soldier-to-soldier soft separation to prevent clustering, jamming, or stacking
-    const livingSoldiers = this.soldiers.filter((s) => s.alive);
-    for (let i = 0; i < livingSoldiers.length; i++) {
-      const a = livingSoldiers[i];
-      for (let j = i + 1; j < livingSoldiers.length; j++) {
-        const b = livingSoldiers[j];
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const minDist = a.radius + b.radius + 1;
-        const dist2 = dx * dx + dy * dy;
-        if (dist2 < minDist * minDist && dist2 > 1e-4) {
-          const dist = Math.sqrt(dist2);
-          const push = (minDist - dist) * 0.5;
-          const nx = dx / dist;
-          const ny = dy / dist;
-          if (circleIsClear(this.world, a.x - nx * push, a.y - ny * push, a.radius)) {
-            a.x -= nx * push;
-            a.y -= ny * push;
-          }
-          if (circleIsClear(this.world, b.x + nx * push, b.y + ny * push, b.radius)) {
-            b.x += nx * push;
-            b.y += ny * push;
-          }
-        }
-      }
-    }
-    this.combat.updateBullets(dt);
-    this.fire.update(dt, this.combat.bullets.items);
-    this.combat.updateGrenades(dt);
-    this.combat.updateTurrets(dt);
-    this.glass.update(dt);
-    this.late.update(dt, this.soldiers);
-    this.creatures.update(dt, this.runStats.time, this.soldiers, this.growth);
-    this.doors.update(dt);
-    this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
-    this.updateFog(dt);
-    if (!this.labDef.framework) this.growth.update(dt, this.runStats.time, this.soldiers);
-    this.growthRate = this.growth.rate;
-    this.runStats.recordSampleIfDue(this.growthRate);
-    this.particles.update(dt);
-    this.casings.update(dt, this.world);
-    const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
-    if (collected > 0) {
-      this.runStats.currency += this.loot.collectedGold;
-      this.runStats.crystals += this.loot.collectedCrystals;
-      this.runStats.greenCrystals += this.loot.collectedGreenCrystals;
-      this.runStats.essence += this.loot.collectedEssence;
-      this.runStats.biomass += this.loot.collectedBiomass;
-    }
-    for (let i = this.flashes.length - 1; i >= 0; i--) {
-      if ((this.flashes[i].life -= dt) <= 0) {
-        this.flashPolyPool.push(this.flashes[i].poly);
-        this.flashLitPool.push(this.flashes[i].lit);
-        this.flashes.splice(i, 1);
-      }
-    }
-    for (let i = this.cellFlashes.length - 1; i >= 0; i--) {
-      if ((this.cellFlashes[i].life -= dt) <= 0) this.cellFlashes.splice(i, 1);
-    }
-    if (this.cellFlashes.length > 512) this.cellFlashes.splice(0, this.cellFlashes.length - 512);
-    for (let i = this.doorFlashes.length - 1; i >= 0; i--) {
-      const df = this.doorFlashes[i];
-      if (df.delay > 0) {
-        df.delay -= dt;
-        continue;
-      }
-      if ((df.life -= dt) <= 0) this.doorFlashes.splice(i, 1);
-    }
-    if (this.doorFlashes.length > 256) this.doorFlashes.splice(0, this.doorFlashes.length - 256);
-    this.canDeploy = this.reserves > 0;
-
-    // Run ends once at least one soldier has been deployed and no living or deployable soldiers remain.
-    const alive = this.soldiers.some((s) => s.alive);
-    const canStillDeploy = this.reserves > 0 && this.canDeploy;
-    if (!alive && !canStillDeploy && this.runStats.soldiersDeployed > 0) {
-      this.endRun();
     }
   }
 

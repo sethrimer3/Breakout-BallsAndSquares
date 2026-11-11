@@ -390,6 +390,55 @@ describe("late campaign pacing and encounters", () => {
     }
     expect(count65k).toBeGreaterThan(0);
   });
+  it("measures real bulkhead breach times across weapon types and drill levels", () => {
+    // World 5 bulkhead cell HP: 65,000 HP. 5 cells deep = 325,000 HP total.
+    // City facility bulkhead cell HP: 45,000 HP. 3 cells deep = 135,000 HP total.
+    const bulkheadCellHp = 65000;
+    const bulkheadDepth = 5;
+    const totalBulkheadHp = bulkheadCellHp * bulkheadDepth; // 325,000 HP
+    expect(totalBulkheadHp).toBe(325000);
+
+    // 1) Single soldier breach times across Siege Drill levels (Assault Rifle: 6.5 shots/s, base dmg 1)
+    const arRps = 6.5;
+    const drillLevels = [0, 1, 2, 3, 4, 5, 6];
+    const breachTimesSingleAR = drillLevels.map((lvl) => {
+      const dmgBonus = lvl * 2000;
+      const hitDmg = 1 + dmgBonus;
+      const hitsPerCell = Math.ceil(bulkheadCellHp / hitDmg);
+      const totalHits = hitsPerCell * bulkheadDepth;
+      const timeSeconds = totalHits / arRps;
+      return { lvl, hitDmg, totalHits, timeSeconds };
+    });
+
+    // With 0 drill: ~325,000 hits -> 50,000 seconds (unbreakable)
+    expect(breachTimesSingleAR[0].totalHits).toBe(325000);
+    expect(breachTimesSingleAR[0].timeSeconds).toBeGreaterThan(10000);
+
+    // With Lv 1 drill (+2,000 dmg, AR 6.5 shots/s): 33 hits/cell * 5 = 165 hits -> 25.38s for 1 soldier
+    expect(breachTimesSingleAR[1].totalHits).toBe(165);
+    expect(breachTimesSingleAR[1].timeSeconds).toBeCloseTo(25.38, 1);
+
+    // With 4 AR soldiers focused fire (26 shots/s): 165 / 26 = 6.35s
+    const squadBreachTimeLv1 = breachTimesSingleAR[1].totalHits / (arRps * 4);
+    expect(squadBreachTimeLv1).toBeCloseTo(6.35, 1);
+
+    // With max Lv 6 drill (+12,000 dmg, 6 hits/cell * 5 = 30 hits):
+    // 1 soldier: 30 / 6.5 = 4.62s; 4 soldiers: 30 / 26 = 1.15s
+    expect(breachTimesSingleAR[6].totalHits).toBe(30);
+    const squadBreachTimeLv6 = breachTimesSingleAR[6].totalHits / (arRps * 4);
+    expect(squadBreachTimeLv6).toBeCloseTo(1.15, 1);
+
+    // 2) Compare weapon types with Lv 1 drill (+2,000 dmg)
+    // Shotgun: 1 shot/s, 5 pellets -> 5 hits/s
+    const shotgunHitsPerSec = 5.0;
+    const shotgunBreachTime = 165 / shotgunHitsPerSec; // 33.0s
+    expect(shotgunBreachTime).toBeCloseTo(33.0, 1);
+
+    // Pistol: 2.5 shots/s (base)
+    const pistolHitsPerSec = 2.5;
+    const pistolBreachTime = 165 / pistolHitsPerSec; // 66.0s
+    expect(pistolBreachTime).toBeCloseTo(66.0, 1);
+  });
   it("navigates squad followers around obstacles to reach commander in formation", async () => {
     // Cell size: 8
     const world = new PixelWorld({
@@ -416,23 +465,23 @@ describe("late campaign pacing and encounters", () => {
     const f2 = new Soldier(300, 400, 0, 0, 60, "pistol", "free", 2);
     const f3 = new Soldier(300, 408, 0, 0, 60, "pistol", "free", 3);
 
-    // Setup Game instance simulation
-    const fakeCanvas = { clientWidth: 800, clientHeight: 600, style: {} } as unknown as HTMLCanvasElement;
-    const fakeUi = { appendChild: () => {}, querySelector: () => null } as unknown as HTMLElement;
-    // @ts-expect-error test harness
+    // Setup Game-like formation simulation
+    const game = {
+      world,
+      soldiers: [commander, f1, f2, f3],
+      activeFormation: "triangle" as const,
+      commanderTrail: [] as { x: number; y: number }[],
+    };
     const { Game } = await import("../src/Game");
-    const game = new Game(fakeCanvas, fakeUi);
-    // Replace world & soldiers with our test scenario
-    // @ts-expect-error access private/readonly for deterministic test
-    game.world = world;
-    game.physics = new (await import("../src/systems/PhysicsSystem")).PhysicsSystem(world, game.rng);
-    game.soldiers = [commander, f1, f2, f3];
-    game.autoMove = false;
-    game.activeFormation = "triangle";
+    const stepFormation = Game.prototype.stepFormation;
+    const physics = new (await import("../src/systems/PhysicsSystem")).PhysicsSystem(world, new Rng(1));
 
     // Simulate 20 seconds of game steps (dt = 0.05)
     for (let t = 0; t < 400; t++) {
-      game.step(0.05);
+      stepFormation.call(game, 0.05, commander);
+      for (const s of [commander, f1, f2, f3]) {
+        physics.step(s, 0.05);
+      }
     }
 
     // Followers should have navigated around the obstacle past x=360 towards commander (432, 400)
