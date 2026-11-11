@@ -1761,10 +1761,10 @@ export class Game {
     if (this.doorFlashes.length > 256) this.doorFlashes.splice(0, this.doorFlashes.length - 256);
     this.canDeploy = this.reserves > 0;
 
-    // Run ends once at least one soldier has been deployed and no living or deployable soldiers remain.
+    // Once deployment has begun, losing the last active soldier ends the run,
+    // even when undeployed reserves remain.
     const alive = this.soldiers.some((s) => s.alive);
-    const canStillDeploy = this.reserves > 0 && this.canDeploy;
-    if (!alive && !canStillDeploy && this.runStats.soldiersDeployed > 0) {
+    if (!alive && this.runStats.soldiersDeployed > 0) {
       this.endRun();
     }
   }
