@@ -104,20 +104,21 @@ function paintCorridor(world: PixelWorld, seg: LabCorridorSegment, seed: number)
       }
     }
   }
-  // Ceiling tubes down the middle of the hall, set between the guide-line dashes;
-  // none left where the ceiling came down.
+  // Single-cell fixtures along both edges leave the corridor center clear.
+  // Skip fixtures where a cave-in has brought the ceiling down.
   const falls = seg.rubble ? corridorCaveIns(seg, seed) : [];
   const pitch = FACILITY.panelPitch + 2;
   const a0 = seg.axis === "h" ? seg.x0 : seg.y0;
   const a1 = seg.axis === "h" ? seg.x1 : seg.y1;
-  for (let a = a0 + 3; a + 1 <= a1 - 2; a += pitch) {
-    const panel = seg.axis === "h"
-      ? { x0: a, y0: mid, x1: a + 1, y1: mid }
-      : { x0: mid, y0: a, x1: mid, y1: a + 1 };
-    const px = (panel.x0 + panel.x1 + 1) / 2;
-    const py = (panel.y0 + panel.y1 + 1) / 2;
-    if (falls.some((f) => Math.hypot(f.x - px, f.y - py) < f.r * FACILITY.caveInScatter + 1)) continue;
-    addPanel(world, panel, { cx0: seg.x0, cy0: seg.y0, cx1: seg.x1, cy1: seg.y1 }, state, hash2(a, mid, seed + 7));
+  const sides = seg.axis === "h" ? [seg.y0, seg.y1] : [seg.x0, seg.x1];
+  for (let a = a0 + 3; a <= a1 - 2; a += pitch) {
+    for (const side of sides) {
+      const x = seg.axis === "h" ? a : side;
+      const y = seg.axis === "h" ? side : a;
+      if (falls.some((f) => Math.hypot(f.x - (x + 0.5), f.y - (y + 0.5)) < f.r * FACILITY.caveInScatter + 1)) continue;
+      addPanel(world, { x0: x, y0: y, x1: x, y1: y },
+        { cx0: seg.x0, cy0: seg.y0, cx1: seg.x1, cy1: seg.y1 }, state, hash2(x, y, seed + 7));
+    }
   }
   if (state === ROOM_STATE.pristine) {
     world.roomLights.push({ kind: LIGHT_KIND.wash, x0: seg.x0, y0: seg.y0, x1: seg.x1, y1: seg.y1, cx0: seg.x0, cy0: seg.y0, cx1: seg.x1, cy1: seg.y1, phase: 0 });
