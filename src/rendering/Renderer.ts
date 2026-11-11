@@ -128,6 +128,7 @@ export class Renderer {
     const wallClockMs = performance.now();
     const still = this.motion.matches;
     game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);
+    game.terrain.drawSurfaceOutlines(ctx, cam);
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.

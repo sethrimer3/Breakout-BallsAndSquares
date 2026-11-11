@@ -1,3 +1,4 @@
+import { traceSurfaceOutline } from "./surfaceOutline";
 import { COLORS, FACILITY, TERRAIN, TERRAIN as T, zoneForDepth } from "../config";
 import { EDGE_PIXELS_PER_SUB, markBlightEdges } from "./blightEdges";
 import { paintPortal } from "./portalNoise";
@@ -128,6 +129,7 @@ function ledLevel(r: number, time: number): number {
 export class TerrainRenderer {
   readonly chunks: TerrainChunks;
   private canvases: HTMLCanvasElement[] = [];
+  private surfaceOutlines: (Path2D | null)[] = [];
   /** One pixel per world cell: what the lab's emergency power keeps lit. */
   private glowCanvas: HTMLCanvasElement;
   private image: ImageData;
@@ -169,6 +171,7 @@ export class TerrainRenderer {
     this.chunks = new TerrainChunks(world, chunkSize);
     const n = this.chunks.cols * this.chunks.rows;
     const subChunk = chunkSize * 2;
+    this.surfaceOutlines = new Array<Path2D | null>(n).fill(null);
     for (let i = 0; i < n; i++) {
       const c = document.createElement("canvas");
       c.width = chunkSize * TEX;
@@ -718,6 +721,11 @@ export class TerrainRenderer {
       }
     }
     this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0);
+    const outline = new Path2D();
+    const subs = cs * 2;
+    const edges = traceSurfaceOutline(world, kx * subs, ky * subs, subs, this.edgeSolid,
+      (x, y, width, height) => outline.rect(x, y, width, height));
+    this.surfaceOutlines[k] = edges ? outline : null;
     this.buildEdgeMask(k, kx, ky);
   }
 
@@ -1094,6 +1102,23 @@ export class TerrainRenderer {
         ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1);
       }
     });
+  }
+
+  /** Thin exposed-surface rims stay readable after lighting, but underneath fog. */
+  drawSurfaceOutlines(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
+    ctx.save();
+    ctx.fillStyle = "rgba(205, 221, 230, 0.72)";
+    const size = this.chunks.chunkSize;
+    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      const outline = this.surfaceOutlines[ky * this.chunks.cols + kx];
+      if (!outline) return;
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.scale(sw / size, sh / size);
+      ctx.fill(outline);
+      ctx.restore();
+    });
+    ctx.restore();
   }
 
   private forEachVisibleChunk(
