@@ -1,6 +1,6 @@
 # Weapon expansion validation and first-pass balance
 
-The first playable expansion is implemented. Automated checks establish mechanics, bounded work, save compatibility, and a reproducible starting point for tuning. They do not establish player enjoyment, long-run currency pacing, or performance on a physical phone.
+The original first-playable weapon mechanics are implemented. Newer Black Market, squad uniqueness, mutation, and secondary-weapon requirements from `main` remain pending in the plan. Automated checks establish mechanics, bounded work, save compatibility, and a reproducible starting point for tuning. They do not establish player enjoyment, long-run currency pacing, or performance on a physical phone.
 
 ## Reproduce
 
@@ -60,4 +60,4 @@ Automated acceptance is complete; these require observation by players or additi
 - Check actual low-end mobile devices, background/resume behavior, sustained memory, battery/thermal load, camera follow, and touch aiming.
 - Watch Drone Shepherd's scattered excavation, late-game mine density, and katana high-speed readability before changing damage or costs.
 
-AR Mirror Rounds/respec and the three future weapon concepts are optional follow-ups, not part of this release scope.
+AR Mirror Rounds remains optional. Newer main-branch design revisions promote respec, several former future concepts, and additional mutations into requested scope; these are not covered by this original implementation report.
