@@ -31,7 +31,7 @@ The build reports Vite's advisory for a roughly 512 kB main JavaScript chunk (15
 
 ## Steady soldier-light follow-up
 
-The follow-up raises the always-on soldier pool from 34 to 64 world units and strength from 0.55 to 0.9, with a dedicated broader falloff shared by wall lighting and the fallback sprite. Room/fire profiles retain their existing tuning. A no-firing regression verifies that a living soldier continuously illuminates a wall 40 units away; dead soldiers add no light. The full suite passes 401 tests in 50 files and the production build passes. In a controlled browser comparison with muzzle flashes off, the sampled surrounding region averaged 1.81× the previous luminance, with no page errors. This improves the steady visibility baseline; it is not a medical safety guarantee or a substitute for player comfort checks.
+The follow-up raises the always-on soldier pool from 34 to 64 world units and strength from 0.55 to 0.9, with a dedicated broader falloff shared by wall lighting and the fallback sprite. Room/fire profiles retain their existing tuning. A no-firing regression verifies that a living soldier continuously illuminates a wall 40 units away; dead soldiers add no light. The full suite passes 401 tests in 50 files and the production build passes. In a controlled browser comparison with muzzle flashes off, the sampled surrounding region averaged 1.81× the previous luminance, with no page errors.
 
 ## Controlled balance sample
 
