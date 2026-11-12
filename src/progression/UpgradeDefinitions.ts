@@ -1,6 +1,8 @@
+import { EXPANSION_DEFS, type ExpansionUpgradeId } from "./WeaponExpansionUpgrades";
 import {
   ASSAULT_RIFLE,
   FACILITY,
+  GOO,
   GRENADE,
   GROWTH,
   KATANA,
@@ -28,12 +30,17 @@ export type UpgradeBranch =
   | "sniper_rifle"
   | "katana"
   | "flamethrower"
+  | "goo_mortar"
+  | "drone_shepherd"
+  | "prism_laser"
   | "grenade"
   | "turret"
   | "facility"
   | "soldier";
 
 export type UpgradeId =
+  | ExpansionUpgradeId
+  | "goo_unlock" | "goo_mass" | "goo_distance"
   | "keycard_t6" | "keycard_t9"
   | "connected_air_mapping"
   | "unlock_map" | "unlock_resources" | "unlock_primary" | "unlock_blight"
@@ -75,6 +82,7 @@ export type UpgradeId =
   | "bullet_speed"
   | "bullet_damage"
   | "multishot"
+  | "pistol_bankshot"
   // Shotgun Tree
   | "shotgun_unlock"
   | "shotgun_pellets"
@@ -82,6 +90,7 @@ export type UpgradeId =
   | "shotgun_damage"
   | "shotgun_choke"
   | "shotgun_range"
+  | "shotgun_rebound"
   // Assault Rifle Tree
   | "ar_unlock"
   | "ar_pierce"
@@ -849,6 +858,25 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     icon: "fan",
   },
 
+  {
+    id: "pistol_bankshot",
+    branch: "pistol",
+    name: "Bankshot Barrel",
+    shortDesc: "+1 terrain ricochet per level; disabled by soldier piercing upgrades",
+    color: "#38d6ff",
+    grid: { col: -1, row: 1 },
+    parent: null,
+    maxLevel: 5,
+    baseCost: 30,
+    costMultiplier: 1.7,
+    unlockLifetimePixels: 0,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => `${v} BOUNCES`,
+    formatDelta: () => "+1 BOUNCE",
+    apply: (s, lvl) => { s.pistolBounces = lvl; },
+    icon: "bulletFast",
+  },
+
   // =========================================================================
   // 5) SHOTGUN TREE (Starts locked — unlock `shotgun_unlock` first)
   // =========================================================================
@@ -974,6 +1002,54 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
       s.shotgunLifetime = SHOTGUN.lifetime * (1 + 0.18 * lvl);
     },
     icon: "range",
+  },
+
+  {
+    id: "shotgun_rebound",
+    branch: "shotgun",
+    name: "Pellet Rebound",
+    shortDesc: "+1 terrain ricochet per pellet; retains 70% damage per bounce; disabled by soldier piercing upgrades",
+    color: "#38d6ff",
+    grid: { col: -1, row: 1 },
+    parent: "shotgun_unlock",
+    maxLevel: 3,
+    baseCost: 60,
+    costMultiplier: 1.8,
+    unlockLifetimePixels: 30,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => `${v} BOUNCES`,
+    formatDelta: () => "+1 BOUNCE",
+    apply: (s, lvl) => { s.shotgunBounces = lvl; },
+    icon: "pellets",
+  },
+
+  // SQUELCH prototype: unlock plus the two lifetime-defining upgrades.
+  {
+    id: "goo_unlock", branch: "goo_mortar", name: "Unlock SQUELCH",
+    shortDesc: "Adhesive Rebound Mortar: sticks, sheds a mine, then rebounds",
+    color: "#9cde68", grid: { col: 0, row: 0 }, parent: null,
+    maxLevel: 1, baseCost: 180, costMultiplier: 1, unlockLifetimePixels: 80,
+    valueAt: (lvl) => lvl, formatValue: (v) => v ? "UNLOCKED" : "LOCKED",
+    formatDelta: () => "UNLOCK WEAPON",
+    apply: (s, lvl) => { s.gooUnlocked = lvl > 0; }, icon: "grenade",
+  },
+  {
+    id: "goo_mass", branch: "goo_mortar", name: "Gel Reservoir",
+    shortDesc: "+0.15 starting slime mass per level; more material for mines",
+    color: "#9cde68", grid: { col: -1, row: 0 }, parent: "goo_unlock",
+    maxLevel: 6, baseCost: 65, costMultiplier: 1.7, unlockLifetimePixels: 80,
+    valueAt: (lvl) => +(GOO.startingMass + 0.15 * lvl).toFixed(2),
+    formatValue: (v) => `${v.toFixed(2)} MASS`, formatDelta: () => "+0.15 MASS",
+    apply: (s, lvl) => { s.gooMass = GOO.startingMass + 0.15 * lvl; }, icon: "coreOrb",
+  },
+  {
+    id: "goo_distance", branch: "goo_mortar", name: "Long Hop",
+    shortDesc: "+80 world units of flight per level; sticky delays consume no range",
+    color: "#38d6ff", grid: { col: 1, row: 0 }, parent: "goo_unlock",
+    maxLevel: 8, baseCost: 55, costMultiplier: 1.6, unlockLifetimePixels: 80,
+    valueAt: (lvl) => GOO.distance + 80 * lvl,
+    formatValue: (v) => `${v} RANGE`, formatDelta: () => "+80 RANGE",
+    apply: (s, lvl) => { s.gooDistance = GOO.distance + 80 * lvl; }, icon: "range",
   },
 
   // =========================================================================
@@ -1976,11 +2052,13 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     };
   }),
   ...EXISTING_DEFS.filter((d) => !CORE_PATH.includes(d.id)),
+  ...EXPANSION_DEFS,
 ];
 
 export const BRANCH_UNLOCK: Partial<Record<UpgradeBranch, UpgradeId>> = {
   resources: "unlock_resources", blight: "unlock_blight", formations: "unlock_formations", facility: "unlock_facility",
   pistol: "unlock_primary", shotgun: "unlock_primary", assault_rifle: "unlock_primary", rocket_launcher: "unlock_primary",
+  drone_shepherd: "unlock_primary", prism_laser: "unlock_primary", goo_mortar: "unlock_primary",
   sniper_rifle: "unlock_primary", katana: "unlock_primary", flamethrower: "unlock_primary",
   grenade: "unlock_secondary", turret: "unlock_secondary",
 };

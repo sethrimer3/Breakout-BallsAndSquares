@@ -1,3 +1,4 @@
+import { GOO_AUDIO, synthesizeGoo, type GooSound } from "./gooAudio";
 import type { CameraSystem } from "../systems/CameraSystem";
 import { spatialMix } from "./spatialAudio";
 import type { SaveManager } from "../progression/SaveManager";
@@ -13,10 +14,15 @@ export class AudioSystem {
   private noiseBuf: AudioBuffer | null = null;
   private lastShotAt = 0;
   private lastImpactAt = 0;
+  private lastRicochetAt = -Infinity;
   private lastDestroyAt = 0;
   private lastPickupAt = 0;
   private lastGlassAt = 0;
   private lastFlameAt = 0;
+  private gooVoices = 0;
+  private electronicVoices = 0;
+  private electronicAt = { drone: -Infinity, prism: -Infinity };
+  private readonly lastGooAt: Record<GooSound, number> = { launch: -Infinity, stick: -Infinity, release: -Infinity, burst: -Infinity };
   private fireBuffer: AudioBuffer | null = null;
   private fireLoad: Promise<void> | null = null;
   private fireFailed = false;
@@ -143,6 +149,48 @@ export class AudioSystem {
     return Math.max(0.0001, this.save.data.settings.volume * scale);
   }
 
+  /** Spatial wet cues share a six-voice cap, with separate event throttles. */
+  playGoo(kind: GooSound, x: number, y: number): void {
+    if (!this.hasGesture || this.muted || this.save.data.settings.volume <= 0 || !this.audible(x, y)) return;
+    const now = performance.now();
+    if (this.gooVoices >= GOO_AUDIO.maxVoices || now - this.lastGooAt[kind] < GOO_AUDIO.throttleMs[kind]) return;
+    const ctx = this.ensure();
+    if (!ctx || !this.noiseBuf) return;
+    const mix = this.camera ? spatialMix(this.camera, x, y) : { gain: 1, pan: 0 };
+    const gain = ctx.createGain();
+    const pan = ctx.createStereoPanner();
+    gain.gain.value = mix.gain * this.save.data.settings.volume;
+    pan.pan.value = mix.pan;
+    gain.connect(pan).connect(ctx.destination);
+    this.lastGooAt[kind] = now;
+    this.gooVoices++;
+    synthesizeGoo(ctx, this.noiseBuf, gain, kind, () => {
+      this.gooVoices--;
+      gain.disconnect();
+      pan.disconnect();
+    });
+  }
+
+  playDrone(x: number, y: number): void { this.playElectronic("drone", x, y); }
+  playPrism(x: number, y: number): void { this.playElectronic("prism", x, y); }
+  private playElectronic(kind: "drone" | "prism", x: number, y: number): void {
+    if (!this.hasGesture || this.muted || this.save.data.settings.volume <= 0 || !this.audible(x,y) || this.electronicVoices >= 4) return;
+    const now = performance.now();
+    if (now-this.electronicAt[kind] < 80) return;
+    const ctx=this.ensure(); if(!ctx)return;
+    this.electronicAt[kind]=now;this.electronicVoices++;
+    const mix=this.camera?spatialMix(this.camera,x,y):{gain:1,pan:0};
+    const gain=ctx.createGain();const pan=ctx.createStereoPanner();const osc=ctx.createOscillator();
+    const t=ctx.currentTime;osc.type=kind==="drone"?"triangle":"sine";
+    osc.frequency.setValueAtTime(kind==="drone"?680:1250,t);
+    osc.frequency.exponentialRampToValueAtTime(kind==="drone"?1100:340,t+0.09);
+    gain.gain.setValueAtTime(Math.max(0.0001,mix.gain*this.save.data.settings.volume*0.045),t);
+    gain.gain.exponentialRampToValueAtTime(0.0001,t+0.09);pan.pan.value=mix.pan;
+    osc.connect(gain).connect(pan).connect(ctx.destination);
+    osc.onended=()=>{osc.disconnect();gain.disconnect();pan.disconnect();this.electronicVoices--;};
+    osc.start(t);osc.stop(t+0.1);
+  }
+
   /** Crisp pistol crack: filtered noise burst + short punchy pitch drop. */
   playShot(x?: number, y?: number): void {
     if (!this.audible(x, y)) return;
@@ -251,6 +299,28 @@ export class AudioSystem {
     osc.connect(g).connect(output);
     osc.start(t);
     osc.stop(t + 0.035);
+  }
+
+  /** Short metallic bankshot ping; the global throttle bounds pellet volleys. */
+  playRicochet(x: number, y: number): void {
+    if (!this.audible(x, y)) return;
+    const now = performance.now();
+    if (now - this.lastRicochetAt < 40) return;
+    this.lastRicochetAt = now;
+    const ctx = this.ensure();
+    if (!ctx) return;
+    const output = this.output(ctx, x, y);
+    const t = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(2300, t);
+    osc.frequency.exponentialRampToValueAtTime(900, t + 0.045);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(this.vol(0.055), t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.05);
+    osc.connect(g).connect(output);
+    osc.start(t);
+    osc.stop(t + 0.055);
   }
 
   /** Low, satisfying pop when a terrain pixel shatters. */

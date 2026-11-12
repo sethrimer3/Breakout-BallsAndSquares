@@ -1,4 +1,5 @@
-import { ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET } from "../config";
+import { DRONE, GOO, ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET } from "../config";
+import { slashMomentum } from "./Momentum";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Rng } from "../core/Rng";
@@ -6,6 +7,10 @@ import { BulletPool, type Bullet } from "../entities/Bullet";
 import type { Soldier, SoldierStats } from "../entities/Soldier";
 import { StickyGrenadePool, type StickyGrenade } from "../entities/StickyGrenade";
 import { AutoTurretPool, type AutoTurret } from "../entities/AutoTurret";
+import { DroneSystem } from "./DroneSystem";
+import { LaserSystem } from "./LaserSystem";
+import type { DroneShot } from "../entities/Drone";
+import { GooOrbSystem } from "./GooOrbSystem";
 import type { PixelWorld } from "../world/PixelWorld";
 
 export interface CombatEvents {
@@ -27,6 +32,17 @@ export interface CombatEvents {
   onExplosion?(x: number, y: number, radiusWorld: number, damage?: number): void;
   /** A bullet struck a creature. */
   onCreatureHit?(x: number, y: number, nx: number, ny: number): void;
+  /** An ordinary round reflected from terrain, after its impact damage. */
+  onBulletRicochet?(x: number, y: number, nx: number, ny: number): void;
+  onDroneLaunch?(x: number, y: number): void;
+  onDroneShot?(x: number, y: number): void;
+  onLaserBounce?(x: number, y: number): void;
+  onLaserOverload?(x: number, y: number): void;
+  onGooStick?(x: number, y: number, nx: number, ny: number): void;
+  onGooRelease?(x: number, y: number): void;
+  onGooResidueLost?(x: number, y: number): void;
+  onGooLaunchBlocked?(x: number, y: number): void;
+  onGooMineBurst?(x: number, y: number, radius: number, damage: number): void;
   /** A sticky grenade was thrown. */
   onGrenadeThrow?(s: Soldier, x: number, y: number, dx: number, dy: number): void;
   /** A sticky grenade stuck to a surface. */
@@ -54,6 +70,10 @@ export class CombatSystem {
   readonly bullets = new BulletPool(BULLET.poolSize);
   readonly grenades = new StickyGrenadePool(GRENADE.poolSize);
   readonly turrets = new AutoTurretPool(TURRET.poolSize);
+  readonly telemetry = { bulletRicochets: 0, bulletBounceHistogram: new Array<number>(9).fill(0), katanaDashes: 0, katanaBoostedSeconds: 0, katanaBoostedDamage: 0 };
+  readonly goo: GooOrbSystem;
+  readonly drones: DroneSystem;
+  readonly laser: LaserSystem;
   stats: SoldierStats;
   /** Creatures bullets can hit before the terrain (the Blight's flowers, worms, specimens). */
   targets: BulletTargets | null = null;
@@ -67,6 +87,34 @@ export class CombatSystem {
     private events: CombatEvents = {},
   ) {
     this.stats = stats;
+    this.drones = new DroneSystem(world, (shot) => this.fireDroneShot(shot), (x,y) => this.events.onDroneLaunch?.(x,y));
+    this.laser = new LaserSystem(world, {
+      onImpact: (...args) => this.events.onImpact?.(...args),
+      onBounce: (x,y) => this.events.onLaserBounce?.(x,y),
+      onOverload: (x,y) => this.events.onLaserOverload?.(x,y),
+      hitCreature: (x,y,dx,dy,distance,damage) => {
+        const target = this.targets?.raycast(x,y,dx,dy,distance) ?? -1;
+        if (target >= 0) {
+          this.targets?.applyHit(damage,x+dx*target,y+dy*target);
+          this.events.onCreatureHit?.(x+dx*target,y+dy*target,-dx,-dy);
+        }
+        return target;
+      },
+    });
+    this.goo = new GooOrbSystem(world, {
+      onStick: (orb) => this.events.onGooStick?.(orb.x, orb.y, orb.normalX, orb.normalY),
+      onRelease: (orb) => this.events.onGooRelease?.(orb.x, orb.y),
+      onResidueLost: (orb) => this.events.onGooResidueLost?.(orb.x, orb.y),
+      onMineBurst: (mine) => {
+        this.damageBlast(mine, mine.x, mine.y, mine.normalX, mine.normalY, mine.radiusCells);
+        this.events.onGooMineBurst?.(mine.x, mine.y, mine.radiusCells * this.world.cellSize, mine.damage);
+      },
+    });
+  }
+
+  resetTelemetry(): void {
+    this.telemetry.bulletRicochets = this.telemetry.katanaDashes = this.telemetry.katanaBoostedSeconds = this.telemetry.katanaBoostedDamage = 0;
+    this.telemetry.bulletBounceHistogram.fill(0);
   }
 
   /** Tick a soldier's weapon according to its equipped weapon type. */
@@ -82,6 +130,15 @@ export class CombatSystem {
     s.fireCooldown -= dt;
     let rate = this.stats.fireRate;
     switch (s.weapon) {
+      case "drone_shepherd":
+        rate = 1 / this.stats.droneReleaseInterval;
+        break;
+      case "prism_laser":
+        rate = this.stats.prismFireRate;
+        break;
+      case "goo_mortar":
+        rate = this.stats.gooFireRate;
+        break;
       case "shotgun":
         rate = this.stats.shotgunFireRate;
         break;
@@ -136,7 +193,29 @@ export class CombatSystem {
     s.facingAngle = Math.atan2(dy, dx);
     this.shooter = s;
 
-    if (s.weapon === "shotgun") {
+    if (s.weapon === "drone_shepherd") {
+      this.drones.release(s, this.stats);
+      this.shooter = null;
+      return;
+    } else if (s.weapon === "prism_laser") {
+      this.laser.traceShot(s, dx, dy, this.stats);
+    } else if (s.weapon === "goo_mortar") {
+      const orb = this.goo.launch({
+        // Cast from the center so a muzzle beside a thin wall cannot skip it.
+        x: s.x, y: s.y, dx, dy, ownerId: s.id,
+        mass: this.stats.gooMass, distance: this.stats.gooDistance,
+        speed: GOO.speed * this.stats.globalBulletSpeedMult * s.mods.bulletSpeedMult,
+        damage: this.stats.gooDamage + this.stats.globalDamageBonus + s.mods.damageBonus,
+        dwell: this.stats.gooDwell, radius: this.stats.gooRadius, residue: this.stats.gooResidue,
+        terrainDamageBonus: s.mods.terrainDamageBonus,
+        blightMultiplier: s.mods.blightMult,
+      });
+      if (!orb) {
+        this.shooter = null;
+        this.events.onGooLaunchBlocked?.(s.x, s.y);
+        return;
+      }
+    } else if (s.weapon === "shotgun") {
       const n = Math.max(1, this.stats.shotgunPellets);
       const halfSpreadRad = this.stats.shotgunSpreadDeg * DEG;
       for (let i = 0; i < n; i++) {
@@ -336,9 +415,9 @@ export class CombatSystem {
     explosionRadius: number,
     clusterCount: number,
     style: 0 | 1 | 2 | 3 | 4,
-  ): void {
+  ): Bullet | null {
     const b = this.bullets.acquire();
-    if (!b) return;
+    if (!b) return null;
     b.x = x;
     b.y = y;
     b.dx = dx;
@@ -350,15 +429,29 @@ export class CombatSystem {
     b.life = life;
     b.maxLife = life;
     b.traveled = 0;
+    b.totalTraveled = 0;
     b.pendingAdvance = pendingAdvance;
     b.ownerId = ownerId;
     b.pierceLeft = pierceLeft + (explosionRadius > 0 ? 0 : (mods?.pierce ?? 0));
+    // Snapshot eligibility at launch: spending a piercing budget must never
+    // turn the same round into ricochet ammunition later in its flight.
+    const weapon = this.shooter?.weapon;
+    b.bounceLeft = style === 0 && explosionRadius === 0 && b.pierceLeft === 0
+      ? weapon === "pistol" ? this.stats.pistolBounces : weapon === "shotgun" ? this.stats.shotgunBounces : 0
+      : 0;
+    b.bounceRetention = weapon === "shotgun" ? 0.7 : 1;
     b.explosionRadius = explosionRadius;
     b.clusterCount = clusterCount;
     b.style = style;
     b.blightMultiplier = mods?.blightMult ?? 1;
     b.slashWidth = 0;
     b.slashAngle = 0;
+    b.afterimage = false;
+    b.fromDrone = false;
+    b.bounces = 0;
+    b.momentumBoosted = false;
+    if (style === 0) this.telemetry.bulletBounceHistogram[0]++;
+    return b;
   }
 
   private spawnSlash(
@@ -389,6 +482,9 @@ export class CombatSystem {
     b.life = life;
     b.maxLife = life;
     b.traveled = 0;
+    b.totalTraveled = 0;
+    b.bounceLeft = 0;
+    b.bounceRetention = 1;
     b.pendingAdvance = pendingAdvance;
     b.ownerId = ownerId;
     b.pierceLeft = pierceLeft + (mods?.pierce ?? 0);
@@ -396,7 +492,14 @@ export class CombatSystem {
     b.clusterCount = 0;
     b.style = 3;
     b.blightMultiplier = blightMultiplier * (mods?.blightMult ?? 1);
-    b.slashWidth = slashWidth;
+    const boost = this.shooter ? slashMomentum(this.shooter, this.stats) : { damage: 1, width: 1 };
+    b.damage = Math.max(1, Math.round(b.damage * boost.damage));
+    b.slashWidth = slashWidth * boost.width;
+    b.fromDrone = false;
+    b.bounces = 0;
+    b.momentumBoosted = boost.damage > 1;
+    b.afterimage = this.shooter?.dashAfterimage ?? false;
+    if (this.shooter) this.shooter.dashAfterimage = false;
     b.slashAngle = slashAngle;
   }
 
@@ -408,7 +511,7 @@ export class CombatSystem {
     }
   }
 
-  /** Swept bullet update: supports multi-block pierce and explosive detonation. */
+  /** Swept bullet update: supports pierce, ordinary ricochets and detonation. */
   updateBullet(b: Bullet, dt: number): void {
     b.life -= dt;
     if (b.life <= 0) {
@@ -441,6 +544,7 @@ export class CombatSystem {
             this.detonateRocket(b, ix, iy, -b.dx, -b.dy, Math.floor(ix / cs), Math.floor(iy / cs));
           } else {
             this.targets.applyHit(b.damage, ix, iy);
+            if (b.fromDrone) this.drones.usefulHits++;
             this.events.onCreatureHit?.(ix, iy, -b.dx, -b.dy);
           }
           this.bullets.release(b);
@@ -473,7 +577,14 @@ export class CombatSystem {
         if (isBlight && b.blightMultiplier > 1) {
           hitDmg = Math.round(hitDmg * b.blightMultiplier);
         }
+        // Terrain stores integer health. Round retained pellet damage explicitly
+        // instead of allowing typed-array truncation to round damage upward.
+        if (b.bounceRetention < 1) hitDmg = Math.max(1, Math.round(hitDmg));
+        const beforeHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
         const result = w.damageSub(hit.cx, hit.cy, hitDmg, true);
+        const afterHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
+        if (b.momentumBoosted) this.telemetry.katanaBoostedDamage += Math.max(0, beforeHp - afterHp);
+        if (b.fromDrone && result > 0) this.drones.usefulHits++;
         this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, result, isSub, b.ownerId);
         if (b.style === 4 && !flameOnRubble) this.events.onFlameHit?.(hit.cx, hit.cy, hit.x, hit.y, hit.nx, hit.ny);
 
@@ -482,7 +593,31 @@ export class CombatSystem {
           this.cleaveSlashSides(b, hit.cx, hit.cy, hit.nx, hit.ny);
         }
 
-        // If the bullet hit the indestructible world border (result === 0) or has no pierce left, stop.
+        // Reflect ordinary rounds only. Normal offsets clear the face even at
+        // t=0; the per-update guard bounds corner/embedded-shot processing.
+        // Reflect even when this impact destroys the surface: its normal was
+        // captured before damage changed the world.
+        if (b.style === 0 && b.pierceLeft <= 0 && b.bounceLeft > 0) {
+          const dot = b.dx * hit.nx + b.dy * hit.ny;
+          b.dx -= 2 * dot * hit.nx;
+          b.dy -= 2 * dot * hit.ny;
+          b.bounceLeft--;
+          this.telemetry.bulletRicochets++;
+          this.telemetry.bulletBounceHistogram[Math.min(8,b.bounces)]--;
+          b.bounces++;
+          this.telemetry.bulletBounceHistogram[Math.min(8,b.bounces)]++;
+          b.damage *= b.bounceRetention;
+          b.terrainDamageBonus *= b.bounceRetention;
+          b.totalTraveled += hit.t;
+          b.traveled = 0;
+          remDist -= hit.t;
+          curX = hit.x + hit.nx * 1e-3;
+          curY = hit.y + hit.ny * 1e-3;
+          this.events.onBulletRicochet?.(hit.x, hit.y, hit.nx, hit.ny);
+          continue;
+        }
+
+        // Piercing and other ammunition still stop at the world border.
         if (result === 0 || b.pierceLeft <= 0) {
           this.bullets.release(b);
           return;
@@ -508,6 +643,7 @@ export class CombatSystem {
 
         const stepPast = Math.max(0.5, distToExit);
         b.traveled += stepPast;
+        b.totalTraveled += stepPast;
         remDist -= stepPast;
         curX += b.dx * stepPast;
         curY += b.dy * stepPast;
@@ -522,6 +658,7 @@ export class CombatSystem {
       curX = hit.x;
       curY = hit.y;
       b.traveled += remDist;
+      b.totalTraveled += remDist;
       break;
     }
 
@@ -542,7 +679,7 @@ export class CombatSystem {
     // Perpendicular vector to projectile direction: (-dy, dx)
     const px = -b.dy;
     const py = b.dx;
-    const maxSteps = Math.min(2, Math.max(1, Math.floor(b.slashWidth / (ss * 2))));
+    const maxSteps = Math.min(4, Math.max(1, Math.floor(b.slashWidth / (ss * 2))));
     const centerNormIdx = (hitSubY >> 1) * w.width + (hitSubX >> 1);
     let cleavedNormIdx = -1;
 
@@ -583,18 +720,15 @@ export class CombatSystem {
     }
   }
 
-  private detonateRocket(
-    b: Bullet,
-    ix: number,
-    iy: number,
-    nx: number,
-    ny: number,
-    centerCx: number,
-    centerCy: number,
+  /** Shared terrain damage/owner pipeline for rockets and independent goo mines. */
+  private damageBlast(
+    source: Pick<Bullet, "damage" | "terrainDamageBonus" | "blightMultiplier" | "ownerId">,
+    ix: number, iy: number, nx: number, ny: number, radCells: number,
   ): void {
     const w = this.world;
     const cs = w.cellSize;
-    const radCells = b.explosionRadius;
+    const centerCx = Math.floor(ix / cs);
+    const centerCy = Math.floor(iy / cs);
     const rCeil = Math.ceil(radCells);
     const r2 = radCells * radCells;
 
@@ -611,16 +745,31 @@ export class CombatSystem {
         const idx = cy * w.width + cx;
         const wasSub = w.health[idx] === 0;
         const isCore = !wasSub && w.coreId[idx] > 0;
-        let dmg = Math.max(1, Math.round((b.damage + b.terrainDamageBonus) * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
-        if (b.blightMultiplier > 1 && w.isBlightAt(cx, cy)) dmg = Math.round(dmg * b.blightMultiplier);
+        let dmg = Math.max(1, Math.round((source.damage + source.terrainDamageBonus) * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
+        if (source.blightMultiplier > 1 && w.isBlightAt(cx, cy)) dmg = Math.round(dmg * source.blightMultiplier);
         const res = w.damage(cx, cy, dmg, true);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
           const wy = (cy + 0.5) * cs;
-          this.events.onImpact?.(wx, wy, nx, ny, cx, cy, res, wasSub, b.ownerId);
+          this.events.onImpact?.(wx, wy, nx, ny, cx, cy, res, wasSub, source.ownerId);
         }
       }
     }
+
+  }
+
+  private detonateRocket(
+    b: Bullet,
+    ix: number,
+    iy: number,
+    nx: number,
+    ny: number,
+    centerCx: number,
+    centerCy: number,
+  ): void {
+    const cs = this.world.cellSize;
+    const radCells = b.explosionRadius;
+    this.damageBlast(b, (centerCx + 0.5) * cs, (centerCy + 0.5) * cs, nx, ny, radCells);
 
     this.events.onExplosion?.(ix, iy, radCells * cs, b.damage);
 
@@ -890,6 +1039,17 @@ export class CombatSystem {
       if (turret) deployed.push(turret);
     }
     return deployed;
+  }
+
+  /** Narrow actor-shot interface: no fake Soldier and no inherited ricochet policy. */
+  fireDroneShot(shot: DroneShot): void {
+    const bullet = this.spawnBullet(shot.x, shot.y, shot.dx, shot.dy, DRONE.bulletSpeed,
+      shot.damage, 1.1, 0, shot.ownerId, shot.pierce, 0, 0, 0);
+    if (!bullet) return;
+    bullet.terrainDamageBonus = shot.terrainDamageBonus;
+    bullet.blightMultiplier = shot.blightMultiplier;
+    bullet.fromDrone = true;
+    this.events.onDroneShot?.(shot.x, shot.y);
   }
 
   /** Fires a bullet from an autoturret barrel at the tracked block. */

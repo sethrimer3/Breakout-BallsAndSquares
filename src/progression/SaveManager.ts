@@ -56,6 +56,9 @@ const VALID_WEAPONS: readonly WeaponType[] = [
   "sniper_rifle",
   "katana",
   "flamethrower",
+  "goo_mortar",
+  "drone_shepherd",
+  "prism_laser",
 ];
 const MAX_SOLDIER_SLOTS = 8;
 
@@ -106,6 +109,7 @@ export interface SaveData {
     fieryMuzzleFlash: boolean;
     /** Blur shadow edges in open-air light instead of crisp lines. */
     softShadows: boolean;
+    prismPatterns: boolean;
     autoFollowCamera: boolean;
     autoMove: boolean;
     alwaysShootWhenAutoMoveOff: boolean;
@@ -171,6 +175,7 @@ export function defaultSaveData(): SaveData {
       muzzleFlash: "brightest",
       fieryMuzzleFlash: false,
       softShadows: false,
+      prismPatterns: true,
       autoFollowCamera: false,
       autoMove: true,
       alwaysShootWhenAutoMoveOff: false,
@@ -269,7 +274,13 @@ export function sanitizeSaveData(raw: unknown): SaveData {
   }
   // If any weapon or behavior is not unlocked in this save, fall back to safe defaults.
   for (const ld of def.loadouts) {
-    if (ld.weapon === "shotgun" && (def.upgrades.shotgun_unlock ?? 0) === 0) {
+    if (ld.weapon === "drone_shepherd" && (def.upgrades.drone_unlock ?? 0) === 0) {
+      ld.weapon = "pistol";
+    } else if (ld.weapon === "prism_laser" && (def.upgrades.prism_unlock ?? 0) === 0) {
+      ld.weapon = "pistol";
+    } else if (ld.weapon === "goo_mortar" && (def.upgrades.goo_unlock ?? 0) === 0) {
+      ld.weapon = "pistol";
+    } else if (ld.weapon === "shotgun" && (def.upgrades.shotgun_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
     } else if (ld.weapon === "assault_rifle" && (def.upgrades.ar_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
@@ -321,6 +332,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     }
     def.settings.fieryMuzzleFlash =
       typeof s.fieryMuzzleFlash === "boolean" ? s.fieryMuzzleFlash : false;
+    def.settings.prismPatterns = typeof s.prismPatterns === "boolean" ? s.prismPatterns : true;
     def.settings.softShadows = typeof s.softShadows === "boolean" ? s.softShadows : false;
     def.settings.autoFollowCamera =
       typeof s.autoFollowCamera === "boolean" ? s.autoFollowCamera : false;

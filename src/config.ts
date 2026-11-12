@@ -927,3 +927,37 @@ export const COLORS = {
   tracer: "rgba(255, 214, 140, ",
   aim: "rgba(160, 230, 255, 0.55)",
 };
+
+/** SQUELCH prototype tuning. Distance and mass, rather than bounce count, govern lifetime. */
+export const GOO = {
+  fireRate: 0.65,
+  speed: 260,
+  startingMass: 1,
+  minMass: 0.12,
+  massPerMine: 0.075,
+  distance: 300,
+  dwell: 0.18,
+  /** Last portion of the existing dwell stretches into the peel; no extra delay. */
+  peelSeconds: 0.05,
+  mineFuse: 0.75,
+  mineRadiusCells: 1.8,
+  mineDamage: 5,
+  orbPoolSize: 16,
+  minePoolSize: 96,
+  maxDetonationsPerStep: 8,
+  maxContactsPerStep: 8,
+  // A failsafe for embedded or corrupted projectiles, far beyond normal travel.
+  safetySeconds: 120,
+} as const;
+
+export const DRONE = {
+  poolSize: 24, releaseInterval: 4.5, capacity: 2, life: 12,
+  emergencyLife: 1.5, speed: 85, radius: 1.2, orbitRadius: 28,
+  fireRate: 1.4, damage: 1, bulletSpeed: 300, health: 1, retarget: 0.25,
+} as const;
+export const PRISM = {
+  damage: 3, fireRate: 0.8, distance: 380, bounces: 2,
+  maxDistance: 600, maxBounces: 8, maxHits: 16, maxSegments: 32,
+  segmentPoolSize: 256, visualLife: 0.12,
+  colors: ["#ff4a48", "#ff963c", "#ffe05b", "#7de267", "#54b8ff", "#8c83ff", "#d37cff"],
+} as const;

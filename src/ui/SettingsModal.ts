@@ -235,6 +235,8 @@ export class SettingsModal {
       const fiery = set.fieryMuzzleFlash;
       const softSh = set.softShadows;
       body.innerHTML = `
+        <div class="set-row"><div class="set-info"><div class="set-label">PRISM PATTERNS</div><div class="set-desc">Distinct beam dash lengths supplement color and thickness.</div></div>
+          <button class="btn" data-set="prism-patterns">${set.prismPatterns ? "ON" : "OFF"}</button></div>
         <div class="set-row">
           <div class="set-info">
             <div class="set-label">FIERY MUZZLE FLASH</div>
@@ -267,6 +269,9 @@ export class SettingsModal {
         </div>
       `;
 
+      body.querySelector('[data-set="prism-patterns"]')!.addEventListener("click", () => {
+        set.prismPatterns = !set.prismPatterns; this.game.save.save(); this.render();
+      });
       body.querySelector('[data-set="fiery"]')!.addEventListener("click", () => {
         set.fieryMuzzleFlash = !set.fieryMuzzleFlash;
         this.game.save.save();

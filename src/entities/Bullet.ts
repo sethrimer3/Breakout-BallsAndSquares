@@ -1,5 +1,9 @@
 export class Bullet {
   active = false;
+  afterimage = false;
+  fromDrone = false;
+  bounces = 0;
+  momentumBoosted = false;
   x = 0;
   y = 0;
   /** Normalized direction. */
@@ -11,6 +15,9 @@ export class Bullet {
   life = 0;
   /** Number of additional solid blocks this projectile can penetrate before expiring. */
   pierceLeft = 0;
+  /** Ordinary ammunition only; piercing shots never receive a bounce budget. */
+  bounceLeft = 0;
+  bounceRetention = 1;
   /** Explosion radius in cells (> 0 for rockets / cluster bombs). */
   explosionRadius = 0;
   /** Number of secondary cluster mini-bombs spawned upon detonation. */
@@ -25,8 +32,10 @@ export class Bullet {
   slashAngle = 0;
   /** Initial max lifetime for alpha/animation scaling. */
   maxLife = 0;
-  /** Distance traveled (used to clamp the tracer so it never trails behind the muzzle). */
+  /** Distance since launch or last reflection, used to clamp the straight tracer. */
   traveled = 0;
+  /** Actual flight distance across all reflected segments. */
+  totalTraveled = 0;
   /**
    * Distance still to "advance" from the soldier's center to the muzzle on the
    * first cast. The first cast starts at the soldier center (always clear) so a

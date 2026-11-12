@@ -1,3 +1,5 @@
+import { drawWeaponExpansion } from "./WeaponExpansionRenderer";
+import { drawGoo } from "./GooRenderer";
 import { worldAtmosphere } from "../world/worldAtmosphere";
 import { sectorSpawnCell } from "../world/labMap";
 import { LootKind } from "../entities/LootSystem";
@@ -160,8 +162,10 @@ export class Renderer {
     if (!game.devMapAccess) this.fogRenderer.draw(ctx, cam);
     // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
     // its full palette even when it outruns the light creeping after it.
+    drawWeaponExpansion(ctx, game, still);
     this.drawSoldiers();
     this.drawGrenades();
+    drawGoo(ctx, cam, game.combat.goo, still, game.lighting.quality === "low");
     this.drawTurrets();
     game.late.drawOverlay(ctx, cam);
     this.drawAimIndicator();

@@ -99,6 +99,7 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
     expect(categoryForBranch("rocket_launcher")).toBe("primary");
     expect(categoryForBranch("sniper_rifle")).toBe("primary");
     expect(categoryForBranch("katana")).toBe("primary");
+    expect(categoryForBranch("goo_mortar")).toBe("primary");
 
     expect(categoryForBranch("grenade")).toBe("secondary");
 
@@ -118,6 +119,9 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
       "sniper_rifle",
       "katana",
       "flamethrower",
+      "goo_mortar",
+      "drone_shepherd",
+      "prism_laser",
     ]);
     expect(secondaryCat.branches).toEqual(["grenade", "turret"]);
   });

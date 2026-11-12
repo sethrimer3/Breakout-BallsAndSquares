@@ -1,5 +1,8 @@
 import {
   FACILITY,
+  GOO,
+  DRONE,
+  PRISM,
   ASSAULT_RIFLE,
   GRENADE,
   GROWTH,
@@ -23,7 +26,10 @@ export type WeaponType =
   | "rocket_launcher"
   | "sniper_rifle"
   | "katana"
-  | "flamethrower";
+  | "flamethrower"
+  | "goo_mortar"
+  | "drone_shepherd"
+  | "prism_laser";
 
 export type SecondaryWeaponType = "grenade" | "turret";
 
@@ -40,6 +46,7 @@ export interface SoldierStats {
   damage: number;
   bulletSpeed: number;
   multishotChance: number;
+  pistolBounces: number;
   // Shotgun stats
   shotgunUnlocked: boolean;
   shotgunFireRate: number;
@@ -48,6 +55,7 @@ export interface SoldierStats {
   shotgunSpreadDeg: number;
   shotgunBulletSpeed: number;
   shotgunLifetime: number;
+  shotgunBounces: number;
   // Assault Rifle stats
   arUnlocked: boolean;
   arFireRate: number;
@@ -77,6 +85,13 @@ export interface SoldierStats {
   katanaBulletSpeed: number;
   katanaPierce: number;
   katanaSlashWidth: number;
+  katanaDash: boolean;
+  katanaDashPeak: number;
+  katanaDashDuration: number;
+  katanaDashCooldown: number;
+  katanaKinetic: number;
+  katanaWide: number;
+  katanaPerfect: boolean;
   // Flamethrower stats
   flameUnlocked: boolean;
   flameFireRate: number;
@@ -84,6 +99,33 @@ export interface SoldierStats {
   flameLifetime: number;
   /** Multiplier on how long rubble burns. */
   flameBurnMult: number;
+  // SQUELCH primary weapon prototype
+  gooUnlocked: boolean;
+  gooFireRate: number;
+  gooMass: number;
+  gooDistance: number;
+  gooDwell: number;
+  gooDamage: number;
+  gooRadius: number;
+  gooResidue: boolean;
+  droneUnlocked: boolean;
+  droneCapacity: number;
+  droneReleaseInterval: number;
+  droneDamage: number;
+  droneSpeed: number;
+  droneFireRate: number;
+  droneHealth: number;
+  droneAim: number;
+  droneRecall: boolean;
+  prismUnlocked: boolean;
+  prismDamage: number;
+  prismSpectrum: number;
+  prismBounces: number;
+  prismGain: number;
+  prismShear: number;
+  prismDistance: number;
+  prismOverload: boolean;
+  prismFireRate: number;
   // Secondary Ability: Grenade stats
   grenadeUnlocked: boolean;
   grenadeBlocksRequired: number;
@@ -148,6 +190,7 @@ export function baseSoldierStats(): SoldierStats {
     damage: SOLDIER.damage,
     bulletSpeed: SOLDIER.bulletSpeed,
     multishotChance: SOLDIER.multishotChance,
+    pistolBounces: 0,
     shotgunUnlocked: false,
     shotgunFireRate: SHOTGUN.fireRate,
     shotgunDamage: SHOTGUN.damage,
@@ -155,6 +198,7 @@ export function baseSoldierStats(): SoldierStats {
     shotgunSpreadDeg: SHOTGUN.spreadDeg,
     shotgunBulletSpeed: SHOTGUN.bulletSpeed,
     shotgunLifetime: SHOTGUN.lifetime,
+    shotgunBounces: 0,
     arUnlocked: false,
     arFireRate: ASSAULT_RIFLE.fireRate,
     arDamage: ASSAULT_RIFLE.damage,
@@ -180,11 +224,28 @@ export function baseSoldierStats(): SoldierStats {
     katanaBulletSpeed: KATANA.bulletSpeed,
     katanaPierce: KATANA.pierce,
     katanaSlashWidth: KATANA.slashWidth,
+    katanaDash: false,
+    katanaDashPeak: 2.25,
+    katanaDashDuration: 0.7,
+    katanaDashCooldown: 1.8,
+    katanaKinetic: 1,
+    katanaWide: 1,
+    katanaPerfect: false,
     flameUnlocked: false,
     flameFireRate: FLAMETHROWER.fireRate,
     flameDamage: FLAMETHROWER.damage,
     flameLifetime: FLAMETHROWER.lifetime,
     flameBurnMult: 1,
+    gooUnlocked: false,
+    gooFireRate: GOO.fireRate,
+    gooMass: GOO.startingMass,
+    gooDistance: GOO.distance,
+    gooDwell: GOO.dwell, gooDamage: GOO.mineDamage, gooRadius: GOO.mineRadiusCells, gooResidue: false,
+    droneUnlocked: false, droneCapacity: DRONE.capacity, droneReleaseInterval: DRONE.releaseInterval,
+    droneDamage: DRONE.damage, droneSpeed: DRONE.speed, droneFireRate: DRONE.fireRate,
+    droneHealth: DRONE.health, droneAim: 0, droneRecall: false,
+    prismUnlocked: false, prismDamage: PRISM.damage, prismSpectrum: 0, prismBounces: PRISM.bounces,
+    prismGain: 0.25, prismShear: 1, prismDistance: PRISM.distance, prismOverload: false, prismFireRate: PRISM.fireRate,
     grenadeUnlocked: false,
     grenadeBlocksRequired: GRENADE.blocksRequired,
     grenadeEnergyRequired: GRENADE.energyRequired,
@@ -255,9 +316,16 @@ export class Soldier {
   fireCooldown: number;
   /** Alternating swing index for katana slashes. */
   slashIndex = 0;
+  dashLeft = 0;
+  dashDuration = 0;
+  dashPeak = 1;
+  dashCooldown = 0;
+  dashAfterimage = false;
   facingAngle: number;
   isManual = false;
   isInFormation = false;
+  /** Hold a chosen side while rounding cover; avoid left/right steering oscillation. */
+  formationAvoidSign = 0;
   /** Which side shell casings eject to (+1 / -1). */
   ejectSide: number;
   /** Consecutive substeps the soldier could not be freed from terrain (debug). */

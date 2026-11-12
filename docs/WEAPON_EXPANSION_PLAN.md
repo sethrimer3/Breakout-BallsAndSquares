@@ -3,7 +3,7 @@
 **Game design specification and code-oriented implementation plan**  
 **Project:** `sethrimer3/Breakout-BallsAndSquares` (`main` branch)  
 **Prepared:** November 12, 2026  
-**Status:** Proposal, not implemented  
+**Status:** First playable expansion implemented; automated release validation complete; human playtest acceptance pending<br>
 **Design intent:** Make the weapons feel mechanically surprising, tactile, and distinctly different, while protecting the core experience of autonomous soldiers ricocheting through destructible environments.
 
 ## Executive summary
@@ -16,7 +16,80 @@ The first release of this expansion should deliver five connected improvements:
 4. **Chromatic Prism:** a reflective laser that begins red and unlocks orange, yellow, green, blue, indigo, and violet through upgrades. Each bounce makes the ray more dangerous, increasing its damage and penetration budget.
 5. **Momentum Katana:** the existing katana's slash damage and width scale with actual soldier velocity, and a wall collision can initiate a fast dash that eases back to ordinary running speed.
 
-All numeric values below are **proposed first-pass tuning**, not values verified in the existing game. Implement mechanics first, then tune against playtests and telemetry.
+Except for the implemented values recorded in the progress section, numeric values below are **proposed first-pass tuning**. Implement mechanics first, then tune against playtests and telemetry.
+
+## Implementation progress — November 12, 2026
+
+### Phase 1 — ordinary Pistol and Shotgun ricochet ammunition
+
+This slice is implemented. The original validation results below describe its completion before Phase 2.
+
+- **Bankshot Barrel** (`pistol_bankshot`): 5 levels, one terrain reflection per level, full damage retention. Starts at 30 gold with a 1.7 cost multiplier, after Primary Weapons access.
+- **Pellet Rebound** (`shotgun_rebound`): 3 levels, one reflection per pellet per level, retaining 70% damage after each bounce. Starts at 60 gold with a 1.8 cost multiplier; requires Shotgun and 30 lifetime pixels. Terrain damage rounds to the nearest integer with a minimum of one.
+- Effective penetration is checked at launch: soldier piercing upgrades disable ordinary ricochets for that shot, even after its penetration is exhausted. AR, Sniper, Katana, rockets, flames, turret rounds, and grenade shrapnel receive no ordinary ricochet budget.
+- Terrain takes damage before reflection, including when that hit destroys the wall. World boundaries reflect eligible rounds; creature hits consume them. Remaining movement continues in the same update, with an eight-contact safety guard.
+- Reflection resets straight-tracer distance, preserves total segment travel, and emits a cyan spark plus a spatial metallic ping throttled to one per 40 ms. Both projectile spawn paths reset the new pooled state.
+- The existing definition-driven upgrade UI and save sanitation include the new nodes automatically. Old saves default missing levels to zero, and purchases remain capped at 5 / 3 levels.
+
+**Validation:** `npm test` passed 323 tests in 42 files, including 22 new ricochet/progression cases; `npm run build` passed the TypeScript check and production build. Coverage includes axis-aligned surfaces, corners, exact-face/zero-distance impacts, half-size Blight, destroyed walls, world boundaries, finite budgets, per-update guards, damage retention, penetration exclusivity, creature hits, pool reuse, purchases, and legacy saves. Existing tree-fit tests also pass with both new nodes. Chromium smoke checks verified both tooltips and purchases through the upgrade UI with no JavaScript errors.
+
+### Phase 2 — playable SQUELCH prototype
+
+- `goo_mortar` is a primary loadout weapon with its own firing rate (0.65/s). Orbs use subcell swept collision, stick for 0.18 s, deposit a mine, and resume along the captured reflected trajectory. The center-point cast starts at the soldier center so a wall inside the muzzle offset cannot be skipped.
+- Each orb starts with 1.0 mass and 300 world units of flight at 260 units/s. Each contact sheds up to 0.075 mass; the final fragment scales mine damage proportionally. Orbs expire at 0.12 living mass, exhausted distance, out-of-world position, or a 120 s runtime failsafe. Sticky delays consume time but no distance. There is no lifetime bounce counter.
+- Mines have independent positions and 0.75 s fuses, survive support-wall removal and parent expiration, and deal 5 base damage in a 1.8-cell blast through the shared rocket terrain-impact/owner pipeline. Soldier damage, terrain bonus, and Blight multiplier are captured at launch. Creature, fixture, and encounter blast callbacks also run.
+- Global pools cap orbs/mines at 16/96. At mine capacity a shed fragment dissipates while mass is still consumed. At most eight mine detonations and eight contacts per orb are processed per fixed update; overdue mines remain queued. Run restarts and sector transitions clear both pools.
+- **Unlock SQUELCH:** 180 gold, after Primary Arsenal and 80 lifetime pixels. **Gel Reservoir:** 6 levels of +0.15 mass, starting at 65 gold (1.7× costs). **Long Hop:** 8 levels of +80 distance, starting at 55 gold (1.6× costs). Both require the weapon unlock. Saves retain unlocked loadouts and sanitize locked ones to Pistol; legacy saves default new levels to zero.
+- Phase 2 introduced basic shrinking silhouettes and fuse indicators; Phase 3 below replaces its placeholder animation and sounds. The remaining goo progression upgrades are still deferred to Phase 7.
+
+**Validation:** `npm test` passed 345 tests in 43 files, including 22 new SQUELCH cases. `npm run build` passed. Tests cover flight-only distance, timed sticking/release, multiple contacts per update, final mass fragments, more than sixteen lifetime contacts, corner/border/half-size hits, support removal, frame grouping, pool reuse and saturation, queued detonations, owner-attributed blast damage, progression caps, and old saves. Chromium verified UI purchases, equipping, live stick/release/detonation, and restart cleanup with no JavaScript errors.
+
+### Phase 3 — SQUELCH visual/audio polish
+
+- Each pooled orb owns a preallocated ten-point `GooBody` spring ring. Impact compresses the normal axis and expands the tangent axis; three contact-side points remain anchored while the free edge jiggles. The last 0.05 s of the existing 0.18 s dwell adds a single peel/stretch impulse, followed by a damped release overshoot. This adds no flight delay, collision geometry, or damage changes.
+- Springs advance alongside fixed-step flight/dwell segments with bounded visual substeps. Their positions, velocities, orientation, and phase reset on pool reuse. The Canvas renderer only reads state, drawing a smooth closed outline and mass-scaled highlight.
+- Mines develop a warm core, restrained charge breathing, and a filling fuse ring. Reduced-motion mode replaces the animated ring with a static contact silhouette and disables breathing. Low lighting quality omits the extra mine halo while retaining the core and fuse indicator.
+- Dedicated procedural **launch**, **wet impact**, **suction release**, and **compact mine burst** cues combine filtered noise with short sine chirps. They use existing spatial falloff, stereo pan, mute, gesture unlock, and effects volume. Per-cue throttles (60/45/55/65 ms) share a maximum of six voices, each with two finite sources. Completion disconnects local audio nodes and spatial routing; there are no per-orb sound loops.
+- Full orb pools suppress launch/shot effects and emit a small dissipating puff. At mine capacity, lost residue emits a green puff while consuming mass as before. The debug overlay reports active orb/mine counts and dropped orb/fragment totals; run resets and sector changes reset those counters.
+
+**Validation:** 357 tests in 45 files pass, including 12 new spring/audio/pressure cases; the production build passes. Chromium rendered impact, jiggle, peel, rebound, and reduced-motion snapshots; rendering preserved simulation and spring state. Real Web Audio offline rendering produced finite, non-clipping output and completion events for all four cues. A 600-frame simulation/render stress check starting with 16 orbs and 96 mines kept counts bounded, exercised overflow, and drained all entities. UI unlock/equip, live stick/release/burst, and restart cleanup also passed without JavaScript errors. These are functional checks, not a mobile-device performance or balance certification.
+
+### Phase 4 — momentum katana
+
+- Slashes snapshot damage and arc width from actual `hypot(vx, vy)` using the proposed 2.6× ratio cap. Kinetic Edge and Wide Momentum scale only the velocity-derived bonus; already active slashes retain their values.
+- Rebound Dash triggers after a real autonomous wall reflection, along the reflected velocity. Base peak/duration/cooldown are 2.25× / 0.70 s / 1.8 s. Impulse Engine reaches a hard movement cap of 3.0×; the slash ratio still caps at 2.6×. All seven proposed katana specialization nodes are purchasable on its existing tree.
+- Physics substeps use actual speed and allow for an imminent dash peak. Collision response preserves active dash speed, cooldown prevents repeated-contact retriggers, and the callback carries the surface normal and reflected soldier state. Manual control, formations, sentries, recovery relocation, and soft separation do not trigger dashes. Sector travel clears transient dash state.
+- Cyan trails/rings and a short swish show the burst. Perfect Rebound adds one harmless slash afterimage. Reduced motion suppresses moving trails/afterimages. Formation navigation now uses circle-width clearance and a consistent flank side, preserving the existing obstacle-navigation regression test under corrected substeps.
+
+### Phase 5 — Drone Shepherd
+
+- `DroneSystem` owns a separate 24-actor pool. The carrier releases one drone every 4.5 s, initially two per owner; Brood Capacity permits seven per owner but never bypasses the shared cap. Drones live 12 s, then optionally fire one Recall Burst. Owner death limits remaining life to 1.5 s.
+- Actors orbit/sweep locally, validate swept travel plus radius clearance, cannot teleport to their owner, and can be crushed by newly grown terrain. They never become Soldiers, consume deployment slots, join formations, collect loot, or receive soldier rescue relocations.
+- Pistol micro-rounds use a typed owner-attributed shot interface. Owner damage, terrain bonus, Blight multiplier and pierce are captured; ordinary Pistol Bankshot is explicitly not inherited. Optional aim correction is limited to 20° and searches a bounded local neighborhood at 0.25 s intervals.
+- All eight proposed drone nodes, loadout options, miniature sprites/propellers/muzzle cues, electronic launch audio, cleanup and save sanitation are implemented.
+
+### Phase 6 — Chromatic Prism
+
+- `LaserSystem.traceShot()` resolves each pulse once; pooled segment visuals fade for 0.12 s without retracing damage. Purchased spectrum controls the initial red-through-violet band, and each reflection advances the next segment's band.
+- A pulse damages a distinct terrain cell once, spends available penetration through destructible terrain before reflecting, and treats closed doors as non-penetrable. World boundaries absorb the ray. Corners, zero-distance contacts and surfaces destroyed by the same pulse are bounded and deterministic.
+- Each reflection adds damage relative to the initial base and replenishes penetration. Hard limits are 8 reflections, 16 distinct terrain hits, 32 visual segments per pulse, and 600 units shared travel; the damage growth multiplier caps at 6×. The global visual pool has 256 segments.
+- All seven proposed nodes are implemented. Spectrum levels I–VII, thickness, reflection marks, and optional dash patterns supplement color; Prism Patterns defaults on and is saved in Visual Settings. Chromatic Overload is a harmless light pulse on the final violet reflection, so it cannot add recursive damage.
+
+### Phase 7 — progression and presentation
+
+- All remaining goo nodes (Elastic Recall, Volatile Droplets, Glow Bloom, Rapid Culture, Living Residue) are implemented. Living Residue shortens nearby positive fuses once per burst with a 0.04 s floor; the eight-detonation update budget remains in force.
+- Every new node has a level cap, price, prerequisite and tooltip. The weapon trees remain within the existing 5×3 stage; weapon/category locks, dash prerequisites, and the violet capstone requirement are enforced. Old saves default missing levels/settings and replace locked new loadouts with Pistol.
+- Loadout summaries state each weapon's rule. Existing mute/volume controls cover the new sounds; reduced motion and low-quality rendering preserve non-color fuse/power information. Drone/prism electronic cues share a four-voice cap with explicit node cleanup.
+- Shared fixed pools serve goo, drones and laser segments while standard bullets retain their existing pool/fast path. Optional AR Mirror Rounds/respec and the three future concepts remain outside the initial release.
+
+### Phase 8 — automated balance and release candidate
+
+- Added `npm run test:weapons`, `npm run test:weapon-browser`, and controlled seed-17 base/max-upgrade samples for open rooms and corridors. An eight-carrier case reaches the 24-drone cap without adding Soldiers.
+- Exported telemetry now includes ordinary/goo bounce histograms, mine contacts/deposits/bursts, drone shots/useful hits, laser hits/reflections, dash uptime/damage, pool drops, and timing. Weapon counters reset with their systems on run/sector rebuilds.
+- Browser checks exercise real UI purchases, all four live weapon rules, restart cleanup, saved settings, and mobile touch tooltips/loadouts. Desktop and 4× CPU-throttled mobile-viewport profiles exercise 600 simulation/render steps, followed by 1,800 more frames for retained-heap checks. The full suite passes 400 tests in 50 files; TypeScript, production build, and built-bundle startup/render checks pass.
+- See [validation, benchmark results, and release playtest checklist](WEAPON_VALIDATION.md). Automated results are a playtest-ready implementation, not evidence of physical-phone performance, long-run economy parity, or first-time-player comprehension.
+
+**Implementation scope complete.** Remaining acceptance work is human playtesting and physical-device checks listed in the validation document; no further mandatory weapon feature is deferred.
 
 ## 1. Creative principles and technical guardrails
 
@@ -29,19 +102,19 @@ All numeric values below are **proposed first-pass tuning**, not values verified
 - **Convenience is not complexity.** Unusual mechanics should be understandable without memorizing long upgrade descriptions.
 - **Upgrades create new milestones.** Prefer distinctive unlocks and capped effect upgrades over 15 nearly identical percentage increases.
 
-### Codebase facts verified in the inspected repository
+### Codebase baseline before this expansion
 
-- `src/entities/Bullet.ts`: fixed-size bullet pool and bullet state; no bounce or distance budget fields currently.
+- `src/entities/Bullet.ts`: fixed-size bullet pool and bullet state. Phase 1 adds bounce counters, retention, and total travel alongside the existing straight-tracer distance; a maximum travel budget remains future work.
 - `src/systems/CombatSystem.ts`: soldier weapon switching, `spawnBullet`, swept subcell raycasting with hit normals, piercing, grenades, and autoturrets.
 - `src/core/gridRaycast.ts`: axis-aligned surface normal (`nx`, `ny`) and precise hit point are already returned.
-- `src/systems/PhysicsSystem.ts`: wall reflection for soldiers; `step(s, dt)` currently returns only a bounce count and computes substeps from `s.speed`.
+- `src/systems/PhysicsSystem.ts`: baseline wall reflection returned a bounce count and sized substeps from `s.speed`; Phase 4 corrects substeps and adds the post-reflection dash callback.
 - `src/entities/Soldier.ts`: `WeaponType`, derived `SoldierStats`, and `Soldier` movement and loadout state.
 - `src/rendering/Renderer.ts`: dedicated bullet, slash, soldier, and grenade drawing in Canvas 2D.
 - `src/audio/AudioSystem.ts`: Web Audio sound generators with per-category throttling and existing spatial audio support.
 - `src/progression/UpgradeDefinitions.ts`, `UpgradeManager.ts`, `SaveManager.ts`, and `src/ui/UpgradeTree.ts`: permanent upgrade definitions, purchasing, save sanitation, and upgrade-tree presentation.
 - `src/Game.ts`: fixed simulation orchestration. Soldier physics happens before soldier shooting, followed by bullet and grenade updates.
 
-**Important implementation rule:** Existing project names and functions in this document are verified where stated; new names such as `GooOrbSystem`, `DroneSystem`, and `LaserSystem` are suggested interfaces, not files already present.
+**Implementation note:** `GooOrbSystem`, `GooBody`, `GooRenderer`, `DroneSystem`, `LaserSystem`, and `Momentum` now exist. The design sketches below remain useful context; implemented choices and validation above take precedence where they differ.
 
 ## 2. Shared engineering foundation
 
@@ -405,16 +478,16 @@ Suggested new files: `src/entities/GooOrb.ts`, `GooMine.ts`, `Drone.ts`; `src/sy
 
 ## 13. Definition of done for the first playable expansion
 
-- [ ] Pistol and Shotgun can buy weapon-specific bullet ricochet upgrades, without giving bounce to piercing sniper bullets, rockets or flames.
-- [ ] SQUELCH visibly squashes, clings, jiggles, peels off and rebounds; it leaves a smaller orange-glowing sticky mine at every qualifying contact.
-- [ ] SQUELCH's lifetime is constrained by traveled distance and mass, not an arbitrary number of bounces; upgraded starting mass extends potential mine deposits.
-- [ ] Mine fuses and damage are deterministic, owner-attributed, pool-limited, and legible in crowded scenes.
-- [ ] Drone Shepherd deploys individually moving miniature pistol drones that do not count as full soldiers or pass through sealed walls.
-- [ ] Chromatic Prism starts red and progresses through seven color bands; each bounce raises damage and pierce within hard safety limits.
-- [ ] Katana damage and slash width are computed from real wielder velocity; wall impact triggers a fast dash and continuous return to base speed.
-- [ ] All upgrades are purchasable, capped, described, loadout-compatible, and safe in old saves.
-- [ ] No fixed-timestep simulation regressions, high-speed tunneling, memory growth, infinite loops or unbounded audio voices occur in stress tests.
-- [ ] A first-time player can explain each weapon's distinctive rule after observing it once or twice.
+- [x] Pistol and Shotgun can buy weapon-specific bullet ricochet upgrades, without giving bounce to piercing sniper bullets, rockets or flames.
+- [x] SQUELCH visibly squashes, clings, jiggles, peels off and rebounds; it leaves a smaller orange-glowing sticky mine at every qualifying contact.
+- [x] SQUELCH's lifetime is constrained by traveled distance and mass, not an arbitrary number of bounces; upgraded starting mass extends potential mine deposits.
+- [x] Mine fuses and damage are deterministic, owner-attributed, pool-limited, and legible in crowded scenes.
+- [x] Drone Shepherd deploys individually moving miniature pistol drones that do not count as full soldiers or pass through sealed walls.
+- [x] Chromatic Prism starts red and progresses through seven color bands; each bounce raises damage and pierce within hard safety limits.
+- [x] Katana damage and slash width are computed from real wielder velocity; wall impact triggers a fast dash and continuous return to base speed.
+- [x] All upgrades are purchasable, capped, described, loadout-compatible, and safe in old saves.
+- [x] No fixed-timestep simulation regressions, high-speed tunneling, memory growth, infinite loops or unbounded audio voices occur in stress tests. The automated retained-heap gate permits less than 1 MiB after warm-up; see the recorded measurements and longer physical-device checks in WEAPON_VALIDATION.md.
+- [ ] A first-time player can explain each weapon's distinctive rule after observing it once or twice. **Requires a real first-time-player playtest; not claimed by automated checks.**
 
 ## Sources and notes
 
@@ -431,4 +504,4 @@ Repository source, reviewed from `main` on November 12, 2026:
 - https://github.com/sethrimer3/Breakout-BallsAndSquares/blob/main/src/progression/SaveManager.ts
 - https://github.com/sethrimer3/Breakout-BallsAndSquares/blob/main/src/Game.ts
 
-All new weapon concepts, upgrade names, formulas, timings, counts, and performance limits in this document are proposals. The existing systems and file names listed as current were read from the repository, but the proposed mechanics have **not** been implemented or run as a playtest.
+All mandatory first-playable weapon features are implemented as documented in the progress sections. Optional concepts and AR Mirror Rounds remain proposals. Automated validation and browser smoke checks do not establish human playtested balance or physical-device performance; outstanding acceptance checks are listed in WEAPON_VALIDATION.md.

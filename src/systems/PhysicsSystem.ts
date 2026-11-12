@@ -1,3 +1,5 @@
+import { advanceMomentum, triggerMomentum } from "./Momentum";
+import type { SoldierStats } from "../entities/Soldier";
 import { SOLDIER } from "../config";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import { DEG } from "../core/math";
@@ -194,6 +196,18 @@ export function hasLineOfSight(
   return false;
 }
 
+/** A circle-width visibility corridor, including rounded endpoint clearance. */
+export function hasCircleLineOfSight(world: PixelWorld, x: number, y: number, tx: number, ty: number, radius: number): boolean {
+  if (!circleIsClear(world, tx, ty, radius)) return false;
+  const length = Math.hypot(tx-x,ty-y);
+  if (length < 1e-6) return true;
+  const dx=(tx-x)/length;const dy=(ty-y)/length;
+  for (const offset of [-radius,0,radius]) {
+    if (gridRaycast(world.subSolidQuery,world.subCellSize,x-dy*offset,y+dx*offset,dx,dy,length,sightHit)) return false;
+  }
+  return true;
+}
+
 /** Find the deepest contact between the circle and solid cells / sub-pixels. Returns false if none. */
 function deepestContact(world: PixelWorld, x: number, y: number, r: number, out: Contact): boolean {
   const cs = world.cellSize;
@@ -317,6 +331,8 @@ export interface PhysicsStats {
 }
 
 export class PhysicsSystem {
+  private dashStats: SoldierStats | null = null;
+  private onDash: ((s: Soldier, nx: number, ny: number) => void) | undefined;
   readonly stats: PhysicsStats = { relocations: 0, stuckEvents: 0 };
 
   constructor(
@@ -325,9 +341,12 @@ export class PhysicsSystem {
   ) {}
 
   /** Advance one soldier by dt using substeps. Returns number of bounces. */
-  step(s: Soldier, dt: number): number {
+  step(s: Soldier, dt: number, stats?: SoldierStats, onDash?: (s: Soldier, nx: number, ny: number) => void): number {
+    advanceMomentum(s, dt);
+    this.dashStats = stats ?? null;
+    this.onDash = onDash;
     const r = s.radius;
-    const dist = s.speed * dt;
+    const dist = Math.max(Math.hypot(s.vx, s.vy), stats?.katanaDash && s.weapon === "katana" ? s.speed * Math.min(3, stats.katanaDashPeak) : 0) * dt;
     const n = Math.max(1, Math.ceil(dist / (r * 0.5)));
     const h = dt / n;
     let bounces = 0;
@@ -336,12 +355,15 @@ export class PhysicsSystem {
       s.y += s.vy * h;
       if (this.resolve(s)) bounces++;
     }
+    this.dashStats = null;
+    this.onDash = undefined;
     return bounces;
   }
 
   /** Resolve overlap and reflect velocity. Returns true if a bounce occurred. */
   resolve(s: Soldier): boolean {
     const r = s.radius;
+    const moveSpeed = s.dashLeft > 0 ? Math.hypot(s.vx, s.vy) || s.speed : s.speed;
     let firstNx = 0;
     let firstNy = 0;
     let touched = false;
@@ -361,7 +383,8 @@ export class PhysicsSystem {
       return false;
     }
 
-    if (!circleIsClear(this.world, s.x, s.y, r)) {
+    const recovered = !circleIsClear(this.world, s.x, s.y, r);
+    if (recovered) {
       this.recover(s, firstNx, firstNy);
     } else {
       s.stuckFrames = 0;
@@ -391,22 +414,22 @@ export class PhysicsSystem {
       if (Math.abs(nx) > Math.abs(ny)) {
         s.vx = -s.vx;
         s.vy = 0;
-        if (Math.abs(s.vx) < 1e-4) s.vx = nx > 0 ? s.speed : -s.speed;
+        if (Math.abs(s.vx) < 1e-4) s.vx = nx > 0 ? moveSpeed : -moveSpeed;
       } else {
         s.vy = -s.vy;
         s.vx = 0;
-        if (Math.abs(s.vy) < 1e-4) s.vy = ny > 0 ? s.speed : -s.speed;
+        if (Math.abs(s.vy) < 1e-4) s.vy = ny > 0 ? moveSpeed : -moveSpeed;
       }
       s.facingAngle = Math.atan2(s.vy, s.vx);
     } else if (s.behavior === "vertical") {
       s.vx = 0;
       s.vy = -s.vy;
-      if (Math.abs(s.vy) < 1e-4) s.vy = ny >= 0 ? s.speed : -s.speed;
+      if (Math.abs(s.vy) < 1e-4) s.vy = ny >= 0 ? moveSpeed : -moveSpeed;
       s.facingAngle = Math.atan2(s.vy, 0);
     } else if (s.behavior === "horizontal") {
       s.vy = 0;
       s.vx = -s.vx;
-      if (Math.abs(s.vx) < 1e-4) s.vx = nx >= 0 ? s.speed : -s.speed;
+      if (Math.abs(s.vx) < 1e-4) s.vx = nx >= 0 ? moveSpeed : -moveSpeed;
       s.facingAngle = Math.atan2(0, s.vx);
     } else if (s.behavior === "turn_left") {
       let nvx = s.vy;
@@ -416,8 +439,8 @@ export class PhysicsSystem {
         nvy = s.vy - 2 * vn * ny;
       }
       const nlen = Math.hypot(nvx, nvy) || 1;
-      s.vx = (nvx / nlen) * s.speed;
-      s.vy = (nvy / nlen) * s.speed;
+      s.vx = (nvx / nlen) * moveSpeed;
+      s.vy = (nvy / nlen) * moveSpeed;
       s.facingAngle = Math.atan2(s.vy, s.vx);
     } else if (s.behavior === "turn_right") {
       let nvx = -s.vy;
@@ -427,8 +450,8 @@ export class PhysicsSystem {
         nvy = s.vy - 2 * vn * ny;
       }
       const nlen = Math.hypot(nvx, nvy) || 1;
-      s.vx = (nvx / nlen) * s.speed;
-      s.vy = (nvy / nlen) * s.speed;
+      s.vx = (nvx / nlen) * moveSpeed;
+      s.vy = (nvy / nlen) * moveSpeed;
       s.facingAngle = Math.atan2(s.vy, s.vx);
     } else {
       let vx = s.vx - 2 * vn * nx;
@@ -444,10 +467,11 @@ export class PhysicsSystem {
         vy = jy;
       }
       const vlen = Math.hypot(vx, vy) || 1;
-      s.vx = (vx / vlen) * s.speed;
-      s.vy = (vy / vlen) * s.speed;
+      s.vx = (vx / vlen) * moveSpeed;
+      s.vy = (vy / vlen) * moveSpeed;
       s.facingAngle = Math.atan2(s.vy, s.vx);
     }
+    if (!recovered && this.dashStats && triggerMomentum(s, this.dashStats)) this.onDash?.(s, nx, ny);
     return true;
   }
 

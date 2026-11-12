@@ -21,7 +21,7 @@ import { CombinedTargets, RoomFixtures } from "./systems/RoomFixtures";
 import { FireSystem } from "./systems/FireSystem";
 import { Input } from "./systems/Input";
 import { LightingSystem, makeLitCells, type LitCells, type MuzzleLight } from "./systems/LightingSystem";
-import { PhysicsSystem, circleIsClear, findClearDeployPoint, findSpawnPoint, hasLineOfSight } from "./systems/PhysicsSystem";
+import { PhysicsSystem, circleIsClear, findClearDeployPoint, findSpawnPoint, hasCircleLineOfSight } from "./systems/PhysicsSystem";
 import { RunStats } from "./systems/RunStats";
 import { HUD } from "./ui/HUD";
 import { DebugOverlay } from "./ui/DebugOverlay";
@@ -185,7 +185,29 @@ export class Game {
       onGrenadeThrow: (s, x, y, dx, dy) => this.onGrenadeThrow(s, x, y, dx, dy),
       onGrenadeStick: (x, y, nx, ny) => this.onGrenadeStick(x, y, nx, ny),
       onGrenadeBeep: (x, y, pct) => this.onGrenadeBeep(x, y, pct),
+      onDroneLaunch: (x,y) => this.audio.playDrone(x,y),
+      onDroneShot: (x,y) => this.audio.playShot(x,y),
+      onLaserBounce: (x,y) => this.audio.playRicochet(x,y),
+      onLaserOverload: (x,y) => this.particles.spawn(PKind.Burst,x,y,0,0,0.12,12,0xd37cff,8),
+      onGooStick: (x, y, nx, ny) => {
+        this.audio.playGoo("stick", x, y);
+        this.particles.spawn(PKind.Spark, x, y, nx * 20, ny * 20, 0.12, 2, 0x9cde68, 8);
+      },
+      onGooRelease: (x, y) => this.audio.playGoo("release", x, y),
+      onGooResidueLost: (x, y) => this.particles.spawn(PKind.Smoke, x, y, 0, -8, 0.2, 1.5, 0x9cde68, 8),
+      onGooLaunchBlocked: (x, y) => this.particles.spawn(PKind.Smoke, x, y, 0, -6, 0.15, 1, 0x9cde68, 8),
+      onGooMineBurst: (x, y, radius, damage) => {
+        this.creatures.explode(x, y, radius, damage);
+        this.fixtures.explode(x, y, radius);
+        this.late.explode(x, y, radius, damage);
+        this.audio.playGoo("burst", x, y);
+        this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.2, radius, 0xff963c, 8);
+      },
       onCreatureHit: (x, y, nx, ny) => this.onCreatureHit(x, y, nx, ny),
+      onBulletRicochet: (x, y, nx, ny) => {
+        this.audio.playRicochet(x, y);
+        this.particles.spawn(PKind.Spark, x, y, nx * 55, ny * 55, 0.06, 1.5, 0x8eeaff, 8);
+      },
       onFlameHit: (sx, sy, x, y, nx, ny) => {
         this.fire.splash(x, y, nx, ny);
         return this.fire.ignite(sx, sy) || this.fire.isBurning(sy * this.world.subWidth + sx);
@@ -454,7 +476,11 @@ export class Game {
     this.cellFlashes = [];
     this.doorFlashes = [];
     this.combat.bullets.clear();
+    this.combat.resetTelemetry();
     this.combat.grenades.clear();
+    this.combat.goo.clear();
+    this.combat.drones.clear();
+    this.combat.laser.clear();
     this.combat.turrets.clear();
     this.particles.clear();
     this.fire.clear();
@@ -641,7 +667,11 @@ export class Game {
       this.cellFlashes = [];
     this.doorFlashes = [];
       this.combat.bullets.clear();
+      this.combat.resetTelemetry();
       this.combat.grenades.clear();
+      this.combat.goo.clear();
+      this.combat.drones.clear();
+      this.combat.laser.clear();
       this.combat.turrets.clear();
       this.particles.clear();
       this.fire.clear();
@@ -655,6 +685,11 @@ export class Game {
         const r = alive.length > 1 ? cs * 2 : 0;
         s.x = this.world.roomCenterX + Math.cos(a) * r;
         s.y = this.world.roomCenterY + Math.sin(a) * r;
+        s.dashLeft = s.dashCooldown = 0;
+        s.dashAfterimage = false;
+        s.formationAvoidSign = 0;
+        const speed = Math.hypot(s.vx, s.vy);
+        if (speed > 1e-6) { s.vx *= s.speed / speed; s.vy *= s.speed / speed; }
       });
       this.soldiers = alive;
       this.camera.reset();
@@ -1001,6 +1036,12 @@ export class Game {
         return this.stats.sniperUnlocked;
       case "katana":
         return this.stats.katanaUnlocked;
+      case "drone_shepherd":
+        return this.stats.droneUnlocked;
+      case "prism_laser":
+        return this.stats.prismUnlocked;
+      case "goo_mortar":
+        return this.stats.gooUnlocked;
       case "flamethrower":
         return this.stats.flameUnlocked;
     }
@@ -1084,6 +1125,9 @@ export class Game {
       else if (commander.weapon === "rocket_launcher") rate = this.stats.rocketFireRate;
       else if (commander.weapon === "sniper_rifle") rate = this.stats.sniperFireRate;
       else if (commander.weapon === "katana") rate = this.stats.katanaFireRate;
+      else if (commander.weapon === "drone_shepherd") rate = 1 / this.stats.droneReleaseInterval;
+      else if (commander.weapon === "prism_laser") rate = this.stats.prismFireRate;
+      else if (commander.weapon === "goo_mortar") rate = this.stats.gooFireRate;
       else if (commander.weapon === "flamethrower") rate = this.stats.flameFireRate;
       commander.fireCooldown = 1 / Math.max(0.1, rate);
     }
@@ -1097,6 +1141,12 @@ export class Game {
 
   private onShot(s: Soldier, dx: number, dy: number, mx: number, my: number): void {
     this.runStats.shotsFired++;
+    if (s.weapon === "prism_laser") { this.audio.playPrism(mx, my); return; }
+    if (s.weapon === "drone_shepherd") return;
+    if (s.weapon === "goo_mortar") {
+      this.audio.playGoo("launch", mx, my);
+      return;
+    }
     if (s.weapon === "flamethrower") {
       // No white muzzle flash: the stream lights its surroundings with warm firelight.
       this.audio.playFlame(mx, my);
@@ -1709,7 +1759,12 @@ export class Game {
     for (const s of this.soldiers) {
       if (!s.alive) continue;
       s.age += dt;
-      this.physics.step(s, dt);
+      this.physics.step(s, dt, this.stats, (soldier) => {
+        this.combat.telemetry.katanaDashes++;
+        this.audio.playSlash(soldier.x, soldier.y);
+        this.particles.spawn(PKind.Burst, soldier.x, soldier.y, 0, 0, 0.12, 10, 0x83ecff, 8);
+      });
+      if (s.dashLeft > 0) this.combat.telemetry.katanaBoostedSeconds += dt;
       this.combat.updateSoldier(s, dt);
     }
     // Soldier-to-soldier soft separation to prevent clustering, jamming, or stacking
@@ -1741,6 +1796,9 @@ export class Game {
     this.combat.updateBullets(dt);
     this.fire.update(dt, this.combat.bullets.items);
     this.combat.updateGrenades(dt);
+    this.combat.goo.update(dt);
+    this.combat.drones.update(dt);
+    this.combat.laser.update(dt);
     this.combat.updateTurrets(dt);
     this.glass.update(dt);
     this.late.update(dt, this.soldiers);
@@ -1858,14 +1916,14 @@ export class Game {
       // Obstacle-aware navigation: check direct line-of-sight to target
       let steerX = tx;
       let steerY = ty;
-      if (!hasLineOfSight(this.world, f.x, f.y, tx, ty)) {
+      if (!hasCircleLineOfSight(this.world, f.x, f.y, tx, ty, f.radius)) {
         // 1) Search breadcrumbs from newest to oldest for one visible to follower
         let foundBreadcrumb = false;
         for (let bIdx = this.commanderTrail.length - 1; bIdx >= 0; bIdx--) {
           const pt = this.commanderTrail[bIdx];
           if (
             Math.hypot(pt.x - f.x, pt.y - f.y) > 4 &&
-            hasLineOfSight(this.world, f.x, f.y, pt.x, pt.y)
+            hasCircleLineOfSight(this.world, f.x, f.y, pt.x, pt.y, f.radius)
           ) {
             steerX = pt.x;
             steerY = pt.y;
@@ -1883,8 +1941,10 @@ export class Game {
           const ny = directDy / directDist;
           // Test lateral angles on both sides
           let bestAngDist = Infinity;
+          let chosenSign = 0;
           for (const sign of [-1, 1]) {
-            for (const deg of [30, 60, 85]) {
+            if (f.formationAvoidSign !== 0 && sign !== f.formationAvoidSign) continue;
+            for (const deg of [30, 60, 85, 90, 110]) {
               const rad = (deg * Math.PI) / 180 * sign;
               const cosA = Math.cos(rad);
               const sinA = Math.sin(rad);
@@ -1892,18 +1952,22 @@ export class Game {
               const probeY = f.y + (nx * sinA + ny * cosA) * Math.min(24, directDist);
               if (
                 circleIsClear(this.world, probeX, probeY, f.radius) &&
-                hasLineOfSight(this.world, f.x, f.y, probeX, probeY)
+                hasCircleLineOfSight(this.world, f.x, f.y, probeX, probeY, f.radius)
               ) {
                 const toGoal = Math.hypot(tx - probeX, ty - probeY);
                 if (toGoal < bestAngDist) {
                   bestAngDist = toGoal;
+                  chosenSign = sign;
                   steerX = probeX;
                   steerY = probeY;
                 }
               }
             }
           }
+          if (chosenSign !== 0) f.formationAvoidSign = chosenSign;
         }
+      } else {
+        f.formationAvoidSign = 0;
       }
 
       const fdx = steerX - f.x;
@@ -1963,6 +2027,13 @@ export class Game {
         const flash = (g.fuse % 0.22) < 0.11;
         grenadeLights.push({ x: g.x, y: g.y, radius: 24, strength: flash ? 0.9 : 0.45 });
       }
+    }
+    let gooLights = 0;
+    for (const mine of this.combat.goo.mines.items) {
+      if (!mine.active || gooLights >= 16) continue;
+      const charge = 1 - Math.max(0, mine.fuse / mine.maxFuse);
+      grenadeLights.push({ x: mine.x, y: mine.y, radius: 12 + charge * 8, strength: 0.25 + charge * 0.45, warm: true });
+      gooLights++;
     }
     const fireLights = this.fire.collectLights(performance.now() / 1000);
     for (let i = 0; i < fireLights.length; i++) grenadeLights.push(fireLights[i]);
@@ -2085,6 +2156,10 @@ export class Game {
         nearSoldierGrowthPct: +this.growth.nearSoldierPercent(r.time).toFixed(1),
         upgrades: this.save.data.upgrades,
         samples: r.samples,
+        timing: this.debugInfo,
+        weapons: { combat: this.combat.telemetry, goo: { contacts: this.combat.goo.contacts, deposits: this.combat.goo.deposits, bursts: this.combat.goo.bursts, bounceHistogram: this.combat.goo.bounceHistogram, orbs: this.combat.goo.orbs.activeCount, mines: this.combat.goo.mines.activeCount, droppedOrbs: this.combat.goo.droppedOrbs, droppedMines: this.combat.goo.droppedMines },
+          drones: { active: this.combat.drones.pool.activeCount, launched: this.combat.drones.launched, shots: this.combat.drones.shots, hits: this.combat.drones.usefulHits, dropped: this.combat.drones.dropped },
+          prism: { shots: this.combat.laser.shots, bounces: this.combat.laser.bounces, hits: this.combat.laser.hits, droppedSegments: this.combat.laser.droppedSegments } },
       },
       null,
       2,

@@ -127,6 +127,14 @@ The project is configured with `base: "./"` in [`vite.config.ts`](vite.config.ts
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
 3. Push to the `main` branch (or trigger **Build and deploy to GitHub Pages** manually from the **Actions** tab). The workflow in [`.github/workflows/static.yml`](.github/workflows/static.yml) runs `npm ci`, `npm test`, `npm run build`, and deploys `./dist`.
 
+## Experimental weapon expansion
+
+The Primary Arsenal now includes **SQUELCH** (stick → leave a timed mine → rebound), **Drone Shepherd** (independent miniature pistol drones), and **Chromatic Prism** (a pulsed beam that gains color, damage, and penetration on reflection). The existing Pistol and Shotgun trees offer weapon-specific bankshots. Katana's **Rebound Dash** specialization converts autonomous wall rebounds into a short speed burst, with slash damage and width captured from actual velocity.
+
+Weapon unlocks and upgrades live on their respective Primary Weapons tabs. Piercing soldier upgrades disable ordinary Pistol/Shotgun ricochets for that shot. Drone rounds do not inherit Pistol Bankshot. Prism spends charged penetration before reflecting; world boundaries absorb it. Visual Settings includes **Prism Patterns** as a non-color power cue. All new loadouts and upgrade levels are compatible with older save slots.
+
+See [the implementation plan](docs/WEAPON_EXPANSION_PLAN.md) and [validation / playtest notes](docs/WEAPON_VALIDATION.md). Run `npm run test:weapons` for focused coverage and `npm run test:weapon-browser` against a running Vite server for browser validation.
+
 ## Later worlds
 
 The empty-room framework now covers the 13×13 forest (zones 7–9), 7×7 fallen city (zone 10) and 5×3 Blight mother ship (zone 11). See [the world roadmap](docs/WORLD_ROADMAP.md) for exact exits, the central city facility/teleporter, atmosphere profiles, and the scenery/encounters reserved for later work.

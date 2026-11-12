@@ -61,6 +61,12 @@ export class UpgradeManager {
       if (parent && this.levelOf(parent) === 0) return false;
     }
     if (this.save.data.lifetimePixels < def.unlockLifetimePixels) return false;
+    if (def.branch === "drone_shepherd" && def.id !== "drone_unlock" && this.levelOf("drone_unlock") === 0) return false;
+    if (def.branch === "prism_laser" && def.id !== "prism_unlock" && this.levelOf("prism_unlock") === 0) return false;
+    if ((def.id.startsWith("katana_") && ["katana_impulse", "katana_glide", "katana_kinetic", "katana_wide", "katana_recovery", "katana_perfect"].includes(def.id)) && this.levelOf("katana_dash") === 0) return false;
+    if (["goo_residue", "drone_recall", "prism_overload", "katana_perfect"].includes(def.id) && def.parent && this.levelOf(def.parent) === 0) return false;
+    if (def.id === "prism_overload" && this.levelOf("prism_spectrum") < 6) return false;
+    if (def.branch === "goo_mortar" && def.id !== "goo_unlock" && this.levelOf("goo_unlock") === 0) return false;
     if (def.branch === "shotgun" && def.id !== "shotgun_unlock") {
       if (this.levelOf("shotgun_unlock") === 0) return false;
     }

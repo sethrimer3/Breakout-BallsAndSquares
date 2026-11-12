@@ -99,7 +99,7 @@ export const CATEGORIES: readonly CategoryInfo[] = [
     name: "PRIMARY WEAPONS",
     icon: "rifle",
     color: "#52f296",
-    branches: ["pistol", "shotgun", "assault_rifle", "rocket_launcher", "sniper_rifle", "katana", "flamethrower"],
+    branches: ["pistol", "shotgun", "assault_rifle", "rocket_launcher", "sniper_rifle", "katana", "flamethrower", "goo_mortar", "drone_shepherd", "prism_laser"],
   },
   {
     id: "secondary",
@@ -157,6 +157,9 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   rocket_launcher: { icon: "launcher", color: "#ff5c40" },
   sniper_rifle: { icon: "sniper", color: UI_COLORS.soldier },
   katana: { icon: "katana", color: "#38d6ff" },
+  drone_shepherd: { icon: "turret", color: "#7ce4df" },
+  prism_laser: { icon: "bulletFast", color: "#d37cff" },
+  goo_mortar: { icon: "grenade", color: "#9cde68" },
   flamethrower: { icon: "flamethrower", color: "#ff7a18" },
   grenade: { icon: "grenade", color: "#ff9d3b" },
   turret: { icon: "turret", color: "#38d6ff" },
@@ -301,6 +304,9 @@ export class UpgradeTree {
                 <button class="tree-tab" data-tab="sniper_rifle"></button>
                 <button class="tree-tab" data-tab="katana"></button>
                 <button class="tree-tab" data-tab="flamethrower"></button>
+                <button class="tree-tab" data-tab="goo_mortar"></button>
+                <button class="tree-tab" data-tab="drone_shepherd"></button>
+                <button class="tree-tab" data-tab="prism_laser"></button>
               </div>
               <div class="tree-cat-panel hidden" data-cat="secondary">
                 <button class="tree-tab" data-tab="grenade"></button>
@@ -583,6 +589,12 @@ export class UpgradeTree {
         this.subEl.textContent = "SNIPER RIFLE WEAPON TREE — HIGH-VELOCITY PENETRATING ROUNDS & CRITS";
       } else if (tab === "katana") {
         this.subEl.textContent = "KATANA WEAPON TREE — RAPID HIGH-PIERCE ENERGY SLASHES & ANTI-BLIGHT CRITS";
+      } else if (tab === "drone_shepherd") {
+        this.subEl.textContent = "DRONE SHEPHERD — MINIATURE PISTOL DRONES; 24 GLOBAL, NO SOLDIER SLOTS";
+      } else if (tab === "prism_laser") {
+        this.subEl.textContent = "CHROMATIC PRISM — PIERCE WHEN CHARGED, OTHERWISE REFLECT; EDGES ABSORB";
+      } else if (tab === "goo_mortar") {
+        this.subEl.textContent = "SQUELCH — STICK, SHED A MINE, REBOUND; MASS & DISTANCE LIMIT FLIGHT";
       } else if (tab === "flamethrower") {
         this.subEl.textContent = "FLAMETHROWER WEAPON TREE — SHORT-RANGE FIRE STREAM THAT SETS RUBBLE BURNING";
       } else if (tab === "grenade") {
@@ -1039,6 +1051,9 @@ export class UpgradeTree {
     } else if (!unlocked) {
       const branch = branchOf(def);
       const needCenter =
+        (branch === "drone_shepherd" && def.id !== "drone_unlock" && u.levelOf("drone_unlock") === 0) ||
+        (branch === "prism_laser" && def.id !== "prism_unlock" && u.levelOf("prism_unlock") === 0) ||
+        (branch === "goo_mortar" && def.id !== "goo_unlock" && u.levelOf("goo_unlock") === 0) ||
         (branch === "shotgun" && def.id !== "shotgun_unlock" && u.levelOf("shotgun_unlock") === 0) ||
         (branch === "assault_rifle" && def.id !== "ar_unlock" && u.levelOf("ar_unlock") === 0) ||
         (branch === "rocket_launcher" && def.id !== "rocket_unlock" && u.levelOf("rocket_unlock") === 0) ||
@@ -1051,9 +1066,11 @@ export class UpgradeTree {
       let prerequisite = def.parent;
       while (branch === "core" && prerequisite && treeDef(prerequisite).placeholder) prerequisite = treeDef(prerequisite).parent;
       const needParent =
-        (branch === "facility" || branch === "core") && prerequisite !== null && u.levelOf(prerequisite) === 0 ? treeDef(prerequisite).name : "";
+        prerequisite !== null && u.levelOf(prerequisite) === 0 ? treeDef(prerequisite).name : "";
       const lockMsg =
-        rem > 0
+        def.id === "prism_overload" && u.levelOf("prism_spectrum") < 6
+          ? "LOCKED — Requires Spectrum Ascension VI"
+          : rem > 0
           ? `LOCKED — Destroy ${def.unlockLifetimePixels} lifetime pixels (${rem} more)`
           : needCenter
             ? `LOCKED — Unlock this weapon at the center node first`
@@ -1117,6 +1134,9 @@ export class UpgradeTree {
       { id: "rocket_launcher", label: "ROCKET", unlocked: st.rocketUnlocked },
       { id: "sniper_rifle", label: "SNIPER", unlocked: st.sniperUnlocked },
       { id: "katana", label: "KATANA", unlocked: st.katanaUnlocked },
+      { id: "drone_shepherd", label: "DRONES", unlocked: st.droneUnlocked },
+      { id: "prism_laser", label: "PRISM", unlocked: st.prismUnlocked },
+      { id: "goo_mortar", label: "SQUELCH", unlocked: st.gooUnlocked },
       { id: "flamethrower", label: "FLAMER", unlocked: st.flameUnlocked },
     ];
 
@@ -1155,7 +1175,13 @@ export class UpgradeTree {
       } else if (curW === "sniper_rifle") {
         wSummary = `Sniper · ${st.sniperDamage} DMG · ${st.sniperPierce} Pierce · ${Math.round(st.sniperCritChance * 100)}% Crit`;
       } else if (curW === "katana") {
-        wSummary = `Slash · ${st.katanaDamage} DMG (${st.katanaBlightMultiplier}× Blight) · ${st.katanaPierce} Pierce · ${st.katanaFireRate.toFixed(1)}/s`;
+        wSummary = `${st.katanaDash ? "Rebound dash · " : ""}Slash · ${st.katanaDamage} DMG (${st.katanaBlightMultiplier}× Blight) · ${st.katanaPierce} Pierce · ${st.katanaFireRate.toFixed(1)}/s`;
+      } else if (curW === "drone_shepherd") {
+        wSummary = `Independent pistol drones · ${st.droneCapacity} cap · ${st.droneReleaseInterval.toFixed(2)}s release · ${st.droneDamage} DMG`;
+      } else if (curW === "prism_laser") {
+        wSummary = `Pierce when charged, otherwise reflect · BAND ${st.prismSpectrum+1}/7 · ${st.prismBounces} bounces · ${st.prismDamage} DMG`;
+      } else if (curW === "goo_mortar") {
+        wSummary = `Stick → mine → rebound · ${st.gooMass.toFixed(2)} mass · ${st.gooDistance} range · sticky mines`;
       } else if (curW === "flamethrower") {
         wSummary = `Flame · ${st.flameDamage} DMG · ${st.flameFireRate.toFixed(1)}/s · ignites rubble`;
       }
@@ -1317,6 +1343,9 @@ export class UpgradeTree {
       ["rocket_launcher", "ROCKET", st.rocketUnlocked],
       ["sniper_rifle", "SNIPER", st.sniperUnlocked],
       ["katana", "KATANA", st.katanaUnlocked],
+      ["drone_shepherd", "DRONES", st.droneUnlocked],
+      ["prism_laser", "PRISM", st.prismUnlocked],
+      ["goo_mortar", "SQUELCH", st.gooUnlocked],
       ["flamethrower", "FLAMER", st.flameUnlocked],
       ["grenade", "GRENADE", st.grenadeUnlocked],
       ["turret", "TURRET", st.turretUnlocked],
@@ -1356,6 +1385,9 @@ export class UpgradeTree {
       this.activeTab === "rocket_launcher" ||
       this.activeTab === "sniper_rifle" ||
       this.activeTab === "katana" ||
+      this.activeTab === "drone_shepherd" ||
+      this.activeTab === "prism_laser" ||
+      this.activeTab === "goo_mortar" ||
       this.activeTab === "flamethrower" ||
       this.activeTab === "grenade" ||
       this.activeTab === "turret";
