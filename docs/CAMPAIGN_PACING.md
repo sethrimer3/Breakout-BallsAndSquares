@@ -20,11 +20,18 @@ World encounter spaces use distinct spatial archetypes rather than uniform rooms
   - *Archetype 1 (Serpentine Glade & Central Bluff):* Winding clearing with a natural central obstacle creating circular flanking combat lanes.
   - *Archetype 2 (Twin Flanking Lobes):* Dual clearings linked by a central choke bridge, providing alternate avenues of approach and retreat against heavy patrols.
 - **World 4 (City, Tier 10):**
-  - Wide street grid with crossfire corners and tactical barricade ruins positioned at outer boulevard intersections. These barricades provide crucial high-durability cover from hacked turrets and line-of-sight protection from rifle patrols while neutralizing warning mines.
+  - *Archetype 0 (Boulevard Plaza & Corner Barricades):* Wide cross boulevard with outer ring alleys and corner barricade ruins at intersection diagonals, providing crucial high-durability cover from hacked turrets and line-of-sight protection from rifle patrols while neutralizing warning mines.
+  - *Archetype 1 (Commercial Avenue & Flanking Street Alcoves):* Broad thoroughfare with deep storefront alcoves and mid-street concrete planter cover islands, supporting tactical squad bounding and flank attacks against turret nests.
+  - *Archetype 2 (Industrial Logistics & Freight Yard):* Dual transit lanes featuring heavy freight cargo container barriers, creating stepping-stone cover positions to advance under crossfire.
+  - *Sector 24 (Aerospace Teleporter Launchpad):* Octagonal staging platform protected by 4 perimeter barrier pylons at the heart of the C3–E5 aerospace facility, linking directly to World 5.
   - Outer aerospace facility perimeter (sectors C3–E5) is reinforced with 45,000 HP barriers, requiring breach via high-level Siege Drills or navigating through four heavily fortified entrance choke corridors.
 - **World 5 (Mothership, Tier 11):**
-  - Armored command hubs with side alcoves, dual-security bunker intersections, and wide hangar bays featuring dual pillar cover.
-  - 3-cell-deep bulkheads at 65,000 HP per cell defend corridor throats, presenting deliberate breach-versus-bypass decisions.
+  - Exactly 21 sectors (3×7 grid) progressing from Sector 19 (B7: player staging airlock at bottom) to Sector 4 (B2: Final Blight Boss sanctum at top middle).
+  - *Sector 19 (Staging Airlock Deck):* Safe, combat-free arrival hangar with wide clearance.
+  - *Sector 4 (Boss Sanctum):* Grand octagonal arena ($R=18$) defended by the 50,000 HP Leviathan Core and two flank guardian turrets, with 4 reinforced blast pillars ($\pm 7, \pm 7$) for tactical squad cover. Multi-phase spreading plasma volleys, enraged phase below 30% HP, and a 10,000 essence bounty accompanied by a celebratory particle fanfare and screen shake upon victory.
+  - *Sector 1 (Apex Observation Dome):* Elliptical viewing deck directly above the boss sanctum with dual conduit core pylons.
+  - *Archetypes 0–2 (Decks & Hangar Bays):* Command bays with side alcoves, cross-security bunker intersections, and wide hangar bays featuring dual pillar cover.
+  - Checkpoint bulkheads (5 cells deep at 65,000 HP per cell, 325,000 HP total) defend corridor throats between ship sectors, presenting deliberate breach-versus-bypass decisions.
 
 ## Concrete combat and breach benchmarks
 

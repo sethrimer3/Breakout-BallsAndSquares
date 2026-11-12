@@ -251,14 +251,33 @@ describe("late campaign pacing and encounters", () => {
     const fcy1 = Math.round((fb1.y0 + fb1.y1) / 2);
     expect(forest.w.health[(fcy1 + 3) * forest.w.width + (fcx1 + 3)]).toBeGreaterThan(0);
 
-    // Verify that world 4 (city) has barricade cover elements at intersection diagonals
+    // Verify that world 4 (city) has barricade cover elements across archetypes
     const city = setup(4);
     expect(city.w.solidAt).toBeDefined();
     const cFrame = city.w.labLayout!.frame!;
-    const cb = sectorBounds(cFrame, 0);
-    const ccx = Math.round((cb.x0 + cb.x1) / 2);
-    const ccy = Math.round((cb.y0 + cb.y1) / 2);
-    expect(city.w.health[(ccy + 5) * city.w.width + (ccx + 5)]).toBeGreaterThan(0);
+    // Archetype 0: Corner barricades (Sector 0)
+    const cb0 = sectorBounds(cFrame, 0);
+    const ccx0 = Math.round((cb0.x0 + cb0.x1) / 2);
+    const ccy0 = Math.round((cb0.y0 + cb0.y1) / 2);
+    expect(city.w.health[(ccy0 + 5) * city.w.width + (ccx0 + 5)]).toBeGreaterThan(0);
+
+    // Archetype 1: Commercial Avenue planters (Sector 1)
+    const cb1 = sectorBounds(cFrame, 1);
+    const ccx1 = Math.round((cb1.x0 + cb1.x1) / 2);
+    const ccy1 = Math.round((cb1.y0 + cb1.y1) / 2);
+    expect(city.w.health[(ccy1 + 6) * city.w.width + (ccx1 + 6)]).toBeGreaterThan(0);
+
+    // Archetype 2: Logistics freight crate barriers (Sector 2)
+    const cb2 = sectorBounds(cFrame, 2);
+    const ccx2 = Math.round((cb2.x0 + cb2.x1) / 2);
+    const ccy2 = Math.round((cb2.y0 + cb2.y1) / 2);
+    expect(city.w.health[(ccy2 + 5) * city.w.width + (ccx2 + 5)]).toBeGreaterThan(0);
+
+    // Aerospace Teleporter Launchpad (Sector 24)
+    const cb24 = sectorBounds(cFrame, 24);
+    const ccx24 = Math.round((cb24.x0 + cb24.x1) / 2);
+    const ccy24 = Math.round((cb24.y0 + cb24.y1) / 2);
+    expect(city.w.health[(ccy24 + 6) * city.w.width + (ccx24 + 6)]).toBeGreaterThan(0);
 
     // Verify world 5 (ship) has varied archetypes and solid pillar/alcove cover
     const ship = setup(5);
@@ -270,6 +289,18 @@ describe("late campaign pacing and encounters", () => {
     const scy = Math.round((sb.y0 + sb.y1) / 2);
     expect(ship.w.health[scy * ship.w.width + (scx + 5)]).toBeGreaterThan(0);
     expect(ship.w.health[scy * ship.w.width + (scx - 5)]).toBeGreaterThan(0);
+
+    // Sector 1 is Apex Observation Dome with conduit pylons
+    const sb1 = sectorBounds(sFrame, 1);
+    const scx1 = Math.round((sb1.x0 + sb1.x1) / 2);
+    const scy1 = Math.round((sb1.y0 + sb1.y1) / 2);
+    expect(ship.w.health[(scy1 + 5) * ship.w.width + (scx1 + 5)]).toBeGreaterThan(0);
+
+    // Sector 4 is Boss Sanctum with 4 blast pillars at (+-7, +-7)
+    const sb4 = sectorBounds(sFrame, 4);
+    const scx4 = Math.round((sb4.x0 + sb4.x1) / 2);
+    const scy4 = Math.round((sb4.y0 + sb4.y1) / 2);
+    expect(ship.w.health[(scy4 + 7) * ship.w.width + (scx4 + 7)]).toBeGreaterThan(0);
   });
   it("secures encounter drops immediately to prevent softlocks upon squad wipe", () => {
     // Verified via Game late encounter reward callback and loot collection

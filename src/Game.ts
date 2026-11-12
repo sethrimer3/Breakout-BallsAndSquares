@@ -261,6 +261,16 @@ export class Game {
       if (a.kind === "grove") {
         this.loot.spawnOne(a.x, a.y, 90, this.rng, cacheRewardKind, cacheRewardVal, true);
       }
+      if (a.kind === "boss") {
+        this.addScreenShake(8);
+        for (let i = 0; i < 48; i++) {
+          const ang = this.rng.range(0, Math.PI * 2);
+          const sp = this.rng.range(50, 180);
+          this.particles.spawn(PKind.Spark, a.x, a.y, Math.cos(ang) * sp, Math.sin(ang) * sp, this.rng.range(0.4, 0.9), 1, i % 2 ? 0xff0055 : 0xffd84d, 8);
+        }
+        this.particles.spawn(PKind.Burst, a.x, a.y, 0, 0, 0.4, 18, 0xff3377, 1);
+        this.particles.spawn(PKind.Burst, a.x, a.y, 0, 0, 0.25, 28, 0xffd84d, 1);
+      }
       this.audio.playDestroy(a.x, a.y);
     }, (soldier, damage, x, y) => this.hurtSoldier(soldier, damage, x, y), (x, y) => this.audio.playSpore(x, y));
     this.combat.targets = new CombinedTargets([this.creatures, this.fixtures, this.late]);

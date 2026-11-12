@@ -62,16 +62,50 @@ export function designLateSpaces(w: PixelWorld, f: LabFrame): void {
           }
         } else if (f.def.id === 4) {
           // City: Street grids with crossfire corners, barricade ruins, and perimeter approaches.
-          const inBoulevard = Math.abs(dx) < 4 || Math.abs(dy) < 4;
-          const inRingAlley =
-            Math.abs(dx) < 15 &&
-            Math.abs(dy) < 15 &&
-            Math.abs(dx) > 7 &&
-            Math.abs(dy) > 7;
-          // Tactical barricade ruins in the intersection to duck behind turret fire
-          const inCornerBarricade =
-            (dx === 5 || dx === -5) && (dy === 5 || dy === -5);
-          open = (inBoulevard || inRingAlley) && !inCornerBarricade;
+          if (s === 24) {
+            // Aerospace Teleporter Launchpad (Sector 24: col 3, row 3 in 7x7 city)
+            // Octagonal launchpad platform with 4 defensive perimeter barrier pylons
+            const inLaunchpad = dx * dx + dy * dy < 16 * 16;
+            const inPylon =
+              (Math.abs(dx - 6) <= 1 || Math.abs(dx + 6) <= 1) &&
+              (Math.abs(dy - 6) <= 1 || Math.abs(dy + 6) <= 1);
+            open = inLaunchpad && !inPylon;
+          } else if (archetype === 0) {
+            // Archetype 0: Boulevard Plaza & Corner Barricades
+            // Cross boulevard with outer ring alley and corner barricade ruins
+            const inBoulevard = Math.abs(dx) < 4 || Math.abs(dy) < 4;
+            const inRingAlley =
+              Math.abs(dx) < 15 &&
+              Math.abs(dy) < 15 &&
+              Math.abs(dx) > 7 &&
+              Math.abs(dy) > 7;
+            const inCornerBarricade =
+              (dx === 5 || dx === -5) && (dy === 5 || dy === -5);
+            open = (inBoulevard || inRingAlley) && !inCornerBarricade;
+          } else if (archetype === 1) {
+            // Archetype 1: Commercial Avenue & Flanking Street Alcoves
+            // Broad thoroughfare with storefront alcoves and planter cover islands
+            const inAvenue = Math.abs(dy) < 5 || Math.abs(dx) < 5;
+            const inAlcoves =
+              Math.abs(dx) < 14 &&
+              Math.abs(dy) < 13 &&
+              !(Math.abs(dx) > 8 && Math.abs(dy) > 7 && Math.abs(dx) < 11);
+            const inPlanterCover =
+              (Math.abs(dx) === 6 || Math.abs(dx) === 7) &&
+              (Math.abs(dy) === 6 || Math.abs(dy) === 7);
+            open = (inAvenue || inAlcoves) && !inPlanterCover;
+          } else {
+            // Archetype 2: Industrial Freight Logistics Yard
+            // Dual transit lanes with heavy concrete freight crate barriers
+            const inTransitLanes =
+              Math.abs(dx) < 4 ||
+              Math.abs(dy) < 4 ||
+              (Math.abs(dx) < 14 && Math.abs(dy) < 10);
+            const inFreightCrate =
+              (Math.abs(dx) === 5 || Math.abs(dx) === 6) &&
+              (Math.abs(dy) === 5 || Math.abs(dy) === 6);
+            open = inTransitLanes && !inFreightCrate;
+          }
         } else {
           // Ship (World 5): Armored chambers, guard plazas, and maintenance service conduits.
           if (s === 4) {
@@ -86,6 +120,13 @@ export function designLateSpaces(w: PixelWorld, f: LabFrame): void {
             // Player spawn (Sector 19: Bottom middle, col 1, row 6)
             // Staging airlock & arrival hangar
             open = Math.abs(dx) < 14 && Math.abs(dy) < 12;
+          } else if (s === 1) {
+            // Apex Dorsal Core Conduit / Observation Dome directly above the Boss Sanctum (col 1, row 0)
+            const inDome = (dx * dx) / (15 * 15) + (dy * dy) / (12 * 12) < 1;
+            const inConduitPylons =
+              (Math.abs(dx) === 5 || Math.abs(dx) === 6) &&
+              (Math.abs(dy) === 5 || Math.abs(dy) === 6);
+            open = inDome && !inConduitPylons;
           } else if (archetype === 0) {
             // Central command bay with flanking side alcoves
             open =
@@ -161,15 +202,21 @@ export function fortifyLateSpaces(w: PixelWorld, f: LabFrame): void {
     // World 5 mothership uses deep 5-cell reinforced bulkheads (65,000 HP/cell, 325,000 HP total)
     // requiring high-level Siege Drills or sustained squad breaches under pressure.
     const bulkheadDepth = f.def.id === 5 ? 5 : 3;
-    for (const edge of [-18, 18])
+    for (const edge of [-18, 18]) {
+      const dir = edge > 0 ? 1 : -1;
       for (let d = -3; d <= 3; d++)
-        for (let depth = 0; depth < bulkheadDepth; depth++)
+        for (let depth = 0; depth < bulkheadDepth; depth++) {
+          const offset = edge + depth * dir;
           for (const [x, y] of [
-            [cx + d, cy + edge + depth],
-            [cx + edge + depth, cy + d],
+            [cx + d, cy + offset],
+            [cx + offset, cy + d],
           ]) {
-            const i = y * w.width + x;
-            w.health[i] = f.def.id === 5 ? 65000 : 45000;
+            if (w.inBounds(x, y)) {
+              const i = y * w.width + x;
+              w.health[i] = f.def.id === 5 ? 65000 : 45000;
+            }
           }
+        }
+    }
   }
 }
