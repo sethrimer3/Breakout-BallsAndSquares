@@ -62,12 +62,14 @@ export interface MuzzleLight {
   lit: LitCells;
 }
 
-/** Faint always-on glow (soldier self-light or the spawn room). */
+/** Always-on light (soldier visibility pool, spawn room, or environmental glow). */
 export interface SoftLight {
   x: number;
   y: number;
   radius: number;
   strength: number;
+  /** Uses the broader, brighter steady visibility profile. */
+  soldier: boolean;
   /** Warm firelight (burning rubble, flamethrower nozzle) instead of the cool soldier glow. */
   warm: boolean;
   poly: Float32Array;
@@ -83,6 +85,7 @@ function makeSoftLight(): SoftLight {
     radius: 0,
     strength: 0,
     warm: false,
+    soldier: false,
     poly: new Float32Array(LIGHT.maxRays * 2),
     polyCount: 0,
     lit: makeLitCells(),
@@ -305,6 +308,7 @@ export class LightingSystem {
     const idx = this.softCount++;
     const l = this.softLights[idx] ?? (this.softLights[idx] = makeSoftLight());
     l.warm = warm;
+    l.soldier = ownerId >= 0;
     l.x = x;
     l.y = y;
     l.radius = radius;

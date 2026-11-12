@@ -1,5 +1,5 @@
 import { worldAtmosphere } from "../world/worldAtmosphere";
-import { GROWTH, LIGHT } from "../config";
+import { GROWTH, LIGHT, SOLDIER_AMBIENT_STOPS } from "../config";
 import type { Game } from "../Game";
 import type { LitCells } from "../systems/LightingSystem";
 import { LIGHT_KIND } from "../world/PixelWorld";
@@ -88,6 +88,7 @@ function buildLut(stops: readonly Stop[]): Float32Array {
 const FLASH_LUT = buildLut(FLASH_STOPS);
 const FIERY_FLASH_LUT = buildLut(FIERY_FLASH_STOPS);
 const SOFT_LUT = buildLut(SOFT_STOPS);
+const SOLDIER_LUT = buildLut(SOLDIER_AMBIENT_STOPS);
 const FIRE_LUT = buildLut(FIRE_STOPS);
 
 /** Ceiling panel light by `LIGHT_KIND`: cold clinical white, warm worn tube, sickly failing tube. */
@@ -194,12 +195,12 @@ export class LightRenderer {
       const rad = l.radius * cam.zoom;
       if (l.polyCount >= 3) {
         this.tracePolygonPath(air, game, l.poly, l.polyCount);
-        air.fillStyle = gradientFor(air, sx, sy, rad, l.warm ? FIRE_STOPS : SOFT_STOPS, l.strength);
+        air.fillStyle = gradientFor(air, sx, sy, rad, l.warm ? FIRE_STOPS : l.soldier ? SOLDIER_AMBIENT_STOPS : SOFT_STOPS, l.strength);
         air.fill();
       } else {
         // Past the shadow budget, or inside new terrain: air only (masked below).
         air.globalAlpha = l.strength;
-        air.drawImage(l.warm ? this.sprites.warmGlow : this.sprites.soldierGlow, sx - rad, sy - rad, rad * 2, rad * 2);
+        air.drawImage(l.warm ? this.sprites.warmGlow : l.soldier ? this.sprites.soldierAmbientGlow : this.sprites.soldierGlow, sx - rad, sy - rad, rad * 2, rad * 2);
         air.globalAlpha = 1;
       }
     }
@@ -378,7 +379,7 @@ export class LightRenderer {
     const lighting = game.lighting;
     for (let i = 0; i < lighting.softCount; i++) {
       const l = lighting.softLights[i];
-      this.addWallLight(game, l.lit, l.x, l.y, l.radius, l.strength, l.warm ? FIRE_LUT : SOFT_LUT);
+      this.addWallLight(game, l.lit, l.x, l.y, l.radius, l.strength, l.warm ? FIRE_LUT : l.soldier ? SOLDIER_LUT : SOFT_LUT);
     }
     const now = performance.now() / 1000;
     for (const f of lighting.fixtures) {

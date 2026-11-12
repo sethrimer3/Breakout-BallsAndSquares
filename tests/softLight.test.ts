@@ -1,3 +1,7 @@
+import { Soldier } from "../src/entities/Soldier";
+import { LightingSystem } from "../src/systems/LightingSystem";
+import { CameraSystem } from "../src/systems/CameraSystem";
+import { PixelWorld } from "../src/world/PixelWorld";
 import { describe, expect, it } from "vitest";
 import { sanitizeSaveData, SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { softLayerAlpha, softLayerScale } from "../src/rendering/SoftLight";
@@ -44,4 +48,24 @@ describe("Fiery muzzle flash setting & soft-light layers", () => {
       expect(softLayerScale(i, opts)).toBeGreaterThan(softLayerScale(i - 1, opts));
     }
   });
+  it("steadily illuminates nearby walls without firing and keeps room/fire profiles separate", () => {
+    const world=new PixelWorld({width:64,height:64,cellSize:8,roomSize:10});
+    const wall=32*world.width+37;world.health[wall]=10; // 40 units from the soldier, beyond the old glow.
+    const soldier=new Soldier(256,256,1,0,60);
+    const dead=new Soldier(240,240,1,0,60);dead.alive=false;
+    const camera=new CameraSystem(world);camera.viewW=800;camera.viewH=600;camera.x=camera.y=256;camera.zoom=2;
+    const lighting=new LightingSystem(world);
+    let intensity=0;
+    for(let frame=0;frame<20;frame++){
+      lighting.updateSoftLights([soldier,dead],256,256,camera,[{x:270,y:270,radius:20,strength:0.3,warm:true}]);
+      expect(lighting.softCount).toBe(3);
+      const glow=lighting.softLights[1];
+      expect(glow.soldier).toBe(true);expect(glow.warm).toBe(false);
+      expect(Array.from(glow.lit.cells.subarray(0,glow.lit.count))).toContain(wall);
+      if(frame===0)intensity=glow.strength;else expect(glow.strength).toBe(intensity);
+      expect(lighting.softLights[0].soldier).toBe(false);
+      expect(lighting.softLights[2].warm).toBe(true);expect(lighting.softLights[2].soldier).toBe(false);
+    }
+  });
+
 });

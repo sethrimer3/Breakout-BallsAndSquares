@@ -1,4 +1,4 @@
-import { ART_PIXEL, SOLDIER } from "../config";
+import { ART_PIXEL, SOLDIER, SOLDIER_AMBIENT_STOPS } from "../config";
 import { SOLDIER_SHAPES, shapeSdf, type SoldierShape } from "../entities/soldierShapes";
 
 /** Pre-rendered sprites (avoid creating gradients per particle per frame). */
@@ -271,6 +271,7 @@ export interface Sprites {
   /** Sphere inside the pixel ring, for the soldier the camera is following. */
   soldierSelected: HTMLCanvasElement;
   soldierGlow: HTMLCanvasElement;
+  soldierAmbientGlow: HTMLCanvasElement;
   warmGlow: HTMLCanvasElement;
   hotGlow: HTMLCanvasElement;
   crimsonGlow: HTMLCanvasElement;
@@ -284,6 +285,7 @@ export function createSprites(): Sprites {
   return {
     soldier: soldierSprite(SOLDIER.renderRadius / ART_PIXEL, SOLDIER.ringRadius / ART_PIXEL, false),
     soldierSelected: soldierSprite(SOLDIER.renderRadius / ART_PIXEL, SOLDIER.ringRadius / ART_PIXEL, true),
+    soldierAmbientGlow: radialSprite(64, SOLDIER_AMBIENT_STOPS.map(([offset,r,g,b,alpha]) => [offset, `rgba(${r}, ${g}, ${b}, ${alpha})`])),
     soldierGlow: radialSprite(64, [
       [0, "rgba(120, 225, 255, 0.45)"],
       [0.4, "rgba(80, 180, 255, 0.15)"],

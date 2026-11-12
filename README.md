@@ -59,6 +59,8 @@ The layout scales down to fit small screens; the Upgrade Tree is easiest to read
 
 ---
 
+Every living soldier has a steady, shadow-casting visibility light, independent of firing, upgrades, or muzzle-flash brightness. Its eight-cell radius and broader bright falloff keep nearby terrain readable between shots, reducing the contrast of gunfire against darkness. Muzzle-flash brightness can still be lowered or disabled in Visual Settings.
+
 ## Core Mechanics
 
 - **World & Starting Room:** Each run generates a fresh `512 × 512`-cell world (`4096 × 4096` logical units at `8 × 8` units/cell) with a `10 × 10`-cell empty chamber at the exact center.

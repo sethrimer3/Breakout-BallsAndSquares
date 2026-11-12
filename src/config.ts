@@ -653,10 +653,10 @@ export const LIGHT = {
   maxShadowLights: 20,
   /** Ambient darkness RGB multiplied over the scene (low = dark atmosphere). */
   ambientRgb: [50, 46, 46] as const,
-  /** Faint ambient self-glow radius around each soldier (world units). */
-  soldierLightRadius: 34,
-  /** Soldier self-glow strength. */
-  soldierLightStrength: 0.55,
+  /** Always-on visibility pool around every living soldier (eight cells). */
+  soldierLightRadius: 64,
+  /** Steady baseline independent of gunfire, upgrades and muzzle-flash settings. */
+  soldierLightStrength: 0.9,
   /** Faint glow radius at the center of the spawn room (world units). */
   roomLightRadius: 54,
   /** Spawn-room glow strength. */
@@ -961,3 +961,11 @@ export const PRISM = {
   segmentPoolSize: 256, visualLife: 0.12,
   colors: ["#ff4a48", "#ff963c", "#ffe05b", "#7de267", "#54b8ff", "#8c83ff", "#d37cff"],
 } as const;
+
+/** Shared by shadow-traced soldier lighting, wall illumination and its fallback sprite. */
+export const SOLDIER_AMBIENT_STOPS = [
+  [0, 185, 225, 240, 0.85],
+  [0.4, 150, 210, 235, 0.62],
+  [0.75, 95, 175, 210, 0.3],
+  [1, 70, 130, 190, 0],
+] as const;
