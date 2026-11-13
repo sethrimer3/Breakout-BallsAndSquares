@@ -37,13 +37,14 @@ fs.mkdirSync(artifacts, { recursive: true });
   assert.equal(await page.evaluate(()=>window.__game.upgrades.getSoldierStats().overchargeSpreadDeg),10.5);
   for(let i=0;i<6;i++)await buy('overcharge_accuracy');
   assert.equal(await page.evaluate(()=>window.__game.upgrades.getSoldierStats().overchargeSpreadDeg),0.1);
+  await buy('circuit_unlock');
   await page.locator('[data-tab="katana"]').click();await buy('katana_unlock');await buy('katana_dash');await buy('gale_unlock');
   await page.locator('[data-tab="pistol"]').click();await buy('drone_unlock');await buy('drone_capacity');await buy('orbit_unlock');await buy('reverse_unlock');
   await page.locator('[data-tab="sniper_rifle"]').click();await buy('sniper_unlock');await buy('prism_unlock');
   for(let i=0;i<6;i++)await buy('prism_spectrum');await buy('prism_overload');await buy('rail_lance_unlock');
   await page.locator('[data-tab="rocket_launcher"]').click();await buy('rocket_unlock');await buy('burrower_unlock');await buy('freeze_rockets_unlock');
   await page.locator('[data-tab="flamethrower"]').click();await buy('flame_unlock');await buy('napalm_unlock');await buy('cryospray_unlock');
-  assert.deepEqual(await page.evaluate(()=>['goo_residue','katana_dash','drone_capacity','prism_spectrum','prism_overload','orbit_unlock','vacuum_unlock','burrower_unlock','freeze_rockets_unlock','rail_lance_unlock','napalm_unlock','cryospray_unlock'].map(id=>window.__game.upgrades.levelOf(id))),[1,1,1,6,1,1,1,1,1,1,1,1]);
+  assert.deepEqual(await page.evaluate(()=>['goo_residue','katana_dash','drone_capacity','prism_spectrum','prism_overload','orbit_unlock','vacuum_unlock','circuit_unlock','burrower_unlock','freeze_rockets_unlock','rail_lance_unlock','napalm_unlock','cryospray_unlock'].map(id=>window.__game.upgrades.levelOf(id))),[1,1,1,6,1,1,1,1,1,1,1,1,1]);
   const mutations=[];
   const roster=[
     ['pistol','reverse_revolver'],
@@ -52,6 +53,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     ['shotgun','squelch'],
     ['shotgun','vacuum_pulse'],
     ['assault_rifle','overcharge_conductor'],
+    ['assault_rifle','circuit_runner'],
     ['rocket_launcher','burrower'],
     ['rocket_launcher','freeze_rockets'],
     ['sniper_rifle','chromatic_prism'],

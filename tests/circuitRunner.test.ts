@@ -54,7 +54,7 @@ describe("Circuit Runner — Assault Rifle branch 2", () => {
     const save = new SaveManager(storage);
     unlockTabs(save);
     save.data.lifetimePixels = 10000;
-    save.data.gold = 5000;
+    save.data.bank = 5000;
     save.data.essence = 100;
     const upg = new UpgradeManager(save);
 
@@ -64,26 +64,26 @@ describe("Circuit Runner — Assault Rifle branch 2", () => {
     expect(save.data.essence).toBe(65);
     expect(upg.levelOf("circuit_unlock")).toBe(1);
 
-    const stats = upg.deriveStats();
+    const stats = upg.getSoldierStats();
     expect(stats.circuitUnlocked).toBe(true);
     expect(resolvePrimaryMutation("assault_rifle", "circuit_runner", stats)).toBe("circuit_runner");
     expect(mutationCompatibility("circuit_runner").active.length).toBeGreaterThan(0);
 
-    save.data.soldierLoadouts[0].weapon = "assault_rifle";
-    save.data.soldierLoadouts[0].mutation = "circuit_runner";
+    save.data.loadouts[0].weapon = "assault_rifle";
+    save.data.loadouts[0].mutation = "circuit_runner";
     save.save();
 
     const reloaded = new SaveManager(storage);
     reloaded.load();
-    expect(reloaded.data.soldierLoadouts[0].mutation).toBe("circuit_runner");
+    expect(reloaded.data.loadouts[0].mutation).toBe("circuit_runner");
 
     // Sanitation rejects circuit_runner on non-AR weapon
-    reloaded.data.soldierLoadouts[0].weapon = "pistol";
-    reloaded.data.soldierLoadouts[0].mutation = "circuit_runner";
+    reloaded.data.loadouts[0].weapon = "pistol";
+    reloaded.data.loadouts[0].mutation = "circuit_runner";
     reloaded.save();
     const reloaded2 = new SaveManager(storage);
     reloaded2.load();
-    expect(reloaded2.data.soldierLoadouts[0].mutation).toBeNull();
+    expect(reloaded2.data.loadouts[0].mutation).toBeNull();
 
     // Refund returns exact Essence
     const refund = upg.refundBlackMarket(false);
@@ -326,6 +326,7 @@ describe("Circuit Runner — Assault Rifle branch 2", () => {
       applyHit: (dmg) => {
         hitCount++;
         enemy.hp -= dmg;
+        return true;
       },
     };
     combat.targets = targets;
