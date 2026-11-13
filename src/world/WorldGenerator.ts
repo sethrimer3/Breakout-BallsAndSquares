@@ -1,3 +1,4 @@
+import { installMapBoundary } from "./MapBoundary";
 import { designLateSpaces, fortifyLateSpaces } from "./LateWorldLayouts";
 import { FACILITY, TERRAIN, zoneForDepth } from "../config";
 import { hash2, valueNoise } from "../core/math";
@@ -127,6 +128,7 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
   world.doors = [];
   world.upgradeSpots = [];
   const def = options.labWorld ?? LAB_WORLDS[1];
+  world.boundary.fill(0);
   const frame = options.procedural ? null : labFrame(world, def);
   world.labLayout = null;
   // Distance, depth and tiers count from the world's own start.
@@ -164,6 +166,7 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
       }
     }
     forRect(world, world.roomX0, world.roomY0, world.roomX1, world.roomY1, clear);
+    installMapBoundary(world);
     return;
   }
   const runSeed = seed;
@@ -284,6 +287,7 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     if (options.conquered) clearConqueredSectors(world, frame, options.conquered);
   }
   ensureRoomFixtures(world, layout);
+  installMapBoundary(world);
 }
 
 /**

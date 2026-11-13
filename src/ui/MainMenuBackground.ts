@@ -1,3 +1,4 @@
+import { drawMapBoundary } from "../rendering/MapBoundaryRenderer";
 import { ART_PIXEL, SOLDIER } from "../config";
 import { CameraSystem } from "../systems/CameraSystem";
 import { TerrainRenderer } from "../rendering/TerrainRenderer";
@@ -143,5 +144,6 @@ export class MainMenuBackground {
       ctx.fillStyle = "#a3edff";
       ctx.fillRect(x - 1, y - 1, Math.max(1, cam.zoom), Math.max(1, cam.zoom));
     }
+    drawMapBoundary(ctx, demo.world, cam);
   }
 }

@@ -184,6 +184,10 @@ export class PixelWorld implements SolidQuery {
   readonly coreId: Uint8Array;
   /** Per-cell Blight flag (`1` = block generated/replicated by Blight or overrun with Blight). */
   readonly blight: Uint8Array;
+  /** Permanent perimeter layer: 0 = playable, 1..3 = wall, 255 = black void. */
+  readonly boundary: Uint8Array;
+  boundaryStone = false;
+  boundaryThickness = 3;
   /** Per-cell special material (`MAT`). */
   readonly mat: Uint8Array;
   /** Per-cell door id (`0` = none, `id >= 1` = `doors[id - 1]`). */
@@ -259,6 +263,7 @@ export class PixelWorld implements SolidQuery {
     this.decor = new Uint8Array(dims.width * dims.height);
     this.coreId = new Uint8Array(dims.width * dims.height);
     this.blight = new Uint8Array(dims.width * dims.height);
+    this.boundary = new Uint8Array(dims.width * dims.height);
     this.mat = new Uint8Array(dims.width * dims.height);
     this.doorId = new Uint16Array(dims.width * dims.height);
     this.subKind = new Uint8Array(dims.width * 2 * dims.height * 2);
@@ -398,6 +403,7 @@ export class PixelWorld implements SolidQuery {
   }
 
   maxHealthAt(cx: number, cy: number): number {
+    if (this.inBounds(cx,cy) && this.boundary[cy*this.width+cx]) return 65535;
     if (this.labLayout?.frame) return this.labMaxHealthAt(cx, cy);
     const dist = this.distanceOf(cx, cy);
     if (this.inBounds(cx, cy)) {
@@ -464,6 +470,7 @@ export class PixelWorld implements SolidQuery {
   setCell(cx: number, cy: number, hp: number, kind: CellChangeKind = "set", silent = false): void {
     if (!this.inBounds(cx, cy)) return;
     const idx = cy * this.width + cx;
+    if (this.boundary[idx]) return;
     this.health[idx] = hp;
     if (kind === "grown") {
       this.blight[idx] = 1;
@@ -494,6 +501,7 @@ export class PixelWorld implements SolidQuery {
    */
   setSubCell(sx: number, sy: number, hp: number, kind: CellChangeKind = "grown", silent = false): void {
     if (!this.subInBounds(sx, sy)) return;
+    if (this.boundary[(sy >> 1) * this.width + (sx >> 1)]) return;
     const si = sy * this.subWidth + sx;
     this.subHealth[si] = hp;
     if (kind === "grown") this.subKind[si] = SUB.blight;
@@ -554,6 +562,7 @@ export class PixelWorld implements SolidQuery {
   damage(cx: number, cy: number, amount: number, byPlayer = false): 0 | 1 | 2 {
     if (!this.inBounds(cx, cy)) return 0;
     const i = cy * this.width + cx;
+    if (this.boundary[i]) return 0;
     const hp = this.health[i];
     if (hp === 0) {
       // Check if any subcell in this normal cell is occupied.

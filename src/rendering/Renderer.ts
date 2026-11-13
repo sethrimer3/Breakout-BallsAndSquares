@@ -1,3 +1,4 @@
+import { drawMapBoundary } from "./MapBoundaryRenderer";
 import { drawWeaponExpansion } from "./WeaponExpansionRenderer";
 import { drawGoo } from "./GooRenderer";
 import { worldAtmosphere } from "../world/worldAtmosphere";
@@ -168,6 +169,7 @@ export class Renderer {
     drawGoo(ctx, cam, game.combat.goo, still, game.lighting.quality === "low");
     this.drawTurrets();
     game.late.drawOverlay(ctx, cam);
+    drawMapBoundary(ctx, game.world, cam);
     this.drawAimIndicator();
     this.drawGateNotice();
 

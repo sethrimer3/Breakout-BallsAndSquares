@@ -1,3 +1,4 @@
+import { installMapBoundary } from "../world/MapBoundary";
 import { SIM } from "../config";
 import { Rng } from "../core/Rng";
 import { LootSystem } from "../entities/LootSystem";
@@ -63,6 +64,7 @@ export class MenuGameplaySimulation {
     this.time = this.accumulator = 0;
     this.combat.clearAll();
     this.loot.clear();
+    w.boundary.fill(0);
     w.wall.fill(0); w.health.fill(1); w.tint.fill(0); w.decor.fill(0);
     w.blight.fill(0); w.coreId.fill(0); w.mat.fill(0); w.doorId.fill(0);
     w.subHealth.fill(0); w.subTint.fill(0); w.subKind.fill(0);
@@ -132,6 +134,7 @@ export class MenuGameplaySimulation {
       const a = this.rng.range(-0.65, 0.65) + (side < 0 ? Math.PI : 0);
       return new Soldier(w.roomCenterX + side * 10, w.roomCenterY + side * 8, Math.cos(a), Math.sin(a), this.stats.speed, "pistol", "free", slot);
     });
+    installMapBoundary(w);
     this.growth.reset();
   }
 

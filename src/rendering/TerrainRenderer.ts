@@ -1,3 +1,4 @@
+import { boundaryColor } from "../world/MapBoundary";
 import { traceSurfaceOutline } from "./surfaceOutline";
 import { COLORS, FACILITY, TERRAIN, TERRAIN as T, zoneForDepth } from "../config";
 import { EDGE_PIXELS_PER_SUB, markBlightEdges } from "./blightEdges";
@@ -605,6 +606,13 @@ export class TerrainRenderer {
                 }
               }
             }
+          }
+          continue;
+        }
+        if (world.boundary[i]) {
+          for(let oy=0;oy<TEX;oy++) for(let ox=0;ox<TEX;ox++) {
+            const c=boundaryColor(world,cx,cy,ox,oy);
+            put(tx0+ox,ty0+oy,c[0],c[1],c[2],255);
           }
           continue;
         }

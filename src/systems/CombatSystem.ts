@@ -1179,6 +1179,14 @@ export class CombatSystem {
         const hcx = hit.cx >> 1;
         const hcy = hit.cy >> 1;
 
+        const protectedHit = w.inBounds(hcx,hcy) && w.boundary[hcy*w.width+hcx] !== 0;
+        const canReflect = b.style === 0 && b.pierceLeft <= 0 && b.bounceLeft > 0;
+        const canExplode = b.explosionRadius > 0 && b.burrowerGroupId === 0 && !b.freezeRocket;
+        if (protectedHit && !canReflect && !canExplode) {
+          this.finishBullet(b);
+          return;
+        }
+
         // Napalm Garden spray: place unlit fuel on terrain without damaging or igniting.
         if (b.napalmSpray) {
           if (w.inBounds(hcx, hcy)) {

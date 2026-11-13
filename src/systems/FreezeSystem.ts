@@ -79,7 +79,7 @@ export class FreezeSystem {
   }
 
   isCellFrozen(cx: number, cy: number): boolean {
-    if (!this.world.inBounds(cx, cy)) return false;
+    if (!this.world.inBounds(cx, cy) || this.world.boundary[cy * this.world.width + cx]) return false;
     return this.cellTimer[cy * this.world.width + cx] > 0;
   }
 
@@ -93,7 +93,7 @@ export class FreezeSystem {
 
   /** Freeze a normal cell without dealing damage. Refreshes duration on overlap. */
   freezeCell(cx: number, cy: number, ownerId: number, duration = FREEZE.duration): boolean {
-    if (!this.world.inBounds(cx, cy)) return false;
+    if (!this.world.inBounds(cx, cy) || this.world.boundary[cy * this.world.width + cx]) return false;
     const i = cy * this.world.width + cx;
     if (this.world.health[i] === 0) return false;
     if (this.cellTimer[i] <= 0) {

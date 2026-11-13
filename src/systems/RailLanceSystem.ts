@@ -119,6 +119,7 @@ export class RailLanceSystem {
 
         // Authoritative door/gate check.
         const ci = cy * this.world.width + cx;
+        if (this.world.boundary[ci]) { curX=hx; curY=hy; break; }
         if (this.world.mat[ci] === MAT.door) {
           const door = this.world.doors[this.world.doorId[ci] - 1];
           if (door && !door.open) {

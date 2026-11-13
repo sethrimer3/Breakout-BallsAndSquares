@@ -145,6 +145,10 @@ Non-Pistol primary weapons remain unique across the squad (including alternate m
 
 See [the revised Black Market plan](docs/BLACK_MARKET_IMPLEMENTATION_PLAN.md) and [validation / playtest notes](docs/WEAPON_VALIDATION.md). Run `npm run test:weapons` for focused coverage and `npm run test:weapon-browser` against a running Vite server for browser validation.
 
+## Map boundaries
+
+Every map has a permanent, non-destructible perimeter. Indoor maps and the menu lab use three-cell dark brushed-metal walls; forest and city maps use uneven, three-cell black-stone cliffs. The mothership has a two-cell metal hull with chamfered corners. Layers fade from full visibility on the inner face to pure black on the outer face, with an opaque black exterior beyond. Boundaries block deployment, growth, freezing and piercing/drilling weapons without awarding resources. Ordinary rounds can still ricochet, and world-travel doors and exit pockets remain usable. Boundaries are regenerated for existing profiles too.
+
 ## Later worlds
 
 The empty-room framework now covers the 13×13 forest (zones 7–9), 7×7 fallen city (zone 10) and 5×3 Blight mother ship (zone 11). See [the world roadmap](docs/WORLD_ROADMAP.md) for exact exits, the central city facility/teleporter, atmosphere profiles, and the scenery/encounters reserved for later work.

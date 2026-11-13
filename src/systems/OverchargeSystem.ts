@@ -298,7 +298,7 @@ export class OverchargeSystem {
   chargeCell(cx: number, cy: number, ownerId: number, power: number, blightMultiplier = 1, terrainDamageBonus = 0): OverchargeEntry | null {
     if (!this.world.inBounds(cx, cy)) return null;
     const ci = cy * this.world.width + cx;
-    if (this.world.health[ci] <= 0) return null;
+    if (this.world.boundary[ci] || this.world.health[ci] <= 0) return null;
     const cs = this.world.cellSize;
     return this.addCharge(
       `c:${ci}`, "cell",
