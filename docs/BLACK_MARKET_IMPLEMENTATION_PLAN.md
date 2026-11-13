@@ -8,13 +8,13 @@ This document records the latest requested mechanics and supersedes conflicting 
 |---|---|---|---|
 | Pistol | Reverse-Playback Revolver | Orbit Cylinder | **Drone Shepherd** |
 | Shotgun | SQUELCH | **Vacuum Pulse** | — |
-| Assault Rifle | **Undecided — no accepted mutation** | **Undecided — no accepted mutation** | — |
+| Assault Rifle | **Overcharge Conductor (working name)** | **Undecided** | — |
 | Rocket Launcher | **Burrower** | **Freeze Rockets** | — |
 | Sniper Rifle | Chromatic Prism | **Rail Lance** | — |
 | Katana | Momentum Katana | Gale Edge | — |
 | Flamethrower | **Napalm Garden** | **Cryospray** | — |
 
-Drone Shepherd belongs to **Pistol**, not Assault Rifle. Do not implement Arc Leech, Splinter Engine, Recoil Engine, or another Assault Rifle mutation without an accepted design. Collapse Charge, Compression Cannon and other superseded alternatives are not the active plan. Echo Stapler and Resonance Bell remain separate secondary-weapon designs.
+Drone Shepherd belongs to **Pistol**, not Assault Rifle. Do not implement Arc Leech, Splinter Engine, Recoil Engine, or another Assault Rifle mutation without an accepted design. Overcharge Conductor below is the first accepted AR concept; its second branch remains undecided. Collapse Charge, Compression Cannon and other superseded alternatives are not the active plan. Echo Stapler and Resonance Bell remain separate secondary-weapon designs.
 
 Each soldier carries one base primary with at most one active mutation. Pistol mutation state is per soldier; Pistol is the only primary family allowed more than one squad owner. Other families remain unique across their mutations. Switching a mutation must never manufacture an extra copy of its base gun.
 
@@ -34,10 +34,44 @@ The two newly completed mechanics use permanent Essence unlock nodes and next-de
 ## Shared Black Market and migration work
 
 1. Retain canonical base weapon identities in saves and equip/deployment checks. Resolve a selected mutation into its firing system; migrate legacy `goo_mortar`, `prism_laser`, and `drone_shepherd` loadouts to Shotgun/Sniper/Pistol plus the matching mutation without losing purchased upgrades or currency.
-2. Expose three Pistol cards and two cards for each accepted non-AR family; do not populate undecided AR slots with invented weapons. Hide or mark unimplemented cards rather than making them selectable.
+2. Expose three Pistol cards, two cards for each accepted non-AR family, and one accepted Assault Rifle branch; do not populate the remaining AR slot with an invented weapon. Hide or mark unimplemented cards rather than making them selectable.
 3. Persist one compatible selection per slot, validate unlocks and unknown IDs, and default old saves to ordinary behavior. Mutation changes affect the next deployment, never active projectiles/soldiers retroactively.
 4. Charge Blight Essence for mutation research and show conventional-stat compatibility before purchase. Provide a lab-only atomic reconfigure/refund operation with exact recorded spending; reject insufficient funds and duplicate non-Pistol ownership. Keep existing ordinary upgrades and save-slot progression.
 5. Define compatibility deliberately: fire rate maps to actual trigger/release intervals; velocity changes cannot silently extend an explicit range budget; unavailable pellet/crit/pierce effects must be mapped or clearly disabled. Never sell an inert upgrade.
+
+## Overcharge Conductor — Assault Rifle branch 1 (working name)
+
+**Status:** Newly accepted design; planned, not implemented. The name is provisional. The Assault Rifle's second Black Market branch remains undecided.
+
+### Required behavior
+
+- Replace direct-damage ammunition with charging shots. A hit adds electrical charge to the specific terrain object or enemy it actually strikes; the charging hit itself deals **zero damage**.
+- Track consecutive hits **per target**, not as one soldier-wide counter. Each hit makes that target glow slightly brighter and adds progressively stronger lightning effects, visibly communicating charge accumulation.
+- **At least three hits are required to arm a discharge.** One or two hits produce charge feedback but no explosion, chain lightning, or damage.
+- Every new charging hit refreshes a short quiet-period timer for that target. An armed target overcharges and discharges only after that delay passes **without another charging shot hitting it**. Reaching three hits must not detonate immediately while shots continue landing.
+- The discharge produces **chain lightning and a small electrical explosion** at the charged target.
+- Additional hits beyond three make the discharge progressively more violent: increase chain damage, chain reach/length and visible duration, plus explosion damage/intensity. Keep the blast recognizably small; exact scaling curves and radius tuning remain implementation/balance work.
+- Selecting this mutation restores **major Assault Rifle spread**, even for a previously accurate ordinary rifle. Accuracy upgrades must be able to improve it all the way to **±0.1 degrees**. This is the half-angle on either side of the aim direction (0.2 degrees total cone), not ±1 degree or a 0.1-degree total cone.
+
+### Proposed implementation defaults / unresolved tuning
+
+These are recommendations for implementation, not additional user-approved mechanics:
+
+- Expose the quiet delay, initial wide spread, charge scaling and safety caps as named tuning values; choose initial values through playtesting rather than presenting invented timings as requirements.
+- When a sub-threshold target's quiet period expires, dissipate its one/two-hit charge harmlessly. A later burst begins a new consecutive-hit sequence.
+- Use dedicated mutation accuracy research for the wide-spread-to-±0.1-degree progression, or explicitly document another mapping that preserves both the initial accuracy penalty and the final endpoint. Do not let previously purchased ordinary accuracy levels silently remove the new branch's intended tradeoff.
+- Resolve chain arcs through distinct nearby targets with a clear range/obstruction policy. Proposed default: one chain hit per target per discharge, no return loop to its origin, no automatic charge stacks from chain/explosion damage, and no uncontrolled recursive detonations. Decide explicitly how other precharged targets interact before enabling chain-triggered cascades.
+- Proposed default for a host killed/destroyed by another weapon before its quiet period ends: clear its charge harmlessly. Never transfer its charge to terrain regrown at the same coordinates or to a reused enemy object.
+
+### Integration and acceptance
+
+- Use canonical `assault_rifle` plus one selected mutation. Preserve one Assault Rifle owner across the squad. Unlock and configure it through the existing Essence/lab workflow; do not add a separate equippable primary ID.
+- Charging shots must reach and collide with the target normally, including gates, without applying base ammunition damage, AP terrain damage, generic explosion callbacks, or Napalm ignition on contact. Define AP/pierce, multishot, ordinary accuracy, fire-rate, velocity and damage research compatibility explicitly. Damage research should map to discharge output rather than restoring direct hit damage.
+- The eventual damaging discharge may interact with shared freezing, external Napalm ignition and ordinary reward/drop systems through the normal damage pipeline. Respect authoritative gates and world bounds. Carry the firing owner's attribution through delayed charge, arcs and blast.
+- Support both `CreatureSystem` and `LateEncounters`, normal cells and applicable subcells. Key charge state by world generation and stable target identity; clear on target death/replacement, expiry and run/world reset. Define the owner-death policy deliberately.
+- Use simulation time so pausing, upgrades and other inactive screens do not advance the quiet timer. Bound charged targets, arc hops, total arc travel, explosion work and visuals with documented overflow behavior; do not silently turn a one/two-hit target into a damaging discharge.
+- Use a steady glow and readable restrained electrical accents, with reduced-motion support. More charge should be obvious without introducing rapid brightness flashes or strobing.
+- Test: zero direct damage; harmless one/two-hit expiry; exact three-hit arming; refresh on every hit; continued firing delays discharge; independent targets and misses; monotonic charge scaling before caps; exact ±0.1-degree endpoint; existing ordinary accuracy on branch selection; both enemy systems; pooled target/projectile reuse; host death/regrowth; gates; attribution; freeze/Napalm interactions; pause; low frame rates; reset and overflow. Browser checks must show the charge ramp, quiet gap and resulting chain/blast, not just the unlock card.
 
 ## Orbit Cylinder — Pistol branch 2
 
@@ -140,12 +174,13 @@ Replace hot flame jets with freezing mist. Apply the **same freezing/orthogonal 
 ## Implementation order and completion gates
 
 1. **Current audit repairs:** implement/verify Gale Edge and Reverse-Playback; regress Prism, Momentum and SQUELCH. Keep code-vs-plan status truthful.
-2. **Canonical Black Market model:** migrate legacy variants; move Drone Shepherd to Pistol branch 3; enforce one base identity/active branch, squad uniqueness, Essence accounting and lab-only reconfiguration. Leave AR branches undecided.
+2. **Canonical Black Market model:** migrate legacy variants; move Drone Shepherd to Pistol branch 3; enforce one base identity/active branch, squad uniqueness, Essence accounting and lab-only reconfiguration. Keep the second AR branch undecided; stage the newly accepted Overcharge Conductor separately.
 3. **Shared destruction/status infrastructure:** gameplay debris ledger, spatial queries, external ignition events, temporary freeze metadata, growth modifiers, and the glass-cadence shatter scheduler.
 4. **Orbit Cylinder and Vacuum Pulse:** actor-owned loading/release and destruction-driven suction/output scaling; deterministic pooling and source accounting.
 5. **Burrower and Freeze Rockets:** grouped simultaneous charges; cold-only projectile payloads; shared shatter tests.
 6. **Rail Lance:** charge/release state, straight swept trace, aligned multi-target and single-resolution tests.
 7. **Napalm Garden and Cryospray:** fuel lifecycle and exact tick timing, externally triggered ignition, early-death cleanup and shared freezing.
-8. **Progression, presentation and balance:** accepted branch cards only, compatibility labels, old saves, bounds/costs, visible tradeoffs, desktop/touch checks, telemetry and controlled open/corridor/mixed-weapon samples.
+8. **Overcharge Conductor:** per-target zero-damage hit accumulation, three-hit arming, refreshable quiet timer, scaled chain/blast discharge and wide-spread-to-±0.1-degree accuracy progression.
+9. **Progression, presentation and balance:** accepted branch cards only, compatibility labels, old saves, bounds/costs, visible tradeoffs, desktop/touch checks, telemetry and controlled open/corridor/mixed-weapon samples.
 
 Do not mark a planned branch implemented merely because its base weapon or a visual prototype exists. New feature acceptance requires collision/status/timing tests, owner credit, pool reset/overflow checks and a representative browser interaction before merging to `main`.

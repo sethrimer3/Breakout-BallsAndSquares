@@ -6,7 +6,7 @@
 **Status:** Original mechanics plus Gale/Reverse audit repairs implemented; revised Black Market plan and integration pending<br>
 **Design intent:** Make the weapons feel mechanically surprising, tactile, and distinctly different, while protecting the core experience of autonomous soldiers ricocheting through destructible environments.
 
-> **Latest accepted roster and mechanics:** [Black Market implementation plan](BLACK_MARKET_IMPLEMENTATION_PLAN.md). Its user revisions supersede conflicting older proposals below, including Drone Shepherd as Pistol branch 3 and no accepted Assault Rifle mutation.
+> **Latest accepted roster and mechanics:** [Black Market implementation plan](BLACK_MARKET_IMPLEMENTATION_PLAN.md). Its user revisions supersede conflicting older proposals below, including Drone Shepherd as Pistol branch 3 and Overcharge Conductor as the first accepted Assault Rifle mutation (second branch undecided).
 
 ## Executive summary
 
@@ -497,7 +497,7 @@ All branch labels other than the user-requested signature concepts are **optiona
 |---|---|
 | Pistol | Reverse-Playback Revolver; Orbit Cylinder; **Drone Shepherd (third branch)** |
 | Shotgun | SQUELCH; **Vacuum Pulse** |
-| Assault Rifle | **Undecided: no accepted branches** |
+| Assault Rifle | **Overcharge Conductor (working name)**; second branch undecided |
 | Rocket Launcher | **Burrower; Freeze Rockets** |
 | Sniper Rifle | Chromatic Prism; **Rail Lance** |
 | Katana | Momentum Katana; Gale Edge |
