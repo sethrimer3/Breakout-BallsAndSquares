@@ -332,6 +332,7 @@ export class Game {
       this.audio.playDestroy(a.x, a.y);
     }, (soldier, damage, x, y) => this.hurtSoldier(soldier, damage, x, y), (x, y) => this.audio.playSpore(x, y));
     this.combat.targets = new CombinedTargets([this.creatures, this.fixtures, this.late]);
+    this.combat.late = this.late;
     this.camera = new CameraSystem(this.world);
     this.audio.setCamera(this.camera);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
@@ -1153,6 +1154,16 @@ export class Game {
   }
 
   shootCommanderManual(commander: Soldier): void {
+    if (commander.weapon === "sniper_rifle" && commander.mutation === "rail_lance") {
+      if (!commander.railCharging) {
+        commander.railCharging = true;
+        commander.railCharge = 0;
+        commander.railChargeTotal = 1 / Math.max(0.05, this.combat.effectiveFireRate(commander));
+        commander.railLockDx = Math.cos(commander.facingAngle);
+        commander.railLockDy = Math.sin(commander.facingAngle);
+      }
+      return;
+    }
     if (commander.fireCooldown <= 0) {
       const cdx = Math.cos(commander.facingAngle);
       const cdy = Math.sin(commander.facingAngle);
@@ -1776,7 +1787,17 @@ export class Game {
         this.save.data.settings.alwaysShootWhenAutoMoveOff ||
         this.input.isMouseDown ||
         this.dualStick.aim.active;
-      if (shouldShoot && commander.fireCooldown <= 0) {
+      if (commander.weapon === "sniper_rifle" && commander.mutation === "rail_lance") {
+        if (shouldShoot) {
+          const cdx = Math.cos(commander.facingAngle);
+          const cdy = Math.sin(commander.facingAngle);
+          if (this.combat.advanceRailCharge(commander, dt, cdx, cdy)) {
+            this.onShot(commander, commander.railLockDx, commander.railLockDy, commander.x, commander.y);
+          }
+        } else {
+          this.combat.cancelRailCharge(commander);
+        }
+      } else if (shouldShoot && commander.fireCooldown <= 0) {
         this.shootCommanderManual(commander);
       }
       if (commander.weapon === "pistol" && commander.mutation === "orbit_cylinder") {

@@ -1,8 +1,9 @@
 import { NAPALM } from "../config";
 import type { Creature, CreatureSystem } from "../entities/Creatures";
+import type { Encounter, LateEncounters } from "./LateEncounters";
 import type { PixelWorld } from "../world/PixelWorld";
 
-export type NapalmHostKind = "ground" | "cell" | "subcell" | "creature";
+export type NapalmHostKind = "ground" | "cell" | "subcell" | "creature" | "encounter";
 
 export interface NapalmPatch {
   active: boolean;
@@ -18,6 +19,8 @@ export interface NapalmPatch {
   sy: number;
   creatureId: number;
   creature: Creature | null;
+  encounterId: string;
+  encounter: Encounter | null;
   damage: number;
   terrainDamageBonus: number;
   blightMultiplier: number;
@@ -59,6 +62,8 @@ export class NapalmSystem {
         sy: 0,
         creatureId: 0,
         creature: null,
+        encounterId: "",
+        encounter: null,
         damage: 1,
         terrainDamageBonus: 0,
         blightMultiplier: 1,
@@ -75,6 +80,8 @@ export class NapalmSystem {
     for (const p of this.patches) {
       p.active = false;
       p.creature = null;
+      p.encounter = null;
+      p.encounterId = "";
     }
   }
 
@@ -89,6 +96,8 @@ export class NapalmSystem {
     sy: number,
     creatureId: number,
     creature: Creature | null,
+    encounterId: string,
+    encounter: Encounter | null,
     damage: number,
     terrainDamageBonus: number,
     blightMultiplier: number,
@@ -107,6 +116,11 @@ export class NapalmSystem {
         return p;
       }
       if (hostKind === "creature" && p.creatureId === creatureId) {
+        p.damage = Math.max(p.damage, damage);
+        if (!p.lit) p.unlitLeft = NAPALM.unlitDuration;
+        return p;
+      }
+      if (hostKind === "encounter" && p.encounterId === encounterId) {
         p.damage = Math.max(p.damage, damage);
         if (!p.lit) p.unlitLeft = NAPALM.unlitDuration;
         return p;
@@ -140,6 +154,8 @@ export class NapalmSystem {
     slot.sy = sy;
     slot.creatureId = creatureId;
     slot.creature = creature;
+    slot.encounterId = encounterId;
+    slot.encounter = encounter;
     slot.damage = damage;
     slot.terrainDamageBonus = terrainDamageBonus;
     slot.blightMultiplier = blightMultiplier;
@@ -152,22 +168,27 @@ export class NapalmSystem {
   }
 
   placeGroundPatch(ownerId: number, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number): NapalmPatch | null {
-    return this.acquireOrMerge(ownerId, "ground", x, y, 0, 0, 0, 0, 0, null, damage, terrainDamageBonus, blightMultiplier);
+    return this.acquireOrMerge(ownerId, "ground", x, y, 0, 0, 0, 0, 0, null, "", null, damage, terrainDamageBonus, blightMultiplier);
   }
 
   placeCellPatch(ownerId: number, cx: number, cy: number, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number): NapalmPatch | null {
     if (!this.world.inBounds(cx, cy) || this.world.health[cy * this.world.width + cx] === 0) return null;
-    return this.acquireOrMerge(ownerId, "cell", x, y, cx, cy, 0, 0, 0, null, damage, terrainDamageBonus, blightMultiplier);
+    return this.acquireOrMerge(ownerId, "cell", x, y, cx, cy, 0, 0, 0, null, "", null, damage, terrainDamageBonus, blightMultiplier);
   }
 
   placeSubPatch(ownerId: number, sx: number, sy: number, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number): NapalmPatch | null {
     if (!this.world.subInBounds(sx, sy) || this.world.subHealth[sy * this.world.subWidth + sx] === 0) return null;
-    return this.acquireOrMerge(ownerId, "subcell", x, y, sx >> 1, sy >> 1, sx, sy, 0, null, damage, terrainDamageBonus, blightMultiplier);
+    return this.acquireOrMerge(ownerId, "subcell", x, y, sx >> 1, sy >> 1, sx, sy, 0, null, "", null, damage, terrainDamageBonus, blightMultiplier);
   }
 
   placeCreaturePatch(ownerId: number, creature: Creature, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number): NapalmPatch | null {
     if (creature.hp <= 0) return null;
-    return this.acquireOrMerge(ownerId, "creature", x, y, 0, 0, 0, 0, creature.id, creature, damage, terrainDamageBonus, blightMultiplier);
+    return this.acquireOrMerge(ownerId, "creature", x, y, 0, 0, 0, 0, creature.id, creature, "", null, damage, terrainDamageBonus, blightMultiplier);
+  }
+
+  placeEncounterPatch(ownerId: number, enc: Encounter, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number): NapalmPatch | null {
+    if (!enc.alive || enc.hp <= 0 || enc.kind === "grove") return null;
+    return this.acquireOrMerge(ownerId, "encounter", x, y, 0, 0, 0, 0, 0, null, enc.id, enc, damage, terrainDamageBonus, blightMultiplier);
   }
 
   /**
@@ -210,15 +231,19 @@ export class NapalmSystem {
     if (p.hostKind === "creature") {
       return p.creature !== null && p.creature.hp > 0;
     }
+    if (p.hostKind === "encounter") {
+      return p.encounter !== null && p.encounter.alive && p.encounter.hp > 0;
+    }
     return false;
   }
 
-  update(dt: number, creatures: CreatureSystem | null): void {
+  update(dt: number, creatures: CreatureSystem | null, late: LateEncounters | null = null): void {
     for (const p of this.patches) {
       if (!p.active) continue;
       if (p.worldGen !== this.worldGen || !this.isHostAlive(p)) {
         p.active = false;
         p.creature = null;
+        p.encounter = null;
         continue;
       }
 
@@ -226,6 +251,9 @@ export class NapalmSystem {
         const pos = this.creaturePos(p.creature);
         p.x = pos.x;
         p.y = pos.y;
+      } else if (p.hostKind === "encounter" && p.encounter) {
+        p.x = p.encounter.x;
+        p.y = p.encounter.y;
       }
 
       if (!p.lit) {
@@ -233,6 +261,7 @@ export class NapalmSystem {
         if (p.unlitLeft <= 0) {
           p.active = false;
           p.creature = null;
+          p.encounter = null;
         }
         continue;
       }
@@ -243,10 +272,11 @@ export class NapalmSystem {
         p.burnElapsed + 1e-6 >= (p.ticksDone + 1) * NAPALM.tickInterval
       ) {
         p.ticksDone++;
-        this.applyBurnTick(p, creatures);
+        this.applyBurnTick(p, creatures, late);
         if (!this.isHostAlive(p)) {
           p.active = false;
           p.creature = null;
+          p.encounter = null;
           break;
         }
       }
@@ -254,11 +284,12 @@ export class NapalmSystem {
       if (p.active && p.burnElapsed >= NAPALM.burnDuration - 1e-6 && p.ticksDone >= NAPALM.maxTicks) {
         p.active = false;
         p.creature = null;
+        p.encounter = null;
       }
     }
   }
 
-  private applyBurnTick(p: NapalmPatch, creatures: CreatureSystem | null): void {
+  private applyBurnTick(p: NapalmPatch, creatures: CreatureSystem | null, late: LateEncounters | null): void {
     this.totalTicks++;
     if (p.hostKind === "cell") {
       const ci = p.cy * this.world.width + p.cx;
@@ -274,6 +305,8 @@ export class NapalmSystem {
       if (res > 0) this.onTerrainTick?.(p.sx >> 1, p.sy >> 1, res, true, p.sx, p.sy, p.ownerId);
     } else if (p.hostKind === "creature" && p.creature && creatures) {
       creatures.damageCreature(p.creature, p.damage, p.x, p.y);
+    } else if (p.hostKind === "encounter" && p.encounter && late) {
+      late.damageEncounter(p.encounter, p.damage);
     } else if (p.hostKind === "ground") {
       // Burning territory damages new Blight growth entering its cell/subcells and creatures entering its radius.
       const cs = this.world.cellSize;
@@ -298,6 +331,15 @@ export class NapalmSystem {
       }
       if (creatures) {
         creatures.explode(p.x, p.y, NAPALM.patchRadius, p.damage);
+      }
+      if (late) {
+        for (const a of late.actors) {
+          if (!a.alive || a.kind === "grove") continue;
+          const r = NAPALM.patchRadius + this.world.cellSize * (a.kind === "boss" ? 2.8 : a.kind === "brute" ? 1.2 : 0.8);
+          if (Math.hypot(a.x - p.x, a.y - p.y) < r) {
+            late.damageEncounter(a, p.damage);
+          }
+        }
       }
     }
   }

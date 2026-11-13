@@ -13,8 +13,9 @@ import { slashMomentum } from "./Momentum";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Rng } from "../core/Rng";
-import { BulletPool, type Bullet } from "../entities/Bullet";
-import type { CreatureSystem } from "../entities/Creatures";
+import { BulletPool, resetBulletFields, type Bullet } from "../entities/Bullet";
+import type { Creature, CreatureSystem } from "../entities/Creatures";
+import type { Encounter, LateEncounters } from "./LateEncounters";
 import type { Soldier, SoldierStats } from "../entities/Soldier";
 import { StickyGrenadePool, type StickyGrenade } from "../entities/StickyGrenade";
 import { AutoTurretPool, type AutoTurret } from "../entities/AutoTurret";
@@ -98,6 +99,7 @@ export class CombatSystem {
   /** Creatures bullets can hit before the terrain (the Blight's flowers, worms, specimens). */
   targets: BulletTargets | null = null;
   creatures: CreatureSystem | null = null;
+  late: LateEncounters | null = null;
   /** Current damaging owner ID for authoritative destruction attribution. */
   private currentOwnerId = 0;
   /** The soldier firing right now, whose own tree shapes the shots they spawn. */
@@ -170,6 +172,7 @@ export class CombatSystem {
       onResidueLost: (orb) => this.events.onGooResidueLost?.(orb.x, orb.y),
       onMineBurst: (mine) => {
         this.damageBlast(mine, mine.x, mine.y, mine.normalX, mine.normalY, mine.radiusCells);
+        this.napalm.igniteAt(mine.x, mine.y, mine.radiusCells * this.world.cellSize, mine.ownerId);
         this.events.onGooMineBurst?.(mine.x, mine.y, mine.radiusCells * this.world.cellSize, mine.damage);
       },
     });
@@ -252,32 +255,7 @@ export class CombatSystem {
 
     // Rail Lance uses an explicit charge cycle with an aim-lock phase before firing once.
     if (s.weapon === "sniper_rifle" && s.mutation === "rail_lance") {
-      if (!s.railCharging) {
-        s.railCharging = true;
-        s.railCharge = 0;
-        s.railChargeTotal = interval;
-      }
-      s.railChargeTotal = interval;
-      s.railCharge += dt;
-      const lockStart = s.railChargeTotal * (1 - RAIL.aimLockFraction);
-      if (s.railCharge < lockStart) {
-        const vlen = Math.hypot(s.vx, s.vy);
-        if (vlen > 1e-6) {
-          s.railLockDx = s.vx / vlen;
-          s.railLockDy = s.vy / vlen;
-          s.facingAngle = Math.atan2(s.railLockDy, s.railLockDx);
-        } else {
-          s.railLockDx = Math.cos(s.facingAngle);
-          s.railLockDy = Math.sin(s.facingAngle);
-        }
-      }
-      if (s.railCharge >= s.railChargeTotal) {
-        s.railCharge -= s.railChargeTotal;
-        this.fireRailLance(s, s.railLockDx, s.railLockDy);
-        if (s.mods.twinChance > 0 && this.rng.next() < s.mods.twinChance) {
-          this.fireRailLance(s, s.railLockDx, s.railLockDy);
-        }
-      }
+      this.advanceRailCharge(s, dt);
       return;
     }
 
@@ -329,7 +307,15 @@ export class CombatSystem {
     } else if (s.weapon === "sniper_rifle" && s.mutation === "chromatic_prism") {
       this.laser.traceShot(s, dx, dy, this.stats);
     } else if (s.weapon === "sniper_rifle" && s.mutation === "rail_lance") {
-      this.fireRailLance(s, dx, dy);
+      if (!s.railCharging) {
+        s.railCharging = true;
+        s.railCharge = 0;
+        s.railChargeTotal = 1 / Math.max(0.05, this.effectiveFireRate(s));
+        s.railLockDx = dx;
+        s.railLockDy = dy;
+      }
+      this.shooter = null;
+      return;
     } else if (s.weapon === "shotgun" && s.mutation === "squelch") {
       const orb = this.goo.launch({
         // Cast from the center so a muzzle beside a thin wall cannot skip it.
@@ -609,6 +595,7 @@ export class CombatSystem {
   ): Bullet | null {
     const b = this.bullets.acquire();
     if (!b) return null;
+    resetBulletFields(b);
     b.x = x;
     b.y = y;
     b.dx = dx;
@@ -679,6 +666,7 @@ export class CombatSystem {
     if(this.shooter?.mutation === "gale_edge" && this.bullets.items.filter(b=>b.active&&b.gale).length>=GALE.poolCap)return;
     const b = this.bullets.acquire();
     if (!b) return;
+    resetBulletFields(b);
     b.x = x;
     b.y = y;
     b.dx = dx;
@@ -712,6 +700,58 @@ export class CombatSystem {
     b.replay=null; b.gale=this.shooter?.mutation === "gale_edge";
     b.galeCells.clear();
     b.distanceLeft=b.gale?this.stats.galeDistance:Infinity;
+  }
+
+  /**
+   * Shared Rail Lance charge state machine used by both autonomous and manual control.
+   * Returns true if a strike fired on this step.
+   */
+  advanceRailCharge(s: Soldier, dt: number, manualDx?: number, manualDy?: number): boolean {
+    if (!s.alive || s.weapon !== "sniper_rifle" || s.mutation !== "rail_lance") return false;
+    const rate = this.effectiveFireRate(s);
+    const interval = 1 / Math.max(0.05, rate);
+    if (!s.railCharging) {
+      s.railCharging = true;
+      s.railCharge = 0;
+      s.railChargeTotal = interval;
+    }
+    s.railChargeTotal = interval;
+    s.railCharge += dt;
+    const lockStart = s.railChargeTotal * (1 - RAIL.aimLockFraction);
+    if (s.railCharge < lockStart) {
+      if (manualDx !== undefined && manualDy !== undefined) {
+        const len = Math.hypot(manualDx, manualDy);
+        if (len > 1e-6) {
+          s.railLockDx = manualDx / len;
+          s.railLockDy = manualDy / len;
+          s.facingAngle = Math.atan2(s.railLockDy, s.railLockDx);
+        }
+      } else {
+        const vlen = Math.hypot(s.vx, s.vy);
+        if (vlen > 1e-6) {
+          s.railLockDx = s.vx / vlen;
+          s.railLockDy = s.vy / vlen;
+          s.facingAngle = Math.atan2(s.railLockDy, s.railLockDx);
+        } else {
+          s.railLockDx = Math.cos(s.facingAngle);
+          s.railLockDy = Math.sin(s.facingAngle);
+        }
+      }
+    }
+    if (s.railCharge >= s.railChargeTotal) {
+      s.railCharge -= s.railChargeTotal;
+      this.fireRailLance(s, s.railLockDx, s.railLockDy);
+      if (s.mods.twinChance > 0 && this.rng.next() < s.mods.twinChance) {
+        this.fireRailLance(s, s.railLockDx, s.railLockDy);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  cancelRailCharge(s: Soldier): void {
+    s.railCharging = false;
+    s.railCharge = 0;
   }
 
   private fireRailLance(s: Soldier, dx: number, dy: number): void {
@@ -752,6 +792,7 @@ export class CombatSystem {
       this.orbit.releaseOnBounce(s, nx, ny, (x, y, dx, dy, speed, damage, life, ownerId, bounces, terrainDamageBonus, blightMultiplier, pierce) => {
         const b = this.bullets.acquire();
         if (!b) return false;
+        resetBulletFields(b);
         b.x = x; b.y = y; b.dx = dx; b.dy = dy;
         b.speed = speed; b.damage = damage; b.life = life; b.maxLife = life;
         b.traveled = 0; b.totalTraveled = 0; b.pendingAdvance = 0;
@@ -777,6 +818,7 @@ export class CombatSystem {
     return this.orbit.releaseManual(s, (x, y, dx, dy, speed, damage, life, ownerId, bounces, terrainDamageBonus, blightMultiplier, pierce) => {
       const b = this.bullets.acquire();
       if (!b) return false;
+      resetBulletFields(b);
       b.x = x; b.y = y; b.dx = dx; b.dy = dy;
       b.speed = speed; b.damage = damage; b.life = life; b.maxLife = life;
       b.traveled = 0; b.totalTraveled = 0; b.pendingAdvance = 0;
@@ -799,12 +841,20 @@ export class CombatSystem {
     this.revolver.update(dt);
     this.freeze.update(dt);
     this.rail.update(dt);
-    this.napalm.update(dt, this.creatures);
+    this.napalm.update(dt, this.creatures, this.late);
     const items = this.bullets.items;
     for (let i = 0; i < items.length; i++) {
       const b = items[i];
       if (b.active) this.updateBullet(b, dt);
     }
+  }
+
+  private isEncounterKey(k: object | null): k is Encounter {
+    return k !== null && "sector" in k && "id" in k && "kind" in k;
+  }
+
+  private isCreatureKey(k: object | null): k is Creature {
+    return k !== null && "kind" in k && (k.kind === "flower" || k.kind === "worm" || k.kind === "specimen");
   }
 
   private findCreatureNear(x: number, y: number, maxR = 14) {
@@ -856,12 +906,18 @@ export class CombatSystem {
           const iy = curY + b.dy * ct;
           if(!this.recordSegment(b,curX,curY,ix,iy))return;
           if (b.napalmSpray) {
-            const c = this.findCreatureNear(ix, iy, 16);
-            if (c) this.napalm.placeCreaturePatch(b.ownerId, c, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier);
+            const k = this.targets.targetKey ?? null;
+            const enc = this.isEncounterKey(k) ? k : null;
+            const cr = !enc ? (this.isCreatureKey(k) ? k : this.findCreatureNear(ix, iy, 16)) : null;
+            if (enc) this.napalm.placeEncounterPatch(b.ownerId, enc, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier);
+            else if (cr) this.napalm.placeCreaturePatch(b.ownerId, cr, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier);
             else this.napalm.placeGroundPatch(b.ownerId, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier);
           } else if (b.cryoSpray) {
-            const c = this.findCreatureNear(ix, iy, 16);
-            if (c) this.freeze.freezeCreature(c);
+            const k = this.targets.targetKey ?? null;
+            const enc = this.isEncounterKey(k) ? k : null;
+            const cr = !enc ? (this.isCreatureKey(k) ? k : this.findCreatureNear(ix, iy, 16)) : null;
+            if (enc) this.freeze.freezeCreature(enc);
+            else if (cr) this.freeze.freezeCreature(cr);
           } else if (b.explosionRadius > 0) {
             this.detonateRocket(b, ix, iy, -b.dx, -b.dy, Math.floor(ix / cs), Math.floor(iy / cs));
           } else {
@@ -1112,6 +1168,7 @@ export class CombatSystem {
       if(shot.targets.has(key))break;
       shot.targets.add(key);shot.hits++;
       this.targets.applyHit(shot.damage,x+dx*t,y+dy*t);
+      this.napalm.igniteAt(x+dx*t,y+dy*t,4,shot.ownerId);
       this.events.onCreatureHit?.(x+dx*t,y+dy*t,-dx,-dy);
     }
     let remaining=length;let ox=x;let oy=y;
@@ -1125,6 +1182,7 @@ export class CombatSystem {
         let damage=shot.damage+shot.terrainDamageBonus+(w.coreId[index]>0?shot.coreDamageBonus:0);
         if(sub?w.isBlightSubAt(hit.cx,hit.cy):w.isBlightAt(cx,cy))damage=Math.round(damage*shot.blightMultiplier);
         const result=w.damageSub(hit.cx,hit.cy,damage,true);
+        if(result>0)this.napalm.igniteAt(hit.x,hit.y,4,shot.ownerId);
         this.events.onImpact?.(hit.x,hit.y,hit.nx,hit.ny,cx,cy,result,sub,shot.ownerId);
       }
       const size=sub?w.subCellSize:w.cellSize;const gx=sub?hit.cx:cx;const gy=sub?hit.cy:cy;
@@ -1188,6 +1246,7 @@ export class CombatSystem {
         if (res > 0) {
           const wx = (sx + 0.5) * ss;
           const wy = (sy + 0.5) * ss;
+          this.napalm.igniteAt(wx, wy, ss, b.ownerId);
           this.events.onImpact?.(wx, wy, nx, ny, hcx, hcy, res, isSub, b.ownerId);
         }
       }
@@ -1245,10 +1304,14 @@ export class CombatSystem {
     const radCells = b.explosionRadius;
 
     if (b.freezeRocket) {
-      const allCreatures = this.creatures
-        ? [...this.creatures.flowers, ...this.creatures.worms, ...this.creatures.specimens]
-        : undefined;
-      this.freeze.freezeArea(ix, iy, radCells * cs, b.ownerId, allCreatures);
+      const allTargets: (Creature | Encounter)[] = [];
+      if (this.creatures) {
+        allTargets.push(...this.creatures.flowers, ...this.creatures.worms, ...this.creatures.specimens);
+      }
+      if (this.late) {
+        for (const a of this.late.actors) if (a.alive && a.kind !== "grove") allTargets.push(a);
+      }
+      this.freeze.freezeArea(ix, iy, radCells * cs, b.ownerId, allTargets);
       this.events.onExplosion?.(ix, iy, radCells * cs, 0);
       return;
     }

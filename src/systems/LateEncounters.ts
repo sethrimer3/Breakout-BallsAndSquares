@@ -1,3 +1,4 @@
+import { FREEZE } from "../config";
 import type { PixelWorld } from "../world/PixelWorld";
 import { sectorBounds, sectorCount, sectorTier } from "../world/labMap";
 import { CAMPAIGN, campaignTier } from "../world/campaignBalance";
@@ -23,6 +24,7 @@ export interface Encounter {
   phase: number;
   aimAngle: number;
   windup: number;
+  freezeTimer?: number;
 }
 interface Shot {
   x: number;
@@ -138,6 +140,8 @@ export class LateEncounters implements BulletTargets {
     const cs = this.world.cellSize;
     for (const a of this.actors) {
       if (!a.alive) continue;
+      if ((a.freezeTimer ?? 0) > 0) a.freezeTimer = Math.max(0, a.freezeTimer! - dt);
+      const freezeSpeedMult = (a.freezeTimer ?? 0) > 0 ? FREEZE.enemySpeedMult : 1;
       let target: Soldier | undefined,
         dist = Infinity;
       for (const s of soldiers) {
@@ -173,7 +177,7 @@ export class LateEncounters implements BulletTargets {
         const healthPct = a.hp / a.maxHp;
         const enraged = healthPct <= 0.3;
         const phase2 = healthPct <= 0.6;
-        const hoverSpeed = cs * (enraged ? 2.5 : 1.4);
+        const hoverSpeed = cs * (enraged ? 2.5 : 1.4) * freezeSpeedMult;
         const tx = active ? a.homeX + (target.x - a.homeX) * 0.35 + Math.cos(a.phase * 0.8) * cs * 4 : a.homeX;
         const ty = active ? a.homeY + (target.y - a.homeY) * 0.35 + Math.sin(a.phase * 0.8) * cs * 4 : a.homeY;
         const d = Math.hypot(tx - a.x, ty - a.y) || 1;
@@ -227,7 +231,7 @@ export class LateEncounters implements BulletTargets {
             : a.homeX + Math.cos(a.phase * 0.5) * cs * 5,
           ty = chase ? target.y : a.homeY + Math.sin(a.phase * 0.5) * cs * 5;
         const d = Math.hypot(tx - a.x, ty - a.y) || 1,
-          speed = cs * (a.kind === "brute" ? 3 : 2);
+          speed = cs * (a.kind === "brute" ? 3 : 2) * freezeSpeedMult;
         if (!chase || dist > cs * (a.kind === "brute" ? 2 : 8)) {
           const nx = a.x + ((tx - a.x) / d) * speed * dt,
             ny = a.y + ((ty - a.y) / d) * speed * dt;
@@ -312,17 +316,25 @@ export class LateEncounters implements BulletTargets {
     }
     return this.selected ? best : -1;
   }
+  damageEncounter(a: Encounter, damage: number): boolean {
+    if (!a.alive) return true;
+    const mult = (a.freezeTimer ?? 0) > 0 && a.kind !== "grove" ? FREEZE.enemyDamageMult : 1;
+    a.hp -= damage * mult;
+    if (a.hp <= 0) {
+      this.kill(a);
+      return true;
+    }
+    return false;
+  }
   applyHit(damage: number): boolean {
     if (!this.selected || !this.selected.alive) return false;
-    this.selected.hp -= damage;
-    if (this.selected.hp <= 0) this.kill(this.selected);
+    this.damageEncounter(this.selected, damage);
     return true;
   }
   explode(x: number, y: number, r: number, damage: number): void {
     for (const a of this.actors)
       if (a.alive && Math.hypot(a.x - x, a.y - y) < r) {
-        a.hp -= damage;
-        if (a.hp <= 0) this.kill(a);
+        this.damageEncounter(a, damage);
       }
   }
   private kill(a: Encounter): void {

@@ -66,6 +66,50 @@ export class Bullet {
   cryoSpray = false;
 }
 
+/** Reset all per-projectile fields on pooled Bullet reuse so no mutation state leaks. */
+export function resetBulletFields(b: Bullet): void {
+  b.replay = null;
+  b.gale = false;
+  b.galeCells.clear();
+  b.distanceLeft = Infinity;
+  b.afterimage = false;
+  b.fromDrone = false;
+  b.bounces = 0;
+  b.momentumBoosted = false;
+  b.x = 0;
+  b.y = 0;
+  b.dx = 0;
+  b.dy = 0;
+  b.speed = 0;
+  b.terrainDamageBonus = 0;
+  b.damage = 1;
+  b.life = 0;
+  b.pierceLeft = 0;
+  b.bounceLeft = 0;
+  b.bounceRetention = 1;
+  b.explosionRadius = 0;
+  b.clusterCount = 0;
+  b.style = 0;
+  b.blightMultiplier = 1;
+  b.slashWidth = 0;
+  b.slashAngle = 0;
+  b.maxLife = 0;
+  b.traveled = 0;
+  b.totalTraveled = 0;
+  b.pendingAdvance = 0;
+  b.ownerId = 0;
+  b.burrowerGroupId = 0;
+  b.burrowerDrilling = false;
+  b.burrowerDrillDist = 0;
+  b.burrowerDrilledCells = 0;
+  b.burrowerMinesPlaced = 0;
+  b.burrowerLastMineDist = -999;
+  b.freezeRocket = false;
+  b.vacuumPellet = false;
+  b.napalmSpray = false;
+  b.cryoSpray = false;
+}
+
 /** Fixed-size object pool for bullets. */
 export class BulletPool {
   readonly items: Bullet[];

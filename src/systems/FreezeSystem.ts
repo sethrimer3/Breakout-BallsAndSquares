@@ -1,5 +1,6 @@
 import { FACILITY, FREEZE } from "../config";
 import type { Creature } from "../entities/Creatures";
+import type { Encounter } from "./LateEncounters";
 import { MAT, type PixelWorld } from "../world/PixelWorld";
 
 interface PendingShatter {
@@ -131,19 +132,20 @@ export class FreezeSystem {
     return true;
   }
 
-  /** Freeze a creature without dealing damage. Refreshes duration without compounding multipliers. */
-  freezeCreature(c: Creature, duration = FREEZE.duration): void {
+  /** Freeze a creature or late-world enemy without dealing damage. Refreshes duration without compounding multipliers. */
+  freezeCreature(c: Creature | Encounter, duration = FREEZE.duration): void {
+    if (c.kind === "grove") return;
     const cur = c.freezeTimer ?? 0;
     if (duration > cur) c.freezeTimer = duration;
   }
 
-  /** Freeze all solid cells, subcells, and creatures within `radiusWorld` of `(x, y)`. */
+  /** Freeze all solid cells, subcells, and enemies within `radiusWorld` of `(x, y)`. */
   freezeArea(
     x: number,
     y: number,
     radiusWorld: number,
     ownerId: number,
-    creatures?: readonly Creature[],
+    creatures?: readonly (Creature | Encounter)[],
     duration = FREEZE.duration,
   ): void {
     const cs = this.world.cellSize;
@@ -190,8 +192,12 @@ export class FreezeSystem {
         } else if (c.kind === "worm") {
           cx = c.seg[0];
           cy = c.seg[1];
-        } else {
+        } else if (c.kind === "specimen") {
           if (!c.free) continue;
+          cx = c.x;
+          cy = c.y;
+        } else {
+          if (!c.alive || c.kind === "grove") continue;
           cx = c.x;
           cy = c.y;
         }

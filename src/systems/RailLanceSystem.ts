@@ -81,7 +81,7 @@ export class RailLanceSystem {
     const stepAdvance = 0.25;
 
     let guard = 0;
-    while (remainingDist > 0.05 && remainingHits > 0 && guard++ < 128) {
+    while (remainingDist > 0.05 && remainingHits > 0 && guard++ < 512) {
       const tDist = targets ? targets.raycast(curX, curY, dx, dy, remainingDist, hitTargets) : -1;
       const wHit = gridRaycast(this.world.subSolidQuery, this.world.subCellSize, curX, curY, dx, dy, remainingDist, rayHit);
       const wDist = wHit ? rayHit.t : -1;
@@ -150,7 +150,19 @@ export class RailLanceSystem {
           this.totalHits++;
         }
 
-        const adv = Math.max(stepAdvance, rayHit.t + stepAdvance);
+        if (remainingHits <= 0) {
+          curX = hx;
+          curY = hy;
+          break;
+        }
+
+        const size = isSub ? this.world.subCellSize : this.world.cellSize;
+        const gx = isSub ? sx : cx;
+        const gy = isSub ? sy : cy;
+        const ex = Math.abs(dx) > 1e-9 ? (((dx > 0 ? gx + 1 : gx) * size) - curX) / dx : Infinity;
+        const ey = Math.abs(dy) > 1e-9 ? (((dy > 0 ? gy + 1 : gy) * size) - curY) / dy : Infinity;
+        const exitDist = Math.min(ex, ey);
+        const adv = Math.min(remainingDist, Math.max(rayHit.t + 1e-3, exitDist + 1e-3));
         curX += dx * adv;
         curY += dy * adv;
         remainingDist -= adv;

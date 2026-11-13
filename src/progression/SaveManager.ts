@@ -6,7 +6,7 @@ import { LAB_WORLD_COUNT, LAB_WORLDS } from "../world/labMap";
 import { CAMPAIGN, campaignTier } from "../world/campaignBalance";
 import { normalizeLegacyWeapon, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
 import { SOLDIER_UPGRADE_DEFS, type SoldierUpgradeLevels } from "./SoldierUpgrades";
-import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
+import { UPGRADE_DEFS, upgradePrices, type UpgradeId } from "./UpgradeDefinitions";
 
 export const SAVE_KEY = "breach.save.v1";
 export const SAVE_VERSION = 1;
@@ -477,6 +477,21 @@ export function sanitizeSaveData(raw: unknown): SaveData {
           if (ess > 0) {
             spentEssence += Math.round(ess * (1 + 0.5 * l));
           }
+        }
+      }
+    }
+    // Also account for Essence spent on tree / Black Market upgrades so reload never restores spent Essence.
+    for (const d of UPGRADE_DEFS) {
+      const recorded = def.upgradeSpent?.[d.id];
+      if (recorded) {
+        if (typeof recorded.essence === "number" && recorded.essence > 0) spentEssence += recorded.essence;
+        continue;
+      }
+      // Legacy pre-ledger saves: reconstruct Essence cost for purchased nodes without an upgradeSpent entry.
+      const lvl = def.upgrades[d.id] ?? 0;
+      for (let l = 0; l < lvl; l++) {
+        for (const p of upgradePrices(d, l)) {
+          if (p.currency === "essence") spentEssence += p.amount;
         }
       }
     }
