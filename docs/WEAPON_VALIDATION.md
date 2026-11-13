@@ -79,4 +79,23 @@ Validation:
 - Chromium smoke purchases both Essence unlocks through actual tree nodes, selects both loadout modes, observes live Gale crescents and paused/returning Playback actors, and switches back to ordinary modes. Existing SQUELCH/Drone/Prism/Momentum smoke checks still pass. No page errors.
 - Existing 600-frame desktop and 4× CPU-throttled mobile profiles plus 1,800 additional memory-stress frames pass. Simulation p95: 0.2 / 1.1 ms; rendering p95: 0.5 / 0.9 ms; retained heap growth: 394,124 / 230,840 bytes. These stress profiles cover the original mixed weapon workload; the two new modes have separate live smoke and focused correctness coverage, not a claim of completed mobile balance testing.
 
-Screenshots/report are generated under `/tmp/breach-weapon-validation`. Full lab refunds/respec, legacy variant migration, broader specialist tiers and player balance testing are not marked complete by these checks.
+Screenshots/report are generated under `/tmp/breach-weapon-validation`.
+
+## Full Black Market expansion implementation & validation
+
+All accepted Black Market branches from [BLACK_MARKET_IMPLEMENTATION_PLAN.md](BLACK_MARKET_IMPLEMENTATION_PLAN.md) are implemented, with Assault Rifle mutation slots left undecided:
+
+- **Canonical Black Market model:** `WeaponType` uses the 7 canonical base weapons; `SaveManager` migrates legacy `goo_mortar`, `drone_shepherd`, and `prism_laser` loadouts without losing purchases or currency, enforces unique non-Pistol primary ownership across the squad, and allows independent per-slot Pistol mutations. `UpgradeManager.refundBlackMarket` provides lab-only atomic refunds from recorded `upgradeSpent` totals, and `UpgradeTree` surfaces inactive conventional upgrades explicitly.
+- **Initial tuning choices (documented in `src/config.ts`):**
+  - `ORBIT`: max 8 rounds/owner, orbit radius 12, angular speed 4.4 rad/s, release cooldown 0.08 s.
+  - `VACUUM`: intake radius 88, 0.5× ordinary shotgun fire rate, normal cell mass 1.0 / subcell 0.25, max 12 pellets with overflow converted to +0.75 damage/pellet, bounded 512-entry debris ledger.
+  - `BURROWER`: drills terrain up to 48 world units (50% speed), places up to 3 mines along the drilled path (`BURROWER.mineCount`), detonates the entire group + terminal payload together on the same step, and stops at closed gates/world borders.
+  - `FREEZE` / `CRYO`: 3.0 s freeze duration (`FREEZE.duration`), 50% creature speed, 2× incoming creature damage, 0.5× local frozen Blight growth, 0 direct terrain damage; external destruction of a frozen cell deals 50% of its frozen `maxHealthAt` HP to its 4 orthogonal neighbors on `FACILITY.glassChainDelay` (`0.05 s`) cadence (max 64/step).
+  - `RAIL`: 1200-unit range, +10 bonus pierce, final 25% of charge locks aim direction, single straight piercing trace stopping at closed gates and world borders.
+  - `NAPALM`: 10 s unlit expiry, external damaging ignition only (no self-ignition or cold ignition), 3.0 s burn dealing full weapon damage across 15 ticks (`0.2 s..3.0 s`), immediate cleanup of target-bound patches when the host block breaks or creature dies.
+
+### Observed validation results
+
+- **TypeScript + Vite production build (`npm run build`):** passed.
+- **Playwright Chromium smoke (`npm run test:weapon-browser`):** passed with 0 page errors; purchased, equipped, deployed, and visibly exercised all 12 accepted Black Market mutations (`reverse_revolver`, `orbit_cylinder`, `drone_shepherd`, `squelch`, `vacuum_pulse`, `burrower`, `freeze_rockets`, `chromatic_prism`, `rail_lance`, `gale_edge`, `napalm_garden`, `cryospray`), verified restart cleanup, Settings persistence, desktop (1440×900: `simP95Ms: 0.2`, `renderP95Ms: 0.3`, `heapDeltaBytes: 261168`) and 4×-CPU-throttled mobile (390×844: `simP95Ms: 1.9`, `renderP95Ms: 2.3`, `heapDeltaBytes: 99852`) stress profiles.
+- **Unverified playtesting:** Live multi-run Essence economy pacing, player readability of the 12 mutations in long sessions, and physical mobile device thermal/touch ergonomics remain on the manual playtest checklist.

@@ -129,17 +129,21 @@ The project is configured with `base: "./"` in [`vite.config.ts`](vite.config.ts
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**.
 3. Push to the `main` branch (or trigger **Build and deploy to GitHub Pages** manually from the **Actions** tab). The workflow in [`.github/workflows/static.yml`](.github/workflows/static.yml) runs `npm ci`, `npm test`, `npm run build`, and deploys `./dist`.
 
-## Experimental weapon expansion
+## Black Market weapon expansion
 
-The Primary Arsenal now includes **SQUELCH** (stick → leave a timed mine → rebound), **Drone Shepherd** (independent miniature pistol drones), and **Chromatic Prism** (a pulsed beam that gains color, damage, and penetration on reflection). The existing Pistol and Shotgun trees offer weapon-specific bankshots. Katana's **Rebound Dash** specialization converts autonomous wall rebounds into a short speed burst, with slash damage and width captured from actual velocity.
+The Primary Arsenal now uses canonical base weapon identities (`pistol`, `shotgun`, `assault_rifle`, `rocket_launcher`, `sniper_rifle`, `katana`, `flamethrower`) with per-soldier Black Market mutations unlocked via Essence and Gold/Crystals in their base weapon tabs:
 
-Weapon unlocks and upgrades live on their respective Primary Weapons tabs. Piercing soldier upgrades disable ordinary Pistol/Shotgun ricochets for that shot. Drone rounds do not inherit Pistol Bankshot. Prism spends charged penetration before reflecting; world boundaries absorb it. Visual Settings includes **Prism Patterns** as a non-color power cue. All new loadouts and upgrade levels are compatible with older save slots.
+- **Pistol:** **Reverse-Playback Revolver** (pauses then rewinds its exact bankshot path), **Orbit Cylinder** (rounds orbit the soldier and sling outward on real wall reflections), and **Drone Shepherd** (independent miniature pistol drones; supports multiple carriers within per-owner and global caps).
+- **Shotgun:** **SQUELCH** (elastic slime orb that sticks, lays timed mines, and rebounds) and **Vacuum Pulse** (half fire rate; pulls in authoritative debris from all destroyed blocks in range to scale pellets and damage).
+- **Assault Rifle:** Mutation slots remain undecided.
+- **Rocket Launcher:** **Burrower** (drills through terrain, placing mines along the path and detonating all charges together) and **Freeze Rockets** (cold-only burst; 0 direct block damage).
+- **Sniper Rifle:** **Chromatic Prism** (pulsed beam gaining color, damage, and penetration on reflection) and **Rail Lance** (charge cycle with aim-lock into one ultra-long straight piercing strike).
+- **Katana:** **Momentum Katana** (rebound dash with velocity-scaled slash damage/width) and **Gale Edge** (long-range flying crescents; mutually exclusive with Momentum dash/scaling).
+- **Flamethrower:** **Napalm Garden** (sprays 10 s unlit fuel patches that must be ignited by another weapon for a 3 s / 15-tick burn) and **Cryospray** (freezing mist sharing the Freeze & Orthogonal Shatter system).
 
-Pistol also offers **Reverse-Playback Revolver**, which pauses then rewinds its exact shot path, including bankshots. Katana offers **Gale Edge**, a long-range crescent alternative that disables Momentum dash/scaling; **Extended Horizon** increases its travel range. Unlock these with Essence in their Primary tabs and select them in the next-deployment loadout.
+Non-Pistol primary weapons remain unique across the squad (including alternate mutations of the same base weapon), while Pistol mutations are selectable independently per slot. Legacy standalone saves (`goo_mortar`, `drone_shepherd`, `prism_laser`) migrate automatically to their canonical Shotgun/Pistol/Sniper mutations, and a lab-only **Refund Black Market** action atomically refunds recorded Black Market spending.
 
-The [revised Black Market plan](docs/BLACK_MARKET_IMPLEMENTATION_PLAN.md) records the accepted next branches, shared freeze/fuel/debris systems, Drone Shepherd as Pistol branch 3, and undecided Assault Rifle slots. Those additions and the remaining canonical branch migration are planned.
-
-See [the implementation plan](docs/WEAPON_EXPANSION_PLAN.md) and [validation / playtest notes](docs/WEAPON_VALIDATION.md). Run `npm run test:weapons` for focused coverage and `npm run test:weapon-browser` against a running Vite server for browser validation.
+See [the revised Black Market plan](docs/BLACK_MARKET_IMPLEMENTATION_PLAN.md) and [validation / playtest notes](docs/WEAPON_VALIDATION.md). Run `npm run test:weapons` for focused coverage and `npm run test:weapon-browser` against a running Vite server for browser validation.
 
 ## Later worlds
 
