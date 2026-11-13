@@ -756,6 +756,7 @@ export class Game {
 
   /** Bank currency & lifetime pixels earned in the current run (idempotent per run). */
   bankCurrentRun(): { time: boolean; depth: boolean; pixels: boolean } {
+    if (!this.runStarted) return { time: false, depth: false, pixels: false };
     this.syncSpeedrun();
     this.loot.clear();
     const r = this.runStats;
@@ -856,20 +857,7 @@ export class Game {
       return;
     }
     if (this.mainMenu.visible) {
-      if (code === "Space" || code === "Enter") {
-        this.mainMenu.hide();
-        this.beginDeploy();
-      } else if (code === "KeyU") {
-        this.openUpgrades();
-      } else if (code === "Digit1" || code === "Numpad1") {
-        this.mainMenu.selectSlot(1);
-      } else if (code === "Digit2" || code === "Numpad2") {
-        this.mainMenu.selectSlot(2);
-      } else if (code === "Digit3" || code === "Numpad3") {
-        this.mainMenu.selectSlot(3);
-      } else if (code === "Escape") {
-        this.mainMenu.onEscape();
-      }
+      this.mainMenu.onKey(code);
       return;
     }
     switch (code) {

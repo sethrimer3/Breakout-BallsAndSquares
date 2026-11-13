@@ -159,6 +159,10 @@ Run `npm run test:profile-browser` against the Vite dev server for settings, rep
 
 ## Main-menu gameplay backdrop
 
-The menu runs a separate miniature lab with six randomly arranged, connected rooms, two ordinary pistol soldiers in a safe room, and two exposed Blight generators. It uses the game's physics, combat, growth, terrain textures and soldier sprites. All terrain is tier 1. A new skirmish starts after the last generator or soldier is lost, or after 90 seconds; **New Skirmish** generates another immediately.
+The menu runs a separate miniature lab with six randomly arranged, connected rooms, two ordinary pistol soldiers in a safe room, and two exposed Blight generators. It uses the game's physics, combat, growth, terrain textures and soldier sprites. All terrain is tier 1. A new skirmish starts automatically after the last generator or soldier is lost, or after 90 seconds.
 
 The backdrop adapts to landscape/portrait screens, uses steady soldier lighting, pauses while hidden, and stops when leaving the menu. Its combat and gold pickups never affect save slots, profile seeds, player resources, or speedrun timing. Run `npm run test:menu-browser` against the Vite server to verify gameplay, long-session save isolation, regeneration, stop/resume, and phone layout. The release check passed 466 unit tests, the production build, and Chromium menu validation with no page errors; screenshots are generated under `/tmp/breach-menu-validation`.
+
+## Choosing a profile
+
+The main menu focuses on three profiles. Choose **Continue** or **Create Profile** to enter directly; number keys **1–3** provide quick selection. Each saved card shows its progress once, with no duplicate wallet bar or separate deploy/upgrade menu. A quiet Settings control in the header includes a profile selector for seed and speedrun settings. Deleting a profile requires explicit confirmation, and empty slots remain empty until created or configured. Keyboard Tab/Enter/Space use normal button navigation; gameplay shortcuts do not open the upgrade tree from the profile menu.

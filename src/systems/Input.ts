@@ -301,7 +301,14 @@ export class Input {
   };
 
   private onKeyDown = (e: KeyboardEvent): void => {
-    if (e.target instanceof HTMLInputElement) return;
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (target?.closest("input, select, textarea, [contenteditable=true]")) {
+      if (e.code === "Escape") this.handlers.onKey?.(e.code, e);
+      return;
+    }
+    // Menus use native focus/activation; gameplay keeps Tab camera cycling.
+    if ((e.code === "Enter" || e.code === "Space") && target?.closest("button")) return;
+    if (e.code === "Tab" && document.querySelector(".main-overlay:not(.hidden)")) return;
     if (e.code === "Tab" || e.code === "Space") e.preventDefault();
     this.keysDown.add(e.code);
     this.handlers.onKey?.(e.code, e);

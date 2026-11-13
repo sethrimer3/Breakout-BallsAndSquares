@@ -1,6 +1,6 @@
 import { formatSpeedrunTime } from "../core/SpeedrunTimer";
 import type { Game } from "../Game";
-import { MUZZLE_FLASH_LEVELS, type MuzzleFlashLevel } from "../progression/SaveManager";
+import { MUZZLE_FLASH_LEVELS, SAVE_SLOTS_COUNT, type MuzzleFlashLevel } from "../progression/SaveManager";
 import type { LightQuality } from "../systems/LightingSystem";
 
 export type SettingsTab = "gameplay" | "sound" | "visuals" | "dev";
@@ -96,6 +96,8 @@ export class SettingsModal {
     if (this.activeTab === "gameplay") {
       body.innerHTML = `
         ${this.showProfileSettings ? `
+        <div class="set-row"><label class="set-label" for="menu-settings-profile">PROFILE SETTINGS</label>
+          <select id="menu-settings-profile" class="set-profile-select" aria-label="Profile to configure">${Array.from({length:SAVE_SLOTS_COUNT},(_,i)=>`<option value="${i+1}" ${i+1===this.game.save.activeSlot?"selected":""}>Profile ${String(i+1).padStart(2,"0")}${this.game.save.slotExists(i+1)?"":" · New"}</option>`).join("")}</select></div>
         <div class="set-group profile-settings">
           <div class="set-label">NEW SAVE SEED</div>
           <div class="set-desc">Use 1–8 letters or numbers for any new save. Leave blank for a random seed. Existing saves keep their seed.</div>
@@ -145,6 +147,11 @@ export class SettingsModal {
       `;
 
       if (this.showProfileSettings) {
+        body.querySelector<HTMLSelectElement>(".set-profile-select")!.addEventListener("change", e => {
+          this.game.selectSaveSlot(Number((e.target as HTMLSelectElement).value));
+          this.render();
+          this.bodyEl.querySelector<HTMLSelectElement>(".set-profile-select")!.focus();
+        });
         const input = body.querySelector<HTMLInputElement>(".set-seed-input")!;
         input.value = this.game.save.newProfileSeed;
         const applySeed = () => {

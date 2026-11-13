@@ -12,6 +12,7 @@ const artifacts='/tmp/breach-profile-validation';fs.mkdirSync(artifacts,{recursi
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(process.env.BREACH_BASE_URL||'http://127.0.0.1:5173');
   await page.locator('[data-act="play"]').waitFor({state:'visible'});
+  await page.evaluate(()=>{const g=window.__game;g.save.save();g.mainMenu.show();});
   const original=await page.evaluate(()=>window.__game.save.data.seed);
   const settings=page.locator('.main-overlay .settings-panel');
   async function openSettings(){await page.locator('.main-panel [data-act="settings"]').click();}
@@ -22,6 +23,7 @@ const artifacts='/tmp/breach-profile-validation';fs.mkdirSync(artifacts,{recursi
   await closeSettings();
   await page.locator('.save-slot-card[data-slot="2"] [data-action="init"]').click();
   assert.equal(await page.evaluate(()=>window.__game.save.data.seed),'RACE42');
+  await page.evaluate(()=>window.__game.openMainMenu());
   await openSettings();await settings.locator('[data-set="speedrun"]').click();
   await page.screenshot({path:`${artifacts}/settings.png`});await closeSettings();
   await page.locator('.main-panel [data-act="play"]').click();
@@ -66,10 +68,11 @@ const artifacts='/tmp/breach-profile-validation';fs.mkdirSync(artifacts,{recursi
   await openSettings();await settings.locator('.set-seed-input').fill('next7');await settings.locator('[data-set="apply-seed"]').click();await closeSettings();
   await page.locator('.save-slot-card[data-slot="3"] [data-action="init"]').click();
   assert.deepEqual(await page.evaluate(()=>{const d=window.__game.save.data;return[d.seed,d.speedrun.elapsedMs,d.speedrun.enabled];}),['NEXT7',0,false]);
-  await page.locator('.main-panel [data-act="play"]').click();assert.notDeepEqual(await digest(),first);
+  assert.notDeepEqual(await digest(),first);
   await page.evaluate(()=>window.__game.openMainMenu());
   await page.locator('.save-slot-card[data-slot="2"] [data-action="select"]').click();
   assert.deepEqual(await page.evaluate(()=>{const d=window.__game.save.data;return[d.seed,d.speedrun.elapsedMs];}),['RACE42',stopped]);
+  await page.evaluate(()=>window.__game.openMainMenu());
   // Narrow-screen settings remain usable and do not overflow the viewport.
   await page.setViewportSize({width:390,height:844});await openSettings();
   const bounds=await settings.locator('.set-seed-input').boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=390);
