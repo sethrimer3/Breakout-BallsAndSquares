@@ -22,7 +22,7 @@ fs.mkdirSync(artifacts, { recursive: true });
    g.save.data.essence=1000000;g.save.data.bank=g.save.data.crystals=g.save.data.greenCrystals=1000000;g.save.data.lifetimePixels=10000;g.openUpgrades();
    for(const id of [
      'shotgun_unlock','goo_unlock','goo_radius','goo_residue','vacuum_unlock',
-     'ar_unlock','ar_stabilizer','overcharge_unlock','overcharge_accuracy',
+     'ar_unlock','ar_stabilizer','overcharge_unlock','overcharge_accuracy','circuit_unlock',
      'katana_unlock','katana_dash','gale_unlock',
      'drone_unlock','drone_capacity','orbit_unlock','reverse_unlock',
      'sniper_unlock','prism_unlock','prism_spectrum','prism_overload','rail_lance_unlock',
@@ -81,6 +81,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     else if(m==='squelch')ready=c.goo.bursts>0;
     else if(m==='vacuum_pulse')ready=c.bullets.items.some(b=>b.active&&b.vacuumPellet);
     else if(m==='overcharge_conductor')ready=c.overcharge.totalCharges>0;
+    else if(m==='circuit_runner')ready=c.circuit.segments.some(s=>s.active);
     else if(m==='burrower')ready=c.burrower.totalGroupsDetonated>0||c.burrower.mines.activeCount>0;
     else if(m==='freeze_rockets')ready=c.freeze.activeFrozenCells>0;
     else if(m==='chromatic_prism')ready=c.laser.hits>0;
@@ -97,7 +98,7 @@ fs.mkdirSync(artifacts, { recursive: true });
    assert.equal(await page.evaluate(()=>window.__game.save.data.loadouts[0].mutation),null);
    await page.evaluate(()=>window.__game.openUpgrades());
   }
-  assert.equal(mutations.length,13);
+  assert.equal(mutations.length,14);
   const live=[];
   for(const [weapon,mutation] of [['shotgun','squelch'],['pistol','drone_shepherd'],['sniper_rifle','chromatic_prism'],['katana',null]]) {
    await page.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
