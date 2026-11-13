@@ -2000,6 +2000,8 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
 ];
 
 /** Milestones run left-to-right, right-to-left, then left-to-right. */
+export const CORE_HUB_GRID = { col: -2.5, row: -1.5 } as const;
+
 export const CORE_PATH: readonly UpgradeId[] = [
   "keycard_t1", "unlock_map", "connected_air_mapping", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
   "core_placeholder_3", "unlock_blight", "keycard_t2", "core_placeholder_4", "unlock_formations", "core_placeholder_5", "unlock_secondary",
@@ -2031,8 +2033,10 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     const milestone = MILESTONES[id];
     const placeholder = id.startsWith("core_placeholder_");
     const columns = 6;
-    const row = Math.floor(index / columns);
-    const col = row % 2 === 0 ? index % columns : columns - 1 - index % columns;
+    // Slot zero is a decorative hub, not an upgrade or saved level.
+    const slot = index + 1;
+    const row = Math.floor(slot / columns);
+    const col = row % 2 === 0 ? slot % columns : columns - 1 - slot % columns;
     const base: UpgradeDef = existing ?? {
       id, branch: "core", name: milestone?.[0] ?? "Unknown Upgrade",
       shortDesc: milestone?.[1] ?? "Future upgrade slot. Continue along the path to the next milestone.",
@@ -2041,13 +2045,13 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       valueAt: (level) => level, formatValue: (v) => v > 0 ? "UNLOCKED" : "LOCKED",
       formatDelta: () => "UNLOCK", apply: () => {}, icon: placeholder ? "question" : MILESTONE_ICONS[id] ?? "gear",
     };
-    return { ...base, branch: "core", grid: { col: col - (columns - 1) / 2, row: row - (Math.ceil(CORE_PATH.length / columns) - 1) / 2 },
+    return { ...base, branch: "core", grid: { col: col - (columns - 1) / 2, row: row - (Math.ceil((CORE_PATH.length + 1) / columns) - 1) / 2 },
       parent: index > 0 ? CORE_PATH[index - 1] : null, placeholder,
       ...(id === "keycard_t6" ? { currency: "greenCrystals" as const, essenceCost: 100, icon: "keycard" as const,
         apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,6); } } : {}),
       ...(id === "keycard_t9" ? { currency: "biomass" as const, essenceCost: 2000, icon: "keycard" as const,
         apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,9); } } : {}),
-      ...(id === "keycard_t1" ? { baseCost: 8, icon: "coreOrb" as const, color: "#38d6ff" } : {}),
+      ...(id === "keycard_t1" ? { baseCost: 8, icon: "keycard" as const } : {}),
       ...(id === "connected_air_mapping" ? { apply: (s: SoldierStats, level: number) => { s.connectedAirMapping = level > 0; } } : {}),
     };
   }),

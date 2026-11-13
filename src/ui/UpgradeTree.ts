@@ -9,6 +9,7 @@ import {
   type SoldierUpgradeId,
 } from "../progression/SoldierUpgrades";
 import {
+  CORE_HUB_GRID,
   UPGRADE_BY_ID,
   UPGRADE_DEFS,
   type Currency,
@@ -624,7 +625,7 @@ export class UpgradeTree {
       const to = nodePos(def.grid.col, def.grid.row);
       const btn = document.createElement("button");
       // The weapon-unlock node at the center of a tree gets a round frame.
-      const round = def.id === "keycard_t1" || (branchOf(def) !== "core" && def.grid.col === 0 && def.grid.row === 0);
+      const round = branchOf(def) !== "core" && def.grid.col === 0 && def.grid.row === 0;
       btn.className = round ? "tree-node round" : "tree-node";
       btn.style.setProperty("--node-color", def.color);
       const ring = round
@@ -660,7 +661,7 @@ export class UpgradeTree {
       this.nodeEls.set(def.id, btn);
       this.bodies.set(def.id, {
         id: def.id,
-        parent: def.parent ?? (round || branchOf(def) === "core" ? null : HUB_ID),
+        parent: def.parent ?? (round ? null : HUB_ID),
         hx: to.x,
         hy: to.y,
         x: to.x,
@@ -866,7 +867,15 @@ export class UpgradeTree {
     this.cycles.reset();
     const defs = this.activeDefs();
     const ids = defs.map((d) => d.id as string);
-    if (this.activeTab !== "core" && defs.length > 0 && !defs.some((d) => d.grid.col === 0 && d.grid.row === 0)) ids.push(HUB_ID);
+    const core = this.activeTab === "core";
+    const hub = this.bodies.get(HUB_ID)!;
+    const home = core ? nodePos(CORE_HUB_GRID.col, CORE_HUB_GRID.row) : nodePos(0, 0);
+    hub.hx = hub.x = home.x;
+    hub.hy = hub.y = home.y;
+    hub.vx = hub.vy = 0;
+    this.coreHubEl.style.pointerEvents = core ? "none" : "";
+    this.coreHubEl.setAttribute("aria-hidden", String(core));
+    if (core || (defs.length > 0 && !defs.some((d) => d.grid.col === 0 && d.grid.row === 0))) ids.push(HUB_ID);
     this.activeBodies = ids.map((id) => this.bodies.get(id)!);
 
     const neighbors = new Map<string, string[]>(ids.map((id) => [id, []]));
@@ -1379,7 +1388,6 @@ export class UpgradeTree {
     // Center hub ball is shown on Core, Resources, Blight & Pistol (where 0,0 has no upgrade node),
     // and hidden on weapon trees where their unlock node sits at (0,0).
     const hasCenterUnlockNode =
-      this.activeTab === "core" ||
       this.activeTab === "shotgun" ||
       this.activeTab === "assault_rifle" ||
       this.activeTab === "rocket_launcher" ||
