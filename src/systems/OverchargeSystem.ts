@@ -456,8 +456,8 @@ export class OverchargeSystem {
     const ux = dx / dist;
     const uy = dy / dist;
     const ss = this.world.subCellSize;
-    // Start slightly outside origin cell if origin itself is solid.
-    const startOffset = Math.min(dist * 0.25, ss * 0.6);
+    // Start outside origin cell/subcell if origin itself is solid.
+    const startOffset = Math.min(dist * 0.5, this.world.cellSize * 0.75);
     const sx0 = x1 + ux * startOffset;
     const sy0 = y1 + uy * startOffset;
     const traceDist = Math.max(0, dist - startOffset);

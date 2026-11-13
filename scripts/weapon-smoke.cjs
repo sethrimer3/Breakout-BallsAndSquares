@@ -22,6 +22,7 @@ fs.mkdirSync(artifacts, { recursive: true });
    g.save.data.essence=1000000;g.save.data.bank=g.save.data.crystals=g.save.data.greenCrystals=1000000;g.save.data.lifetimePixels=10000;g.openUpgrades();
    for(const id of [
      'shotgun_unlock','goo_unlock','goo_radius','goo_residue','vacuum_unlock',
+     'ar_unlock','ar_stabilizer','overcharge_unlock','overcharge_accuracy',
      'katana_unlock','katana_dash','gale_unlock',
      'drone_unlock','drone_capacity','orbit_unlock','reverse_unlock',
      'sniper_unlock','prism_unlock','prism_spectrum','prism_overload','rail_lance_unlock',
@@ -32,6 +33,10 @@ fs.mkdirSync(artifacts, { recursive: true });
   await page.locator('.tree-cat-btn[data-cat="primary"]').click();
   async function buy(id) { const node=page.locator(`[data-smoke="${id}"]`);await node.hover();await node.click(); }
   await page.locator('[data-tab="shotgun"]').click();await buy('shotgun_unlock');await buy('goo_unlock');await buy('goo_radius');await buy('goo_residue');await buy('vacuum_unlock');
+  await page.locator('[data-tab="assault_rifle"]').click();await buy('ar_unlock');for(let i=0;i<6;i++)await buy('ar_stabilizer');await buy('overcharge_unlock');
+  assert.equal(await page.evaluate(()=>window.__game.upgrades.getSoldierStats().overchargeSpreadDeg),10.5);
+  for(let i=0;i<6;i++)await buy('overcharge_accuracy');
+  assert.equal(await page.evaluate(()=>window.__game.upgrades.getSoldierStats().overchargeSpreadDeg),0.1);
   await page.locator('[data-tab="katana"]').click();await buy('katana_unlock');await buy('katana_dash');await buy('gale_unlock');
   await page.locator('[data-tab="pistol"]').click();await buy('drone_unlock');await buy('drone_capacity');await buy('orbit_unlock');await buy('reverse_unlock');
   await page.locator('[data-tab="sniper_rifle"]').click();await buy('sniper_unlock');await buy('prism_unlock');
@@ -46,6 +51,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     ['pistol','drone_shepherd'],
     ['shotgun','squelch'],
     ['shotgun','vacuum_pulse'],
+    ['assault_rifle','overcharge_conductor'],
     ['rocket_launcher','burrower'],
     ['rocket_launcher','freeze_rockets'],
     ['sniper_rifle','chromatic_prism'],
@@ -72,6 +78,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     else if(m==='drone_shepherd')ready=c.drones.shots>0;
     else if(m==='squelch')ready=c.goo.bursts>0;
     else if(m==='vacuum_pulse')ready=c.bullets.items.some(b=>b.active&&b.vacuumPellet);
+    else if(m==='overcharge_conductor')ready=c.overcharge.totalCharges>0;
     else if(m==='burrower')ready=c.burrower.totalGroupsDetonated>0||c.burrower.mines.activeCount>0;
     else if(m==='freeze_rockets')ready=c.freeze.activeFrozenCells>0;
     else if(m==='chromatic_prism')ready=c.laser.hits>0;
@@ -88,7 +95,7 @@ fs.mkdirSync(artifacts, { recursive: true });
    assert.equal(await page.evaluate(()=>window.__game.save.data.loadouts[0].mutation),null);
    await page.evaluate(()=>window.__game.openUpgrades());
   }
-  assert.equal(mutations.length,12);
+  assert.equal(mutations.length,13);
   const live=[];
   for(const [weapon,mutation] of [['shotgun','squelch'],['pistol','drone_shepherd'],['sniper_rifle','chromatic_prism'],['katana',null]]) {
    await page.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
@@ -133,10 +140,25 @@ fs.mkdirSync(artifacts, { recursive: true });
    // 3. Napalm external ignition
    const patch=g.combat.napalm.placeGroundPatch(1,g.world.roomCenterX,g.world.roomCenterY,2,0,1);
    const litCount=g.combat.napalm.igniteAt(g.world.roomCenterX,g.world.roomCenterY,8,2);
+   // 4. Overcharge Conductor: 3-hit threshold, refreshed quiet delay, chain/blast discharge
    g.combat.clearAll();
-   return{pooledClean,manualChargedWithoutFiring,napalmIgnited:litCount===1&&patch.lit};
+   const ocCx=Math.floor(g.world.roomCenterX/g.world.cellSize)+2;
+   const ocCy=Math.floor(g.world.roomCenterY/g.world.cellSize);
+   const ocIdx=ocCy*g.world.width+ocCx;
+   g.world.health[ocIdx]=500;
+   g.world.health[ocIdx+2]=500;
+   const e1=g.combat.overcharge.chargeCell(ocCx,ocCy,1,4,1);
+   const e2=g.combat.overcharge.chargeCell(ocCx,ocCy,1,4,1);
+   g.combat.updateBullets(0.25);
+   const e3=g.combat.overcharge.chargeCell(ocCx,ocCy,1,4,1);
+   const armedAndRefreshed=e3.stacks===3&&e3.quietLeft>0.4&&g.world.health[ocIdx]===500;
+   const dischargesBefore=g.combat.overcharge.totalDischarges;
+   g.combat.updateBullets(0.5);
+   const overchargeDischarged=armedAndRefreshed&&g.combat.overcharge.totalDischarges===dischargesBefore+1&&g.world.health[ocIdx]<500;
+   g.combat.clearAll();
+   return{pooledClean,manualChargedWithoutFiring,napalmIgnited:litCount===1&&patch.lit,overchargeDischarged};
   });
-  assert.deepEqual(regressionChecks,{pooledClean:true,manualChargedWithoutFiring:true,napalmIgnited:true});
+  assert.deepEqual(regressionChecks,{pooledClean:true,manualChargedWithoutFiring:true,napalmIgnited:true,overchargeDischarged:true});
   await page.evaluate(()=>window.__game.openMainMenu());
   await page.locator('.main-overlay [data-act="settings"]').click();
   await page.locator('.settings-panel:not(.hidden) .settings-tab[data-tab="visuals"]').click();
