@@ -40,6 +40,7 @@ export type PrimaryMutation =
   | "squelch"
   | "vacuum_pulse"
   | "overcharge_conductor"
+  | "circuit_runner"
   | "burrower"
   | "freeze_rockets"
   | "chromatic_prism"
@@ -76,6 +77,7 @@ export interface SoldierStats {
   railLanceUnlocked: boolean;
   napalmUnlocked: boolean;
   cryosprayUnlocked: boolean;
+  circuitUnlocked: boolean;
   // Shotgun stats
   shotgunUnlocked: boolean;
   shotgunFireRate: number;
@@ -222,7 +224,7 @@ export function baseSoldierStats(): SoldierStats {
     pistolBounces: 0,
     reverseUnlocked: false, orbitUnlocked: false, overchargeUnlocked: false, overchargeSpreadDeg: OVERCHARGE.initialSpreadDeg, galeUnlocked: false, galeDistance: GALE.distance,
     vacuumUnlocked: false, burrowerUnlocked: false, freezeRocketsUnlocked: false,
-    railLanceUnlocked: false, napalmUnlocked: false, cryosprayUnlocked: false,
+    railLanceUnlocked: false, napalmUnlocked: false, cryosprayUnlocked: false, circuitUnlocked: false,
     shotgunUnlocked: false,
     shotgunFireRate: SHOTGUN.fireRate,
     shotgunDamage: SHOTGUN.damage,
@@ -454,6 +456,7 @@ export function resolvePrimaryMutation(weapon: WeaponType, mutation: unknown, st
     if (mutation === "vacuum_pulse" && stats.vacuumUnlocked) return mutation;
   } else if (weapon === "assault_rifle") {
     if (mutation === "overcharge_conductor" && stats.overchargeUnlocked) return mutation;
+    if (mutation === "circuit_runner" && stats.circuitUnlocked) return mutation;
   } else if (weapon === "rocket_launcher") {
     if (mutation === "burrower" && stats.burrowerUnlocked) return mutation;
     if (mutation === "freeze_rockets" && stats.freezeRocketsUnlocked) return mutation;
@@ -489,6 +492,8 @@ export function mutationCompatibility(mutation: PrimaryMutation | null): Mutatio
       return { active: ["Fire Rate (0.5×)", "Damage", "Pellets (base min)", "Spread", "Bullet Speed", "Range"], inactive: ["Shotgun Rebound"] };
     case "overcharge_conductor":
       return { active: ["Fire Rate", "FMJ Caliber (Discharge DMG)", "AP Rounds (Terrain Pierce)", "Stabilizer (Velocity)", "Conductor Accuracy"], inactive: ["Direct Contact DMG", "Recoil Stabilizer Spread"] };
+    case "circuit_runner":
+      return { active: ["Fire Rate", "FMJ Caliber (Laser DMG)", "AP Rounds (+Pierce)", "Recoil Stabilizer (Accuracy & Velocity)"], inactive: ["Overcharge Charge/Spread"] };
     case "burrower":
       return { active: ["Fire Rate", "Damage", "Rocket Speed", "Blast Radius", "Cluster (+Group Charges)"], inactive: [] };
     case "freeze_rockets":

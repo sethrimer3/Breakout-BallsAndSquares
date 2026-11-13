@@ -1130,3 +1130,21 @@ export const OVERCHARGE = {
   arcDurationPerStack: 0.025,
   maxArcDuration: 0.55,
 } as const;
+
+/** Circuit Runner Assault Rifle branch 2 tuning. */
+export const CIRCUIT = {
+  /** Total cumulative path length (world units) across all turns and centering moves. */
+  baseRange: 176,
+  /** High base penetration budget (added to ordinary AR pierce + soldier mods). */
+  pierce: 24,
+  /** Laser head travel speed (world units / sec). */
+  headSpeed: 640,
+  /** Bounded retained right-angled trail segment pool. */
+  maxSegments: 256,
+  /** Trail afterglow lifetime (seconds) as range expires or head finishes. */
+  trailLife: 0.45,
+  /** Per-frame safety cap on terrain contacts for a single laser shot. */
+  maxStepContacts: 16,
+  /** Cooling color progression along cumulative range consumed: bright orange -> light blue -> blue -> purple. */
+  colors: ["#ff8a2b", "#7ce8ff", "#3b82f6", "#a855f7"] as const,
+} as const;

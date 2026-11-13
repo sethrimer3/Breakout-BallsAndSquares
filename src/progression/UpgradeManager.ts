@@ -176,7 +176,7 @@ export class UpgradeManager {
       "drone_unlock", "drone_capacity", "drone_cycle", "drone_damage", "drone_speed", "drone_aim", "drone_health", "drone_recall",
       "goo_unlock", "goo_mass", "goo_distance", "goo_dwell", "goo_damage", "goo_radius", "goo_rate", "goo_residue",
       "vacuum_unlock",
-      "overcharge_unlock", "overcharge_accuracy",
+      "overcharge_unlock", "overcharge_accuracy", "circuit_unlock",
       "burrower_unlock", "freeze_rockets_unlock",
       "prism_unlock", "prism_spectrum", "prism_bounces", "prism_gain", "prism_shear", "prism_distance", "prism_overload",
       "rail_lance_unlock",

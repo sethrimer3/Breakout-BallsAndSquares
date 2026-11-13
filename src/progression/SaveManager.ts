@@ -69,6 +69,7 @@ const VALID_MUTATIONS: readonly PrimaryMutation[] = [
   "squelch",
   "vacuum_pulse",
   "overcharge_conductor",
+  "circuit_runner",
   "burrower",
   "freeze_rockets",
   "chromatic_prism",
@@ -368,6 +369,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     else if (ld.mutation === "squelch" && (ld.weapon !== "shotgun" || def.upgrades.goo_unlock === 0)) ld.mutation = null;
     else if (ld.mutation === "vacuum_pulse" && (ld.weapon !== "shotgun" || def.upgrades.vacuum_unlock === 0)) ld.mutation = null;
     else if (ld.mutation === "overcharge_conductor" && (ld.weapon !== "assault_rifle" || def.upgrades.overcharge_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "circuit_runner" && (ld.weapon !== "assault_rifle" || def.upgrades.circuit_unlock === 0)) ld.mutation = null;
     else if (ld.mutation === "burrower" && (ld.weapon !== "rocket_launcher" || def.upgrades.burrower_unlock === 0)) ld.mutation = null;
     else if (ld.mutation === "freeze_rockets" && (ld.weapon !== "rocket_launcher" || def.upgrades.freeze_rockets_unlock === 0)) ld.mutation = null;
     else if (ld.mutation === "chromatic_prism" && (ld.weapon !== "sniper_rifle" || def.upgrades.prism_unlock === 0)) ld.mutation = null;

@@ -1,5 +1,6 @@
 import { NAPALM, ORBIT, OVERCHARGE, PRISM, RAIL } from "../config";
 import type { Game } from "../Game";
+import { circuitColorAt } from "../systems/CircuitRunnerSystem";
 
 /** Bounded Canvas-only effects; never alter weapon simulation. */
 export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, reduced: boolean): void {
@@ -306,6 +307,68 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     ctx.lineTo(kx, ky);
     ctx.lineTo(x2, y2);
     ctx.stroke();
+  }
+
+  // Circuit Runner: crisp right-angled Tron-like traces cooling orange -> light blue -> blue -> purple.
+  ctx.lineCap = "square";
+  ctx.lineJoin = "miter";
+  for (const seg of game.combat.circuit.segments) {
+    if (!seg.active) continue;
+    const x1 = cam.worldToScreenX(seg.x1);
+    const y1 = cam.worldToScreenY(seg.y1);
+    const x2 = cam.worldToScreenX(seg.x2);
+    const y2 = cam.worldToScreenY(seg.y2);
+    const pad = 48;
+    if (
+      Math.max(x1, x2) < -pad ||
+      Math.min(x1, x2) > cam.viewW + pad ||
+      Math.max(y1, y2) < -pad ||
+      Math.min(y1, y2) > cam.viewH + pad
+    ) {
+      continue;
+    }
+    const fade = Math.max(0, seg.life / Math.max(1e-4, seg.maxLife));
+    const midProg = (seg.progress0 + seg.progress1) * 0.5;
+    const rangeAlpha = seg.progress1 > 0.8 ? Math.max(0.15, 1 - (seg.progress1 - 0.8) * 4.25) : 1;
+    const alpha = (reduced ? 0.85 : 0.92) * fade * rangeAlpha;
+    if (alpha <= 0.01) continue;
+
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = circuitColorAt(midProg);
+    ctx.lineWidth = Math.max(1.5, cam.zoom * 1.9);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    ctx.globalAlpha = alpha * 0.72;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = Math.max(0.7, cam.zoom * 0.65);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    if (!reduced && seg.progress1 < 0.98) {
+      const nodeSz = Math.max(1.5, cam.zoom * 1.2);
+      ctx.globalAlpha = alpha * 0.85;
+      ctx.fillStyle = circuitColorAt(seg.progress1);
+      ctx.fillRect(x2 - nodeSz * 0.5, y2 - nodeSz * 0.5, nodeSz, nodeSz);
+    }
+  }
+
+  for (const b of game.combat.bullets.items) {
+    if (!b.active || !b.circuit) continue;
+    const x = cam.worldToScreenX(b.x);
+    const y = cam.worldToScreenY(b.y);
+    if (x < -24 || y < -24 || x > cam.viewW + 24 || y > cam.viewH + 24) continue;
+    const prog = Math.max(0, Math.min(1, b.circuitTraveled / Math.max(1e-4, b.circuitMaxRange)));
+    const headSz = Math.max(2.4, cam.zoom * 2.1);
+    ctx.globalAlpha = 0.95;
+    ctx.fillStyle = circuitColorAt(prog);
+    ctx.fillRect(x - headSz * 0.5, y - headSz * 0.5, headSz, headSz);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(x - headSz * 0.22, y - headSz * 0.22, headSz * 0.44, headSz * 0.44);
   }
 
   ctx.restore();

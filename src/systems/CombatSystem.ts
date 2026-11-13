@@ -1,5 +1,5 @@
 import {
-  DRONE, GOO, GALE, REVERSE, VACUUM, BURROWER, RAIL, NAPALM, CRYO,
+  DRONE, GOO, GALE, REVERSE, VACUUM, BURROWER, RAIL, NAPALM, CRYO, CIRCUIT,
   ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET,
 } from "../config";
 import { ReverseRevolver, type ReverseShot } from "./ReverseRevolver";
@@ -10,6 +10,7 @@ import { BurrowerSystem } from "./BurrowerSystem";
 import { RailLanceSystem } from "./RailLanceSystem";
 import { NapalmSystem } from "./NapalmSystem";
 import { OverchargeSystem } from "./OverchargeSystem";
+import { CircuitRunnerSystem, chooseOutgoingCardinal } from "./CircuitRunnerSystem";
 import { slashMomentum } from "./Momentum";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
@@ -97,6 +98,7 @@ export class CombatSystem {
   readonly rail: RailLanceSystem;
   readonly napalm: NapalmSystem;
   readonly overcharge: OverchargeSystem;
+  readonly circuit: CircuitRunnerSystem;
   stats: SoldierStats;
   /** Creatures bullets can hit before the terrain (the Blight's flowers, worms, specimens). */
   targets: BulletTargets | null = null;
@@ -121,6 +123,7 @@ export class CombatSystem {
     this.rail = new RailLanceSystem(world);
     this.napalm = new NapalmSystem(world);
     this.overcharge = new OverchargeSystem(world);
+    this.circuit = new CircuitRunnerSystem();
 
     world.addDestroyListener((cx, cy, isSub, sx, sy) => {
       if (isSub) {
@@ -203,6 +206,7 @@ export class CombatSystem {
     this.rail.clear();
     this.napalm.clear();
     this.overcharge.clear();
+    this.circuit.clear();
   }
 
   /** Effective fire rate for a soldier, accounting for active Black Market mutation. */
@@ -392,6 +396,7 @@ export class CombatSystem {
       }
     } else if (s.weapon === "assault_rifle") {
       const isOvercharge = s.mutation === "overcharge_conductor";
+      const isCircuit = s.mutation === "circuit_runner";
       const halfSpreadRad = (isOvercharge ? this.stats.overchargeSpreadDeg : this.stats.arSpreadDeg) * DEG;
       const a = this.rng.range(-halfSpreadRad, halfSpreadRad);
       const c = Math.cos(a);
@@ -401,12 +406,12 @@ export class CombatSystem {
         s.y,
         dx * c - dy * sn,
         dx * sn + dy * c,
-        this.stats.arBulletSpeed,
+        isCircuit ? Math.max(CIRCUIT.headSpeed, this.stats.arBulletSpeed) : this.stats.arBulletSpeed,
         isOvercharge ? 0 : this.stats.arDamage,
-        ASSAULT_RIFLE.lifetime,
+        isCircuit ? Math.max(ASSAULT_RIFLE.lifetime, CIRCUIT.baseRange / Math.max(1, CIRCUIT.headSpeed) + 0.5) : ASSAULT_RIFLE.lifetime,
         s.radius + BULLET.muzzleGap,
         s.id,
-        this.stats.arPierce,
+        isCircuit ? CIRCUIT.pierce + this.stats.arPierce : this.stats.arPierce,
         0,
         0,
         0,
@@ -417,6 +422,13 @@ export class CombatSystem {
         b.terrainDamageBonus = 0;
         b.overchargePower = Math.max(1, this.stats.arDamage + this.stats.globalDamageBonus + (s.mods?.damageBonus ?? 0));
         b.overchargeTerrainBonus = s.mods?.terrainDamageBonus ?? 0;
+      } else if (b && isCircuit) {
+        b.circuit = true;
+        b.circuitMaxRange = CIRCUIT.baseRange;
+        b.circuitTraveled = 0;
+        b.distanceLeft = CIRCUIT.baseRange;
+        b.circuitPrevX = b.x;
+        b.circuitPrevY = b.y;
       }
     } else if (s.weapon === "rocket_launcher") {
       const isBurrower = s.mutation === "burrower";
@@ -856,6 +868,7 @@ export class CombatSystem {
     this.freeze.update(dt);
     this.rail.update(dt);
     this.napalm.update(dt, this.creatures, this.late);
+    this.circuit.update(dt);
     this.overcharge.update(dt, {
       creatures: this.creatures,
       late: this.late,
@@ -970,15 +983,47 @@ export class CombatSystem {
     let curY = b.y;
     let guard = 0;
 
-    while (remDist > 1e-4 && guard++ < 8) {
+    const maxContacts = b.circuit ? CIRCUIT.maxStepContacts : 8;
+    while (remDist > 1e-4 && guard++ < maxContacts) {
       // Fine-grid traversal: sees normal cells and 50% pink sub-pixels alike.
       const terrainHit = gridRaycast(w.subSolidQuery, ss, curX, curY, b.dx, b.dy, remDist, hit);
       // Creatures in front of the terrain hit take the shot instead.
       if (this.targets) {
-        const ct = this.targets.raycast(curX, curY, b.dx, b.dy, terrainHit ? hit.t : remDist);
+        const ct = this.targets.raycast(
+          curX,
+          curY,
+          b.dx,
+          b.dy,
+          terrainHit ? hit.t : remDist,
+          b.circuit ? b.circuitHitTargets : undefined,
+        );
         if (ct >= 0) {
           const ix = curX + b.dx * ct;
           const iy = curY + b.dy * ct;
+          if (b.circuit) {
+            this.recordCircuitSegment(b, curX, curY, ix, iy, ct);
+            const k = this.targets.targetKey ?? this.targets;
+            b.circuitHitTargets.add(k);
+            this.targets.applyHit(b.damage, ix, iy);
+            this.napalm.igniteAt(ix, iy, 4, b.ownerId);
+            this.events.onCreatureHit?.(ix, iy, -b.dx, -b.dy);
+            remDist -= ct;
+            b.distanceLeft = Math.max(0, b.distanceLeft - ct);
+            b.traveled += ct;
+            b.totalTraveled += ct;
+            curX = ix;
+            curY = iy;
+            b.circuitPrevX = curX;
+            b.circuitPrevY = curY;
+            if (b.pierceLeft <= 0 || b.distanceLeft <= 1e-6) {
+              b.x = curX;
+              b.y = curY;
+              this.finishBullet(b);
+              return;
+            }
+            b.pierceLeft--;
+            continue;
+          }
           if(!this.recordSegment(b,curX,curY,ix,iy))return;
           if (b.napalmSpray) {
             const k = this.targets.targetKey ?? null;
@@ -1105,6 +1150,161 @@ export class CombatSystem {
           remDist -= stepPast;
           curX += b.dx * stepPast;
           curY += b.dy * stepPast;
+          continue;
+        }
+
+        // Circuit Runner laser shot: centers on impacted block and turns 90° (non-reversing cardinal).
+        if (b.circuit) {
+          if (!w.inBounds(hcx, hcy)) {
+            this.recordCircuitSegment(b, curX, curY, hit.x, hit.y, hit.t);
+            b.distanceLeft = Math.max(0, b.distanceLeft - hit.t);
+            b.x = hit.x;
+            b.y = hit.y;
+            this.finishBullet(b);
+            return;
+          }
+          this.recordCircuitSegment(b, curX, curY, hit.x, hit.y, hit.t);
+          remDist -= hit.t;
+          b.distanceLeft = Math.max(0, b.distanceLeft - hit.t);
+          b.traveled += hit.t;
+          b.totalTraveled += hit.t;
+          curX = hit.x;
+          curY = hit.y;
+          b.circuitPrevX = curX;
+          b.circuitPrevY = curY;
+          if (b.distanceLeft <= 1e-6) {
+            b.x = curX;
+            b.y = curY;
+            this.finishBullet(b);
+            return;
+          }
+
+          const ci = hcy * w.width + hcx;
+          const isSubC = w.health[ci] === 0;
+          const targetKey = isSubC ? (w.width * w.height + hit.cy * w.subWidth + hit.cx) : ci;
+          if (b.circuitHitKeys.has(targetKey)) {
+            const S = isSubC ? ss : cs;
+            const gx = isSubC ? hit.cx : hcx;
+            const gy = isSubC ? hit.cy : hcy;
+            let distToExit = S * 1.5;
+            if (Math.abs(b.dx) > 1e-8) {
+              const exitX = (b.dx > 0 ? gx + 1 : gx) * S;
+              const tx = (exitX - curX) / b.dx;
+              if (tx >= -1e-6) distToExit = Math.min(distToExit, Math.max(1e-3, tx + 1e-3));
+            }
+            if (Math.abs(b.dy) > 1e-8) {
+              const exitY = (b.dy > 0 ? gy + 1 : gy) * S;
+              const ty = (exitY - curY) / b.dy;
+              if (ty >= -1e-6) distToExit = Math.min(distToExit, Math.max(1e-3, ty + 1e-3));
+            }
+            const stepOut = Math.min(remDist, b.distanceLeft, Math.max(1e-3, distToExit));
+            const ox = curX + b.dx * stepOut;
+            const oy = curY + b.dy * stepOut;
+            this.recordCircuitSegment(b, curX, curY, ox, oy, stepOut);
+            remDist -= stepOut;
+            b.distanceLeft = Math.max(0, b.distanceLeft - stepOut);
+            b.traveled += stepOut;
+            b.totalTraveled += stepOut;
+            curX = ox;
+            curY = oy;
+            b.circuitPrevX = curX;
+            b.circuitPrevY = curY;
+            if (b.distanceLeft <= 1e-6) {
+              b.x = curX;
+              b.y = curY;
+              this.finishBullet(b);
+              return;
+            }
+            if (remDist <= 1e-4) break;
+            continue;
+          }
+
+          const inDx = b.dx;
+          const inDy = b.dy;
+          b.circuitHitKeys.add(targetKey);
+          const isCoreC = w.coreId[ci] > 0;
+          const isBlightC = isSubC ? w.isBlightSubAt(hit.cx, hit.cy) : w.isBlightAt(hcx, hcy);
+          let hitDmgC = b.damage + b.terrainDamageBonus + (isCoreC ? this.stats.coreDamageBonus : 0);
+          if (isBlightC && b.blightMultiplier > 1) hitDmgC = Math.round(hitDmgC * b.blightMultiplier);
+          this.currentOwnerId = b.ownerId;
+          const resC = w.damageSub(hit.cx, hit.cy, hitDmgC, true);
+          this.currentOwnerId = 0;
+          if (resC > 0) this.napalm.igniteAt(hit.x, hit.y, 4, b.ownerId);
+          this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, resC, isSubC, b.ownerId);
+
+          if (w.mat[ci] === MAT.door) {
+            const door = w.doors[w.doorId[ci] - 1];
+            if (door && !door.open) {
+              b.x = curX;
+              b.y = curY;
+              this.finishBullet(b);
+              return;
+            }
+          }
+          if (b.pierceLeft <= 0) {
+            b.x = curX;
+            b.y = curY;
+            this.finishBullet(b);
+            return;
+          }
+          b.pierceLeft--;
+
+          const centerX = isSubC ? (hit.cx + 0.5) * ss : (hcx + 0.5) * cs;
+          const centerY = isSubC ? (hit.cy + 0.5) * ss : (hcy + 0.5) * cs;
+          const cDx = centerX - curX;
+          const cDy = centerY - curY;
+          const centerDist = Math.hypot(cDx, cDy);
+          if (centerDist > 1e-6) {
+            const availCenter = Math.min(centerDist, remDist, b.distanceLeft);
+            const nxCenter = curX + (cDx / centerDist) * availCenter;
+            const nyCenter = curY + (cDy / centerDist) * availCenter;
+            this.recordCircuitSegment(b, curX, curY, nxCenter, nyCenter, availCenter);
+            remDist -= availCenter;
+            b.distanceLeft = Math.max(0, b.distanceLeft - availCenter);
+            b.traveled += availCenter;
+            b.totalTraveled += availCenter;
+            curX = nxCenter;
+            curY = nyCenter;
+            b.circuitPrevX = curX;
+            b.circuitPrevY = curY;
+            if (b.distanceLeft <= 1e-6) {
+              b.x = curX;
+              b.y = curY;
+              this.finishBullet(b);
+              return;
+            }
+            if (availCenter + 1e-6 < centerDist) {
+              b.dx = cDx / centerDist;
+              b.dy = cDy / centerDist;
+              break;
+            }
+          }
+
+          const [outDx, outDy] = chooseOutgoingCardinal(inDx, inDy, this.rng);
+          b.dx = outDx;
+          b.dy = outDy;
+
+          const halfExit = (isSubC ? ss : cs) * 0.5 + 1e-3;
+          const exitStep = Math.min(remDist, b.distanceLeft, halfExit);
+          if (exitStep > 1e-6) {
+            const ex = curX + b.dx * exitStep;
+            const ey = curY + b.dy * exitStep;
+            this.recordCircuitSegment(b, curX, curY, ex, ey, exitStep);
+            remDist -= exitStep;
+            b.distanceLeft = Math.max(0, b.distanceLeft - exitStep);
+            b.traveled += exitStep;
+            b.totalTraveled += exitStep;
+            curX = ex;
+            curY = ey;
+            b.circuitPrevX = curX;
+            b.circuitPrevY = curY;
+            if (b.distanceLeft <= 1e-6) {
+              b.x = curX;
+              b.y = curY;
+              this.finishBullet(b);
+              return;
+            }
+          }
           continue;
         }
 
@@ -1275,6 +1475,11 @@ export class CombatSystem {
       }
 
       // No hit along the remaining segment.
+      if (b.circuit) {
+        this.recordCircuitSegment(b, curX, curY, hit.x, hit.y, remDist);
+        b.circuitPrevX = hit.x;
+        b.circuitPrevY = hit.y;
+      }
       if(!this.recordSegment(b,curX,curY,hit.x,hit.y))return;
       b.distanceLeft=Math.max(0,b.distanceLeft-remDist);
       curX = hit.x;
@@ -1287,6 +1492,14 @@ export class CombatSystem {
     b.x = curX;
     b.y = curY;
     if(b.distanceLeft<=1e-6)this.finishBullet(b);
+  }
+
+  private recordCircuitSegment(b: Bullet, x1: number, y1: number, x2: number, y2: number, segDist: number): void {
+    const maxR = Math.max(1e-4, b.circuitMaxRange);
+    const p0 = b.circuitTraveled / maxR;
+    b.circuitTraveled += segDist;
+    const p1 = b.circuitTraveled / maxR;
+    this.circuit.addSegment(x1, y1, x2, y2, p0, p1);
   }
 
   private finishBullet(b: Bullet): void {

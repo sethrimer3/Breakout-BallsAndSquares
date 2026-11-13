@@ -1,4 +1,4 @@
-import { TERRAIN } from "../config";
+import { CIRCUIT, TERRAIN } from "../config";
 import { mutationCompatibility, resolvePrimaryMutation, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
 import type { SoldierBehavior } from "../progression/SaveManager";
@@ -1171,6 +1171,7 @@ export class UpgradeTree {
         ] : curW === "assault_rifle" ? [
           {id:null,label:"STANDARD",unlocked:true},
           {id:"overcharge_conductor",label:"OVERCHARGE CONDUCTOR",unlocked:st.overchargeUnlocked},
+          {id:"circuit_runner",label:"CIRCUIT RUNNER",unlocked:st.circuitUnlocked},
         ] : curW === "rocket_launcher" ? [
           {id:null,label:"STANDARD",unlocked:true},
           {id:"burrower",label:"BURROWER",unlocked:st.burrowerUnlocked},
@@ -1214,6 +1215,7 @@ export class UpgradeTree {
       else if(curM==="squelch")wSummary=`Stick → mine → rebound · ${st.gooMass.toFixed(2)} mass · ${st.gooDistance} range`;
       else if(curM==="vacuum_pulse")wSummary=`0.5× cadence (${(st.shotgunFireRate*0.5).toFixed(2)}/s) · sucks debris → +pellets & DMG`;
       else if(curM==="overcharge_conductor")wSummary=`Charging rounds (0 hit DMG) · 3+ hits arm delayed chain + blast · ±${st.overchargeSpreadDeg<=0.2?st.overchargeSpreadDeg.toFixed(1):st.overchargeSpreadDeg.toFixed(2)}°`;
+      else if(curM==="circuit_runner")wSummary=`Laser turns 90° at blocks · ${st.arDamage} DMG · ${CIRCUIT.pierce+st.arPierce} Pierce · ${CIRCUIT.baseRange} range`;
       else if(curM==="burrower")wSummary=`Drills terrain → grouped mines detonate together · ${st.rocketDamage} DMG`;
       else if(curM==="freeze_rockets")wSummary=`Cold-only burst · 50% slow / 2× DMG / 0.5× Blight · shatter`;
       else if(curM==="chromatic_prism")wSummary=`Prism laser · BAND ${st.prismSpectrum+1}/7 · ${st.prismBounces} bounces · ${st.prismDamage} DMG`;

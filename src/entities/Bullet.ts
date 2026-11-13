@@ -72,6 +72,19 @@ export class Bullet {
   overchargeTerrainBonus = 0;
   /** Distinct terrain cell/subcell keys already charged by this projectile (max 1 stack per target per round). */
   overchargeHitCells = new Set<number>();
+  /** Circuit Runner laser shot flag (centers on blocks and turns 90°). */
+  circuit = false;
+  /** Maximum cumulative travel range for this Circuit Runner shot. */
+  circuitMaxRange = 0;
+  /** Cumulative distance traveled by this Circuit Runner shot (including centering). */
+  circuitTraveled = 0;
+  /** Distinct terrain cell/subcell keys already struck by this Circuit Runner shot. */
+  circuitHitKeys = new Set<number>();
+  /** Distinct enemy/creature targets already struck by this Circuit Runner shot. */
+  circuitHitTargets = new Set<object>();
+  /** Previous head position for recording continuous right-angled trail segments. */
+  circuitPrevX = 0;
+  circuitPrevY = 0;
 }
 
 /** Reset all per-projectile fields on pooled Bullet reuse so no mutation state leaks. */
@@ -120,6 +133,13 @@ export function resetBulletFields(b: Bullet): void {
   b.overchargePower = 1;
   b.overchargeTerrainBonus = 0;
   b.overchargeHitCells.clear();
+  b.circuit = false;
+  b.circuitMaxRange = 0;
+  b.circuitTraveled = 0;
+  b.circuitHitKeys.clear();
+  b.circuitHitTargets.clear();
+  b.circuitPrevX = 0;
+  b.circuitPrevY = 0;
 }
 
 /** Fixed-size object pool for bullets. */

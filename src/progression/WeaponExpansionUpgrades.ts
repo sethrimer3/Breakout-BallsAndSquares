@@ -11,7 +11,7 @@ export function overchargeSpreadAt(level: number): number {
 export type ExpansionUpgradeId =
   | "reverse_unlock" | "orbit_unlock"
   | "vacuum_unlock"
-  | "overcharge_unlock" | "overcharge_accuracy"
+  | "overcharge_unlock" | "overcharge_accuracy" | "circuit_unlock"
   | "burrower_unlock" | "freeze_rockets_unlock"
   | "rail_lance_unlock"
   | "gale_unlock" | "gale_range"
@@ -51,6 +51,8 @@ export const EXPANSION_DEFS: readonly UpgradeDef[] = [
     (s,l)=>{s.overchargeUnlocked=l>0;},count,unlocked,"ar_unlock","essence"),
   node("overcharge_accuracy","assault_rifle","Conductor Stabilization","Reduces Overcharge wide spread (±10.5°) down to ±0.1° (0.2° cone)",1,-1,OVERCHARGE.accuracyMaxLevel,5,
     (s,l)=>{s.overchargeSpreadDeg=overchargeSpreadAt(l);},overchargeSpreadAt,n=>`±${n<=0.2?n.toFixed(1):n.toFixed(2)}°`,"overcharge_unlock","essence"),
+  node("circuit_unlock","assault_rifle","Circuit Runner","Unlock Assault Rifle mutation: high-pierce laser shots center on blocks and turn 90° with limited range",1,1,1,35,
+    (s,l)=>{s.circuitUnlocked=l>0;},count,unlocked,"ar_unlock","essence"),
   node("burrower_unlock","rocket_launcher","Burrower","Unlock Rocket mutation: drills through terrain, laying mines that detonate together",-1,-1,1,35,
     (s,l)=>{s.burrowerUnlocked=l>0;},count,unlocked,"rocket_unlock","essence"),
   node("freeze_rockets_unlock","rocket_launcher","Freeze Rockets","Unlock Rocket mutation: cold-only burst freezes terrain, Blight & enemies (no block damage)",1,-1,1,35,
