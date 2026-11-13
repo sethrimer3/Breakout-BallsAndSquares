@@ -290,11 +290,12 @@ export class LateEncounters implements BulletTargets {
       if (p.life <= 0) this.shots.splice(i, 1);
     }
   }
-  raycast(x: number, y: number, dx: number, dy: number, max: number): number {
+  get targetKey(): object | null { return this.selected; }
+  raycast(x: number, y: number, dx: number, dy: number, max: number, ignored?: ReadonlySet<object>): number {
     this.selected = null;
     let best = max;
     for (const a of this.actors) {
-      if (!a.alive) continue;
+      if (!a.alive || ignored?.has(a)) continue;
       const ox = a.x - x,
         oy = a.y - y,
         t = ox * dx + oy * dy,

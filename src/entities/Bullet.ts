@@ -1,5 +1,11 @@
+import type { ReverseShot } from "../systems/ReverseRevolver";
+
 export class Bullet {
   active = false;
+  replay: ReverseShot | null = null;
+  gale = false;
+  readonly galeCells = new Set<number>();
+  distanceLeft = Infinity;
   afterimage = false;
   fromDrone = false;
   bounces = 0;

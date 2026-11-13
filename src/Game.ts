@@ -9,7 +9,7 @@ import { SentrySystem } from "./entities/Sentry";
 import { CreatureSystem, type Creature } from "./entities/Creatures";
 import { LootKind, lootKindForZone, LootSystem } from "./entities/LootSystem";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
-import { Soldier, baseSoldierStats, type SecondaryWeaponType, type SoldierStats } from "./entities/Soldier";
+import { Soldier, resolvePrimaryMutation, baseSoldierStats, type SecondaryWeaponType, type SoldierStats } from "./entities/Soldier";
 import { MUZZLE_FLASH_MULTIPLIER, SaveManager, type SoldierBehavior } from "./progression/SaveManager";
 import { UpgradeManager } from "./progression/UpgradeManager";
 import { Renderer } from "./rendering/Renderer";
@@ -185,6 +185,7 @@ export class Game {
       onGrenadeThrow: (s, x, y, dx, dy) => this.onGrenadeThrow(s, x, y, dx, dy),
       onGrenadeStick: (x, y, nx, ny) => this.onGrenadeStick(x, y, nx, ny),
       onGrenadeBeep: (x, y, pct) => this.onGrenadeBeep(x, y, pct),
+      onRevolverReturn: (x,y) => this.audio.playRicochet(x,y),
       onDroneLaunch: (x,y) => this.audio.playDrone(x,y),
       onDroneShot: (x,y) => this.audio.playShot(x,y),
       onLaserBounce: (x,y) => this.audio.playRicochet(x,y),
@@ -481,6 +482,7 @@ export class Game {
     this.combat.goo.clear();
     this.combat.drones.clear();
     this.combat.laser.clear();
+    this.combat.revolver.clear();
     this.combat.turrets.clear();
     this.particles.clear();
     this.fire.clear();
@@ -672,6 +674,7 @@ export class Game {
       this.combat.goo.clear();
       this.combat.drones.clear();
       this.combat.laser.clear();
+      this.combat.revolver.clear();
       this.combat.turrets.clear();
       this.particles.clear();
       this.fire.clear();
@@ -977,6 +980,7 @@ export class Game {
     const mods = this.upgrades.soldierMods(slotIdx);
     const s = new Soldier(clampedX, clampedY, ndx, ndy, this.stats.speed * mods.speedMult, weapon, behavior, slotIdx, secondary);
     s.mods = mods;
+    s.mutation = resolvePrimaryMutation(weapon,this.save.data.loadouts[slotIdx]?.mutation,this.stats);
     s.maxHealth = this.stats.soldierHealth + mods.healthBonus;
     s.health = s.maxHealth;
     this.soldiers.push(s);

@@ -18,8 +18,8 @@ fs.mkdirSync(artifacts, { recursive: true });
   await page.goto(base,{waitUntil:"domcontentloaded"});await page.locator('[data-act="play"]').waitFor({state:'visible'});
   await page.evaluate(()=>{
    const g=window.__game;g.save.data.upgrades.unlock_primary=1;
-   g.save.data.bank=g.save.data.crystals=g.save.data.greenCrystals=1000000;g.save.data.lifetimePixels=10000;g.openUpgrades();
-   for(const id of ['goo_unlock','goo_radius','goo_residue','katana_unlock','katana_dash','drone_unlock','drone_capacity','prism_unlock','prism_spectrum','prism_overload'])g.upgradeTree.nodeEls.get(id).dataset.smoke=id;
+   g.save.data.essence=1000000;g.save.data.bank=g.save.data.crystals=g.save.data.greenCrystals=1000000;g.save.data.lifetimePixels=10000;g.openUpgrades();
+   for(const id of ['goo_unlock','goo_radius','goo_residue','katana_unlock','katana_dash','drone_unlock','drone_capacity','prism_unlock','prism_spectrum','prism_overload','reverse_unlock','gale_unlock'])g.upgradeTree.nodeEls.get(id).dataset.smoke=id;
   });
   await page.locator('.tree-cat-btn[data-cat="primary"]').click();
   async function buy(id) { const node=page.locator(`[data-smoke="${id}"]`);await node.hover();await node.click(); }
@@ -29,6 +29,23 @@ fs.mkdirSync(artifacts, { recursive: true });
   await page.locator('[data-tab="prism_laser"]').click();await buy('prism_unlock');
   for(let i=0;i<6;i++)await buy('prism_spectrum');await buy('prism_overload');
   assert.deepEqual(await page.evaluate(()=>['goo_residue','katana_dash','drone_capacity','prism_spectrum','prism_overload'].map(id=>window.__game.upgrades.levelOf(id))),[1,1,1,6,1]);
+  const mutations=[];
+  for(const [weapon,mutation,unlock] of [['pistol','reverse_revolver','reverse_unlock'],['katana','gale_edge','gale_unlock']]) {
+   await page.locator(`[data-tab="${weapon}"]`).click();await buy(unlock);
+   await page.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
+   await page.locator(`[data-slot="0"][data-weapon="${weapon}"]`).click();
+   await page.locator(`.lc-mbtn[data-slot="0"][data-mutation="${mutation}"]`).click();
+   assert.equal(await page.evaluate(()=>window.__game.save.data.loadouts[0].mutation),mutation);
+   await page.evaluate(()=>{const g=window.__game;g.startRun();g.growth.graceSeconds=1000;g.deploySoldier(g.world.roomCenterX,g.world.roomCenterY,1,0);});
+   await page.waitForFunction(m=>{const g=window.__game;const ready=m==='gale_edge'?g.combat.bullets.items.some(b=>b.active&&b.gale):g.combat.revolver.pool.items.some(s=>s.active&&s.phase!=='recording');if(ready)g.paused=true;return ready;},mutation);
+   assert.equal(await page.evaluate(()=>window.__game.soldiers[0].mutation),mutation);
+   mutations.push(mutation);await page.screenshot({path:path.join(artifacts,`${mutation}.png`)});
+   await page.evaluate(()=>{const g=window.__game;g.openUpgrades();g.upgradeTree.openLoadoutScreen();});
+   await page.locator('.lc-mbtn[data-slot="0"][data-mutation=""]').click();
+   assert.equal(await page.evaluate(()=>window.__game.save.data.loadouts[0].mutation),null);
+   await page.evaluate(()=>window.__game.openUpgrades());
+  }
+  assert.equal(mutations.length,2);
   const live=[];
   for(const weapon of ['goo_mortar','drone_shepherd','prism_laser','katana']) {
    await page.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
@@ -119,7 +136,7 @@ fs.mkdirSync(artifacts, { recursive: true });
    profiles.push(report);await profile.close();
   }
   assert.deepEqual(errors,[]);
-  const report={live,profiles,pageErrors:errors};fs.writeFileSync(path.join(artifacts,'report.json'),JSON.stringify(report,null,2));
+  const report={mutations,live,profiles,pageErrors:errors};fs.writeFileSync(path.join(artifacts,'report.json'),JSON.stringify(report,null,2));
   console.log(JSON.stringify({status:'passed',artifacts,profiles}));await context.close();
  }finally{await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

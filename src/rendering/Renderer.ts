@@ -874,7 +874,7 @@ export class Renderer {
     const lifePct = b.maxLife > 0 ? Math.max(0, b.life / b.maxLife) : 1;
     const alpha = Math.min(1, lifePct * 1.5);
     const w = (b.slashWidth || 16) * cam.zoom;
-    const bulge = w * 0.42;
+    const bulge = w * (b.gale ? 0.65 : 0.42);
     const dir = Math.atan2(b.dy, b.dx);
     const tilt = b.slashAngle;
 
@@ -900,7 +900,7 @@ export class Renderer {
     ctx.quadraticCurveTo(bulge * 1.15, 0, tipX, tipY);
     ctx.quadraticCurveTo(bulge * 0.28, 0, tipX, -tipY);
     ctx.closePath();
-    ctx.fillStyle = `rgba(168, 245, 255, ${0.85 * alpha})`;
+    ctx.fillStyle = b.gale ? `rgba(170, 255, 215, ${0.85 * alpha})` : `rgba(168, 245, 255, ${0.85 * alpha})`;
     ctx.fill();
 
     // 3. Razor-sharp white leading cutting edge
@@ -911,6 +911,10 @@ export class Renderer {
     ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.stroke();
 
+    if(b.gale && !this.motion.matches){
+      ctx.strokeStyle=`rgba(150,255,220,${0.35*alpha})`;ctx.lineWidth=Math.max(1,cam.zoom);
+      for(const offset of [6,12]){ctx.beginPath();ctx.moveTo(tipX-offset*cam.zoom,-tipY*0.8);ctx.quadraticCurveTo(bulge-offset*cam.zoom,0,tipX-offset*cam.zoom,tipY*0.8);ctx.stroke();}
+    }
     // 4. Subtle trailing motion streaks (air cut effect)
     const trailOffset = Math.min(8 * cam.zoom, b.traveled * cam.zoom * 0.5);
     if (trailOffset > 1) {

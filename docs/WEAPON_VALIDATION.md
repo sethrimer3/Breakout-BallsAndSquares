@@ -65,3 +65,18 @@ Automated acceptance is complete; these require observation by players or additi
 - Watch Drone Shepherd's scattered excavation, late-game mine density, and katana high-speed readability before changing damage or costs.
 
 AR Mirror Rounds remains optional. Newer main-branch design revisions promote respec, several former future concepts, and additional mutations into requested scope; these are not covered by this original implementation report.
+
+## Revised Black Market audit and missing mechanic repairs
+
+The accepted roster and exact new requirements are recorded in [BLACK_MARKET_IMPLEMENTATION_PLAN.md](BLACK_MARKET_IMPLEMENTATION_PLAN.md). The new Orbit/Vacuum/Burrower/Freeze/Rail/Napalm/Cryospray mechanics remain planned. Drone Shepherd's move to Pistol branch 3 and the full canonical Black Market migration remain planned as well.
+
+The audit confirmed working Chromatic Prism, Momentum Katana and SQUELCH systems. It found Gale Edge and Reverse-Playback Revolver absent and added their combat mechanics, Essence unlocks, compatible per-slot persistence and next-deployment selectors. Gale disables Momentum dash/scaling, sweeps side terrain, has an explicit 300–660-unit range independent of speed, and stops at unopened world gates. Playback records bounded outgoing polylines, preserves bankshots, pauses for 0.18 seconds, then damages terrain and distinct targets once on the return pass. Its return does not steer when terrain changes.
+
+Validation:
+
+- Full Vitest regression suite: **410 tests in 51 files pass**, including nine focused mutation cases: exact reverse corners, pause, record bounds/reset, real wall reflection and second damage, target identity deduplication, Gale range/Momentum exclusion, width sweep deduplication, compatible unlock resolution, save sanitation and authoritative gates.
+- Production TypeScript/Vite build passes; the existing bundle-size advisory remains.
+- Chromium smoke purchases both Essence unlocks through actual tree nodes, selects both loadout modes, observes live Gale crescents and paused/returning Playback actors, and switches back to ordinary modes. Existing SQUELCH/Drone/Prism/Momentum smoke checks still pass. No page errors.
+- Existing 600-frame desktop and 4× CPU-throttled mobile profiles plus 1,800 additional memory-stress frames pass. Simulation p95: 0.2 / 1.1 ms; rendering p95: 0.5 / 0.9 ms; retained heap growth: 394,124 / 230,840 bytes. These stress profiles cover the original mixed weapon workload; the two new modes have separate live smoke and focused correctness coverage, not a claim of completed mobile balance testing.
+
+Screenshots/report are generated under `/tmp/breach-weapon-validation`. Full lab refunds/respec, legacy variant migration, broader specialist tiers and player balance testing are not marked complete by these checks.

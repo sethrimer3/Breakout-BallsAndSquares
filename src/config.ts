@@ -969,3 +969,6 @@ export const SOLDIER_AMBIENT_STOPS = [
   [0.75, 95, 175, 210, 0.3],
   [1, 70, 130, 190, 0],
 ] as const;
+
+export const REVERSE = { poolSize: 64, maxPoints: 64, maxHits: 64, pause: 0.18, safetyLife: 8 } as const;
+export const GALE = { distance: 300, maxDistance: 660, speed: 420, width: 24, pierce: 2, poolCap: 32 } as const;

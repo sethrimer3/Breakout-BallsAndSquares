@@ -135,6 +135,10 @@ The Primary Arsenal now includes **SQUELCH** (stick → leave a timed mine → r
 
 Weapon unlocks and upgrades live on their respective Primary Weapons tabs. Piercing soldier upgrades disable ordinary Pistol/Shotgun ricochets for that shot. Drone rounds do not inherit Pistol Bankshot. Prism spends charged penetration before reflecting; world boundaries absorb it. Visual Settings includes **Prism Patterns** as a non-color power cue. All new loadouts and upgrade levels are compatible with older save slots.
 
+Pistol also offers **Reverse-Playback Revolver**, which pauses then rewinds its exact shot path, including bankshots. Katana offers **Gale Edge**, a long-range crescent alternative that disables Momentum dash/scaling; **Extended Horizon** increases its travel range. Unlock these with Essence in their Primary tabs and select them in the next-deployment loadout.
+
+The [revised Black Market plan](docs/BLACK_MARKET_IMPLEMENTATION_PLAN.md) records the accepted next branches, shared freeze/fuel/debris systems, Drone Shepherd as Pistol branch 3, and undecided Assault Rifle slots. Those additions and the remaining canonical branch migration are planned.
+
 See [the implementation plan](docs/WEAPON_EXPANSION_PLAN.md) and [validation / playtest notes](docs/WEAPON_VALIDATION.md). Run `npm run test:weapons` for focused coverage and `npm run test:weapon-browser` against a running Vite server for browser validation.
 
 ## Later worlds

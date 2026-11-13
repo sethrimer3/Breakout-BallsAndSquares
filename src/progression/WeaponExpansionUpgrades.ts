@@ -1,8 +1,9 @@
-import { DRONE, GOO, PRISM } from "../config";
+import { DRONE, GOO, PRISM, GALE } from "../config";
 import type { SoldierStats } from "../entities/Soldier";
 import type { UpgradeBranch, UpgradeDef, UpgradeId, Currency } from "./UpgradeDefinitions";
 
 export type ExpansionUpgradeId =
+  | "reverse_unlock" | "gale_unlock" | "gale_range"
   | "goo_dwell" | "goo_damage" | "goo_radius" | "goo_rate" | "goo_residue"
   | "katana_dash" | "katana_impulse" | "katana_glide" | "katana_kinetic" | "katana_wide" | "katana_recovery" | "katana_perfect"
   | "drone_unlock" | "drone_capacity" | "drone_cycle" | "drone_damage" | "drone_speed" | "drone_aim" | "drone_health" | "drone_recall"
@@ -25,6 +26,13 @@ const seconds = (n: number) => `${n.toFixed(2)}s`;
 const fixed = (n: number) => `${n.toFixed(2)}×`;
 
 export const EXPANSION_DEFS: readonly UpgradeDef[] = [
+  node("reverse_unlock","pistol","Reverse-Playback Revolver","Unlock a selectable Pistol mutation: shots pause, then rewind their exact route",1,1,1,20,
+    (s,l)=>{s.reverseUnlocked=l>0;},count,unlocked,null,"essence"),
+  node("gale_unlock","katana","Windborn Blade","Unlock Gale Edge: long-range flying crescents instead of Momentum dash-and-cleave",1,-1,1,30,
+    (s,l)=>{s.galeUnlocked=l>0;},count,unlocked,"katana_unlock","essence"),
+  node("gale_range","katana","Extended Horizon","+60 units Gale Edge range per level (maximum 660)",-1,-1,6,10,
+    (s,l)=>{s.galeDistance=Math.min(GALE.maxDistance,GALE.distance+l*60);},l=>Math.min(GALE.maxDistance,GALE.distance+l*60),n=>`${n} RANGE`,"gale_unlock","essence"),
+
   node("goo_dwell", "goo_mortar", "Elastic Recall", "-0.02s contact dwell per level (minimum 0.08s)", 0,-1,5,70,
     (s,l)=>{s.gooDwell=Math.max(0.08,GOO.dwell-l*0.02);}, l=>Math.max(0.08,GOO.dwell-l*0.02),seconds,"goo_unlock"),
   node("goo_damage", "goo_mortar", "Volatile Droplets", "+1 mine center damage per level", 0,1,6,85,

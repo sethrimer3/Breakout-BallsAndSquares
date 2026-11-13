@@ -1,5 +1,5 @@
 import { TERRAIN } from "../config";
-import type { SecondaryWeaponType, WeaponType } from "../entities/Soldier";
+import { resolvePrimaryMutation, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
 import type { SoldierBehavior } from "../progression/SaveManager";
 import {
@@ -1172,6 +1172,11 @@ export class UpgradeTree {
       const curW: WeaponType = this.game.isWeaponUnlocked(ld.weapon) ? ld.weapon : "pistol";
       const curS: SecondaryWeaponType | null =
         ld.secondary && this.game.isSecondaryUnlocked(ld.secondary) ? ld.secondary : null;
+      const curM=resolvePrimaryMutation(curW,ld.mutation,st);
+      const mutationOptions: {id: PrimaryMutation | null; label: string; unlocked: boolean}[] = curW === "pistol"
+        ? [{id:null,label:"STANDARD",unlocked:true},{id:"reverse_revolver",label:"REVERSE-PLAYBACK",unlocked:st.reverseUnlocked}]
+        : curW === "katana" ? [{id:null,label:st.katanaDash?"MOMENTUM":"STANDARD",unlocked:true},{id:"gale_edge",label:"GALE EDGE",unlocked:st.galeUnlocked}] : [];
+      const mutationHtml=mutationOptions.length?`<div class="lc-section-lbl">BLACK MARKET — NEXT DEPLOYMENT</div><div class="lc-weapons">${mutationOptions.map(m=>`<button class="btn lc-mbtn ${curM===m.id?"btn-primary":""}" data-slot="${i}" data-mutation="${m.id??""}" ${m.unlocked?"":"disabled"}>${m.label}${m.unlocked?"":" · LOCKED"}</button>`).join("")}</div>`:"";
       const curB: SoldierBehavior = this.game.isBehaviorUnlocked(ld.behavior) ? ld.behavior : "free";
 
       let wSummary = `1 round · ${st.damage} DMG · ${st.fireRate.toFixed(2)}/s`;
@@ -1194,6 +1199,8 @@ export class UpgradeTree {
       } else if (curW === "flamethrower") {
         wSummary = `Flame · ${st.flameDamage} DMG · ${st.flameFireRate.toFixed(1)}/s · ignites rubble`;
       }
+      if(curM==="reverse_revolver")wSummary=`Pause → rewind exact shot path · ${st.damage} DMG` ;
+      if(curM==="gale_edge")wSummary=`Flying crescents · ${st.galeDistance} range · Momentum inactive`;
       if (curS === "grenade") {
         wSummary += ` · NADE: ${st.grenadeBlocksRequired} blk (${st.grenadeDamage} dmg)`;
       } else if (curS === "turret") {
@@ -1246,6 +1253,7 @@ export class UpgradeTree {
           </div>
           <div class="lc-section-lbl">PRIMARY WEAPON (1 PER SOLDIER)</div>
           <div class="lc-weapons">${wBtnsHtml}</div>
+          ${mutationHtml}
           <div class="lc-section-lbl">SECONDARY ABILITY (1 PER SOLDIER)</div>
           <div class="lc-secondaries">${sBtnsHtml}</div>
           <div class="lc-section-lbl">BEHAVIOR PROTOCOL</div>
@@ -1278,9 +1286,20 @@ export class UpgradeTree {
         if (!this.game.isWeaponUnlocked(weapon)) return;
         if (!loadouts[slot]) loadouts[slot] = { weapon: "pistol", behavior: "free", equipment: [null, null] };
         loadouts[slot].weapon = weapon;
+        loadouts[slot].mutation=resolvePrimaryMutation(weapon,loadouts[slot].mutation,st);
         this.game.save.save();
         this.game.audio.playPickup();
         this.renderLoadout();
+      });
+    });
+
+    this.loadoutWrap.querySelectorAll<HTMLButtonElement>(".lc-mbtn").forEach(btn=>{
+      btn.addEventListener("click",()=>{
+        const slot=Number(btn.dataset.slot);const loadout=loadouts[slot];if(btn.disabled||!loadout)return;
+        const requested=btn.dataset.mutation??"";
+        const mutation=resolvePrimaryMutation(loadout.weapon,requested,st);
+        if(requested!==""&&!mutation)return;
+        loadout.mutation=mutation;this.game.save.save();this.renderLoadout();
       });
     });
 

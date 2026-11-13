@@ -2,7 +2,7 @@ import { sectorCount, sectorTier } from "../world/labMap";
 import { clamp } from "../core/math";
 import { LAB_WORLD_COUNT, LAB_WORLDS } from "../world/labMap";
 import { CAMPAIGN, campaignTier } from "../world/campaignBalance";
-import type { SecondaryWeaponType, WeaponType } from "../entities/Soldier";
+import type { PrimaryMutation, SecondaryWeaponType, WeaponType } from "../entities/Soldier";
 import { SOLDIER_UPGRADE_DEFS, type SoldierUpgradeLevels } from "./SoldierUpgrades";
 import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
 
@@ -39,6 +39,7 @@ export const VALID_BEHAVIORS: readonly SoldierBehavior[] = [
 
 export interface SoldierLoadout {
   weapon: WeaponType;
+  mutation?: PrimaryMutation | null;
   secondary?: SecondaryWeaponType | null;
   behavior: SoldierBehavior;
   equipment: (string | null)[];
@@ -154,7 +155,7 @@ export function defaultSaveData(): SaveData {
   for (const d of UPGRADE_DEFS) upgrades[d.id] = 0;
   const loadouts: SoldierLoadout[] = [];
   for (let i = 0; i < MAX_SOLDIER_SLOTS; i++) {
-    loadouts.push({ weapon: "pistol", secondary: null, behavior: "free", equipment: [null, null], upgrades: {} });
+    loadouts.push({ weapon: "pistol", mutation: null, secondary: null, behavior: "free", equipment: [null, null], upgrades: {} });
   }
   return {
     version: SAVE_VERSION,
@@ -249,6 +250,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
         if (typeof w === "string" && (VALID_WEAPONS as readonly string[]).includes(w)) {
           def.loadouts[i].weapon = w as WeaponType;
         }
+        def.loadouts[i].mutation = item.mutation === "reverse_revolver" || item.mutation === "gale_edge" ? item.mutation : null;
         const b = item.behavior;
         if (typeof b === "string" && (VALID_BEHAVIORS as readonly string[]).includes(b)) {
           def.loadouts[i].behavior = b as SoldierBehavior;
@@ -293,6 +295,9 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     } else if (ld.weapon === "flamethrower" && (def.upgrades.flame_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
     }
+
+    if (ld.mutation === "reverse_revolver" && (ld.weapon !== "pistol" || def.upgrades.reverse_unlock === 0)) ld.mutation = null;
+    if (ld.mutation === "gale_edge" && (ld.weapon !== "katana" || def.upgrades.gale_unlock === 0)) ld.mutation = null;
 
     if (ld.secondary === "grenade" && (def.upgrades.grenade_unlock ?? 0) === 0) {
       ld.secondary = null;

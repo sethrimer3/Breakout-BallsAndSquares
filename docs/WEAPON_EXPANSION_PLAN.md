@@ -3,8 +3,10 @@
 **Game design specification and code-oriented implementation plan**  
 **Project:** `sethrimer3/Breakout-BallsAndSquares` (`main` branch)  
 **Prepared:** November 12, 2026  
-**Status:** Original weapon mechanics implemented; newer Black Market / squad / secondary requirements pending<br>
+**Status:** Original mechanics plus Gale/Reverse audit repairs implemented; revised Black Market plan and integration pending<br>
 **Design intent:** Make the weapons feel mechanically surprising, tactile, and distinctly different, while protecting the core experience of autonomous soldiers ricocheting through destructible environments.
+
+> **Latest accepted roster and mechanics:** [Black Market implementation plan](BLACK_MARKET_IMPLEMENTATION_PLAN.md). Its user revisions supersede conflicting older proposals below, including Drone Shepherd as Pistol branch 3 and no accepted Assault Rifle mutation.
 
 ## Executive summary
 
@@ -12,7 +14,7 @@ The first release of this expansion should deliver five connected improvements *
 
 1. **Weapon-specific ricochet ammunition** for guns that do not intrinsically pierce targets, beginning with Pistol and Shotgun. Ricochets add deliberate spatial gameplay instead of simply increasing damage.
 2. **SQUELCH, the Adhesive Rebound Mortar (Shotgun Black Market branch):** a squishy, pseudo-soft-body orb that hits a wall, sticks and wobbles, leaves a sticky mine, then springs away along the reflected trajectory after a short delay. It has no purchased bounce-count limit. Travel distance and remaining slime mass limit its useful lifetime.
-3. **Drone Shepherd (Assault Rifle Black Market branch):** a soldier loadout built around releasing small flying pistol drones. Drones behave as independent, lightweight actors, not as additional full soldiers.
+3. **Drone Shepherd (Pistol Black Market branch 3):** a soldier loadout built around releasing small flying pistol drones. Drones behave as independent, lightweight actors, not as additional full soldiers.
 4. **Chromatic Prism (Sniper Rifle Black Market branch):** a reflective laser that begins red and unlocks orange, yellow, green, blue, indigo, and violet through upgrades. Each bounce makes the ray more dangerous, increasing its damage and penetration budget.
 5. **Momentum Katana (Katana Black Market branch):** the existing katana's slash damage and width scale with actual soldier velocity, and a wall collision can initiate a fast dash that eases back to ordinary running speed.
 
@@ -268,7 +270,7 @@ A specialized soldier does not merely carry a stronger gun. It releases little p
 
 ### Recommended classification
 
-Implement **Drone Shepherd as an Assault Rifle Black Market specialization**, not a standalone primary weapon ID and not an upgrade that gives every soldier drones. The Assault Rifle's primary-fire behavior changes into a carrier that releases autonomous drones; the carrier should have lower direct-fire power than an unmutated Assault Rifle, trading its own firepower for a swarm. Drones are not full `Soldier` instances and do not consume `Additional Soldier` deployment slots.
+Implement **Drone Shepherd as the third Pistol Black Market specialization**, not a standalone primary weapon ID and not an upgrade that gives every soldier drones. The Pistol's primary-fire behavior changes into a carrier that releases autonomous drones; the carrier should have lower direct-fire power than an unmutated Pistol, trading its own firepower for a swarm. Drones are not full `Soldier` instances and do not consume `Additional Soldier` deployment slots.
 
 ### Initial behavior
 
@@ -299,7 +301,7 @@ Create `Drone` and a pooled `DroneSystem` with `ownerId`, `slotIndex`, `life`, `
 
 **Performance rule:** cap the **global** number of drones, initially 24. Reacquire targets periodically (for example 4-5 times/s), never search hundreds of cells for every drone every frame. Render as tiny silhouettes with 2-3 pixel propulsor cues, a distinct mini-muzzle flash, and readable owner coloration. Use pitch-light electric chirps and miniature pistol cracks.
 
-**Acceptance:** drones release sequentially, maintain recognizable movement, never cross sealed rooms, shoot with valid owner attribution, despawn on timer/death, and do not alter soldier-cap or formation code. Drone count stays capped even with duplicate-drone edge cases or invalid legacy saves; legitimate squads can equip only one Assault Rifle carrier.
+**Acceptance:** drones release sequentially, maintain recognizable movement, never cross sealed rooms, shoot with valid owner attribution, despawn on timer/death, and do not alter soldier-cap or formation code. Drone count stays capped even with duplicate-drone edge cases or invalid legacy saves; Pistol carriers may occupy multiple soldier slots, with per-owner caps and a shared global cap.
 
 ## 6. Signature weapon C: Chromatic Prism Laser
 
@@ -467,7 +469,7 @@ Recommended rollout:
 1. Make **Pistol Bankshot** available early so players learn the concept in familiar rooms.
 2. Add **Shotgun Rebound** as a midgame spatial weapon choice.
 3. Unlock **Black Market research** after the player acquires Blight Essence. Transform a **Shotgun into SQUELCH** once players have encountered small Blight clusters and destructible corridor geometry.
-4. Allow **Assault Rifle → Drone Shepherd** when multi-soldier loadouts and Blight threats are established; drones should not make initial soldiers redundant.
+4. Allow **Pistol → Drone Shepherd** when multi-soldier loadouts and Blight threats are established; drones should not make initial soldiers redundant.
 5. Allow **Sniper Rifle → Chromatic Prism** as a rare advanced Black Market branch, with the first two color upgrades affordable quickly enough to preview its progression. Offer **Sniper Rifle → Rail Lance** as an equally meaningful alternative.
 6. Add **Katana → Momentum Katana** as an exclusive Blight Essence specialization to its existing tree, rather than creating a redundant standalone katana variant.
 
@@ -491,15 +493,17 @@ Preserve the current gold / orange crystal / green crystal / Blight Essence / bi
 
 All branch labels other than the user-requested signature concepts are **optional design candidates**. Do not implement speculative counterparts without a dedicated balance/design pass.
 
-| Base weapon | Mutation path A | Mutation path B | Exclusive design choice |
-|---|---|---|---|
-| **Pistol** (many soldiers may equip) | **Reverse-Playback Revolver**: records the projectile's ricochet route, then fires a damaging reverse replay; full design in Section 8.2. | **Future mutation TBD**: do not treat Echo Stapler as a competing Pistol branch. | Per-soldier Pistol mutation state; the Revolver changes the primary's projectile behavior. Echo Stapler is independently equipable as a secondary. |
-| **Shotgun** | **SQUELCH**: a delayed-ricochet slime orb that sheds explosive adhesive mines, gains distance and starting mass through upgrades. | **Compression Cannon** *(optional)*: fuses pellets into a slow pressure slug that pushes Blight back and breaks clustered terrain in waves. | Sticky mine routing and delayed rebounds versus one high-impact spatial shockwave. |
-| **Assault Rifle** | **Drone Shepherd**: replaces ordinary sustained rifle fire with a stream of autonomous flying pistol drones. | **Splinter Engine** *(optional)*: sustained hits split bullets into smaller ricocheting fragments with a strict total projectile budget. | Mobile distributed minions versus escalating shrapnel density. |
-| **Sniper Rifle** | **Chromatic Prism**: a reflective red-to-violet laser whose bounces increase damage and penetration; rainbow band upgrades change its initial power. | **Rail Lance**: one ultra-penetrating straight shot that travels through every damageable cell and enemy along its ray, potentially cutting across multiple rooms. | Complex reflected path and color escalation versus extreme straight-line devastation. |
-| **Katana** | **Momentum Katana**: wall-triggered dash, smooth deceleration, movement-scaled arc and damage. | **Gale Edge**: true long-range flying energy crescents that remain dangerous across several rooms, with dedicated range, width and penetration upgrades. | Mutually exclusive kinetic dash-and-cleave versus projectile-based ranged swordplay. |
-| **Rocket Launcher** | **Graviton Warhead** *(optional)*: impact briefly pulls loose enemies and Blight fragments toward its center before detonation. | **Brood Rocket** *(optional)*: impacts hatch several short-lived crawling explosive charges that seek nearby Blight fronts without leaving the current room. | Group-and-detonate versus distributed delayed explosions. |
-| **Flamethrower** | **Glassfire** *(optional)*: fire temporarily vitrifies/blinds Blight growth at a contact line, creating fragile barriers that shatter under pressure. | **Thermal Serpent** *(optional)*: a slower continuous flame thread curves around obstructions but loses power per bend. | Defensive terrain transformation versus indirect, path-bending fire. |
+| Base weapon | Accepted mutations |
+|---|---|
+| Pistol | Reverse-Playback Revolver; Orbit Cylinder; **Drone Shepherd (third branch)** |
+| Shotgun | SQUELCH; **Vacuum Pulse** |
+| Assault Rifle | **Undecided: no accepted branches** |
+| Rocket Launcher | **Burrower; Freeze Rockets** |
+| Sniper Rifle | Chromatic Prism; **Rail Lance** |
+| Katana | Momentum Katana; Gale Edge |
+| Flamethrower | **Napalm Garden; Cryospray** |
+
+Fixed timings, freeze/shatter rules, implementation phases, and code audit status are specified in [the revised plan](BLACK_MARKET_IMPLEMENTATION_PLAN.md). Do not implement superseded speculative counterparts.
 
 ### Katana: Gale Edge ranged flying slash mutation
 
@@ -546,7 +550,7 @@ All branch labels other than the user-requested signature concepts are **optiona
 **This is a required implementation change, not merely an optional design suggestion.** Each soldier already has one `weapon: WeaponType` primary. Extend that constraint across the squad:
 
 - **Pistol is unrestricted:** any number of soldiers can use the standard Pistol or their own Pistol mutation. Pistol is the safe default.
-- **Every other primary weapon is unique across the entire squad:** at most **one equipped Shotgun, one Assault Rifle, one Rocket Launcher, one Sniper Rifle, one Katana, and one Flamethrower**, plus at most one of each future non-pistol base type. This means only one SQUELCH user because SQUELCH is a Shotgun, only one Chromatic Prism **or** Rail Lance user because both are a Sniper Rifle, and only one Drone Shepherd carrier because it is an Assault Rifle.
+- **Every other primary weapon is unique across the entire squad:** at most **one equipped Shotgun, one Assault Rifle, one Rocket Launcher, one Sniper Rifle, one Katana, and one Flamethrower**, plus at most one of each future non-pistol base type. This means only one SQUELCH user because SQUELCH is a Shotgun, only one Chromatic Prism **or** Rail Lance user because both are a Sniper Rifle, while Drone Shepherd is Pistol branch 3 and may have multiple carriers within owner/global drone caps.
 - **No mutation loopholes:** variants never create additional equip slots or appear as parallel, independently assignable base weapons. Drones are auxiliary units, not primary-weapon holders or additional soldier slots. Secondary abilities (Grenade / Turret / Echo Stapler / Resonance Bell) are unaffected by this uniqueness rule; multiple soldiers may use the same secondary.
 - **Equip interaction:** in `src/ui/UpgradeTree.ts`, disable a non-pistol weapon button when another soldier owns it, with a tooltip such as `Equipped by Soldier #3`. The current owner may keep/select it; do not silently unequip an existing soldier to satisfy a new click. The player must first switch the existing holder to Pistol, then equip the released weapon elsewhere. Re-render all weapon cards after each change.
 - **Authoritative validation:** add a reusable `canEquipPrimary(loadouts, slot, weapon)` check in the data/model layer and call it from the UI click handler, any other equip entrypoint, and game/deployment setup. UI disabled styling alone is not sufficient. The model must reject duplicate equip requests even if triggered programmatically.
@@ -593,7 +597,7 @@ Suggested new files: `src/entities/GooOrb.ts`, `GooMine.ts`, `Drone.ts`, `SonicN
 
 **SQUELCH:** full squish/stick/release cycle; variable frame pacing with fixed timestep; monotonically decreasing mass; no distance consumed while stuck; mine count matches valid hits; detonate after support wall is destroyed; correct owner credit; mine pool at capacity; orb destroyed before first bounce; fading glow under reduced effects settings.
 
-**Drones:** release frequency and global cap; owner death; old save slots; travel near doors and narrow rooms; no wall phasing; damage attribution; no soldier slot consumption; target search throttling; only one legitimate Assault Rifle/Drone Shepherd user in the squad; corrupted duplicate carriers must not bypass normalization.
+**Drones:** release frequency and global cap; owner death; old save slots; travel near doors and narrow rooms; no wall phasing; damage attribution; no soldier slot consumption; target search throttling; multiple Pistol/Drone Shepherd carriers within per-owner and global caps; corrupted duplicate carriers must not bypass those caps.
 
 **Chromatic Prism:** all seven initial colors; color shifts on bounce; increasing damage and penetration; pierce-versus-reflection precedence; duplicate-cell suppression; maximum hit/segment/distance caps; tracing at low frame rate; consistent damage regardless of visual lifetime.
 
@@ -620,9 +624,9 @@ Suggested new files: `src/entities/GooOrb.ts`, `GooMine.ts`, `Drone.ts`, `SonicN
 - [x] Drone Shepherd deploys individually moving miniature pistol drones that do not count as full soldiers or pass through sealed walls.
 - [x] Chromatic Prism starts red and progresses through seven color bands; each bounce raises damage and pierce within hard safety limits.
 - [x] Katana damage and slash width are computed from real wielder velocity; wall impact triggers a fast dash and continuous return to base speed.
-- [ ] Each new signature weapon is a Blight Essence **Black Market mutation** of its existing base weapon (Shotgun → SQUELCH, Assault Rifle → Drone Shepherd, Sniper → Chromatic Prism, Katana → Momentum), with one active branch per base gun, clear compatibility rules, and a safe lab-only respec.
+- [ ] Each new signature weapon is a Blight Essence **Black Market mutation** of its existing base weapon (Shotgun → SQUELCH, Pistol → Drone Shepherd, Sniper → Chromatic Prism, Katana → Momentum), with one active branch per base gun, clear compatibility rules, and a safe lab-only respec.
 - [ ] The Sniper also has **Rail Lance** as a competing straight-line super-piercing mutation, and the player cannot activate Prism and Rail Lance simultaneously.
-- [ ] The Pistol has a Reverse-Playback Revolver Black Market mutation, and the Katana has the mutually exclusive **Gale Edge ranged flying slash** alternative to Momentum Katana.
+- [x] Reverse-Playback Revolver and Gale Edge combat mechanics, Essence unlocks and compatible per-slot next-deployment selection. Full Black Market refund/respec and specialist tiers remain pending; see the revised plan.
 - [ ] Echo Stapler and Resonance Bell are selectable, unlockable, charged **secondary weapons** that work alongside any primary; they are not mutation branches or separate soldier slots.
 - [ ] Pistol is the only primary weapon usable by multiple soldiers simultaneously; every other primary, including any special mutation, has at most one squad owner. Equip UI, programmatic validation, saved data and deployment all enforce this.
 - [x] All upgrades are purchasable, capped, described, loadout-compatible, and safe in old saves.
@@ -646,3 +650,8 @@ Repository source, reviewed from `main` on November 12, 2026:
 - https://github.com/sethrimer3/Breakout-BallsAndSquares/blob/main/src/Game.ts
 
 The original first-playable weapon mechanics are implemented and tested as recorded in the progress sections. The two newer main-branch design revisions add Black Market mutations, lab-only respec, unique non-pistol squad ownership, Rail Lance, Reverse-Playback Revolver, Gale Edge, and two new secondary abilities. Those requirements are preserved in this document but are not implemented by the original expansion commit. Human playtesting and physical-device acceptance also remain unverified; see WEAPON_VALIDATION.md.
+
+
+### Latest requested mechanic audit
+
+The follow-up audit added playable Reverse-Playback Revolver and Gale Edge rather than treating the older design text as implementation evidence. See [the revised Black Market plan](BLACK_MARKET_IMPLEMENTATION_PLAN.md) for their verified scope and all newly accepted mechanics. This does not mark lab respec, canonical legacy conversion, or the newly planned weapons complete.

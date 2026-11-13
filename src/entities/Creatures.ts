@@ -673,10 +673,12 @@ export class CreatureSystem {
    * Nearest creature along a bullet's path within `maxDist`, or -1. Remembers
    * the creature so `applyHit` can damage it.
    */
-  raycast(ox: number, oy: number, dx: number, dy: number, maxDist: number): number {
+  get targetKey(): object | null { return this.lastHit; }
+  raycast(ox: number, oy: number, dx: number, dy: number, maxDist: number, ignored?: ReadonlySet<object>): number {
     let best = maxDist;
     let hitC: Creature | null = null;
     const test = (c: Creature, cx: number, cy: number, r: number): void => {
+      if(ignored?.has(c))return;
       const fx = ox - cx;
       const fy = oy - cy;
       const b = fx * dx + fy * dy;

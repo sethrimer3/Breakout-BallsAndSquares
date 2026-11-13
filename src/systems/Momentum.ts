@@ -1,7 +1,7 @@
 import type { Soldier, SoldierStats } from "../entities/Soldier";
 
 export function momentumEligible(s: Soldier): boolean {
-  return s.weapon === "katana" && !s.isManual && !s.isInFormation && s.behavior !== "sentry_slow" && s.behavior !== "sentry_fast";
+  return s.weapon === "katana" && s.mutation !== "gale_edge" && !s.isManual && !s.isInFormation && s.behavior !== "sentry_slow" && s.behavior !== "sentry_fast";
 }
 
 export function advanceMomentum(s: Soldier, dt: number): void {
@@ -30,6 +30,7 @@ export function triggerMomentum(s: Soldier, stats: SoldierStats): boolean {
 }
 
 export function slashMomentum(s: Soldier, stats: SoldierStats): { damage: number; width: number } {
+  if(s.mutation === "gale_edge")return {damage:1,width:1};
   const ratio = Math.min(2.6, Math.max(1, Math.hypot(s.vx, s.vy) / Math.max(1e-6, s.speed)));
   return { damage: 1 + 0.55 * (ratio - 1) * stats.katanaKinetic,
     width: 1 + 0.35 * (ratio - 1) * stats.katanaWide };

@@ -61,6 +61,7 @@ export class UpgradeManager {
       if (parent && this.levelOf(parent) === 0) return false;
     }
     if (this.save.data.lifetimePixels < def.unlockLifetimePixels) return false;
+    if (def.id === "gale_range" && this.levelOf("gale_unlock") === 0) return false;
     if (def.branch === "drone_shepherd" && def.id !== "drone_unlock" && this.levelOf("drone_unlock") === 0) return false;
     if (def.branch === "prism_laser" && def.id !== "prism_unlock" && this.levelOf("prism_unlock") === 0) return false;
     if ((def.id.startsWith("katana_") && ["katana_impulse", "katana_glide", "katana_kinetic", "katana_wide", "katana_recovery", "katana_perfect"].includes(def.id)) && this.levelOf("katana_dash") === 0) return false;

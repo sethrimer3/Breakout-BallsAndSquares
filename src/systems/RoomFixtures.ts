@@ -8,6 +8,8 @@ export class RoomFixtures implements BulletTargets {
   private ids: Int32Array;
   private hit = makeRayHit();
   private selected: RoomLight | null = null;
+  private ignored?: ReadonlySet<object>;
+  get targetKey(): object | null { return this.selected; }
   constructor(private world: PixelWorld, private onBreak: (light: RoomLight) => void = () => {}) {
     this.ids = new Int32Array(world.width * world.height);
   }
@@ -24,11 +26,14 @@ export class RoomFixtures implements BulletTargets {
     if (!this.world.inBounds(x, y)) return false;
     const i = y * this.world.width + x;
     const id = this.ids[i];
-    return id > 0 && !this.world.roomLights[id - 1].destroyed && this.world.decor[i] === DECOR.lightPanel && !this.world.solidAt(x, y);
+    return id > 0 && !this.ignored?.has(this.world.roomLights[id - 1]) && !this.world.roomLights[id - 1].destroyed && this.world.decor[i] === DECOR.lightPanel && !this.world.solidAt(x, y);
   }
-  raycast(x: number, y: number, dx: number, dy: number, max: number): number {
+  raycast(x: number, y: number, dx: number, dy: number, max: number, ignored?: ReadonlySet<object>): number {
     this.selected = null;
-    if (!gridRaycast(this, this.world.cellSize, x, y, dx, dy, max, this.hit)) return -1;
+    this.ignored=ignored;
+    const found=gridRaycast(this, this.world.cellSize, x, y, dx, dy, max, this.hit);
+    this.ignored=undefined;
+    if (!found) return -1;
     this.selected = this.world.roomLights[this.ids[this.hit.cy * this.world.width + this.hit.cx] - 1];
     return this.hit.t;
   }
@@ -61,11 +66,12 @@ export class RoomFixtures implements BulletTargets {
 export class CombinedTargets implements BulletTargets {
   private selected: BulletTargets | null = null;
   constructor(private targets: readonly BulletTargets[]) {}
-  raycast(x: number, y: number, dx: number, dy: number, max: number): number {
+  get targetKey(): object | null { return this.selected?.targetKey ?? null; }
+  raycast(x: number, y: number, dx: number, dy: number, max: number, ignored?: ReadonlySet<object>): number {
     this.selected = null;
     let closest = -1;
     for (const target of this.targets) {
-      const t = target.raycast(x, y, dx, dy, closest < 0 ? max : closest);
+      const t = target.raycast(x, y, dx, dy, closest < 0 ? max : closest, ignored);
       if (t >= 0 && (closest < 0 || t < closest)) { closest = t; this.selected = target; }
     }
     return closest;

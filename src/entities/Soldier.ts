@@ -1,6 +1,7 @@
 import {
   FACILITY,
   GOO,
+  GALE,
   DRONE,
   PRISM,
   ASSAULT_RIFLE,
@@ -31,6 +32,8 @@ export type WeaponType =
   | "drone_shepherd"
   | "prism_laser";
 
+export type PrimaryMutation = "reverse_revolver" | "gale_edge";
+
 export type SecondaryWeaponType = "grenade" | "turret";
 
 /** Derived soldier & run stats (base config combined with upgrades). */
@@ -47,6 +50,9 @@ export interface SoldierStats {
   bulletSpeed: number;
   multishotChance: number;
   pistolBounces: number;
+  reverseUnlocked: boolean;
+  galeUnlocked: boolean;
+  galeDistance: number;
   // Shotgun stats
   shotgunUnlocked: boolean;
   shotgunFireRate: number;
@@ -191,6 +197,7 @@ export function baseSoldierStats(): SoldierStats {
     bulletSpeed: SOLDIER.bulletSpeed,
     multishotChance: SOLDIER.multishotChance,
     pistolBounces: 0,
+    reverseUnlocked: false, galeUnlocked: false, galeDistance: GALE.distance,
     shotgunUnlocked: false,
     shotgunFireRate: SHOTGUN.fireRate,
     shotgunDamage: SHOTGUN.damage,
@@ -297,6 +304,7 @@ export class Soldier {
   vy: number;
   speed: number;
   weapon: WeaponType;
+  mutation: PrimaryMutation | null = null;
   secondary: SecondaryWeaponType | null;
   secondaryEnergy = 0;
   get secondaryBlocksBroken(): number {
@@ -385,4 +393,10 @@ export class Soldier {
       this.facingAngle = Math.atan2(this.vy, this.vx);
     }
   }
+}
+
+export function resolvePrimaryMutation(weapon: WeaponType, mutation: unknown, stats: SoldierStats): PrimaryMutation | null {
+  if(weapon==="pistol" && mutation==="reverse_revolver" && stats.reverseUnlocked)return mutation;
+  if(weapon==="katana" && mutation==="gale_edge" && stats.galeUnlocked)return mutation;
+  return null;
 }

@@ -38,6 +38,20 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([]);
     if(segment.reflected){ctx.beginPath();ctx.moveTo(x2-3,y2);ctx.lineTo(x2+3,y2);ctx.moveTo(x2,y2-3);ctx.lineTo(x2,y2+3);ctx.stroke();}
   }
+  for(const shot of game.combat.revolver.pool.items){
+    if(!shot.active || shot.phase==="recording")continue;
+    const x=cam.worldToScreenX(shot.x);const y=cam.worldToScreenY(shot.y);
+    if(x < -24 || y < -24 || x > cam.viewW+24 || y > cam.viewH+24)continue;
+    ctx.globalAlpha=0.75;ctx.strokeStyle="#d7a5ff";ctx.lineWidth=Math.max(1,cam.zoom);
+    if(shot.phase==="waiting"){
+      ctx.beginPath();ctx.arc(x,y,Math.max(2,cam.zoom*2),0,Math.PI*2);ctx.stroke();
+    }else{
+      const from=(shot.cursor+1)*2;const dx=shot.points[from]-shot.x;const dy=shot.points[from+1]-shot.y;
+      const length=Math.hypot(dx,dy);const tail=Math.min(12,length)*cam.zoom;
+      ctx.beginPath();ctx.moveTo(x,y);if(length>1e-8)ctx.lineTo(x+dx/length*tail,y+dy/length*tail);ctx.stroke();
+    }
+    ctx.fillStyle="#f5e8ff";ctx.fillRect(x-1,y-1,Math.max(1,cam.zoom),Math.max(1,cam.zoom));
+  }
   // Perfect Rebound is a visual echo, not an additional damage actor.
   if (!reduced) for (const b of game.combat.bullets.items) {
     if (!b.active || !b.afterimage || b.style!==3) continue;

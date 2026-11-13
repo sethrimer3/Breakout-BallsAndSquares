@@ -1,4 +1,5 @@
-import { DRONE, GOO, ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET } from "../config";
+import { DRONE, GOO, GALE, REVERSE, ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET } from "../config";
+import { ReverseRevolver, type ReverseShot } from "./ReverseRevolver";
 import { slashMomentum } from "./Momentum";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
@@ -34,6 +35,7 @@ export interface CombatEvents {
   onCreatureHit?(x: number, y: number, nx: number, ny: number): void;
   /** An ordinary round reflected from terrain, after its impact damage. */
   onBulletRicochet?(x: number, y: number, nx: number, ny: number): void;
+  onRevolverReturn?(x: number, y: number): void;
   onDroneLaunch?(x: number, y: number): void;
   onDroneShot?(x: number, y: number): void;
   onLaserBounce?(x: number, y: number): void;
@@ -61,7 +63,8 @@ const hit = makeRayHit();
 /** Something bullets can hit besides terrain. */
 export interface BulletTargets {
   /** Distance along the ray to the nearest target within `maxDist`, or -1. */
-  raycast(ox: number, oy: number, dx: number, dy: number, maxDist: number): number;
+  raycast(ox: number, oy: number, dx: number, dy: number, maxDist: number, ignored?: ReadonlySet<object>): number;
+  readonly targetKey?: object | null;
   /** Damage the target the last `raycast` found. */
   applyHit(damage: number, x: number, y: number): boolean;
 }
@@ -74,6 +77,7 @@ export class CombatSystem {
   readonly goo: GooOrbSystem;
   readonly drones: DroneSystem;
   readonly laser: LaserSystem;
+  readonly revolver: ReverseRevolver;
   stats: SoldierStats;
   /** Creatures bullets can hit before the terrain (the Blight's flowers, worms, specimens). */
   targets: BulletTargets | null = null;
@@ -87,6 +91,7 @@ export class CombatSystem {
     private events: CombatEvents = {},
   ) {
     this.stats = stats;
+    this.revolver = new ReverseRevolver((shot,x,y,tx,ty)=>this.replaySegment(shot,x,y,tx,ty), (shot)=>this.events.onRevolverReturn?.(shot.x,shot.y));
     this.drones = new DroneSystem(world, (shot) => this.fireDroneShot(shot), (x,y) => this.events.onDroneLaunch?.(x,y));
     this.laser = new LaserSystem(world, {
       onImpact: (...args) => this.events.onImpact?.(...args),
@@ -296,6 +301,8 @@ export class CombatSystem {
         2,
       );
     } else if (s.weapon === "katana") {
+      const gale=s.mutation === "gale_edge" && this.stats.galeUnlocked;
+      if(gale && this.bullets.items.filter(b=>b.active&&b.gale).length>=GALE.poolCap){this.shooter=null;return;}
       s.slashIndex = ((s.slashIndex ?? 0) + 1) % 2;
       const tilt = (s.slashIndex === 0 ? -1 : 1) * 0.38;
 
@@ -306,12 +313,12 @@ export class CombatSystem {
         dy,
         this.stats.katanaBulletSpeed,
         this.stats.katanaDamage,
-        KATANA.lifetime,
+        gale ? this.stats.galeDistance / (this.stats.katanaBulletSpeed * this.stats.globalBulletSpeedMult * s.mods.bulletSpeedMult) + 0.1 : KATANA.lifetime,
         s.radius + BULLET.muzzleGap,
         s.id,
-        this.stats.katanaPierce,
+        gale ? GALE.pierce + this.stats.katanaPierce - KATANA.pierce : this.stats.katanaPierce,
         this.stats.katanaBlightMultiplier,
-        this.stats.katanaSlashWidth,
+        gale ? Math.max(GALE.width,this.stats.katanaSlashWidth) : this.stats.katanaSlashWidth,
         tilt,
       );
 
@@ -324,12 +331,12 @@ export class CombatSystem {
           dy,
           this.stats.katanaBulletSpeed,
           this.stats.katanaDamage,
-          KATANA.lifetime,
+          gale ? this.stats.galeDistance / (this.stats.katanaBulletSpeed * this.stats.globalBulletSpeedMult * s.mods.bulletSpeedMult) + 0.1 : KATANA.lifetime,
           s.radius + BULLET.muzzleGap,
           s.id,
-          this.stats.katanaPierce,
+          gale ? GALE.pierce + this.stats.katanaPierce - KATANA.pierce : this.stats.katanaPierce,
           this.stats.katanaBlightMultiplier,
-          this.stats.katanaSlashWidth,
+          gale ? Math.max(GALE.width,this.stats.katanaSlashWidth) : this.stats.katanaSlashWidth,
           -tilt,
         );
       }
@@ -450,6 +457,12 @@ export class CombatSystem {
     b.fromDrone = false;
     b.bounces = 0;
     b.momentumBoosted = false;
+    b.gale = false; b.galeCells.clear(); b.distanceLeft = Infinity; b.replay = null;
+    if (weapon === "pistol" && this.shooter?.mutation === "reverse_revolver" && this.stats.reverseUnlocked) {
+      b.replay=this.revolver.begin(x,y,b.speed,b.damage,b.terrainDamageBonus,b.blightMultiplier,ownerId);
+      if(!b.replay){this.bullets.release(b);return null;}
+      b.replay.coreDamageBonus=this.stats.coreDamageBonus;
+    }
     if (style === 0) this.telemetry.bulletBounceHistogram[0]++;
     return b;
   }
@@ -469,6 +482,7 @@ export class CombatSystem {
     slashWidth: number,
     slashAngle: number,
   ): void {
+    if(this.shooter?.mutation === "gale_edge" && this.bullets.items.filter(b=>b.active&&b.gale).length>=GALE.poolCap)return;
     const b = this.bullets.acquire();
     if (!b) return;
     b.x = x;
@@ -501,9 +515,13 @@ export class CombatSystem {
     b.afterimage = this.shooter?.dashAfterimage ?? false;
     if (this.shooter) this.shooter.dashAfterimage = false;
     b.slashAngle = slashAngle;
+    b.replay=null; b.gale=this.shooter?.mutation === "gale_edge" && this.stats.galeUnlocked;
+    b.galeCells.clear();
+    b.distanceLeft=b.gale?this.stats.galeDistance:Infinity;
   }
 
   updateBullets(dt: number): void {
+    this.revolver.update(dt);
     const items = this.bullets.items;
     for (let i = 0; i < items.length; i++) {
       const b = items[i];
@@ -518,11 +536,12 @@ export class CombatSystem {
       if (b.explosionRadius > 0) {
         this.detonateRocket(b, b.x, b.y, -b.dx, -b.dy, Math.floor(b.x / this.world.cellSize), Math.floor(b.y / this.world.cellSize));
       }
-      this.bullets.release(b);
+      this.finishBullet(b);
       return;
     }
 
-    let remDist = b.speed * dt + b.pendingAdvance;
+    let remDist = Math.min(b.distanceLeft, b.speed * dt + b.pendingAdvance);
+    if(remDist<=1e-6){this.finishBullet(b);return;}
     b.pendingAdvance = 0;
     const w = this.world;
     const cs = w.cellSize;
@@ -540,6 +559,7 @@ export class CombatSystem {
         if (ct >= 0) {
           const ix = curX + b.dx * ct;
           const iy = curY + b.dy * ct;
+          if(!this.recordSegment(b,curX,curY,ix,iy))return;
           if (b.explosionRadius > 0) {
             this.detonateRocket(b, ix, iy, -b.dx, -b.dy, Math.floor(ix / cs), Math.floor(iy / cs));
           } else {
@@ -547,17 +567,26 @@ export class CombatSystem {
             if (b.fromDrone) this.drones.usefulHits++;
             this.events.onCreatureHit?.(ix, iy, -b.dx, -b.dy);
           }
-          this.bullets.release(b);
+          this.finishBullet(b);
           return;
         }
       }
+      if (b.gale) {
+        const length = terrainHit ? hit.t : remDist;
+        // Sweep the full crescent width, even when the center passes through air.
+        // Sampling is at half-cell spacing and every cell can take damage once.
+        for (let d = 0; d <= length; d += ss / 2) {
+          this.cleaveSlashSides(b, Math.floor((curX+b.dx*d)/ss), Math.floor((curY+b.dy*d)/ss), -b.dx, -b.dy);
+        }
+      }
       if (terrainHit) {
+        if(!this.recordSegment(b,curX,curY,hit.x,hit.y))return;
         const hcx = hit.cx >> 1;
         const hcy = hit.cy >> 1;
         // Rocket / explosive projectile detonates on impact!
         if (b.explosionRadius > 0) {
           this.detonateRocket(b, hit.x, hit.y, hit.nx, hit.ny, hcx, hcy);
-          this.bullets.release(b);
+          this.finishBullet(b);
           return;
         }
 
@@ -568,7 +597,7 @@ export class CombatSystem {
         // out. Burnt-out (charred) rubble takes the hit like any other block.
         const flameOnRubble = b.style === 4 && isSub && w.isRubbleSub(hit.cy * w.subWidth + hit.cx);
         if (flameOnRubble && this.events.onFlameHit?.(hit.cx, hit.cy, hit.x, hit.y, hit.nx, hit.ny)) {
-          this.bullets.release(b);
+          this.finishBullet(b);
           return;
         }
         const isCore = inside && !isSub && w.coreId[cellIdx] > 0;
@@ -581,7 +610,10 @@ export class CombatSystem {
         // instead of allowing typed-array truncation to round damage upward.
         if (b.bounceRetention < 1) hitDmg = Math.max(1, Math.round(hitDmg));
         const beforeHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
-        const result = w.damageSub(hit.cx, hit.cy, hitDmg, true);
+        const galeKey = isSub ? w.width*w.height+hit.cy*w.subWidth+hit.cx : cellIdx;
+        const alreadyHit = b.gale && b.galeCells.has(galeKey);
+        if(b.gale)b.galeCells.add(galeKey);
+        const result = alreadyHit ? 1 : w.damageSub(hit.cx, hit.cy, hitDmg, true);
         const afterHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
         if (b.momentumBoosted) this.telemetry.katanaBoostedDamage += Math.max(0, beforeHp - afterHp);
         if (b.fromDrone && result > 0) this.drones.usefulHits++;
@@ -617,9 +649,13 @@ export class CombatSystem {
           continue;
         }
 
+        // An unopened world gate remains authoritative for a flying crescent.
+        const door = inside ? w.doors[w.doorId[cellIdx]-1] : undefined;
+        if(b.gale && door?.gate && !door.open){this.finishBullet(b);return;}
+
         // Piercing and other ammunition still stop at the world border.
         if (result === 0 || b.pierceLeft <= 0) {
-          this.bullets.release(b);
+          this.finishBullet(b);
           return;
         }
 
@@ -641,20 +677,24 @@ export class CombatSystem {
           if (ty > hit.t) distToExit = Math.min(distToExit, ty + 0.5);
         }
 
-        const stepPast = Math.max(0.5, distToExit);
+        const stepPast = b.gale ? Math.min(remDist, Math.max(0.5,distToExit)) : Math.max(0.5,distToExit);
+        if(!this.recordSegment(b,hit.x,hit.y,curX+b.dx*stepPast,curY+b.dy*stepPast))return;
+        b.distanceLeft=Math.max(0,b.distanceLeft-stepPast);
         b.traveled += stepPast;
         b.totalTraveled += stepPast;
         remDist -= stepPast;
         curX += b.dx * stepPast;
         curY += b.dy * stepPast;
         if (!this.world.inBounds(Math.floor(curX / cs), Math.floor(curY / cs))) {
-          this.bullets.release(b);
+          this.finishBullet(b);
           return;
         }
         continue;
       }
 
       // No hit along the remaining segment.
+      if(!this.recordSegment(b,curX,curY,hit.x,hit.y))return;
+      b.distanceLeft=Math.max(0,b.distanceLeft-remDist);
       curX = hit.x;
       curY = hit.y;
       b.traveled += remDist;
@@ -664,6 +704,53 @@ export class CombatSystem {
 
     b.x = curX;
     b.y = curY;
+    if(b.distanceLeft<=1e-6)this.finishBullet(b);
+  }
+
+  private finishBullet(b: Bullet): void {
+    if(b.replay){this.revolver.finish(b.replay);b.replay=null;}
+    this.bullets.release(b);
+  }
+
+  private recordSegment(b: Bullet, x: number, y: number, tx: number, ty: number): boolean {
+    if(!b.replay)return true;
+    if(this.revolver.record(b.replay,x,y)&&this.revolver.record(b.replay,tx,ty))return true;
+    // Stop at the last recorded vertex rather than replaying an invented shortcut.
+    b.x=b.replay.points[(b.replay.count-1)*2];b.y=b.replay.points[(b.replay.count-1)*2+1];
+    this.finishBullet(b);return false;
+  }
+
+  private replaySegment(shot: ReverseShot, x: number, y: number, tx: number, ty: number): void {
+    const length=Math.hypot(tx-x,ty-y);if(length<1e-8)return;
+    const dx=(tx-x)/length;const dy=(ty-y)/length;const w=this.world;
+    // Target identities prevent repeated damage when a replay remains inside a creature.
+    for(let guard=0;this.targets&&guard<16&&shot.hits<REVERSE.maxHits;guard++){
+      const t=this.targets.raycast(x,y,dx,dy,length,shot.targets);if(t<0)break;
+      const key=this.targets.targetKey??this.targets;
+      if(shot.targets.has(key))break;
+      shot.targets.add(key);shot.hits++;
+      this.targets.applyHit(shot.damage,x+dx*t,y+dy*t);
+      this.events.onCreatureHit?.(x+dx*t,y+dy*t,-dx,-dy);
+    }
+    let remaining=length;let ox=x;let oy=y;
+    for(let guard=0;guard<32&&remaining>1e-6&&shot.hits<REVERSE.maxHits;guard++){
+      if(!gridRaycast(w.subSolidQuery,w.subCellSize,ox,oy,dx,dy,remaining,hit))break;
+      if(!w.subInBounds(hit.cx,hit.cy))break;
+      const cx=hit.cx>>1;const cy=hit.cy>>1;const index=cy*w.width+cx;const sub=w.health[index]===0;
+      const key=sub?w.width*w.height+hit.cy*w.subWidth+hit.cx:index;
+      if(!shot.cells.has(index)&&!shot.cells.has(key)){
+        shot.cells.add(key);shot.hits++;
+        let damage=shot.damage+shot.terrainDamageBonus+(w.coreId[index]>0?shot.coreDamageBonus:0);
+        if(sub?w.isBlightSubAt(hit.cx,hit.cy):w.isBlightAt(cx,cy))damage=Math.round(damage*shot.blightMultiplier);
+        const result=w.damageSub(hit.cx,hit.cy,damage,true);
+        this.events.onImpact?.(hit.x,hit.y,hit.nx,hit.ny,cx,cy,result,sub,shot.ownerId);
+      }
+      const size=sub?w.subCellSize:w.cellSize;const gx=sub?hit.cx:cx;const gy=sub?hit.cy:cy;
+      const ex=Math.abs(dx)>1e-9?(((dx>0?gx+1:gx)*size)-ox)/dx:Infinity;
+      const ey=Math.abs(dy)>1e-9?(((dy>0?gy+1:gy)*size)-oy)/dy:Infinity;
+      const advance=Math.min(remaining,Math.max(hit.t+1e-3,Math.min(ex,ey)+1e-3));
+      ox+=dx*advance;oy+=dy*advance;remaining-=advance;
+    }
   }
 
   /** Cleave adjacent cells across the katana slash arc width. */
@@ -679,7 +766,7 @@ export class CombatSystem {
     // Perpendicular vector to projectile direction: (-dy, dx)
     const px = -b.dy;
     const py = b.dx;
-    const maxSteps = Math.min(4, Math.max(1, Math.floor(b.slashWidth / (ss * 2))));
+    const maxSteps = Math.min(b.gale ? 12 : 4, Math.max(1, Math.floor(b.slashWidth / (ss * 2))));
     const centerNormIdx = (hitSubY >> 1) * w.width + (hitSubX >> 1);
     let cleavedNormIdx = -1;
 
@@ -703,6 +790,11 @@ export class CombatSystem {
           cleavedNormIdx = cellIdx;
         }
 
+        if(b.gale){
+          const key=isSub?w.width*w.height+sy*w.subWidth+sx:cellIdx;
+          if(b.galeCells.has(key)||b.galeCells.size>=64)continue;
+          b.galeCells.add(key);
+        }
         const isCore = !isSub && w.coreId[cellIdx] > 0;
         const isBlight = isSub ? w.isBlightSubAt(sx, sy) : w.isBlightAt(hcx, hcy);
 
