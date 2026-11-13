@@ -156,3 +156,9 @@ Open **Main Menu → Settings → Gameplay**. **New Save Seed** accepts 1–8 le
 **Speedrun Timer — Slot N** enables a cumulative `HH:MM:SS.mmm` HUD clock for the selected save. It adds real elapsed time across active runs, independently of simulation speed. Pause, upgrades, map selection, main menu, results, hidden tabs and offline time do not count. Disabling it hides the clock and retains the total; a fresh save starts at zero. Time is saved at transitions and every five seconds during play.
 
 Run `npm run test:profile-browser` against the Vite dev server for settings, reproducible generation, profile isolation, reload, paused/hidden timing and narrow-screen checks.
+
+## Main-menu gameplay backdrop
+
+The menu runs a separate miniature lab with six randomly arranged, connected rooms, two ordinary pistol soldiers in a safe room, and two exposed Blight generators. It uses the game's physics, combat, growth, terrain textures and soldier sprites. All terrain is tier 1. A new skirmish starts after the last generator or soldier is lost, or after 90 seconds; **New Skirmish** generates another immediately.
+
+The backdrop adapts to landscape/portrait screens, uses steady soldier lighting, pauses while hidden, and stops when leaving the menu. Its combat and gold pickups never affect save slots, profile seeds, player resources, or speedrun timing. Run `npm run test:menu-browser` against the Vite server to verify gameplay, long-session save isolation, regeneration, stop/resume, and phone layout. The release check passed 466 unit tests, the production build, and Chromium menu validation with no page errors; screenshots are generated under `/tmp/breach-menu-validation`.

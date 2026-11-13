@@ -32,7 +32,7 @@ export class MainMenu {
     this.root = document.createElement("div");
     this.root.className = "overlay main-overlay hidden";
 
-    // 1. Background simulation of blight generators filling empty hallways
+    // 1. Independent miniature lab using the real gameplay simulation.
     this.background = new MainMenuBackground();
     this.root.append(this.background.canvas);
 
@@ -72,7 +72,7 @@ export class MainMenu {
         <div class="main-sub-actions">
           <button class="btn btn-accent" data-act="upgrades">UPGRADE TREE <span class="kbd">U</span></button>
           <button class="btn" data-act="settings">SETTINGS</button>
-          <button class="btn btn-purge" data-act="purge" title="Trigger corridor sterilization sweep">PURGE CORRIDORS</button>
+          <button class="btn btn-purge" data-act="purge" title="Generate another miniature lab">NEW SKIRMISH</button>
         </div>
       </div>
     `;
