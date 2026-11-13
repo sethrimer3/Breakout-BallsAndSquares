@@ -145,6 +145,10 @@ Non-Pistol primary weapons remain unique across the squad (including alternate m
 
 See [the revised Black Market plan](docs/BLACK_MARKET_IMPLEMENTATION_PLAN.md) and [validation / playtest notes](docs/WEAPON_VALIDATION.md). Run `npm run test:weapons` for focused coverage and `npm run test:weapon-browser` against a running Vite server for browser validation.
 
+The Research Lab's starting sector and the next two sectors in either map direction use tier 1 terrain, including room and corridor walls. Sectors three through five use tier 2, and the outer sectors use tier 3. These bands stay anchored to the original starting sector when deploying elsewhere. Keycard doors, glass, Blight and the invincible perimeter retain their special behavior.
+
+Hallway side lights are recessed into solid walls, with narrow tubes flush to the corridor-facing surface. Their light originates just outside that surface so it illuminates the hallway rather than being blocked by its own wall. Breaking the supporting wall extinguishes the fixture.
+
 ## Map boundaries
 
 Every map has a permanent, non-destructible perimeter. Indoor maps and the menu lab use three-cell dark brushed-metal walls; forest and city maps use uneven, three-cell black-stone cliffs. The mothership has a two-cell metal hull with chamfered corners. Layers fade from full visibility on the inner face to pure black on the outer face, with an opaque black exterior beyond. The perimeter is hidden by unexplored fog just like other terrain. Boundaries block deployment, growth, freezing and piercing/drilling weapons without awarding resources. Ordinary rounds can still ricochet, and world-travel doors and exit pockets remain usable. Boundaries are regenerated for existing profiles too.

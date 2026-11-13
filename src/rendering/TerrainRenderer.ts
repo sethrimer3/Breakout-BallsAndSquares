@@ -7,7 +7,7 @@ import type { CameraSystem } from "../systems/CameraSystem";
 import { hash2 } from "../core/math";
 import { DECOR } from "../world/LabDetails";
 import { materialColor, TEX, TIER_PAINT, crackTexelAt, materialShade } from "./materials";
-import { LIGHT_KIND, MAT, SUB, type PixelWorld, type RoomLight } from "../world/PixelWorld";
+import { roomLightPosition, LIGHT_KIND, MAT, SUB, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
 
 type RGB = readonly [number, number, number];
@@ -322,7 +322,8 @@ export class TerrainRenderer {
     if (l.kind !== LIGHT_KIND.wash) {
       // A panel goes dark once Blight grows over it or rock fills its cell.
       const i = l.y0 * w.width + l.x0;
-      if (w.health[i] > 0 || w.decor[i] !== DECOR.lightPanel) return 0;
+      if (w.decor[i] !== DECOR.lightPanel || w.blight[i] > 0) return 0;
+      if (l.wallFace ? w.health[i] === 0 : w.health[i] > 0) return 0;
     }
     if (l.kind === LIGHT_KIND.flicker) return still ? 0.35 : flickerLevel(t, l.phase);
     return 1;
@@ -331,6 +332,7 @@ export class TerrainRenderer {
   /** Repaint a shot-out panel without rebuilding the whole floor texture. */
   darkenFixture(light: RoomLight): void {
     this.paintFloor(light.x0, light.y0, light.x1, light.y1);
+    if (light.wallFace) this.chunks.markCell(light.x0, light.y0);
   }
 
   /**
@@ -377,8 +379,9 @@ export class TerrainRenderer {
       g.beginPath();
       g.rect(rx, ry, rw, rh);
       g.clip();
-      const mx = cam.worldToScreenX(((l.x0 + l.x1 + 1) / 2) * cs);
-      const my = cam.worldToScreenY(((l.y0 + l.y1 + 1) / 2) * cs);
+      const source = roomLightPosition(l, cs);
+      const mx = cam.worldToScreenX(source.x);
+      const my = cam.worldToScreenY(source.y);
       let rad: number;
       if (l.kind === LIGHT_KIND.blight) {
         rad = Math.max(rw, rh) * 0.75;
@@ -417,6 +420,20 @@ export class TerrainRenderer {
       const pw = (l.x1 - l.x0 + 1) * cs * z;
       const ph = (l.y1 - l.y0 + 1) * cs * z;
       ctx.fillStyle = l.kind === LIGHT_KIND.bright ? "rgb(200, 225, 255)" : l.kind === LIGHT_KIND.dim ? "rgb(255, 225, 170)" : "rgb(190, 255, 220)";
+      if (l.wallFace) {
+        // A dark recess with a narrow tube flush to the hallway-facing wall lip.
+        const unit = cs * z, horizontal = l.wallFace === "north" || l.wallFace === "south";
+        const tx = x + (horizontal ? .15 : l.wallFace === "east" ? .75 : .1) * unit;
+        const ty = y + (horizontal ? l.wallFace === "south" ? .75 : .1 : .15) * unit;
+        const tw = (horizontal ? .7 : .15) * unit, th = (horizontal ? .15 : .7) * unit;
+        const color = ctx.fillStyle;
+        ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+        ctx.fillStyle = "#080c10"; ctx.fillRect(tx-unit*.06,ty-unit*.06,tw+unit*.12,th+unit*.12);
+        ctx.fillStyle = color; ctx.globalAlpha = level * .9;
+        ctx.fillRect(tx,ty,tw,th);
+        ctx.globalCompositeOperation = "lighter";
+        continue;
+      }
       // Halo, then the tube, inset half a subcell so the panel frame shows.
       ctx.globalAlpha = level * 0.18;
       ctx.fillRect(x - cs * z * 0.5, y - cs * z * 0.5, pw + cs * z, ph + cs * z);
@@ -865,19 +882,19 @@ export class TerrainRenderer {
     return zoneForDepth(w.depthOf(cx, cy) + dither) + 1;
   }
 
-  /** Material tier of a solid cell (1..7): zone fill by tier, walls one tier up, doors by keycard. */
+  /** Material tier: starter walls match local fill; later walls are one tier up; doors follow keycards. */
   private materialTier(cx: number, cy: number): number {
     const w = this.world;
     const i = cy * w.width + cx;
     if (w.mat[i] === MAT.door) return w.doors[w.doorId[i] - 1]?.tier ?? 1;
     const wm = w.wall[i];
-    if (wm > 0) return w.tierBase + wm + 1;
+    if (wm > 0) return w.wallTierAt(cx, cy);
     return this.fillTier(cx, cy, i);
   }
 
   /**
    * Terrain tier of a solid cell for its matte paint band (0 = unpainted):
-   * 1..3 for zone fill, wall material one tier up (4 = reinforced), doors by
+   * 1..3 for zone fill and starter walls, later walls one tier up, doors by
    * the keycard tier that opens them. Glass, Blight and rubble have none.
    */
   tierAt(cx: number, cy: number): number {
@@ -889,7 +906,7 @@ export class TerrainRenderer {
     if (m === MAT.door) return w.doors[w.doorId[i] - 1]?.tier ?? 0;
     if (w.coreId[i] > 0 || w.blight[i] > 0) return 0;
     const wm = w.wall[i];
-    if (wm > 0) return w.tierBase + wm + 1;
+    if (wm > 0) return w.wallTierAt(cx, cy);
     return this.fillTier(cx, cy, i);
   }
 

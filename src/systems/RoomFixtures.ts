@@ -12,6 +12,12 @@ export class RoomFixtures implements BulletTargets {
   get targetKey(): object | null { return this.selected; }
   constructor(private world: PixelWorld, private onBreak: (light: RoomLight) => void = () => {}) {
     this.ids = new Int32Array(world.width * world.height);
+    world.addListener((x, y, kind) => {
+      if (kind !== "destroyed" || world.solidAt(x, y)) return;
+      const id = this.ids[y * world.width + x];
+      const light = id ? world.roomLights[id - 1] : undefined;
+      if (light?.wallFace) this.break(light);
+    });
   }
   reset(): void {
     this.ids.fill(0); this.selected = null;

@@ -104,20 +104,22 @@ function paintCorridor(world: PixelWorld, seg: LabCorridorSegment, seed: number)
       }
     }
   }
-  // Single-cell fixtures along both edges leave the corridor center clear.
+  // Recess fixtures into the first wall cell, facing the hallway interior.
   // Skip fixtures where a cave-in has brought the ceiling down.
   const falls = seg.rubble ? corridorCaveIns(seg, seed) : [];
   const pitch = FACILITY.panelPitch + 2;
   const a0 = seg.axis === "h" ? seg.x0 : seg.y0;
   const a1 = seg.axis === "h" ? seg.x1 : seg.y1;
-  const sides = seg.axis === "h" ? [seg.y0, seg.y1] : [seg.x0, seg.x1];
+  const sides = seg.axis === "h" ? [seg.y0 - 1, seg.y1 + 1] : [seg.x0 - 1, seg.x1 + 1];
   for (let a = a0 + 3; a <= a1 - 2; a += pitch) {
     for (const side of sides) {
       const x = seg.axis === "h" ? a : side;
       const y = seg.axis === "h" ? side : a;
+      if (!world.inBounds(x, y) || wallAt(world, x, y) === 0 || world.mat[y * world.width + x] !== MAT.none) continue;
+      const face: RoomLight["wallFace"] = seg.axis === "h" ? (side < seg.y0 ? "south" : "north") : (side < seg.x0 ? "east" : "west");
       if (falls.some((f) => Math.hypot(f.x - (x + 0.5), f.y - (y + 0.5)) < f.r * FACILITY.caveInScatter + 1)) continue;
       addPanel(world, { x0: x, y0: y, x1: x, y1: y },
-        { cx0: seg.x0, cy0: seg.y0, cx1: seg.x1, cy1: seg.y1 }, state, hash2(x, y, seed + 7));
+        { cx0: seg.x0, cy0: seg.y0, cx1: seg.x1, cy1: seg.y1 }, state, hash2(x, y, seed + 7), face);
     }
   }
   if (state === ROOM_STATE.pristine) {
@@ -132,7 +134,7 @@ type Clip = { cx0: number; cy0: number; cx1: number; cy1: number };
  * A ceiling light panel: bright in pristine areas, mostly lit in worn ones,
  * mostly dead in decayed ones. `roll` (0..1) decides which.
  */
-function addPanel(world: PixelWorld, p: Rect, clip: Clip, state: RoomState, roll: number): void {
+function addPanel(world: PixelWorld, p: Rect, clip: Clip, state: RoomState, roll: number, wallFace?: RoomLight["wallFace"]): void {
   let kind: RoomLight["kind"] | -1;
   if (state === ROOM_STATE.pristine) kind = LIGHT_KIND.bright;
   else if (state === ROOM_STATE.worn) {
@@ -143,7 +145,7 @@ function addPanel(world: PixelWorld, p: Rect, clip: Clip, state: RoomState, roll
   for (let y = p.y0; y <= p.y1; y++) {
     for (let x = p.x0; x <= p.x1; x++) setDecor(world, x, y, kind === -1 ? DECOR.deadPanel : DECOR.lightPanel);
   }
-  if (kind !== -1) world.roomLights.push({ kind, ...p, ...clip, phase: (roll * 7.31) % 1 });
+  if (kind !== -1) world.roomLights.push({ kind, ...p, ...clip, wallFace, phase: (roll * 7.31) % 1 });
 }
 
 /**
@@ -538,6 +540,14 @@ export function decorateLab(world: PixelWorld, layout: LabLayout): void {
 
 /** Keep at least one working, shootable ceiling fixture in rooms with open floor. */
 export function ensureRoomFixtures(world: PixelWorld, layout: LabLayout): void {
+  // Room finishes and cave-ins run after hallway dressing. Restore only fixtures
+  // whose solid wall survived, without painting lights across openings or doors.
+  for (const light of world.roomLights) if (light.wallFace) {
+    const i = light.y0 * world.width + light.x0;
+    if (!world.wall[i] || !world.health[i] || world.mat[i] !== MAT.none || world.blight[i]) light.destroyed = true;
+    else world.decor[i] = DECOR.lightPanel;
+  }
+
   for (const room of layout.rooms) {
     const existing = world.roomLights.some((l) => l.kind !== LIGHT_KIND.wash && l.kind !== LIGHT_KIND.blight
       && l.x0 >= room.x && l.y0 >= room.y && l.x1 < room.x + room.size && l.y1 < room.y + room.size

@@ -66,6 +66,8 @@ export const LIGHT_KIND = {
 } as const;
 
 export interface RoomLight {
+  /** Recessed wall fixture, facing the adjacent hallway air. */
+  wallFace?: "north" | "south" | "east" | "west";
   /** Shot-out ceiling fixtures stay dark until the next world generation. */
   destroyed?: boolean;
   kind: (typeof LIGHT_KIND)[keyof typeof LIGHT_KIND];
@@ -83,6 +85,15 @@ export interface RoomLight {
   phase: number;
   /** For a blight glow: the Blight Core id that powers it. */
   coreId?: number;
+}
+
+/** Emit just outside a wall face so the wall cannot occlude its own fixture. */
+export function roomLightPosition(l: RoomLight, cs: number): { x: number; y: number } {
+  const x = (l.x0 + l.x1 + 1) / 2, y = (l.y0 + l.y1 + 1) / 2;
+  return {
+    x: (x + (l.wallFace === "east" ? .501 : l.wallFace === "west" ? -.501 : 0)) * cs,
+    y: (y + (l.wallFace === "south" ? .501 : l.wallFace === "north" ? -.501 : 0)) * cs,
+  };
 }
 
 export interface Door {
@@ -372,6 +383,12 @@ export class PixelWorld implements SolidQuery {
     return this.tierBase + this.zoneAt(cx, cy) + 1;
   }
 
+  /** The starter lab's structural walls share the surrounding block tier. */
+  wallTierAt(cx: number, cy: number): number {
+    if (this.labLayout?.frame?.def.id === 1) return this.fillTierAt(cx, cy);
+    return this.tierBase + this.wall[cy * this.width + cx] + 1;
+  }
+
   /**
    * How far (0..1) a cell sits through its tier band, measured in sectors
    * from the start sector, so blocks toughen toward the band's far edge.
@@ -447,7 +464,8 @@ export class PixelWorld implements SolidQuery {
       if (m === MAT.crystal) return tierHealth(this.tierBase + Math.max(1, this.wall[i]), t);
       if (m === MAT.glass) return Math.max(1, Math.ceil(tierHealth(fill, t) * FACILITY.glassHealthMult));
       const w = this.wall[i];
-      if (w > 0) return tierWallHealth(this.tierBase + w, t);
+      if (w > 0) return this.labLayout?.frame?.def.id === 1
+        ? tierHealth(fill, t) : tierWallHealth(this.tierBase + w, t);
       if (this.coreId[i] > 0) return Math.min(65000, tierHealth(fill, t) + GROWTH.coreHealthBonus);
     }
     return tierHealth(fill, t);

@@ -3,7 +3,7 @@ import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Soldier } from "../entities/Soldier";
 import { SOLDIER_SHAPES, rayPolygonDistance, shapeOccluder, soldierShapeIndex } from "../entities/soldierShapes";
 import type { CameraSystem } from "./CameraSystem";
-import { LIGHT_KIND, type PixelWorld, type RoomLight } from "../world/PixelWorld";
+import { roomLightPosition, LIGHT_KIND, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 
 export type LightQuality = "high" | "medium" | "low";
 
@@ -208,8 +208,7 @@ export class LightingSystem {
           ? null
           : {
               light: l,
-              x: ((l.x0 + l.x1 + 1) / 2) * cs,
-              y: ((l.y0 + l.y1 + 1) / 2) * cs,
+              ...roomLightPosition(l, cs),
               radius: FACILITY.panelRadiusCells * cs,
               poly: null,
               polyCount: 0,

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { WORLD } from "../src/config";
 import { DECOR } from "../src/world/LabDetails";
-import { LIGHT_KIND, PixelWorld } from "../src/world/PixelWorld";
+import { roomLightPosition, LIGHT_KIND, PixelWorld } from "../src/world/PixelWorld";
 import { ROOM_STATE, generateWorld } from "../src/world/WorldGenerator";
 
 const SEEDS = [101, 202, 303, 404];
@@ -46,6 +46,14 @@ describe("room condition", () => {
     expect(kinds.has(LIGHT_KIND.wash)).toBe(true);
     expect(kinds.has(LIGHT_KIND.blight)).toBe(true);
     for (const l of w.roomLights) {
+      if (l.wallFace) {
+        const source = roomLightPosition(l, w.cellSize);
+        expect(source.x / w.cellSize).toBeGreaterThanOrEqual(l.cx0);
+        expect(source.x / w.cellSize).toBeLessThanOrEqual(l.cx1 + 1);
+        expect(source.y / w.cellSize).toBeGreaterThanOrEqual(l.cy0);
+        expect(source.y / w.cellSize).toBeLessThanOrEqual(l.cy1 + 1);
+        continue;
+      }
       // Lights never spill outside the room or hallway that holds them.
       expect(l.x0).toBeGreaterThanOrEqual(l.cx0);
       expect(l.y0).toBeGreaterThanOrEqual(l.cy0);
