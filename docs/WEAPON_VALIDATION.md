@@ -99,3 +99,20 @@ All accepted Black Market branches from [BLACK_MARKET_IMPLEMENTATION_PLAN.md](BL
 - **TypeScript + Vite production build (`npm run build`):** passed.
 - **Playwright Chromium smoke (`npm run test:weapon-browser`):** passed with 0 page errors; purchased, equipped, deployed, and visibly exercised all 12 accepted Black Market mutations (`reverse_revolver`, `orbit_cylinder`, `drone_shepherd`, `squelch`, `vacuum_pulse`, `burrower`, `freeze_rockets`, `chromatic_prism`, `rail_lance`, `gale_edge`, `napalm_garden`, `cryospray`), verified restart cleanup, Settings persistence, desktop (1440×900: `simP95Ms: 0.2`, `renderP95Ms: 0.3`, `heapDeltaBytes: 261168`) and 4×-CPU-throttled mobile (390×844: `simP95Ms: 1.9`, `renderP95Ms: 2.3`, `heapDeltaBytes: 99852`) stress profiles.
 - **Unverified playtesting:** Live multi-run Essence economy pacing, player readability of the 12 mutations in long sessions, and physical mobile device thermal/touch ergonomics remain on the manual playtest checklist.
+
+## Post-review Black Market regression fixes & validation
+
+Six reproduced bugs were fixed and covered by unit/integration tests in `tests/blackMarketRegressions.test.ts` and browser smoke checks in `scripts/weapon-smoke.cjs`:
+
+1. **Pooled projectile reset (`src/entities/Bullet.ts`, `src/systems/CombatSystem.ts`):** Added shared `resetBulletFields()` and called it across all bullet acquisition paths (`spawnBullet`, `spawnSlash`, `onSoldierBounce`, `releaseOrbitManual`) so Napalm/Cryo/Freeze/Burrower/Gale/Reverse state never leaks into reused Katana slashes or other projectiles.
+2. **Black Market Essence recovery (`src/progression/SaveManager.ts`):** `load()` recovery now subtracts `upgradeSpent` Essence totals (and reconstructs legacy pre-ledger Essence purchase costs via `upgradePrices`) so reloading does not restore spent Essence while preserving legitimate recovery and one-time lab refunds.
+3. **Late-world enemies in Cold & Napalm (`src/systems/FreezeSystem.ts`, `src/systems/LateEncounters.ts`, `src/systems/NapalmSystem.ts`, `src/systems/CombatSystem.ts`, `src/Game.ts`):** Integrated `LateEncounters` actors (`soldier`, `brute`, `boss`, `turret`, `trap`) into shared freeze status (50% speed, 2× incoming damage, timed thaw, overlap refresh) and Napalm ground/target-bound burn ticks with death/reset cleanup, preferring raycast `targetKey` identity over proximity fallback.
+4. **Rail Lance terrain traversal (`src/systems/RailLanceSystem.ts`):** Advanced ray traversal to the exit face of each impacted cell/subcell instead of a fixed `0.25` step, preventing the loop guard from terminating prematurely inside surviving terrain while respecting closed gates and world bounds.
+5. **Manual Rail Lance charging (`src/systems/CombatSystem.ts`, `src/Game.ts`):** Extracted shared `advanceRailCharge()` / `cancelRailCharge()` and routed `shootCommanderManual()` through the charge cycle so manual click-spam cannot bypass charging.
+6. **External Napalm ignition paths (`src/systems/CombatSystem.ts`):** Added `napalm.igniteAt(...)` to SQUELCH mine bursts (`onMineBurst`), Reverse-Playback Revolver return strikes (`replaySegment`), and Katana/Gale cleave (`cleaveSlashSides`).
+
+### Observed validation results (post-fix)
+
+- **Vitest suite (`npm test`):** 54 files, 436 tests passed.
+- **TypeScript + Vite production build (`npm run build`):** passed (`tsc --noEmit` + `vite build`).
+- **Playwright Chromium smoke (`npm run test:weapon-browser`):** passed with 0 page errors, including pooled `napalm_garden` -> `katana` reuse, manual Rail charge enforcement, Napalm external ignition, desktop (`simP95Ms: 0.2`, `renderP95Ms: 0.3`, `heapDeltaBytes: -76548`) and 4×-CPU-throttled mobile (`simP95Ms: 1.7`, `renderP95Ms: 1.9`, `heapDeltaBytes: 102268`) 600+1800 frame profiles.

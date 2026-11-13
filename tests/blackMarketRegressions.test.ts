@@ -5,7 +5,7 @@ import { Soldier, baseSoldierStats } from "../src/entities/Soldier";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { UpgradeManager } from "../src/progression/UpgradeManager";
 import { CombatSystem } from "../src/systems/CombatSystem";
-import { LateEncounters } from "../src/systems/LateEncounters";
+import { LateEncounters, type Encounter } from "../src/systems/LateEncounters";
 import { CAMPAIGN, campaignTier } from "../src/world/campaignBalance";
 import { MAT, PixelWorld } from "../src/world/PixelWorld";
 import { unlockTabs } from "./helpers/progression";
@@ -78,7 +78,7 @@ describe("Bug 2: Reload does not restore spent Black Market Essence", () => {
 
     // Simulate a legitimately cleared late-world encounter in world 3 (tier 8).
     const tier8Essence = CAMPAIGN[campaignTier(8)].essence;
-    save.data.worlds[3] = { unlocked: true, cleared: ["0:soldier:0"], gathered: [], conquered: [0] };
+    save.data.lab.worlds[3] = { discovered: [0], conquered: [0], cleared: ["0:soldier:0"], gathered: [], spawn: 0 };
     save.data.essence = tier8Essence;
     save.save();
 
@@ -98,19 +98,21 @@ describe("Bug 2: Reload does not restore spent Black Market Essence", () => {
     expect(res.ok).toBe(true);
     expect(reloaded.data.essence).toBe(tier8Essence);
     expect(reloaded.data.upgrades.reverse_unlock).toBe(0);
-    expect(reloaded.data.upgradeSpent.reverse_unlock).toBeUndefined();
+    expect(reloaded.data.upgradeSpent?.reverse_unlock).toBeUndefined();
     reloaded.save();
 
     // Reload after refund: stays refunded, second refund yields 0.
     const afterRefund = new SaveManager(storage);
     expect(afterRefund.data.essence).toBe(tier8Essence);
     expect(afterRefund.data.upgrades.reverse_unlock).toBe(0);
-    expect(new UpgradeManager(afterRefund).refundBlackMarket(false).refunded.essence ?? 0).toBe(0);
+    const secondRefund = new UpgradeManager(afterRefund).refundBlackMarket(false);
+    expect(secondRefund.ok).toBe(true);
+    if (secondRefund.ok) expect(secondRefund.refunded.essence ?? 0).toBe(0);
 
     // Legacy save without upgradeSpent ledger still accounts for Essence spent on reverse_unlock.
     afterRefund.data.upgrades.reverse_unlock = 1;
     afterRefund.data.essence = tier8Essence - 20;
-    delete afterRefund.data.upgradeSpent.reverse_unlock;
+    delete afterRefund.data.upgradeSpent?.reverse_unlock;
     afterRefund.save();
     const legacyReloaded = new SaveManager(storage);
     expect(legacyReloaded.data.essence).toBe(tier8Essence - 20);
@@ -125,7 +127,7 @@ describe("Bug 3: Cold and Napalm effects apply to LateEncounters enemies", () =>
     combat.late = late;
     combat.targets = late;
 
-    const enemy = {
+    const enemy: Encounter = {
       id: "1:soldier:0",
       sector: 1,
       x: 160,

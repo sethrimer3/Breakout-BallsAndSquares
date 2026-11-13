@@ -111,6 +111,32 @@ fs.mkdirSync(artifacts, { recursive: true });
   const drone=live.find(r=>r.mutation==='drone_shepherd');assert.equal(drone.soldiers,1);assert.equal(drone.deployed,1);assert.ok(drone.drones>0);
   await page.evaluate(()=>window.__game.startRun());
   assert.deepEqual(await page.evaluate(()=>{const c=window.__game.combat;return[c.goo.orbs.activeCount,c.goo.mines.activeCount,c.drones.pool.activeCount,c.laser.segments.activeCount];}),[0,0,0,0]);
+  const regressionChecks=await page.evaluate(async()=>{
+   const {Soldier}=await import('/src/entities/Soldier.ts');
+   const g=window.__game;
+   // 1. Pooled bullet reuse: Napalm -> Katana
+   g.combat.clearAll();
+   const ns=new Soldier(g.world.roomCenterX,g.world.roomCenterY,1,0,0,'flamethrower','free',0,null,'napalm_garden');
+   g.combat.fire(ns);
+   const reused=g.combat.bullets.items.find(b=>b.active);
+   g.combat.bullets.release(reused);
+   const ks=new Soldier(g.world.roomCenterX,g.world.roomCenterY,1,0,0,'katana','free',1,null,null);
+   g.combat.fire(ks);
+   const pooledClean=reused.active&&!reused.napalmSpray&&!reused.cryoSpray&&!reused.freezeRocket&&reused.burrowerGroupId===0;
+   // 2. Manual Rail charging: shootCommanderManual does not bypass charge
+   g.combat.clearAll();
+   const rs=new Soldier(g.world.roomCenterX,g.world.roomCenterY,1,0,0,'sniper_rifle','free',2,null,'rail_lance');
+   rs.isManual=true;rs.fireCooldown=0;
+   const strikesBefore=g.combat.rail.totalStrikes;
+   g.shootCommanderManual(rs);
+   const manualChargedWithoutFiring=rs.railCharging&&g.combat.rail.totalStrikes===strikesBefore;
+   // 3. Napalm external ignition
+   const patch=g.combat.napalm.placeGroundPatch(1,g.world.roomCenterX,g.world.roomCenterY,2,0,1);
+   const litCount=g.combat.napalm.igniteAt(g.world.roomCenterX,g.world.roomCenterY,8,2);
+   g.combat.clearAll();
+   return{pooledClean,manualChargedWithoutFiring,napalmIgnited:litCount===1&&patch.lit};
+  });
+  assert.deepEqual(regressionChecks,{pooledClean:true,manualChargedWithoutFiring:true,napalmIgnited:true});
   await page.evaluate(()=>window.__game.openMainMenu());
   await page.locator('.main-overlay [data-act="settings"]').click();
   await page.locator('.settings-panel:not(.hidden) .settings-tab[data-tab="visuals"]').click();
