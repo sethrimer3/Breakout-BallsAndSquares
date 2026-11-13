@@ -64,6 +64,10 @@ export class Bullet {
   napalmSpray = false;
   /** Cryospray mist flag (cold-only, no fire ignition). */
   cryoSpray = false;
+  /** Overcharge Conductor charging round (zero direct damage, stacks per target). */
+  overcharge = false;
+  /** Snapshot AR discharge power (arDamage + globalDamageBonus) for Overcharge rounds. */
+  overchargePower = 1;
 }
 
 /** Reset all per-projectile fields on pooled Bullet reuse so no mutation state leaks. */
@@ -108,6 +112,8 @@ export function resetBulletFields(b: Bullet): void {
   b.vacuumPellet = false;
   b.napalmSpray = false;
   b.cryoSpray = false;
+  b.overcharge = false;
+  b.overchargePower = 1;
 }
 
 /** Fixed-size object pool for bullets. */

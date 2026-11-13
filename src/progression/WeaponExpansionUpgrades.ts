@@ -1,10 +1,17 @@
-import { DRONE, GOO, PRISM, GALE } from "../config";
+import { DRONE, GOO, PRISM, GALE, OVERCHARGE } from "../config";
 import type { SoldierStats } from "../entities/Soldier";
 import type { UpgradeBranch, UpgradeDef, UpgradeId, Currency } from "./UpgradeDefinitions";
+
+export function overchargeSpreadAt(level: number): number {
+  if (level <= 0) return OVERCHARGE.initialSpreadDeg;
+  if (level >= OVERCHARGE.accuracyMaxLevel) return OVERCHARGE.finalSpreadDeg;
+  return +(OVERCHARGE.initialSpreadDeg * Math.pow(OVERCHARGE.finalSpreadDeg / OVERCHARGE.initialSpreadDeg, level / OVERCHARGE.accuracyMaxLevel)).toFixed(2);
+}
 
 export type ExpansionUpgradeId =
   | "reverse_unlock" | "orbit_unlock"
   | "vacuum_unlock"
+  | "overcharge_unlock" | "overcharge_accuracy"
   | "burrower_unlock" | "freeze_rockets_unlock"
   | "rail_lance_unlock"
   | "gale_unlock" | "gale_range"
@@ -40,6 +47,10 @@ export const EXPANSION_DEFS: readonly UpgradeDef[] = [
     (s,l)=>{s.orbitUnlocked=l>0;},count,unlocked,null,"essence"),
   node("vacuum_unlock","shotgun","Vacuum Pulse","Unlock Shotgun mutation: 0.5× fire rate, sucks in nearby debris to boost pellets & damage",-1,-1,1,30,
     (s,l)=>{s.vacuumUnlocked=l>0;},count,unlocked,"shotgun_unlock","essence"),
+  node("overcharge_unlock","assault_rifle","Overcharge Conductor","Unlock Assault Rifle mutation: zero-damage charging rounds (3+ hits arm delayed chain + blast)",-1,-1,1,35,
+    (s,l)=>{s.overchargeUnlocked=l>0;},count,unlocked,"ar_unlock","essence"),
+  node("overcharge_accuracy","assault_rifle","Conductor Stabilization","Reduces Overcharge wide spread (±10.5°) down to ±0.1° (0.2° cone)",1,-1,OVERCHARGE.accuracyMaxLevel,5,
+    (s,l)=>{s.overchargeSpreadDeg=overchargeSpreadAt(l);},overchargeSpreadAt,n=>`±${n<=0.2?n.toFixed(1):n.toFixed(2)}°`,"overcharge_unlock","essence"),
   node("burrower_unlock","rocket_launcher","Burrower","Unlock Rocket mutation: drills through terrain, laying mines that detonate together",-1,-1,1,35,
     (s,l)=>{s.burrowerUnlocked=l>0;},count,unlocked,"rocket_unlock","essence"),
   node("freeze_rockets_unlock","rocket_launcher","Freeze Rockets","Unlock Rocket mutation: cold-only burst freezes terrain, Blight & enemies (no block damage)",1,-1,1,35,

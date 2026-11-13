@@ -1168,6 +1168,9 @@ export class UpgradeTree {
           {id:null,label:"STANDARD",unlocked:true},
           {id:"squelch",label:"SQUELCH",unlocked:st.gooUnlocked},
           {id:"vacuum_pulse",label:"VACUUM PULSE",unlocked:st.vacuumUnlocked},
+        ] : curW === "assault_rifle" ? [
+          {id:null,label:"STANDARD",unlocked:true},
+          {id:"overcharge_conductor",label:"OVERCHARGE CONDUCTOR",unlocked:st.overchargeUnlocked},
         ] : curW === "rocket_launcher" ? [
           {id:null,label:"STANDARD",unlocked:true},
           {id:"burrower",label:"BURROWER",unlocked:st.burrowerUnlocked},
@@ -1210,6 +1213,7 @@ export class UpgradeTree {
       else if(curM==="drone_shepherd")wSummary=`Independent pistol drones · ${st.droneCapacity} cap · ${st.droneReleaseInterval.toFixed(2)}s · ${st.droneDamage} DMG`;
       else if(curM==="squelch")wSummary=`Stick → mine → rebound · ${st.gooMass.toFixed(2)} mass · ${st.gooDistance} range`;
       else if(curM==="vacuum_pulse")wSummary=`0.5× cadence (${(st.shotgunFireRate*0.5).toFixed(2)}/s) · sucks debris → +pellets & DMG`;
+      else if(curM==="overcharge_conductor")wSummary=`Charging rounds (0 hit DMG) · 3+ hits arm delayed chain + blast · ±${st.overchargeSpreadDeg<=0.2?st.overchargeSpreadDeg.toFixed(1):st.overchargeSpreadDeg.toFixed(2)}°`;
       else if(curM==="burrower")wSummary=`Drills terrain → grouped mines detonate together · ${st.rocketDamage} DMG`;
       else if(curM==="freeze_rockets")wSummary=`Cold-only burst · 50% slow / 2× DMG / 0.5× Blight · shatter`;
       else if(curM==="chromatic_prism")wSummary=`Prism laser · BAND ${st.prismSpectrum+1}/7 · ${st.prismBounces} bounces · ${st.prismDamage} DMG`;

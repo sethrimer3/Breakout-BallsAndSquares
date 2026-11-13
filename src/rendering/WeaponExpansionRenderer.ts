@@ -1,4 +1,4 @@
-import { NAPALM, ORBIT, PRISM, RAIL } from "../config";
+import { NAPALM, ORBIT, OVERCHARGE, PRISM, RAIL } from "../config";
 import type { Game } from "../Game";
 
 /** Bounded Canvas-only effects; never alter weapon simulation. */
@@ -210,6 +210,102 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
         }
       }
     }
+  }
+
+  // Overcharge Conductor: charging rounds, steady per-target glow, restrained arcs & small blasts.
+  for (const b of game.combat.bullets.items) {
+    if (!b.active || !b.overcharge) continue;
+    const x = cam.worldToScreenX(b.x);
+    const y = cam.worldToScreenY(b.y);
+    if (x < -16 || y < -16 || x > cam.viewW + 16 || y > cam.viewH + 16) continue;
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = "#5ad8ff";
+    ctx.lineWidth = Math.max(1.2, cam.zoom * 1.1);
+    ctx.beginPath();
+    ctx.moveTo(x - b.dx * 5 * cam.zoom, y - b.dy * 5 * cam.zoom);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    ctx.fillStyle = "#e6fbff";
+    ctx.fillRect(x - 1, y - 1, Math.max(1.5, cam.zoom * 1.2), Math.max(1.5, cam.zoom * 1.2));
+  }
+
+  for (const e of game.combat.overcharge.entries) {
+    if (!e.active) continue;
+    const x = cam.worldToScreenX(e.x);
+    const y = cam.worldToScreenY(e.y);
+    if (x < -32 || y < -32 || x > cam.viewW + 32 || y > cam.viewH + 32) continue;
+    const frac = Math.min(1, e.stacks / OVERCHARGE.maxChargeStacks);
+    const armed = e.stacks >= OVERCHARGE.armThreshold;
+    const glowRad = Math.max(3, (4 + frac * 6) * cam.zoom);
+    ctx.globalAlpha = 0.24 + frac * 0.44;
+    ctx.fillStyle = armed ? "#6ce5ff" : "#3fa8e8";
+    ctx.beginPath();
+    ctx.arc(x, y, glowRad, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Restrained electrical accents: more ticks with higher charge, static under reduced motion.
+    const accents = armed ? Math.min(6, 2 + Math.floor((e.stacks - OVERCHARGE.armThreshold) / 2)) : 1;
+    const phase = reduced ? 0 : game.runStats.timeSurvived * 1.5;
+    ctx.globalAlpha = armed ? 0.8 : 0.45;
+    ctx.strokeStyle = armed ? "#d8f9ff" : "#7dd6ff";
+    ctx.lineWidth = Math.max(1, cam.zoom * 0.65);
+    for (let i = 0; i < accents; i++) {
+      const a = phase + (i * Math.PI * 2) / accents;
+      const r0 = glowRad * 0.65;
+      const r1 = glowRad * (armed ? 1.25 : 0.95);
+      ctx.beginPath();
+      ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0);
+      ctx.lineTo(x + Math.cos(a + 0.18) * r1, y + Math.sin(a + 0.18) * r1);
+      ctx.stroke();
+    }
+  }
+
+  for (const bl of game.combat.overcharge.blasts) {
+    if (!bl.active) continue;
+    const x = cam.worldToScreenX(bl.x);
+    const y = cam.worldToScreenY(bl.y);
+    if (x < -48 || y < -48 || x > cam.viewW + 48 || y > cam.viewH + 48) continue;
+    const progress = 1 - Math.max(0, bl.life / Math.max(1e-4, bl.maxLife));
+    const rad = Math.max(2, bl.radius * cam.zoom * (reduced ? 0.85 : 0.55 + 0.45 * progress));
+    ctx.globalAlpha = reduced ? 0.65 : Math.max(0, (1 - progress) * 0.85);
+    ctx.strokeStyle = "#8af0ff";
+    ctx.lineWidth = Math.max(1.5, cam.zoom * 1.4);
+    ctx.beginPath();
+    ctx.arc(x, y, rad, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(180, 248, 255, 0.35)";
+    ctx.fill();
+  }
+
+  for (const arc of game.combat.overcharge.arcs) {
+    if (!arc.active) continue;
+    const x1 = cam.worldToScreenX(arc.x1);
+    const y1 = cam.worldToScreenY(arc.y1);
+    const x2 = cam.worldToScreenX(arc.x2);
+    const y2 = cam.worldToScreenY(arc.y2);
+    ctx.globalAlpha = reduced ? 0.85 : Math.max(0, arc.life / Math.max(1e-4, arc.maxLife));
+    ctx.strokeStyle = "#52d8ff";
+    ctx.lineWidth = Math.max(1.5, cam.zoom * (1.2 + Math.min(1.2, arc.stacks * 0.08)));
+    const mx = (x1 + x2) * 0.5;
+    const my = (y1 + y2) * 0.5;
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const kink = reduced ? 0 : Math.min(6 * cam.zoom, len * 0.14);
+    const kx = mx + (-dy / len) * kink;
+    const ky = my + (dx / len) * kink;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(kx, ky);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    ctx.strokeStyle = "#f0fcff";
+    ctx.lineWidth = Math.max(0.7, cam.zoom * 0.45);
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(kx, ky);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
   }
 
   ctx.restore();

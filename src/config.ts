@@ -1088,3 +1088,45 @@ export const CRYO = {
   /** Mist particle pool cap. */
   particleCap: 320,
 } as const;
+
+/** Overcharge Conductor (Assault Rifle branch 1). */
+export const OVERCHARGE = {
+  /** Initial restored half-angle spread (degrees) when Overcharge Conductor is selected. */
+  initialSpreadDeg: 10.5,
+  /** Final half-angle precision endpoint (degrees): ±0.1° (0.2° total cone). */
+  finalSpreadDeg: 0.1,
+  /** Dedicated accuracy research levels from initialSpreadDeg down to finalSpreadDeg. */
+  accuracyMaxLevel: 6,
+  /** Minimum consecutive charging hits on a single target required to arm a discharge. */
+  armThreshold: 3,
+  /** Quiet-period delay (seconds) without another charging hit before discharge/dissipation. */
+  quietDelay: 0.45,
+  /** Maximum charge stacks per target for monotonic scaling. */
+  maxChargeStacks: 15,
+  /** Bounded active charged targets pool. */
+  maxTargets: 96,
+  /** Bounded visual arc & explosion pools. */
+  maxVisualArcs: 64,
+  maxVisualBlasts: 32,
+  /** Small electrical explosion radius (world units) at 3 stacks, and per-stack/cap scaling. */
+  baseBlastRadius: 14,
+  blastRadiusPerStack: 0.85,
+  maxBlastRadius: 24,
+  /** Chain lightning reach per hop (world units) at 3 stacks, and per-stack/cap scaling. */
+  baseChainReach: 48,
+  chainReachPerStack: 4,
+  maxChainReach: 96,
+  /** Chain hop count at 3 stacks, and per-stack/cap scaling. */
+  baseChainHops: 2,
+  chainHopsPerStack: 0.25,
+  maxChainHops: 5,
+  /** Discharge damage multipliers on AR power (arDamage + globalDamageBonus) at 3 stacks. */
+  baseBlastDamageMult: 2.0,
+  blastDamagePerStack: 0.8,
+  baseChainDamageMult: 1.5,
+  chainDamagePerStack: 0.6,
+  /** Visible chain lightning duration (seconds) at 3 stacks, and per-stack/cap scaling. */
+  baseArcDuration: 0.24,
+  arcDurationPerStack: 0.025,
+  maxArcDuration: 0.55,
+} as const;

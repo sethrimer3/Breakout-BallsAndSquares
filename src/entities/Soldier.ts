@@ -5,6 +5,7 @@ import {
   DRONE,
   PRISM,
   ASSAULT_RIFLE,
+  OVERCHARGE,
   GRENADE,
   GROWTH,
   KATANA,
@@ -38,6 +39,7 @@ export type PrimaryMutation =
   | "drone_shepherd"
   | "squelch"
   | "vacuum_pulse"
+  | "overcharge_conductor"
   | "burrower"
   | "freeze_rockets"
   | "chromatic_prism"
@@ -64,6 +66,8 @@ export interface SoldierStats {
   pistolBounces: number;
   reverseUnlocked: boolean;
   orbitUnlocked: boolean;
+  overchargeUnlocked: boolean;
+  overchargeSpreadDeg: number;
   galeUnlocked: boolean;
   galeDistance: number;
   vacuumUnlocked: boolean;
@@ -216,7 +220,7 @@ export function baseSoldierStats(): SoldierStats {
     bulletSpeed: SOLDIER.bulletSpeed,
     multishotChance: SOLDIER.multishotChance,
     pistolBounces: 0,
-    reverseUnlocked: false, orbitUnlocked: false, galeUnlocked: false, galeDistance: GALE.distance,
+    reverseUnlocked: false, orbitUnlocked: false, overchargeUnlocked: false, overchargeSpreadDeg: OVERCHARGE.initialSpreadDeg, galeUnlocked: false, galeDistance: GALE.distance,
     vacuumUnlocked: false, burrowerUnlocked: false, freezeRocketsUnlocked: false,
     railLanceUnlocked: false, napalmUnlocked: false, cryosprayUnlocked: false,
     shotgunUnlocked: false,
@@ -448,6 +452,8 @@ export function resolvePrimaryMutation(weapon: WeaponType, mutation: unknown, st
   } else if (weapon === "shotgun") {
     if (mutation === "squelch" && stats.gooUnlocked) return mutation;
     if (mutation === "vacuum_pulse" && stats.vacuumUnlocked) return mutation;
+  } else if (weapon === "assault_rifle") {
+    if (mutation === "overcharge_conductor" && stats.overchargeUnlocked) return mutation;
   } else if (weapon === "rocket_launcher") {
     if (mutation === "burrower" && stats.burrowerUnlocked) return mutation;
     if (mutation === "freeze_rockets" && stats.freezeRocketsUnlocked) return mutation;
@@ -481,6 +487,8 @@ export function mutationCompatibility(mutation: PrimaryMutation | null): Mutatio
       return { active: ["SQUELCH Mass/Range/Dwell/Damage/Radius/Rate/Residue"], inactive: ["Shotgun Pellets", "Shotgun Spread", "Shotgun Rebound"] };
     case "vacuum_pulse":
       return { active: ["Fire Rate (0.5×)", "Damage", "Pellets (base min)", "Spread", "Bullet Speed", "Range"], inactive: ["Shotgun Rebound"] };
+    case "overcharge_conductor":
+      return { active: ["Fire Rate", "FMJ Caliber (Discharge DMG)", "AP Rounds (Terrain Pierce)", "Stabilizer (Velocity)", "Conductor Accuracy"], inactive: ["Direct Contact DMG", "Recoil Stabilizer Spread"] };
     case "burrower":
       return { active: ["Fire Rate", "Damage", "Rocket Speed", "Blast Radius", "Cluster (+Group Charges)"], inactive: [] };
     case "freeze_rockets":

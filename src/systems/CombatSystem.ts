@@ -9,6 +9,7 @@ import { FreezeSystem } from "./FreezeSystem";
 import { BurrowerSystem } from "./BurrowerSystem";
 import { RailLanceSystem } from "./RailLanceSystem";
 import { NapalmSystem } from "./NapalmSystem";
+import { OverchargeSystem } from "./OverchargeSystem";
 import { slashMomentum } from "./Momentum";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
@@ -95,6 +96,7 @@ export class CombatSystem {
   readonly burrower: BurrowerSystem;
   readonly rail: RailLanceSystem;
   readonly napalm: NapalmSystem;
+  readonly overcharge: OverchargeSystem;
   stats: SoldierStats;
   /** Creatures bullets can hit before the terrain (the Blight's flowers, worms, specimens). */
   targets: BulletTargets | null = null;
@@ -118,14 +120,17 @@ export class CombatSystem {
     this.burrower = new BurrowerSystem();
     this.rail = new RailLanceSystem(world);
     this.napalm = new NapalmSystem(world);
+    this.overcharge = new OverchargeSystem(world);
 
     world.addDestroyListener((cx, cy, isSub, sx, sy) => {
       if (isSub) {
         this.debris.recordSubDestroyed(sx, sy);
         this.freeze.onSubDestroyed(sx, sy, this.currentOwnerId);
+        this.overcharge.onSubDestroyed(sx, sy);
       } else {
         this.debris.recordCellDestroyed(cx, cy);
         this.freeze.onCellDestroyed(cx, cy, this.currentOwnerId);
+        this.overcharge.onCellDestroyed(cx, cy);
       }
     });
 
@@ -197,6 +202,7 @@ export class CombatSystem {
     this.burrower.clear();
     this.rail.clear();
     this.napalm.clear();
+    this.overcharge.clear();
   }
 
   /** Effective fire rate for a soldier, accounting for active Black Market mutation. */
@@ -385,17 +391,18 @@ export class CombatSystem {
         );
       }
     } else if (s.weapon === "assault_rifle") {
-      const halfSpreadRad = this.stats.arSpreadDeg * DEG;
+      const isOvercharge = s.mutation === "overcharge_conductor";
+      const halfSpreadRad = (isOvercharge ? this.stats.overchargeSpreadDeg : this.stats.arSpreadDeg) * DEG;
       const a = this.rng.range(-halfSpreadRad, halfSpreadRad);
       const c = Math.cos(a);
       const sn = Math.sin(a);
-      this.spawnBullet(
+      const b = this.spawnBullet(
         s.x,
         s.y,
         dx * c - dy * sn,
         dx * sn + dy * c,
         this.stats.arBulletSpeed,
-        this.stats.arDamage,
+        isOvercharge ? 0 : this.stats.arDamage,
         ASSAULT_RIFLE.lifetime,
         s.radius + BULLET.muzzleGap,
         s.id,
@@ -404,6 +411,12 @@ export class CombatSystem {
         0,
         0,
       );
+      if (b && isOvercharge) {
+        b.overcharge = true;
+        b.damage = 0;
+        b.terrainDamageBonus = 0;
+        b.overchargePower = Math.max(1, this.stats.arDamage + this.stats.globalDamageBonus);
+      }
     } else if (s.weapon === "rocket_launcher") {
       const isBurrower = s.mutation === "burrower";
       const isFreeze = s.mutation === "freeze_rockets";
@@ -842,6 +855,67 @@ export class CombatSystem {
     this.freeze.update(dt);
     this.rail.update(dt);
     this.napalm.update(dt, this.creatures, this.late);
+    this.overcharge.update(dt, {
+      creatures: this.creatures,
+      late: this.late,
+      onBlast: (x, y, radius, damage, ownerId, blightMultiplier) => {
+        const radCells = radius / this.world.cellSize;
+        this.currentOwnerId = ownerId;
+        this.damageBlast(
+          { damage, terrainDamageBonus: 0, blightMultiplier, ownerId },
+          x,
+          y,
+          0,
+          0,
+          radCells,
+        );
+        this.currentOwnerId = 0;
+        this.creatures?.explode(x, y, radius, damage);
+        this.late?.explode(x, y, radius, damage);
+        this.napalm.igniteAt(x, y, radius, ownerId);
+        this.events.onExplosion?.(x, y, radius, damage);
+      },
+      onChainCell: (cx, cy, x, y, damage, ownerId, blightMultiplier) => {
+        const w = this.world;
+        if (!w.inBounds(cx, cy)) return;
+        const ci = cy * w.width + cx;
+        const isCore = w.coreId[ci] > 0;
+        const isBlight = w.isBlightAt(cx, cy);
+        let dmg = damage + (isCore ? this.stats.coreDamageBonus : 0);
+        if (isBlight && blightMultiplier > 1) dmg = Math.round(dmg * blightMultiplier);
+        this.currentOwnerId = ownerId;
+        const res = w.damage(cx, cy, dmg, true);
+        this.currentOwnerId = 0;
+        if (res > 0) {
+          this.napalm.igniteAt(x, y, 4, ownerId);
+          this.events.onImpact?.(x, y, 0, 0, cx, cy, res, false, ownerId);
+        }
+      },
+      onChainSub: (sx, sy, x, y, damage, ownerId, blightMultiplier) => {
+        const w = this.world;
+        if (!w.subInBounds(sx, sy)) return;
+        const isBlight = w.isBlightSubAt(sx, sy);
+        let dmg = damage;
+        if (isBlight && blightMultiplier > 1) dmg = Math.round(dmg * blightMultiplier);
+        this.currentOwnerId = ownerId;
+        const res = w.damageSub(sx, sy, dmg, true);
+        this.currentOwnerId = 0;
+        if (res > 0) {
+          this.napalm.igniteAt(x, y, 4, ownerId);
+          this.events.onImpact?.(x, y, 0, 0, sx >> 1, sy >> 1, res, true, ownerId);
+        }
+      },
+      onChainCreature: (c, x, y, damage) => {
+        this.creatures?.damageCreature(c, damage, x, y);
+        this.napalm.igniteAt(x, y, 4, 0);
+        this.events.onCreatureHit?.(x, y, 0, 0);
+      },
+      onChainEncounter: (enc, x, y, damage, ownerId) => {
+        this.late?.damageEncounter(enc, damage);
+        this.napalm.igniteAt(x, y, 4, ownerId);
+        this.events.onCreatureHit?.(x, y, 0, 0);
+      },
+    });
     const items = this.bullets.items;
     for (let i = 0; i < items.length; i++) {
       const b = items[i];
@@ -918,6 +992,12 @@ export class CombatSystem {
             const cr = !enc ? (this.isCreatureKey(k) ? k : this.findCreatureNear(ix, iy, 16)) : null;
             if (enc) this.freeze.freezeCreature(enc);
             else if (cr) this.freeze.freezeCreature(cr);
+          } else if (b.overcharge) {
+            const k = this.targets.targetKey ?? null;
+            const enc = this.isEncounterKey(k) ? k : null;
+            const cr = !enc ? (this.isCreatureKey(k) ? k : this.findCreatureNear(ix, iy, 16)) : null;
+            if (enc) this.overcharge.chargeEncounter(enc, b.ownerId, b.overchargePower);
+            else if (cr) this.overcharge.chargeCreature(cr, b.ownerId, b.overchargePower);
           } else if (b.explosionRadius > 0) {
             this.detonateRocket(b, ix, iy, -b.dx, -b.dy, Math.floor(ix / cs), Math.floor(iy / cs));
           } else {
@@ -959,6 +1039,32 @@ export class CombatSystem {
           if (w.inBounds(hcx, hcy)) {
             if (w.health[hcy * w.width + hcx] === 0) this.freeze.freezeSubCell(hit.cx, hit.cy, b.ownerId);
             else this.freeze.freezeCell(hcx, hcy, b.ownerId);
+          }
+          this.finishBullet(b);
+          return;
+        }
+
+        // Overcharge Conductor charging round: zero direct damage, adds per-target charge.
+        if (b.overcharge) {
+          if (w.inBounds(hcx, hcy)) {
+            const ci = hcy * w.width + hcx;
+            if (w.health[ci] === 0) this.overcharge.chargeSubCell(hit.cx, hit.cy, b.ownerId, b.overchargePower, b.blightMultiplier);
+            else this.overcharge.chargeCell(hcx, hcy, b.ownerId, b.overchargePower, b.blightMultiplier);
+            if (w.mat[ci] === MAT.door) {
+              const door = w.doors[w.doorId[ci] - 1];
+              if (door && !door.open) {
+                this.finishBullet(b);
+                return;
+              }
+            }
+          }
+          if (b.pierceLeft > 0) {
+            b.pierceLeft--;
+            b.totalTraveled += hit.t;
+            remDist -= Math.min(remDist, hit.t + 0.5);
+            curX = hit.x + b.dx * 0.5;
+            curY = hit.y + b.dy * 0.5;
+            continue;
           }
           this.finishBullet(b);
           return;
