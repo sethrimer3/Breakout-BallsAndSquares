@@ -147,7 +147,9 @@ See [the revised Black Market plan](docs/BLACK_MARKET_IMPLEMENTATION_PLAN.md) an
 
 ## Map boundaries
 
-Every map has a permanent, non-destructible perimeter. Indoor maps and the menu lab use three-cell dark brushed-metal walls; forest and city maps use uneven, three-cell black-stone cliffs. The mothership has a two-cell metal hull with chamfered corners. Layers fade from full visibility on the inner face to pure black on the outer face, with an opaque black exterior beyond. Boundaries block deployment, growth, freezing and piercing/drilling weapons without awarding resources. Ordinary rounds can still ricochet, and world-travel doors and exit pockets remain usable. Boundaries are regenerated for existing profiles too.
+Every map has a permanent, non-destructible perimeter. Indoor maps and the menu lab use three-cell dark brushed-metal walls; forest and city maps use uneven, three-cell black-stone cliffs. The mothership has a two-cell metal hull with chamfered corners. Layers fade from full visibility on the inner face to pure black on the outer face, with an opaque black exterior beyond. The perimeter is hidden by unexplored fog just like other terrain. Boundaries block deployment, growth, freezing and piercing/drilling weapons without awarding resources. Ordinary rounds can still ricochet, and world-travel doors and exit pockets remain usable. Boundaries are regenerated for existing profiles too.
+
+Destroyed non-Blight half-size pixels deal their maximum HP as damage to all eight neighboring half-size pixels. Debris destroyed by that damage continues the cascade; Blight can receive the damage but does not propagate it. Full-size blocks are unaffected by debris splash.
 
 ## Later worlds
 

@@ -159,6 +159,8 @@ export class Renderer {
     this.drawAdditiveParticles();
     ctx.restore();
 
+    drawMapBoundary(ctx, game.world, cam);
+
     // 4) Fog of war over the whole world; the aim indicator stays readable on top.
     if (!game.devMapAccess) this.fogRenderer.draw(ctx, cam);
     // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
@@ -169,7 +171,6 @@ export class Renderer {
     drawGoo(ctx, cam, game.combat.goo, still, game.lighting.quality === "low");
     this.drawTurrets();
     game.late.drawOverlay(ctx, cam);
-    drawMapBoundary(ctx, game.world, cam);
     this.drawAimIndicator();
     this.drawGateNotice();
 

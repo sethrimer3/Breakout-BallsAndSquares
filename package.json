@@ -12,6 +12,7 @@
     "test:weapons": "vitest run tests/ricochet.test.ts tests/goo*.test.ts tests/momentum.test.ts tests/drone.test.ts tests/prism.test.ts tests/weapon*.test.ts",
     "test:weapon-browser": "node scripts/weapon-smoke.cjs",
     "test:profile-browser": "node scripts/profile-smoke.cjs",
+    "test:boundary-fog-browser": "node scripts/boundary-fog-smoke.cjs",
     "test:menu-browser": "node scripts/menu-smoke.cjs"
   },
   "repository": {

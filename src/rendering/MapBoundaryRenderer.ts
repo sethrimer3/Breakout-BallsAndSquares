@@ -2,7 +2,7 @@ import type { PixelWorld } from '../world/PixelWorld';
 import type { CameraSystem } from '../systems/CameraSystem';
 import { boundaryColor, BOUNDARY_VOID } from '../world/MapBoundary';
 
-/** Final opaque pass keeps lighting, fog and weapon glows out of the void. */
+/** Opaque pass keeps lighting out of the void; gameplay fog must be drawn afterward. */
 export function drawMapBoundary(ctx: CanvasRenderingContext2D, w: PixelWorld, cam: CameraSystem): void {
   const cs=w.cellSize, size=cs*cam.zoom;
   const x0=Math.floor(cam.screenToWorldX(0)/cs), x1=Math.ceil(cam.screenToWorldX(cam.viewW)/cs);

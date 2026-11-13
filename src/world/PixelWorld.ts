@@ -601,9 +601,8 @@ export class PixelWorld implements SolidQuery {
    * Apply damage at subcell coordinates `(sx, sy)`.
    * If the parent normal cell `(sx >> 1, sy >> 1)` is solid, damages the parent normal cell.
    * Otherwise damages the 50% pink blight subcell at `(sx, sy)`.
-   * When the squad itself (`byPlayer`) breaks a rubble sub-pixel, the rubble
-   * orthogonally touching it crumbles too. Those knock-on breaks never spread
-   * further, so one shot clears a small patch, not a whole heap.
+   * Destroyed non-Blight subcells deal their full maximum HP to all eight
+   * neighboring subcells. Secondary non-Blight breaks continue the cascade.
    */
   damageSub(sx: number, sy: number, amount: number, byPlayer = false): 0 | 1 | 2 {
     if (!this.subInBounds(sx, sy)) return 0;
@@ -619,10 +618,11 @@ export class PixelWorld implements SolidQuery {
     const next = Math.max(0, hp - amount);
     this.subHealth[si] = next;
     if (next === 0) {
-      const rubble = this.subKind[si] === SUB.rubble;
+      const spreads = this.subKind[si] !== SUB.blight;
+      const debrisDamage = this.maxSubHealthAt(sx, sy);
       this.emit(cx, cy, "destroyed");
       this.emitDestroy(cx, cy, true, sx, sy);
-      if (rubble && byPlayer) this.crumbleRubbleAround(sx, sy);
+      if (spreads) this.spreadDebrisDamage(sx, sy, debrisDamage, byPlayer);
       return 2;
     }
     this.emit(cx, cy, "damaged");
@@ -632,22 +632,34 @@ export class PixelWorld implements SolidQuery {
   /** Called for each rubble sub-pixel that crumbles as a knock-on break (for debris effects). */
   onRubbleCrumble: ((sx: number, sy: number) => void) | null = null;
 
-  /** Break the rubble orthogonally touching subcell `(sx, sy)`, without chaining further. */
-  private crumbleRubbleAround(sx: number, sy: number): void {
-    const near = [sx + 1, sy, sx - 1, sy, sx, sy + 1, sx, sy - 1];
-    for (let k = 0; k < near.length; k += 2) {
-      const nx = near[k];
-      const ny = near[k + 1];
-      if (!this.subInBounds(nx, ny)) continue;
-      const ncx = nx >> 1;
-      const ncy = ny >> 1;
-      if (this.health[ncy * this.width + ncx] > 0) continue;
-      const ni = ny * this.subWidth + nx;
-      if (this.subKind[ni] !== SUB.rubble || this.subHealth[ni] === 0) continue;
-      this.subHealth[ni] = 0;
-      this.emit(ncx, ncy, "destroyed");
-      this.emitDestroy(ncx, ncy, true, nx, ny);
-      this.onRubbleCrumble?.(nx, ny);
+  private debrisQueue: { sx: number; sy: number; damage: number; byPlayer: boolean }[] = [];
+  private drainingDebris = false;
+
+  /** Drain iteratively so a large debris field cannot overflow the call stack. */
+  private spreadDebrisDamage(sx: number, sy: number, damage: number, byPlayer: boolean): void {
+    this.debrisQueue.push({ sx, sy, damage, byPlayer });
+    if (this.drainingDebris) return;
+    this.drainingDebris = true;
+    try {
+      for (let head = 0; head < this.debrisQueue.length; head++) {
+        const source = this.debrisQueue[head];
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const nx = source.sx + dx, ny = source.sy + dy;
+          if (!this.subInBounds(nx, ny)) continue;
+          const parent = (ny >> 1) * this.width + (nx >> 1);
+          // Only half-size pixels receive splash, never full-size terrain or hull.
+          if (this.health[parent] > 0 || this.boundary[parent]) continue;
+          const ni = ny * this.subWidth + nx;
+          const rubble = this.subKind[ni] === SUB.rubble;
+          if (this.damageSub(nx, ny, source.damage, source.byPlayer) === 2 && rubble) {
+            this.onRubbleCrumble?.(nx, ny);
+          }
+        }
+      }
+    } finally {
+      this.debrisQueue.length = 0;
+      this.drainingDebris = false;
     }
   }
 
