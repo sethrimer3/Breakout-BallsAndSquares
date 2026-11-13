@@ -42,7 +42,7 @@ export interface CombatEvents {
     ownerId?: number,
   ): void;
   /** A rocket or cluster bomb detonated at (x, y) with radius (world units). */
-  onExplosion?(x: number, y: number, radiusWorld: number, damage?: number): void;
+  onExplosion?(x: number, y: number, radiusWorld: number, damage?: number, visualOnly?: boolean): void;
   /** A bullet struck a creature. */
   onCreatureHit?(x: number, y: number, nx: number, ny: number): void;
   /** An ordinary round reflected from terrain, after its impact damage. */
@@ -415,7 +415,8 @@ export class CombatSystem {
         b.overcharge = true;
         b.damage = 0;
         b.terrainDamageBonus = 0;
-        b.overchargePower = Math.max(1, this.stats.arDamage + this.stats.globalDamageBonus);
+        b.overchargePower = Math.max(1, this.stats.arDamage + this.stats.globalDamageBonus + (s.mods?.damageBonus ?? 0));
+        b.overchargeTerrainBonus = s.mods?.terrainDamageBonus ?? 0;
       }
     } else if (s.weapon === "rocket_launcher") {
       const isBurrower = s.mutation === "burrower";
@@ -858,11 +859,11 @@ export class CombatSystem {
     this.overcharge.update(dt, {
       creatures: this.creatures,
       late: this.late,
-      onBlast: (x, y, radius, damage, ownerId, blightMultiplier) => {
+      onBlast: (x, y, radius, damage, terrainBonus, ownerId, blightMultiplier) => {
         const radCells = radius / this.world.cellSize;
         this.currentOwnerId = ownerId;
         this.damageBlast(
-          { damage, terrainDamageBonus: 0, blightMultiplier, ownerId },
+          { damage, terrainDamageBonus: terrainBonus, blightMultiplier, ownerId },
           x,
           y,
           0,
@@ -873,15 +874,15 @@ export class CombatSystem {
         this.creatures?.explode(x, y, radius, damage);
         this.late?.explode(x, y, radius, damage);
         this.napalm.igniteAt(x, y, radius, ownerId);
-        this.events.onExplosion?.(x, y, radius, damage);
+        this.events.onExplosion?.(x, y, radius, damage, true);
       },
-      onChainCell: (cx, cy, x, y, damage, ownerId, blightMultiplier) => {
+      onChainCell: (cx, cy, x, y, damage, terrainBonus, ownerId, blightMultiplier) => {
         const w = this.world;
         if (!w.inBounds(cx, cy)) return;
         const ci = cy * w.width + cx;
         const isCore = w.coreId[ci] > 0;
         const isBlight = w.isBlightAt(cx, cy);
-        let dmg = damage + (isCore ? this.stats.coreDamageBonus : 0);
+        let dmg = damage + terrainBonus + (isCore ? this.stats.coreDamageBonus : 0);
         if (isBlight && blightMultiplier > 1) dmg = Math.round(dmg * blightMultiplier);
         this.currentOwnerId = ownerId;
         const res = w.damage(cx, cy, dmg, true);
@@ -891,11 +892,11 @@ export class CombatSystem {
           this.events.onImpact?.(x, y, 0, 0, cx, cy, res, false, ownerId);
         }
       },
-      onChainSub: (sx, sy, x, y, damage, ownerId, blightMultiplier) => {
+      onChainSub: (sx, sy, x, y, damage, terrainBonus, ownerId, blightMultiplier) => {
         const w = this.world;
         if (!w.subInBounds(sx, sy)) return;
         const isBlight = w.isBlightSubAt(sx, sy);
-        let dmg = damage;
+        let dmg = damage + terrainBonus;
         if (isBlight && blightMultiplier > 1) dmg = Math.round(dmg * blightMultiplier);
         this.currentOwnerId = ownerId;
         const res = w.damageSub(sx, sy, dmg, true);
@@ -1044,30 +1045,67 @@ export class CombatSystem {
           return;
         }
 
-        // Overcharge Conductor charging round: zero direct damage, adds per-target charge.
+        // Overcharge Conductor charging round: zero direct damage, max 1 stack per distinct terrain target.
         if (b.overcharge) {
-          if (w.inBounds(hcx, hcy)) {
-            const ci = hcy * w.width + hcx;
-            if (w.health[ci] === 0) this.overcharge.chargeSubCell(hit.cx, hit.cy, b.ownerId, b.overchargePower, b.blightMultiplier);
-            else this.overcharge.chargeCell(hcx, hcy, b.ownerId, b.overchargePower, b.blightMultiplier);
-            if (w.mat[ci] === MAT.door) {
-              const door = w.doors[w.doorId[ci] - 1];
-              if (door && !door.open) {
-                this.finishBullet(b);
-                return;
-              }
+          if (!w.inBounds(hcx, hcy)) {
+            this.finishBullet(b);
+            return;
+          }
+          const ci = hcy * w.width + hcx;
+          const isSubOc = w.health[ci] === 0;
+          const targetKey = isSubOc ? (w.width * w.height + hit.cy * w.subWidth + hit.cx) : ci;
+          const alreadyCharged = b.overchargeHitCells.has(targetKey);
+          if (!alreadyCharged) {
+            b.overchargeHitCells.add(targetKey);
+            if (isSubOc) {
+              this.overcharge.chargeSubCell(hit.cx, hit.cy, b.ownerId, b.overchargePower, b.blightMultiplier, b.overchargeTerrainBonus);
+            } else {
+              this.overcharge.chargeCell(hcx, hcy, b.ownerId, b.overchargePower, b.blightMultiplier, b.overchargeTerrainBonus);
             }
           }
-          if (b.pierceLeft > 0) {
-            b.pierceLeft--;
-            b.totalTraveled += hit.t;
-            remDist -= Math.min(remDist, hit.t + 0.5);
-            curX = hit.x + b.dx * 0.5;
-            curY = hit.y + b.dy * 0.5;
-            continue;
+          if (w.mat[ci] === MAT.door) {
+            const door = w.doors[w.doorId[ci] - 1];
+            if (door && !door.open) {
+              this.finishBullet(b);
+              return;
+            }
           }
-          this.finishBullet(b);
-          return;
+          if (!alreadyCharged && b.pierceLeft <= 0) {
+            this.finishBullet(b);
+            return;
+          }
+          if (!alreadyCharged) b.pierceLeft--;
+
+          const S = isSubOc ? ss : cs;
+          const gx = isSubOc ? hit.cx : hcx;
+          const gy = isSubOc ? hit.cy : hcy;
+          let distToExit = hit.t + S * 1.5;
+          if (Math.abs(b.dx) > 1e-8) {
+            const exitX = (b.dx > 0 ? gx + 1 : gx) * S;
+            const tx = (exitX - curX) / b.dx;
+            if (tx >= hit.t - 1e-6) distToExit = Math.min(distToExit, Math.max(hit.t + 1e-3, tx + 1e-3));
+          }
+          if (Math.abs(b.dy) > 1e-8) {
+            const exitY = (b.dy > 0 ? gy + 1 : gy) * S;
+            const ty = (exitY - curY) / b.dy;
+            if (ty >= hit.t - 1e-6) distToExit = Math.min(distToExit, Math.max(hit.t + 1e-3, ty + 1e-3));
+          }
+          const stepPast = Math.max(hit.t + 1e-3, distToExit);
+          if (stepPast > remDist) {
+            b.x = curX + b.dx * remDist;
+            b.y = curY + b.dy * remDist;
+            b.traveled += remDist;
+            b.totalTraveled += remDist;
+            b.distanceLeft = Math.max(0, b.distanceLeft - remDist);
+            return;
+          }
+          b.distanceLeft = Math.max(0, b.distanceLeft - stepPast);
+          b.traveled += stepPast;
+          b.totalTraveled += stepPast;
+          remDist -= stepPast;
+          curX += b.dx * stepPast;
+          curY += b.dy * stepPast;
+          continue;
         }
 
         // Burrower rocket: drill through terrain, drop mines along drilled path, detonate all together.

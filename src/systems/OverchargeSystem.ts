@@ -27,6 +27,7 @@ export interface OverchargeEntry {
   quietLeft: number;
   ownerId: number;
   power: number;
+  terrainDamageBonus: number;
   blightMultiplier: number;
 }
 
@@ -54,11 +55,19 @@ export interface OverchargeBlastVisual {
 export interface OverchargeDischargeContext {
   creatures: CreatureSystem | null;
   late: LateEncounters | null;
-  onBlast: (x: number, y: number, radius: number, damage: number, ownerId: number, blightMultiplier: number) => void;
-  onChainCell: (cx: number, cy: number, x: number, y: number, damage: number, ownerId: number, blightMultiplier: number) => void;
-  onChainSub: (sx: number, sy: number, x: number, y: number, damage: number, ownerId: number, blightMultiplier: number) => void;
+  onBlast: (x: number, y: number, radius: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number) => void;
+  onChainCell: (cx: number, cy: number, x: number, y: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number) => void;
+  onChainSub: (sx: number, sy: number, x: number, y: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number) => void;
   onChainCreature: (c: Creature, x: number, y: number, damage: number, ownerId: number) => void;
   onChainEncounter: (enc: Encounter, x: number, y: number, damage: number, ownerId: number) => void;
+}
+
+interface ChainOrigin {
+  kind: OverchargeTargetKind;
+  cx: number;
+  cy: number;
+  sx: number;
+  sy: number;
 }
 
 interface ChainCandidate {
@@ -122,6 +131,7 @@ export class OverchargeSystem {
         quietLeft: 0,
         ownerId: 0,
         power: 1,
+        terrainDamageBonus: 0,
         blightMultiplier: 1,
       });
     }
@@ -234,6 +244,7 @@ export class OverchargeSystem {
     ownerId: number,
     power: number,
     blightMultiplier: number,
+    terrainDamageBonus = 0,
     cx = 0,
     cy = 0,
     ci = 0,
@@ -252,6 +263,7 @@ export class OverchargeSystem {
       slot.quietLeft = OVERCHARGE.quietDelay;
       slot.ownerId = ownerId;
       slot.power = Math.max(slot.power, power);
+      slot.terrainDamageBonus = Math.max(slot.terrainDamageBonus, terrainDamageBonus);
       slot.blightMultiplier = Math.max(slot.blightMultiplier, blightMultiplier);
       slot.x = x;
       slot.y = y;
@@ -275,6 +287,7 @@ export class OverchargeSystem {
       slot.quietLeft = OVERCHARGE.quietDelay;
       slot.ownerId = ownerId;
       slot.power = Math.max(1, power);
+      slot.terrainDamageBonus = Math.max(0, terrainDamageBonus);
       slot.blightMultiplier = Math.max(1, blightMultiplier);
     }
 
@@ -282,7 +295,7 @@ export class OverchargeSystem {
     return slot;
   }
 
-  chargeCell(cx: number, cy: number, ownerId: number, power: number, blightMultiplier = 1): OverchargeEntry | null {
+  chargeCell(cx: number, cy: number, ownerId: number, power: number, blightMultiplier = 1, terrainDamageBonus = 0): OverchargeEntry | null {
     if (!this.world.inBounds(cx, cy)) return null;
     const ci = cy * this.world.width + cx;
     if (this.world.health[ci] <= 0) return null;
@@ -290,12 +303,12 @@ export class OverchargeSystem {
     return this.addCharge(
       `c:${ci}`, "cell",
       (cx + 0.5) * cs, (cy + 0.5) * cs,
-      ownerId, power, blightMultiplier,
+      ownerId, power, blightMultiplier, terrainDamageBonus,
       cx, cy, ci,
     );
   }
 
-  chargeSubCell(sx: number, sy: number, ownerId: number, power: number, blightMultiplier = 1): OverchargeEntry | null {
+  chargeSubCell(sx: number, sy: number, ownerId: number, power: number, blightMultiplier = 1, terrainDamageBonus = 0): OverchargeEntry | null {
     if (!this.world.subInBounds(sx, sy)) return null;
     const si = sy * this.world.subWidth + sx;
     if (this.world.subHealth[si] <= 0) return null;
@@ -303,7 +316,7 @@ export class OverchargeSystem {
     return this.addCharge(
       `s:${si}`, "subcell",
       (sx + 0.5) * ss, (sy + 0.5) * ss,
-      ownerId, power, blightMultiplier,
+      ownerId, power, blightMultiplier, terrainDamageBonus,
       sx >> 1, sy >> 1, 0, sx, sy, si,
     );
   }
@@ -314,7 +327,7 @@ export class OverchargeSystem {
     return this.addCharge(
       this.getCreatureKey(c), "creature",
       pos.x, pos.y,
-      ownerId, power, 1,
+      ownerId, power, 1, 0,
       0, 0, 0, 0, 0, 0, c, null,
     );
   }
@@ -324,7 +337,7 @@ export class OverchargeSystem {
     return this.addCharge(
       `e:${enc.id}`, "encounter",
       enc.x, enc.y,
-      ownerId, power, 1,
+      ownerId, power, 1, 0,
       0, 0, 0, 0, 0, 0, null, enc,
     );
   }
@@ -385,10 +398,12 @@ export class OverchargeSystem {
 
       const stacks = e.stacks;
       const originKey = e.key;
+      const origin: ChainOrigin = { kind: e.kind, cx: e.cx, cy: e.cy, sx: e.sx, sy: e.sy };
       const ox = e.x;
       const oy = e.y;
       const ownerId = e.ownerId;
       const power = e.power;
+      const terrainBonus = e.terrainDamageBonus;
       const blightMult = e.blightMultiplier;
 
       // Clear entry BEFORE discharge to prevent any recursive loop.
@@ -401,7 +416,7 @@ export class OverchargeSystem {
         continue;
       }
 
-      this.discharge(originKey, ox, oy, stacks, ownerId, power, blightMult, ctx);
+      this.discharge(originKey, origin, ox, oy, stacks, ownerId, power, terrainBonus, blightMult, ctx);
     }
   }
 
@@ -436,32 +451,71 @@ export class OverchargeSystem {
     slot.stacks = stacks;
   }
 
+  private isClosedDoorCell(cx: number, cy: number): boolean {
+    if (!this.world.inBounds(cx, cy)) return false;
+    const ci = cy * this.world.width + cx;
+    if (this.world.mat[ci] !== MAT.door) return false;
+    const door = this.world.doors[this.world.doorId[ci] - 1];
+    return Boolean(door && !door.open);
+  }
+
   /**
    * Chain obstruction policy:
-   * - World boundaries and closed gates block chain arcs.
-   * - Intermediate solid walls between hop origin and candidate block arcs;
-   *   hitting the candidate's own cell/subcell at the end of the segment is allowed.
+   * - World boundaries and closed gates block chain arcs and cannot relay lightning.
+   * - Intermediate solid walls and subcells between hop origin and candidate block arcs;
+   *   only the origin cell/subcell itself is cleared using exact exit geometry.
    */
   private hasChainLos(
     x1: number,
     y1: number,
+    origin: ChainOrigin,
     x2: number,
     y2: number,
     cand: ChainCandidate,
   ): boolean {
+    if (origin.kind === "cell" && this.isClosedDoorCell(origin.cx, origin.cy)) return false;
+    if (cand.kind === "cell" && this.isClosedDoorCell(cand.cx, cand.cy)) return false;
+
     const dx = x2 - x1;
     const dy = y2 - y1;
     const dist = Math.hypot(dx, dy);
     if (dist < 1e-4) return true;
     const ux = dx / dist;
     const uy = dy / dist;
+    const cs = this.world.cellSize;
     const ss = this.world.subCellSize;
-    // Start outside origin cell/subcell if origin itself is solid.
-    const startOffset = Math.min(dist * 0.5, this.world.cellSize * 0.75);
+
+    // Only skip the origin cell/subcell itself using exact exit-face geometry;
+    // enemies and open-space origins start at 0 clearance so thin intervening terrain is never skipped.
+    let startOffset = 0;
+    if (origin.kind === "cell" || origin.kind === "subcell") {
+      const S = origin.kind === "subcell" ? ss : cs;
+      const gx = origin.kind === "subcell" ? origin.sx : origin.cx;
+      const gy = origin.kind === "subcell" ? origin.sy : origin.cy;
+      let exitDist = Infinity;
+      if (Math.abs(ux) > 1e-8) {
+        const ex = (ux > 0 ? gx + 1 : gx) * S;
+        const tx = (ex - x1) / ux;
+        if (tx >= 0) exitDist = Math.min(exitDist, tx);
+      }
+      if (Math.abs(uy) > 1e-8) {
+        const ey = (uy > 0 ? gy + 1 : gy) * S;
+        const ty = (ey - y1) / uy;
+        if (ty >= 0) exitDist = Math.min(exitDist, ty);
+      }
+      if (Number.isFinite(exitDist)) {
+        startOffset = Math.min(dist, exitDist + 1e-3);
+      }
+    }
+
     const sx0 = x1 + ux * startOffset;
     const sy0 = y1 + uy * startOffset;
     const traceDist = Math.max(0, dist - startOffset);
     if (traceDist <= 1e-4) return true;
+
+    const startCx = Math.floor(sx0 / cs);
+    const startCy = Math.floor(sy0 / cs);
+    if (!this.world.inBounds(startCx, startCy) || this.isClosedDoorCell(startCx, startCy)) return false;
 
     const hitTerrain = gridRaycast(this.world.subSolidQuery, ss, sx0, sy0, ux, uy, traceDist, losHit);
     if (!hitTerrain) return true;
@@ -469,30 +523,23 @@ export class OverchargeSystem {
     const hcx = losHit.cx >> 1;
     const hcy = losHit.cy >> 1;
     if (!this.world.inBounds(hcx, hcy)) return false;
-
-    const ci = hcy * this.world.width + hcx;
-    if (this.world.mat[ci] === MAT.door) {
-      const door = this.world.doors[this.world.doorId[ci] - 1];
-      if (door && !door.open) {
-        // Closed doors block arcs passing through; only allow if the door itself is the target and unobstructed up to it.
-        return cand.kind === "cell" && cand.cx === hcx && cand.cy === hcy;
-      }
-    }
+    if (this.isClosedDoorCell(hcx, hcy)) return false;
 
     if (cand.kind === "cell" && cand.cx === hcx && cand.cy === hcy) return true;
     if (cand.kind === "subcell" && losHit.cx === cand.sx && losHit.cy === cand.sy) return true;
 
-    // Allow tiny surface tolerance near the target center.
-    return losHit.t >= traceDist - ss * 0.75;
+    return false;
   }
 
   private findNextChainTarget(
     fromX: number,
     fromY: number,
+    origin: ChainOrigin,
     maxReach: number,
     visited: Set<string>,
     ctx: OverchargeDischargeContext,
   ): ChainCandidate | null {
+    if (origin.kind === "cell" && this.isClosedDoorCell(origin.cx, origin.cy)) return null;
     const r2 = maxReach * maxReach;
     let best: ChainCandidate | null = null;
 
@@ -520,7 +567,7 @@ export class OverchargeSystem {
             creature: c,
             encounter: null,
           };
-          if ((!best || cand.dist < best.dist) && this.hasChainLos(fromX, fromY, cand.x, cand.y, cand)) {
+          if ((!best || cand.dist < best.dist) && this.hasChainLos(fromX, fromY, origin, cand.x, cand.y, cand)) {
             best = cand;
           }
         }
@@ -547,13 +594,13 @@ export class OverchargeSystem {
           creature: null,
           encounter: enc,
         };
-        if ((!best || cand.dist < best.dist) && this.hasChainLos(fromX, fromY, cand.x, cand.y, cand)) {
+        if ((!best || cand.dist < best.dist) && this.hasChainLos(fromX, fromY, origin, cand.x, cand.y, cand)) {
           best = cand;
         }
       }
     }
 
-    // Also allow chaining across solid terrain blocks / subcells within reach.
+    // Also allow chaining across solid terrain blocks / subcells within reach (excluding closed gates).
     const w = this.world;
     const cs = w.cellSize;
     const ss = w.subCellSize;
@@ -564,6 +611,7 @@ export class OverchargeSystem {
 
     for (let cy = minCy; cy <= maxCy; cy++) {
       for (let cx = minCx; cx <= maxCx; cx++) {
+        if (this.isClosedDoorCell(cx, cy)) continue;
         const ci = cy * w.width + cx;
         if (w.health[ci] > 0) {
           const key = `c:${ci}`;
@@ -576,7 +624,7 @@ export class OverchargeSystem {
             key, kind: "cell", x: wx, y: wy, dist: Math.sqrt(d2),
             cx, cy, sx: 0, sy: 0, creature: null, encounter: null,
           };
-          if ((!best || cand.dist < best.dist) && this.hasChainLos(fromX, fromY, wx, wy, cand)) {
+          if ((!best || cand.dist < best.dist) && this.hasChainLos(fromX, fromY, origin, wx, wy, cand)) {
             best = cand;
           }
         } else {
@@ -597,7 +645,7 @@ export class OverchargeSystem {
                 key, kind: "subcell", x: wx, y: wy, dist: Math.sqrt(d2),
                 cx, cy, sx, sy, creature: null, encounter: null,
               };
-              if ((!best || cand.dist < best.dist) && this.hasChainLos(fromX, fromY, wx, wy, cand)) {
+              if ((!best || cand.dist < best.dist) && this.hasChainLos(fromX, fromY, origin, wx, wy, cand)) {
                 best = cand;
               }
             }
@@ -611,11 +659,13 @@ export class OverchargeSystem {
 
   private discharge(
     originKey: string,
+    origin: ChainOrigin,
     ox: number,
     oy: number,
     stacks: number,
     ownerId: number,
     power: number,
+    terrainDamageBonus: number,
     blightMultiplier: number,
     ctx: OverchargeDischargeContext,
   ): void {
@@ -646,17 +696,18 @@ export class OverchargeSystem {
       OVERCHARGE.baseArcDuration + extra * OVERCHARGE.arcDurationPerStack,
     );
 
-    ctx.onBlast(ox, oy, blastRadius, blastDmg, ownerId, blightMultiplier);
+    ctx.onBlast(ox, oy, blastRadius, blastDmg, terrainDamageBonus, ownerId, blightMultiplier);
     this.spawnBlastVisual(ox, oy, blastRadius, Math.min(0.32, arcDuration), stacks);
 
     const visited = new Set<string>([originKey]);
+    let curOrigin: ChainOrigin = origin;
     let curX = ox;
     let curY = oy;
     let totalTravelLeft = chainReach * chainHops;
 
     for (let hop = 0; hop < chainHops && totalTravelLeft > 1; hop++) {
       const hopReach = Math.min(chainReach, totalTravelLeft);
-      const next = this.findNextChainTarget(curX, curY, hopReach, visited, ctx);
+      const next = this.findNextChainTarget(curX, curY, curOrigin, hopReach, visited, ctx);
       if (!next) break;
       visited.add(next.key);
       totalTravelLeft -= next.dist;
@@ -666,13 +717,14 @@ export class OverchargeSystem {
       } else if (next.kind === "encounter" && next.encounter) {
         ctx.onChainEncounter(next.encounter, next.x, next.y, chainDmg, ownerId);
       } else if (next.kind === "cell") {
-        ctx.onChainCell(next.cx, next.cy, next.x, next.y, chainDmg, ownerId, blightMultiplier);
+        ctx.onChainCell(next.cx, next.cy, next.x, next.y, chainDmg, terrainDamageBonus, ownerId, blightMultiplier);
       } else if (next.kind === "subcell") {
-        ctx.onChainSub(next.sx, next.sy, next.x, next.y, chainDmg, ownerId, blightMultiplier);
+        ctx.onChainSub(next.sx, next.sy, next.x, next.y, chainDmg, terrainDamageBonus, ownerId, blightMultiplier);
       }
 
       this.spawnArc(curX, curY, next.x, next.y, arcDuration, stacks);
       this.totalChainHits++;
+      curOrigin = { kind: next.kind, cx: next.cx, cy: next.cy, sx: next.sx, sy: next.sy };
       curX = next.x;
       curY = next.y;
     }

@@ -215,7 +215,7 @@ export class Game {
       onShot: (s, dx, dy, mx, my) => this.onShot(s, dx, dy, mx, my),
       onImpact: (x, y, nx, ny, cx, cy, result, sub, ownerId) =>
         this.onImpact(x, y, nx, ny, cx, cy, result, sub, ownerId),
-      onExplosion: (x, y, rad, damage) => this.onExplosion(x, y, rad, damage),
+      onExplosion: (x, y, rad, damage, visualOnly) => this.onExplosion(x, y, rad, damage, visualOnly),
       onGrenadeThrow: (s, x, y, dx, dy) => this.onGrenadeThrow(s, x, y, dx, dy),
       onGrenadeStick: (x, y, nx, ny) => this.onGrenadeStick(x, y, nx, ny),
       onGrenadeBeep: (x, y, pct) => this.onGrenadeBeep(x, y, pct),
@@ -1386,10 +1386,12 @@ export class Game {
     }
   }
 
-  private onExplosion(x: number, y: number, radiusWorld: number, damage = 6 + this.stats.globalDamageBonus): void {
-    this.creatures.explode(x, y, radiusWorld, 6 + this.stats.globalDamageBonus);
+  private onExplosion(x: number, y: number, radiusWorld: number, damage = 6 + this.stats.globalDamageBonus, visualOnly = false): void {
+    if (!visualOnly && damage > 0) {
+      this.creatures.explode(x, y, radiusWorld, damage);
+      this.late.explode(x, y, radiusWorld, damage);
+    }
     this.fixtures.explode(x, y, radiusWorld);
-    this.late.explode(x, y, radiusWorld, damage);
     this.audio.playDestroy(x, y);
     this.shakeForExplosion(x, y, radiusWorld);
     const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);

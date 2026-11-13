@@ -66,8 +66,12 @@ export class Bullet {
   cryoSpray = false;
   /** Overcharge Conductor charging round (zero direct damage, stacks per target). */
   overcharge = false;
-  /** Snapshot AR discharge power (arDamage + globalDamageBonus) for Overcharge rounds. */
+  /** Snapshot AR discharge power (arDamage + globalDamageBonus + soldier damageBonus) for Overcharge rounds. */
   overchargePower = 1;
+  /** Snapshot soldier terrain damage bonus for Overcharge discharge terrain hits. */
+  overchargeTerrainBonus = 0;
+  /** Distinct terrain cell/subcell keys already charged by this projectile (max 1 stack per target per round). */
+  overchargeHitCells = new Set<number>();
 }
 
 /** Reset all per-projectile fields on pooled Bullet reuse so no mutation state leaks. */
@@ -114,6 +118,8 @@ export function resetBulletFields(b: Bullet): void {
   b.cryoSpray = false;
   b.overcharge = false;
   b.overchargePower = 1;
+  b.overchargeTerrainBonus = 0;
+  b.overchargeHitCells.clear();
 }
 
 /** Fixed-size object pool for bullets. */
