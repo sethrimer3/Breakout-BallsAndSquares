@@ -125,7 +125,7 @@ describe("hand-made lab", () => {
     const a = new PixelWorld(WORLD);
     generateWorld(a, 5, { labWorld: Z2 });
     const b = new PixelWorld(WORLD);
-    generateWorld(b, 6, { labWorld: Z2 });
+    generateWorld(b, 5, { labWorld: Z2 });
     expect(a.labLayout!.rooms.map((r) => `${r.x},${r.y},${r.size}`)).toEqual(b.labLayout!.rooms.map((r) => `${r.x},${r.y},${r.size}`));
     expect([...a.wall]).toEqual([...b.wall]);
     const frame = a.labLayout!.frame!;

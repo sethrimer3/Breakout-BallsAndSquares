@@ -123,7 +123,7 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
   world.doorId.fill(0);
 
   // The hand-made lab when the world can hold it; otherwise a procedural maze.
-  // `seed` still drives what changes run to run (crystal veins).
+  // The profile seed varies the dressing without moving authored routes or gates.
   world.doors = [];
   world.upgradeSpots = [];
   const def = options.labWorld ?? LAB_WORLDS[1];
@@ -143,12 +143,15 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     world.tierBase = 0;
   }
   const layout = frame ? buildAuthoredLayout(frame) : buildLabLayout(world, seed);
+  layout.seed = seed;
   world.labLayout = layout;
   if (frame && def.framework) {
     // Later campaign uses outdoor clearings, city defenses and ship checkpoints.
     world.roomLights = []; world.blightCores = []; world.sentrySpots = []; world.specimenSpots = [];
     health.fill(500); tint.fill(96);
     designLateSpaces(world, frame);
+    // Outdoor/ship geometry is authored; profile-specific surface grain is stable.
+    for (let i = 0; i < tint.length; i++) tint[i] = 64 + Math.floor(hash2(i % width, Math.floor(i / width), seed) * 64);
     const clear = (i: number): void => { health[i] = 0; wall[i] = 0; world.decor[i] = DECOR.cleanFloor; };
     fortifyLateSpaces(world, frame);
     buildGates(world, frame);
@@ -164,7 +167,6 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     return;
   }
   const runSeed = seed;
-  if (frame) seed = def.seed;
 
   // Pass 1: Paint 1-3 cell thick wall outlines around every room and corridor.
   for (const room of layout.rooms) {
@@ -285,7 +287,7 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
 }
 
 /**
- * Seams of crystal in the lab's walls, rolled fresh every run: orange crystal
+ * Seams of crystal in the lab's walls, stable for the profile/world seed: orange crystal
  * in tier 2 sectors, green in tier 3. A vein is a short random walk through
  * wall cells starting from a face that touches open floor, so it can be seen
  * and dug out. Crystal breaks like an ordinary block of its tier, a soft spot

@@ -15,8 +15,6 @@ export const WORLD = {
   roomSize: 10,
   /** Terrain chunk edge length in cells (rendering cache granularity). */
   chunkSize: 32,
-  /** Seed for procedural color variation (0 = random each run). */
-  seed: 0,
 };
 
 export const TERRAIN = {

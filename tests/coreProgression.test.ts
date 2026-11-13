@@ -97,7 +97,8 @@ describe("Core progression", () => {
     expect(storage.getItem("other-app")).toBe("keep");
     const fresh = new SaveManager(storage);
     expect(fresh.activeSlot).toBe(1);
-    expect(fresh.data).toEqual(defaultSaveData());
+    expect(fresh.data.seed).toMatch(/^[A-Z0-9]{8}$/);
+    expect(fresh.data).toEqual(defaultSaveData(fresh.data.seed));
     expect(fresh.data.lab.worlds[1].spawn).toBe(0);
     expect(fresh.data.settings.devMode).toBe(false);
   });

@@ -144,3 +144,11 @@ See [the implementation plan](docs/WEAPON_EXPANSION_PLAN.md) and [validation / p
 ## Later worlds
 
 The empty-room framework now covers the 13×13 forest (zones 7–9), 7×7 fallen city (zone 10) and 5×3 Blight mother ship (zone 11). See [the world roadmap](docs/WORLD_ROADMAP.md) for exact exits, the central city facility/teleporter, atmosphere profiles, and the scenery/encounters reserved for later work.
+
+## Profile seeds and speedrun timing
+
+Open **Main Menu → Settings → Gameplay**. **New Save Seed** accepts 1–8 letters or numbers (case-insensitive); press **Apply** to use it for any newly initialized save. Blank restores random eight-character seeds. Existing profiles keep their code, shown on their save card. Each profile/world seed reproduces terrain dressing, rubble and crystal placement; authored routes and gates remain fixed. Conquered-sector progress still applies, and combat randomness is separate. Older profiles receive a seed once on loading.
+
+**Speedrun Timer — Slot N** enables a cumulative `HH:MM:SS.mmm` HUD clock for the selected save. It adds real elapsed time across active runs, independently of simulation speed. Pause, upgrades, map selection, main menu, results, hidden tabs and offline time do not count. Disabling it hides the clock and retains the total; a fresh save starts at zero. Time is saved at transitions and every five seconds during play.
+
+Run `npm run test:profile-browser` against the Vite dev server for settings, reproducible generation, profile isolation, reload, paused/hidden timing and narrow-screen checks.

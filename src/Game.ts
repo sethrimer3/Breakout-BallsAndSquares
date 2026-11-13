@@ -3,6 +3,8 @@ import { lateBlockReward } from "./world/campaignBalance";
 import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
 import { fireAmbienceMix } from "./audio/fireAmbience";
+import { profileWorldSeed } from "./core/ProfileSeed";
+import { SpeedrunTimer } from "./core/SpeedrunTimer";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
 import { SentrySystem } from "./entities/Sentry";
@@ -112,8 +114,40 @@ export class Game {
   reserves = 0;
   canDeploy = true;
   growthRate = 0;
-  paused = false;
-  runOver = false;
+  private readonly speedrunClock = new SpeedrunTimer();
+  private speedrunSavedAt = 0;
+  private runStarted = false;
+  private _paused = false;
+  private _runOver = false;
+  get paused(): boolean { return this._paused; }
+  set paused(value: boolean) {
+    const wasPaused = this._paused;
+    this._paused = value;
+    this.syncSpeedrun();
+    if (value && !wasPaused && this.runStarted && this.save?.data.speedrun.enabled) this.save.save();
+  }
+  get runOver(): boolean { return this._runOver; }
+  set runOver(value: boolean) {
+    this._runOver = value;
+    this.syncSpeedrun();
+    if (value && this.save?.data.speedrun.enabled) this.save.save();
+  }
+
+  /** Flush time at state transitions as well as frames, without simulation scaling. */
+  syncSpeedrun(now = performance.now()): void {
+    if (!this.save) return;
+    const running = this.runStarted && !this.paused && !this.runOver && !document.hidden
+      && !this.mainMenu?.visible && !this.pauseMenu?.visible && !this.upgradeTree?.visible
+      && !this.labMap?.visible && !this.resultsScreen?.visible;
+    this.speedrunClock.sync(now, this.save.data.speedrun, running);
+  }
+
+  setSpeedrunEnabled(enabled: boolean): void {
+    this.syncSpeedrun();
+    this.save.data.speedrun.enabled = enabled;
+    this.syncSpeedrun();
+    this.save.save();
+  }
   aimState = {
     active: false,
     startSx: 0,
@@ -349,6 +383,16 @@ export class Game {
       onKey: (code) => this.onKey(code),
     });
     window.addEventListener("resize", () => this.resize());
+    document.addEventListener("visibilitychange", () => {
+      this.syncSpeedrun();
+      if (this.save.data.speedrun.enabled) this.save.save();
+    });
+    window.addEventListener("pagehide", () => {
+      this.syncSpeedrun();
+      this.speedrunClock.sync(performance.now(), this.save.data.speedrun, false);
+      if (this.save.data.speedrun.enabled) this.save.save();
+    });
+    window.addEventListener("pageshow", () => this.syncSpeedrun());
     this.resize();
     this.openMainMenu();
   }
@@ -434,6 +478,8 @@ export class Game {
 
   /** Begin a fresh run (regenerates the world in place). */
   startRun(): void {
+    this.paused = true;
+    this.runStarted = true;
     if (!this.devMapAccess && this.upgrades.levelOf("unlock_map") === 0) {
       this.save.data.lab.world = 1;
       this.labSave.spawn = 0;
@@ -545,7 +591,7 @@ export class Game {
     const def = this.labDef;
     const lab = this.labSave;
     if (!this.canDeployInto(lab.spawn)) lab.spawn = def.start;
-    generateWorld(this.world, WORLD.seed || this.rng.int(1 << 30), { conquered: this.labProgress.conquered, labWorld: def, spawn: lab.spawn });
+    generateWorld(this.world, profileWorldSeed(this.save.data.seed, def.id), { conquered: this.labProgress.conquered, labWorld: def, spawn: lab.spawn });
     this.labProgress.attach(this.world);
     this.creatures.flowerMult = def.alien ? FACILITY.alienFlowerMult : 1;
     this.gateNotice = null;
@@ -719,6 +765,7 @@ export class Game {
 
   /** Bank currency & lifetime pixels earned in the current run (idempotent per run). */
   bankCurrentRun(): { time: boolean; depth: boolean; pixels: boolean } {
+    this.syncSpeedrun();
     this.loot.clear();
     const r = this.runStats;
     const b = this.save.data.bests;
@@ -776,7 +823,11 @@ export class Game {
   }
 
   selectSaveSlot(slot: number): void {
+    this.syncSpeedrun();
+    if (this.save.slotExists(this.save.activeSlot)) this.save.save();
+    this.runStarted = false;
     this.save.selectSlot(slot);
+    this.syncSpeedrun();
     this.debug = this.save.data.settings.devMode;
     this.timeScale = 1;
     this.showChunkBorders = false;
@@ -2171,6 +2222,11 @@ export class Game {
   }
 
   frame = (now: number): void => {
+    this.syncSpeedrun(now);
+    if (this.runStarted && !this.paused && !this.runOver && this.save.data.speedrun.enabled && now - this.speedrunSavedAt >= 5000) {
+      this.speedrunSavedAt = now;
+      this.save.save();
+    }
     const real = this.last ? Math.min(0.1, (now - this.last) / 1000) : SIM.dt;
     this.last = now;
     const t0 = performance.now();

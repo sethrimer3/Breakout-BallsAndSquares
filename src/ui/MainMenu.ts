@@ -1,3 +1,4 @@
+import { formatSpeedrunTime } from "../core/SpeedrunTimer";
 import { essenceIcon } from "./essenceIcon";
 import type { Game } from "../Game";
 import { SAVE_SLOTS_COUNT } from "../progression/SaveManager";
@@ -128,9 +129,11 @@ export class MainMenu {
     this.settingsModal.show({
       backLabel: "BACK TO MENU",
       showRecenter: false,
+      showProfileSettings: true,
       onClose: () => {
         this.mainPanel.classList.remove("hidden");
         this.updateSummary();
+        this.renderSlots();
       },
     });
   }
@@ -174,6 +177,8 @@ export class MainMenu {
             </span>
           </div>
           <div class="slot-body">
+            <div class="slot-stat-row"><span class="stat-lbl">SEED</span><span class="stat-val slot-seed">${summary.seed}</span></div>
+            ${summary.speedrun.enabled || summary.speedrun.elapsedMs > 0 ? `<div class="slot-stat-row"><span class="stat-lbl">SPEEDRUN${summary.speedrun.enabled ? "" : " (OFF)"}</span><span class="stat-val slot-speedrun">${formatSpeedrunTime(summary.speedrun.elapsedMs)}</span></div>` : ""}
             <div class="slot-stat-row">
               <span class="stat-lbl">${sprite("gold", { color: UI_COLORS.gold })} BANK</span>
               <span class="stat-val val-gold">${summary.bank.toLocaleString()}</span>
@@ -305,6 +310,7 @@ export class MainMenu {
       this.settingsModal.hide();
       this.mainPanel.classList.remove("hidden");
       this.updateSummary();
+      this.renderSlots();
     }
   }
 

@@ -2530,3 +2530,10 @@ button {
 .tree-overlay .tree-cat-btn:disabled .tree-cat-name {
   display: block !important;
 }
+
+/* Shareable profile seed and cumulative active-run clock. */
+.seed-controls { display: flex; gap: 8px; margin: 10px 0; align-items: center; flex-wrap: wrap; }
+.set-seed-input { width: 12ch; max-width: 100%; padding: 9px 10px; border: 1px solid #38d6ff; background: #07151c; color: #d8f7ff; font: inherit; text-transform: uppercase; letter-spacing: 0.12em; }
+.set-seed-input:focus-visible { outline: 2px solid #e8fbff; outline-offset: 2px; }
+.hud-speedrun .hud-value, .slot-speedrun, .slot-seed { font-variant-numeric: tabular-nums; }
+.hud-speedrun .hud-value { white-space: nowrap; color: #83ecff; }

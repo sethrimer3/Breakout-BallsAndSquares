@@ -1,3 +1,4 @@
+import { formatSpeedrunTime } from "../core/SpeedrunTimer";
 import type { Game } from "../Game";
 import { MUZZLE_FLASH_LEVELS, type MuzzleFlashLevel } from "../progression/SaveManager";
 import type { LightQuality } from "../systems/LightingSystem";
@@ -17,6 +18,7 @@ export interface SettingsModalOptions {
   onClose?: () => void;
   backLabel?: string;
   showRecenter?: boolean;
+  showProfileSettings?: boolean;
 }
 
 export class SettingsModal {
@@ -26,6 +28,7 @@ export class SettingsModal {
   private backBtn: HTMLButtonElement;
   private bodyEl: HTMLDivElement;
   private showRecenter = true;
+  private showProfileSettings = false;
 
   constructor(parent: HTMLElement, private game: Game) {
     this.root = document.createElement("div");
@@ -66,6 +69,8 @@ export class SettingsModal {
   show(opts?: SettingsModalOptions): void {
     this.onCloseCallback = opts?.onClose ?? null;
     this.showRecenter = opts?.showRecenter ?? true;
+    this.showProfileSettings = opts?.showProfileSettings ?? false;
+    if (this.showProfileSettings) this.activeTab = "gameplay";
     this.backBtn.textContent = opts?.backLabel ?? "BACK";
     this.root.classList.remove("hidden");
     this.render();
@@ -90,6 +95,23 @@ export class SettingsModal {
 
     if (this.activeTab === "gameplay") {
       body.innerHTML = `
+        ${this.showProfileSettings ? `
+        <div class="set-group profile-settings">
+          <div class="set-label">NEW SAVE SEED</div>
+          <div class="set-desc">Use 1–8 letters or numbers for any new save. Leave blank for a random seed. Existing saves keep their seed.</div>
+          <div class="seed-controls">
+            <input class="set-seed-input" aria-label="Seed for new saves" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="RANDOM" />
+            <button class="btn" data-set="apply-seed">APPLY</button>
+          </div>
+          <div class="set-desc current-seed">SLOT ${this.game.save.activeSlot} SEED: ${this.game.save.data.seed}</div>
+          <div class="set-desc seed-status" role="status" aria-live="polite"></div>
+        </div>
+        <div class="set-row">
+          <div class="set-info"><div class="set-label">SPEEDRUN TIMER — SLOT ${this.game.save.activeSlot}</div>
+          <div class="set-desc">Total active run time for this save. Pauses in menus, upgrades, map, results and hidden tabs. Turning off keeps the recorded time.</div>
+          <div class="set-desc">${formatSpeedrunTime(this.game.save.data.speedrun.elapsedMs)}</div></div>
+          <button class="btn set-toggle ${this.game.save.data.speedrun.enabled ? "btn-primary" : ""}" data-set="speedrun" aria-pressed="${this.game.save.data.speedrun.enabled}">${this.game.save.data.speedrun.enabled ? "ON" : "OFF"}</button>
+        </div>` : ""}
         <div class="set-row">
           <div class="set-info">
             <div class="set-label">CAMERA AUTO-FOLLOW</div>
@@ -121,6 +143,25 @@ export class SettingsModal {
             : ""
         }
       `;
+
+      if (this.showProfileSettings) {
+        const input = body.querySelector<HTMLInputElement>(".set-seed-input")!;
+        input.value = this.game.save.newProfileSeed;
+        const applySeed = () => {
+          const ok = this.game.save.setNewProfileSeed(input.value);
+          body.querySelector(".seed-status")!.textContent = ok
+            ? (this.game.save.newProfileSeed ? `New saves will use ${this.game.save.newProfileSeed}.` : "New saves will receive random seeds.")
+            : "Use 1–8 letters or numbers. The seed could not be saved.";
+          if (ok) input.value = this.game.save.newProfileSeed;
+          body.querySelector(".current-seed")!.textContent = `SLOT ${this.game.save.activeSlot} SEED: ${this.game.save.data.seed}`;
+        };
+        body.querySelector('[data-set="apply-seed"]')!.addEventListener("click", applySeed);
+        input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applySeed(); } });
+        body.querySelector('[data-set="speedrun"]')!.addEventListener("click", () => {
+          this.game.setSpeedrunEnabled(!this.game.save.data.speedrun.enabled);
+          this.render();
+        });
+      }
 
       body.querySelector('[data-set="autofollow"]')!.addEventListener("click", () => {
         set.autoFollowCamera = !set.autoFollowCamera;

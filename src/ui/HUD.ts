@@ -1,3 +1,4 @@
+import { formatSpeedrunTime } from "../core/SpeedrunTimer";
 import { essenceIcon } from "./essenceIcon";
 import { GROWTH, TERRAIN } from "../config";
 import type { Game } from "../Game";
@@ -52,6 +53,7 @@ export class HUD {
     const items: [string, string, SpriteName, string][] = [
       ["area", "AREA", "mapGrid", UI_COLORS.neutral],
       ["time", "TIME", "clock", UI_COLORS.neutral],
+      ["speedrun", "SPEEDRUN", "clock", UI_COLORS.soldier],
       ["pixels", "PIXELS", "pixelBits", UI_COLORS.neutral],
       ["currency", "GOLD", "gold", UI_COLORS.gold],
       ["crystals", "CRYS", "crystal", UI_COLORS.crystal],
@@ -231,6 +233,9 @@ export class HUD {
     const s = game.runStats;
     const alive = game.soldiers.filter((x) => x.alive).length;
     this.fields.time.textContent = fmtTime(s.time);
+    this.boxes.speedrun.classList.toggle("hidden", !game.save.data.speedrun.enabled);
+    this.fields.speedrun.textContent = formatSpeedrunTime(game.save.data.speedrun.elapsedMs);
+    this.boxes.speedrun.title = `Profile seed ${game.save.data.seed} · total active run time`;
     this.fields.pixels.textContent = s.pixelsDestroyed.toLocaleString();
     this.fields.currency.textContent = s.currency.toLocaleString();
 
