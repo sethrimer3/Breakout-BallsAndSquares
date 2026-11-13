@@ -245,7 +245,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
 
     // Restrained electrical accents: more ticks with higher charge, static under reduced motion.
     const accents = armed ? Math.min(6, 2 + Math.floor((e.stacks - OVERCHARGE.armThreshold) / 2)) : 1;
-    const phase = reduced ? 0 : game.runStats.timeSurvived * 1.5;
+    const phase = reduced ? 0 : (OVERCHARGE.quietDelay - e.quietLeft) * 1.5;
     ctx.globalAlpha = armed ? 0.8 : 0.45;
     ctx.strokeStyle = armed ? "#d8f9ff" : "#7dd6ff";
     ctx.lineWidth = Math.max(1, cam.zoom * 0.65);

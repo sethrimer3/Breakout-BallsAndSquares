@@ -115,7 +115,7 @@ export class OverchargeSystem {
         si: 0,
         creature: null,
         encounter: null,
-        encounterId: 0,
+        encounterId: "",
         x: 0,
         y: 0,
         stacks: 0,
@@ -268,7 +268,7 @@ export class OverchargeSystem {
       slot.si = si;
       slot.creature = creature;
       slot.encounter = encounter;
-      slot.encounterId = encounter ? encounter.id : 0;
+      slot.encounterId = encounter ? encounter.id : "";
       slot.x = x;
       slot.y = y;
       slot.stacks = 1;
