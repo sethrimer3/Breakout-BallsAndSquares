@@ -27,12 +27,24 @@ export type WeaponType =
   | "rocket_launcher"
   | "sniper_rifle"
   | "katana"
-  | "flamethrower"
-  | "goo_mortar"
-  | "drone_shepherd"
-  | "prism_laser";
+  | "flamethrower";
 
-export type PrimaryMutation = "reverse_revolver" | "gale_edge";
+export type LegacyWeaponType = "goo_mortar" | "drone_shepherd" | "prism_laser";
+export type AnyWeaponType = WeaponType | LegacyWeaponType;
+
+export type PrimaryMutation =
+  | "reverse_revolver"
+  | "orbit_cylinder"
+  | "drone_shepherd"
+  | "squelch"
+  | "vacuum_pulse"
+  | "burrower"
+  | "freeze_rockets"
+  | "chromatic_prism"
+  | "rail_lance"
+  | "gale_edge"
+  | "napalm_garden"
+  | "cryospray";
 
 export type SecondaryWeaponType = "grenade" | "turret";
 
@@ -51,8 +63,15 @@ export interface SoldierStats {
   multishotChance: number;
   pistolBounces: number;
   reverseUnlocked: boolean;
+  orbitUnlocked: boolean;
   galeUnlocked: boolean;
   galeDistance: number;
+  vacuumUnlocked: boolean;
+  burrowerUnlocked: boolean;
+  freezeRocketsUnlocked: boolean;
+  railLanceUnlocked: boolean;
+  napalmUnlocked: boolean;
+  cryosprayUnlocked: boolean;
   // Shotgun stats
   shotgunUnlocked: boolean;
   shotgunFireRate: number;
@@ -197,7 +216,9 @@ export function baseSoldierStats(): SoldierStats {
     bulletSpeed: SOLDIER.bulletSpeed,
     multishotChance: SOLDIER.multishotChance,
     pistolBounces: 0,
-    reverseUnlocked: false, galeUnlocked: false, galeDistance: GALE.distance,
+    reverseUnlocked: false, orbitUnlocked: false, galeUnlocked: false, galeDistance: GALE.distance,
+    vacuumUnlocked: false, burrowerUnlocked: false, freezeRocketsUnlocked: false,
+    railLanceUnlocked: false, napalmUnlocked: false, cryosprayUnlocked: false,
     shotgunUnlocked: false,
     shotgunFireRate: SHOTGUN.fireRate,
     shotgunDamage: SHOTGUN.damage,
@@ -340,6 +361,16 @@ export class Soldier {
   stuckFrames = 0;
   /** Time alive (seconds). */
   age = 0;
+  /** Rail Lance charge state. */
+  railCharging = false;
+  railCharge = 0;
+  railChargeTotal = 0;
+  railLockDx = 1;
+  railLockDy = 0;
+  /** Orbit Cylinder release cooldown (prevents double-release in same step). */
+  orbitReleaseCd = 0;
+  /** Tracks previous manual shooting state for release-on-let-go. */
+  wasManualShooting = false;
 
   constructor(
     x: number,
@@ -347,7 +378,7 @@ export class Soldier {
     dirX: number,
     dirY: number,
     speed: number,
-    weapon: WeaponType = "pistol",
+    weapon: AnyWeaponType = "pistol",
     behavior: SoldierBehavior = "free",
     slotIndex = 0,
     secondary: SecondaryWeaponType | null = null,
@@ -355,7 +386,9 @@ export class Soldier {
     this.x = x;
     this.y = y;
     this.speed = speed;
-    this.weapon = weapon;
+    const norm = normalizeLegacyWeapon(weapon, null);
+    this.weapon = norm.weapon;
+    this.mutation = norm.mutation;
     this.secondary = secondary;
     this.behavior = behavior;
     this.slotIndex = slotIndex;
@@ -395,8 +428,73 @@ export class Soldier {
   }
 }
 
+export function normalizeLegacyWeapon(
+  weapon: string,
+  mutation: unknown,
+): { weapon: WeaponType; mutation: PrimaryMutation | null } {
+  if (weapon === "goo_mortar") return { weapon: "shotgun", mutation: "squelch" };
+  if (weapon === "drone_shepherd") return { weapon: "pistol", mutation: "drone_shepherd" };
+  if (weapon === "prism_laser") return { weapon: "sniper_rifle", mutation: "chromatic_prism" };
+  const validMutation = typeof mutation === "string" ? (mutation as PrimaryMutation) : null;
+  return { weapon: weapon as WeaponType, mutation: validMutation };
+}
+
 export function resolvePrimaryMutation(weapon: WeaponType, mutation: unknown, stats: SoldierStats): PrimaryMutation | null {
-  if(weapon==="pistol" && mutation==="reverse_revolver" && stats.reverseUnlocked)return mutation;
-  if(weapon==="katana" && mutation==="gale_edge" && stats.galeUnlocked)return mutation;
+  if (weapon === "pistol") {
+    if (mutation === "reverse_revolver" && stats.reverseUnlocked) return mutation;
+    if (mutation === "orbit_cylinder" && stats.orbitUnlocked) return mutation;
+    if (mutation === "drone_shepherd" && stats.droneUnlocked) return mutation;
+  } else if (weapon === "shotgun") {
+    if (mutation === "squelch" && stats.gooUnlocked) return mutation;
+    if (mutation === "vacuum_pulse" && stats.vacuumUnlocked) return mutation;
+  } else if (weapon === "rocket_launcher") {
+    if (mutation === "burrower" && stats.burrowerUnlocked) return mutation;
+    if (mutation === "freeze_rockets" && stats.freezeRocketsUnlocked) return mutation;
+  } else if (weapon === "sniper_rifle") {
+    if (mutation === "chromatic_prism" && stats.prismUnlocked) return mutation;
+    if (mutation === "rail_lance" && stats.railLanceUnlocked) return mutation;
+  } else if (weapon === "katana") {
+    if (mutation === "gale_edge" && stats.galeUnlocked) return mutation;
+  } else if (weapon === "flamethrower") {
+    if (mutation === "napalm_garden" && stats.napalmUnlocked) return mutation;
+    if (mutation === "cryospray" && stats.cryosprayUnlocked) return mutation;
+  }
   return null;
+}
+
+export interface MutationCompatibility {
+  active: string[];
+  inactive: string[];
+}
+
+/** Explicit compatibility of conventional upgrades for each Black Market mutation. */
+export function mutationCompatibility(mutation: PrimaryMutation | null): MutationCompatibility {
+  switch (mutation) {
+    case "reverse_revolver":
+      return { active: ["Fire Rate", "Damage", "Bullet Speed", "Multishot", "Bankshot"], inactive: [] };
+    case "orbit_cylinder":
+      return { active: ["Fire Rate (load)", "Damage", "Bullet Speed", "Multishot", "Bankshot"], inactive: [] };
+    case "drone_shepherd":
+      return { active: ["Drone Capacity/Cycle/Caliber/Speed/Optics/Frame/Recall"], inactive: ["Pistol Bankshot", "Pistol Multishot"] };
+    case "squelch":
+      return { active: ["SQUELCH Mass/Range/Dwell/Damage/Radius/Rate/Residue"], inactive: ["Shotgun Pellets", "Shotgun Spread", "Shotgun Rebound"] };
+    case "vacuum_pulse":
+      return { active: ["Fire Rate (0.5×)", "Damage", "Pellets (base min)", "Spread", "Bullet Speed", "Range"], inactive: ["Shotgun Rebound"] };
+    case "burrower":
+      return { active: ["Fire Rate", "Damage", "Rocket Speed", "Blast Radius", "Cluster (+Group Charges)"], inactive: [] };
+    case "freeze_rockets":
+      return { active: ["Fire Rate", "Rocket Speed", "Blast Radius (Freeze Area)"], inactive: ["Rocket Damage (Cold-Only)", "Cluster Munitions"] };
+    case "chromatic_prism":
+      return { active: ["Prism Spectrum/Bounces/Gain/Shear/Range/Overload"], inactive: ["Sniper Crit", "Sniper Pierce"] };
+    case "rail_lance":
+      return { active: ["Fire Rate (Charge)", "Damage", "Pierce (+10)", "Crit Chance"], inactive: ["Bullet Speed (Instant Beam)"] };
+    case "gale_edge":
+      return { active: ["Fire Rate", "Damage", "Blight Mult", "Pierce", "Extended Horizon"], inactive: ["Momentum Dash", "Velocity Slash Scaling"] };
+    case "napalm_garden":
+      return { active: ["Fire Rate", "Damage (0.2s Burn Ticks)"], inactive: ["Rubble Burn Duration"] };
+    case "cryospray":
+      return { active: ["Fire Rate"], inactive: ["Flame Damage (Cold-Only)", "Rubble Burn Duration"] };
+    default:
+      return { active: ["All base weapon upgrades"], inactive: [] };
+  }
 }

@@ -1,4 +1,4 @@
-import { CREATURES } from "../config";
+import { CREATURES, FREEZE } from "../config";
 import type { Rng } from "../core/Rng";
 import { circleIsClear, hasLineOfSight } from "../systems/PhysicsSystem";
 import type { Colony } from "../world/BlightColonies";
@@ -41,6 +41,7 @@ export interface Flower {
   /** Head position, kept for aiming and hit tests. */
   hx: number;
   hy: number;
+  freezeTimer?: number;
 }
 
 export interface Worm {
@@ -65,6 +66,7 @@ export interface Worm {
   seeking: boolean;
   /** Last half-size subcell of trail laid (-1 = none), so the trail stays 4-connected. */
   lastTrail: number;
+  freezeTimer?: number;
 }
 
 export interface Specimen {
@@ -86,6 +88,7 @@ export interface Specimen {
   biteCd: number;
   hurt: number;
   seed: number;
+  freezeTimer?: number;
 }
 
 export interface Spore {
@@ -175,10 +178,17 @@ export class CreatureSystem {
       this.spawnTimer = 0.5;
       this.trySpawn(0.5, growth);
     }
+    this.tickFreezeTimers(dt);
     this.updateFlowers(dt, soldiers, growth);
     this.updateSpores(dt, soldiers);
     this.updateWorms(dt, soldiers, growth);
     this.updateSpecimens(dt, soldiers);
+  }
+
+  private tickFreezeTimers(dt: number): void {
+    for (const f of this.flowers) if (f.freezeTimer && f.freezeTimer > 0) f.freezeTimer = Math.max(0, f.freezeTimer - dt);
+    for (const w of this.worms) if (w.freezeTimer && w.freezeTimer > 0) w.freezeTimer = Math.max(0, w.freezeTimer - dt);
+    for (const s of this.specimens) if (s.freezeTimer && s.freezeTimer > 0) s.freezeTimer = Math.max(0, s.freezeTimer - dt);
   }
 
   // ---------------------------------------------------------------------------
@@ -431,7 +441,8 @@ export class CreatureSystem {
       while (da > Math.PI) da -= Math.PI * 2;
       while (da < -Math.PI) da += Math.PI * 2;
       worm.angle += Math.max(-1, Math.min(1, da)) * CREATURES.wormTurnRate * dt;
-      const step = CREATURES.wormSpeed * dt;
+      const frozenMult = (worm.freezeTimer ?? 0) > 0 ? FREEZE.enemySpeedMult : 1;
+      const step = CREATURES.wormSpeed * frozenMult * dt;
       // Feel ahead; swing round obstacles.
       let moved = false;
       for (const off of [0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.4, -2.4, Math.PI]) {
@@ -593,7 +604,7 @@ export class CreatureSystem {
       const target = this.nearestVisible(s.x, s.y, CREATURES.specimenSightCells * w.cellSize, soldiers);
       let ax: number;
       let ay: number;
-      let speed = CREATURES.specimenSpeed;
+      let speed = CREATURES.specimenSpeed * ((s.freezeTimer ?? 0) > 0 ? FREEZE.enemySpeedMult : 1);
       if (target) {
         ax = target.x - s.x;
         ay = target.y - s.y;
@@ -701,27 +712,34 @@ export class CreatureSystem {
     return hitC ? best : -1;
   }
 
-  /** Damage the creature the last `raycast` found. Returns true if it died. */
-  applyHit(damage: number, x: number, y: number): boolean {
-    const c = this.lastHit;
-    this.lastHit = null;
-    if (!c) return false;
-    c.hp -= damage;
+  /** Damage a specific creature, applying 2x frozen damage multiplier if frozen. Returns true if killed. */
+  damageCreature(c: Creature, damage: number, x: number, y: number): boolean {
+    const mult = (c.freezeTimer ?? 0) > 0 ? FREEZE.enemyDamageMult : 1;
+    c.hp -= damage * mult;
     if (c.kind !== "flower") c.hurt = 0.12;
     if (c.hp > 0) return false;
     this.kill(c, x, y);
     return true;
   }
 
+  /** Damage the creature the last `raycast` found. Returns true if it died. */
+  applyHit(damage: number, x: number, y: number): boolean {
+    const c = this.lastHit;
+    this.lastHit = null;
+    if (!c) return false;
+    return this.damageCreature(c, damage, x, y);
+  }
+
   /** Damage every creature inside an explosion. */
   explode(x: number, y: number, radius: number, damage: number): void {
     const inside = (cx: number, cy: number): boolean => (cx - x) ** 2 + (cy - y) ** 2 <= radius * radius;
-    for (const f of [...this.flowers]) if (inside(f.hx, f.hy) && (f.hp -= damage) <= 0) this.kill(f, f.hx, f.hy);
-    for (const w of [...this.worms]) if (inside(w.seg[0], w.seg[1]) && (w.hp -= damage) <= 0) this.kill(w, w.seg[0], w.seg[1]);
-    for (const s of [...this.specimens]) if (s.free && inside(s.x, s.y) && (s.hp -= damage) <= 0) this.kill(s, s.x, s.y);
+    for (const f of [...this.flowers]) if (inside(f.hx, f.hy)) this.damageCreature(f, damage, f.hx, f.hy);
+    for (const w of [...this.worms]) if (inside(w.seg[0], w.seg[1])) this.damageCreature(w, damage, w.seg[0], w.seg[1]);
+    for (const s of [...this.specimens]) if (s.free && inside(s.x, s.y)) this.damageCreature(s, damage, s.x, s.y);
   }
 
   private kill(c: Creature, x: number, y: number): void {
+    c.freezeTimer = 0;
     if (c.kind === "flower") this.flowers.splice(this.flowers.indexOf(c), 1);
     else if (c.kind === "worm") this.worms.splice(this.worms.indexOf(c), 1);
     else this.specimens.splice(this.specimens.indexOf(c), 1);

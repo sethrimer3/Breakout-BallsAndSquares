@@ -259,6 +259,7 @@ export class Game {
       onDecay: (sx, sy) => this.onBlightDecay(sx, sy),
       onOverdrive: (on) => this.onOverdrive(on),
     });
+    this.growth.freeze = this.combat.freeze;
     this.lighting = new LightingSystem(this.world);
     this.fog = new FogOfWar(this.world);
     this.glass = new GlassSystem(this.world, { onShatter: (cx, cy) => this.onGlassShatter(cx, cy) });
@@ -522,14 +523,9 @@ export class Game {
     this.flashes = [];
     this.cellFlashes = [];
     this.doorFlashes = [];
-    this.combat.bullets.clear();
+    this.combat.creatures = this.creatures;
+    this.combat.clearAll();
     this.combat.resetTelemetry();
-    this.combat.grenades.clear();
-    this.combat.goo.clear();
-    this.combat.drones.clear();
-    this.combat.laser.clear();
-    this.combat.revolver.clear();
-    this.combat.turrets.clear();
     this.particles.clear();
     this.fire.clear();
     this.fire.burnMult = this.stats.flameBurnMult;
@@ -714,14 +710,8 @@ export class Game {
       this.flashes = [];
       this.cellFlashes = [];
     this.doorFlashes = [];
-      this.combat.bullets.clear();
+      this.combat.clearAll();
       this.combat.resetTelemetry();
-      this.combat.grenades.clear();
-      this.combat.goo.clear();
-      this.combat.drones.clear();
-      this.combat.laser.clear();
-      this.combat.revolver.clear();
-      this.combat.turrets.clear();
       this.particles.clear();
       this.fire.clear();
       this.casings.clear();
@@ -1091,12 +1081,6 @@ export class Game {
         return this.stats.sniperUnlocked;
       case "katana":
         return this.stats.katanaUnlocked;
-      case "drone_shepherd":
-        return this.stats.droneUnlocked;
-      case "prism_laser":
-        return this.stats.prismUnlocked;
-      case "goo_mortar":
-        return this.stats.gooUnlocked;
       case "flamethrower":
         return this.stats.flameUnlocked;
     }
@@ -1174,16 +1158,7 @@ export class Game {
       const cdy = Math.sin(commander.facingAngle);
       this.combat.fire(commander, cdx, cdy);
       this.onShot(commander, cdx, cdy, commander.x, commander.y);
-      let rate = this.stats.fireRate;
-      if (commander.weapon === "shotgun") rate = this.stats.shotgunFireRate;
-      else if (commander.weapon === "assault_rifle") rate = this.stats.arFireRate;
-      else if (commander.weapon === "rocket_launcher") rate = this.stats.rocketFireRate;
-      else if (commander.weapon === "sniper_rifle") rate = this.stats.sniperFireRate;
-      else if (commander.weapon === "katana") rate = this.stats.katanaFireRate;
-      else if (commander.weapon === "drone_shepherd") rate = 1 / this.stats.droneReleaseInterval;
-      else if (commander.weapon === "prism_laser") rate = this.stats.prismFireRate;
-      else if (commander.weapon === "goo_mortar") rate = this.stats.gooFireRate;
-      else if (commander.weapon === "flamethrower") rate = this.stats.flameFireRate;
+      const rate = this.combat.effectiveFireRate(commander);
       commander.fireCooldown = 1 / Math.max(0.1, rate);
     }
   }
@@ -1196,13 +1171,14 @@ export class Game {
 
   private onShot(s: Soldier, dx: number, dy: number, mx: number, my: number): void {
     this.runStats.shotsFired++;
-    if (s.weapon === "prism_laser") { this.audio.playPrism(mx, my); return; }
-    if (s.weapon === "drone_shepherd") return;
-    if (s.weapon === "goo_mortar") {
+    if (s.weapon === "sniper_rifle" && s.mutation === "chromatic_prism") { this.audio.playPrism(mx, my); return; }
+    if (s.weapon === "pistol" && s.mutation === "drone_shepherd") return;
+    if (s.weapon === "shotgun" && s.mutation === "squelch") {
       this.audio.playGoo("launch", mx, my);
       return;
     }
     if (s.weapon === "flamethrower") {
+      if (s.mutation === "cryospray" || s.mutation === "napalm_garden") return;
       // No white muzzle flash: the stream lights its surroundings with warm firelight.
       this.audio.playFlame(mx, my);
       this.fire.nozzle(s.id, mx + dx * 10, my + dy * 10);
@@ -1549,6 +1525,9 @@ export class Game {
   }
 
   private onSoldierKilled(s: Soldier): void {
+    this.combat.orbit.clearFor(s.id);
+    this.combat.debris.releaseFor(s.id);
+    s.railCharging = false;
     this.audio.playSoldierDeath(s.x, s.y);
     for (let i = 0; i < 36; i++) {
       const a = this.rng.range(0, Math.PI * 2);
@@ -1800,6 +1779,12 @@ export class Game {
       if (shouldShoot && commander.fireCooldown <= 0) {
         this.shootCommanderManual(commander);
       }
+      if (commander.weapon === "pistol" && commander.mutation === "orbit_cylinder") {
+        if ((!shouldShoot && commander.wasManualShooting) || (shouldShoot && this.save.data.settings.alwaysShootWhenAutoMoveOff && this.combat.orbit.isFull(commander.id))) {
+          this.combat.releaseOrbitManual(commander);
+        }
+        commander.wasManualShooting = shouldShoot;
+      }
 
       // Ensure camera tracks commander
       this.camera.lockOn(commander.id);
@@ -1811,14 +1796,25 @@ export class Game {
 
     this.dualStick.update();
 
+    this.combat.debris.update(dt, this.soldiers);
+    this.combat.orbit.update(dt, this.soldiers);
+
     for (const s of this.soldiers) {
       if (!s.alive) continue;
       s.age += dt;
-      this.physics.step(s, dt, this.stats, (soldier) => {
-        this.combat.telemetry.katanaDashes++;
-        this.audio.playSlash(soldier.x, soldier.y);
-        this.particles.spawn(PKind.Burst, soldier.x, soldier.y, 0, 0, 0.12, 10, 0x83ecff, 8);
-      });
+      this.physics.step(
+        s,
+        dt,
+        this.stats,
+        (soldier) => {
+          this.combat.telemetry.katanaDashes++;
+          this.audio.playSlash(soldier.x, soldier.y);
+          this.particles.spawn(PKind.Burst, soldier.x, soldier.y, 0, 0, 0.12, 10, 0x83ecff, 8);
+        },
+        (soldier, nx, ny) => {
+          this.combat.onSoldierBounce(soldier, nx, ny);
+        },
+      );
       if (s.dashLeft > 0) this.combat.telemetry.katanaBoostedSeconds += dt;
       this.combat.updateSoldier(s, dt);
     }

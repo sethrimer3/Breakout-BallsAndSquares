@@ -49,6 +49,21 @@ export class Bullet {
    */
   pendingAdvance = 0;
   ownerId = 0;
+  /** Burrower rocket state. */
+  burrowerGroupId = 0;
+  burrowerDrilling = false;
+  burrowerDrillDist = 0;
+  burrowerDrilledCells = 0;
+  burrowerMinesPlaced = 0;
+  burrowerLastMineDist = -999;
+  /** Freeze Rocket flag (cold-only burst, no terrain damage). */
+  freezeRocket = false;
+  /** Vacuum Pulse pellet flag (for rendering). */
+  vacuumPellet = false;
+  /** Napalm Garden spray flag (places unlit fuel, no fire ignition). */
+  napalmSpray = false;
+  /** Cryospray mist flag (cold-only, no fire ignition). */
+  cryoSpray = false;
 }
 
 /** Fixed-size object pool for bullets. */

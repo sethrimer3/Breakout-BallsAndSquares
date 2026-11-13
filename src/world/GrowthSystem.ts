@@ -1,4 +1,5 @@
-import { FACILITY, GROWTH, growthRateAt, overdriveWallRate } from "../config";
+import { FACILITY, FREEZE, GROWTH, growthRateAt, overdriveWallRate } from "../config";
+import type { FreezeSystem } from "../systems/FreezeSystem";
 import type { Rng } from "../core/Rng";
 import type { Soldier } from "../entities/Soldier";
 import { cellOverlapsCircle, circleIsClear } from "../systems/PhysicsSystem";
@@ -74,6 +75,8 @@ export class GrowthSystem {
   decayRate = 0;
   /** Dormant pixels decayed away this run. */
   decayed = 0;
+  /** Optional shared FreezeSystem for 0.5x local growth rate on frozen sources. */
+  freeze: FreezeSystem | null = null;
   /** Rolling telemetry ring (time, 1 if near soldier else 0). */
   private telTime: number[] = [];
   private telNear: number[] = [];
@@ -257,6 +260,12 @@ export class GrowthSystem {
       let tries = n * 3;
       while (n > 0 && tries-- > 0 && c.edges.length > 0) {
         const si = c.edges[this.rng.int(c.edges.length)];
+        const sx = si % w.subWidth;
+        const sy = Math.floor(si / w.subWidth);
+        if (this.freeze?.isSubFrozen(sx, sy) && this.rng.next() >= FREEZE.blightGrowthMult) {
+          n--;
+          continue;
+        }
         const dest = this.openNeighbor(si);
         if (dest < 0) continue;
         this.growSubPixel(dest, runTime, soldiers);
@@ -409,6 +418,9 @@ export class GrowthSystem {
       const src = this.pickSource(soldiers);
       const sx = src % w.width;
       const sy = Math.floor(src / w.width);
+      if (this.freeze?.isCellFrozen(sx, sy) && this.rng.next() >= FREEZE.blightGrowthMult) {
+        return true;
+      }
       neighbors.length = 0;
       for (let d = 0; d < 4; d++) {
         const nx = sx + DX[d];

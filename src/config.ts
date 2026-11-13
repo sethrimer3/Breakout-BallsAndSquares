@@ -970,3 +970,121 @@ export const SOLDIER_AMBIENT_STOPS = [
 
 export const REVERSE = { poolSize: 64, maxPoints: 64, maxHits: 64, pause: 0.18, safetyLife: 8 } as const;
 export const GALE = { distance: 300, maxDistance: 660, speed: 420, width: 24, pierce: 2, poolCap: 32 } as const;
+
+/** Orbit Cylinder (Pistol branch 2). */
+export const ORBIT = {
+  /** Max orbiting rounds held per carrier (initial tuning). */
+  maxRounds: 8,
+  /** Orbit radius from soldier center in world units (initial tuning). */
+  radius: 8.7,
+  /** Angular speed of orbiting rounds in rad/s (initial tuning). */
+  angularSpeed: 4.5,
+  /** Active released orbit projectiles cap (shares BulletPool). */
+  releaseCooldown: 0.04,
+} as const;
+
+/** Vacuum Pulse (Shotgun branch 2). */
+export const VACUUM = {
+  /** Collection radius in world units (initial tuning). */
+  range: 80,
+  /** Seconds before shot when fragments visibly pull inward (initial tuning). */
+  intakeDuration: 0.25,
+  /** Max debris records in the shared ledger (bounded pool). */
+  debrisCap: 512,
+  /** Max debris records a single soldier can reserve per shot. */
+  maxReservePerShot: 48,
+  /** Debris retention lifetime in seconds before fading out. */
+  debrisLife: 14,
+  /** Mass value of a destroyed half-size subcell relative to 1.0 normal cell. */
+  subcellMass: 0.25,
+  /** Extra pellets per unit of consumed mass (initial tuning). */
+  pelletsPerMass: 0.5,
+  /** Extra damage per pellet per unit of consumed mass (initial tuning). */
+  damagePerMass: 0.35,
+  /** Hard projectile safety cap per pulse. */
+  maxPellets: 24,
+  /** Bonus damage per pellet for each excess pellet above maxPellets (overflow policy). */
+  overflowDamagePerPellet: 0.5,
+} as const;
+
+/** Burrower (Rocket Launcher branch 1). */
+export const BURROWER = {
+  /** Max solid cells a rocket can drill through (initial tuning). */
+  maxDrillCells: 8,
+  /** Max drilling distance in world units once terrain contact begins (initial tuning). */
+  maxDrillDist: 64,
+  /** Base mines placed along the drilled path (excluding terminal payload). */
+  mineCount: 3,
+  /** Max mines per group when Cluster Munitions is upgraded. */
+  maxMineCount: 6,
+  /** Minimum world-unit spacing between placed mines along the drilled path. */
+  mineSpacing: 12,
+  /** Bounded pool size for Burrower mines. */
+  minePoolSize: 96,
+  /** Max group detonations processed per fixed step. */
+  maxDetonationsPerStep: 8,
+  /** Damage ratio applied to cells while drilling (initial tuning). */
+  drillDamageRatio: 0.5,
+} as const;
+
+/** Shared Freeze & Shatter system (Freeze Rockets + Cryospray). */
+export const FREEZE = {
+  /** Initial prototype freeze duration in seconds (configurable; refreshed on overlap). */
+  duration: 3.0,
+  /** Frozen enemy movement speed multiplier (fixed requirement: 50%). */
+  enemySpeedMult: 0.5,
+  /** Frozen enemy incoming damage multiplier (fixed requirement: 2x). */
+  enemyDamageMult: 2.0,
+  /** Frozen Blight local growth rate multiplier (fixed requirement: 0.5x). */
+  blightGrowthMult: 0.5,
+  /** Max deferred shatter events in queue. */
+  maxPendingShatters: 2048,
+  /** Max shatter operations processed per fixed step. */
+  maxShattersPerStep: 64,
+} as const;
+
+/** Rail Lance (Sniper Rifle branch 2). */
+export const RAIL = {
+  /** Fraction of fire interval spent visibly charging; final fraction locks aim. */
+  aimLockFraction: 0.35,
+  /** Maximum straight-line piercing range in world units (initial tuning). */
+  maxRange: 1200,
+  /** Bonus pierce budget on top of Sniper pierce (initial tuning). */
+  bonusPierce: 10,
+  /** Visual beam fade duration in seconds. */
+  beamFadeTime: 0.22,
+  /** Pool size for active Rail Lance beam visuals. */
+  beamPoolSize: 32,
+} as const;
+
+/** Napalm Garden (Flamethrower branch 1). */
+export const NAPALM = {
+  /** Fixed requirement: unlit fuel expires after 10 seconds. */
+  unlitDuration: 10.0,
+  /** Fixed requirement: lit fuel burns for 3 seconds. */
+  burnDuration: 3.0,
+  /** Fixed requirement: full weapon damage every 0.2 seconds (15 ticks). */
+  tickInterval: 0.2,
+  /** Fixed requirement: 15 ticks over 3.0 seconds (at 0.2..3.0s). */
+  maxTicks: 15,
+  /** Bounded pool size for fuel patches. */
+  maxPatches: 192,
+  /** Spray projectile speed & lifetime (initial tuning). */
+  spraySpeed: 170,
+  sprayLifetime: 0.36,
+  spreadDeg: 11,
+  /** Ground patch damage radius in world units (initial tuning). */
+  patchRadius: 7,
+} as const;
+
+/** Cryospray (Flamethrower branch 2). */
+export const CRYO = {
+  /** Mist jet speed (initial tuning). */
+  speed: 160,
+  /** Mist jet lifetime (initial tuning). */
+  lifetime: 0.34,
+  /** Mist cone half-angle spread in degrees. */
+  spreadDeg: 14,
+  /** Mist particle pool cap. */
+  particleCap: 320,
+} as const;

@@ -4,7 +4,7 @@ import { sectorCount, sectorTier } from "../world/labMap";
 import { clamp } from "../core/math";
 import { LAB_WORLD_COUNT, LAB_WORLDS } from "../world/labMap";
 import { CAMPAIGN, campaignTier } from "../world/campaignBalance";
-import type { PrimaryMutation, SecondaryWeaponType, WeaponType } from "../entities/Soldier";
+import { normalizeLegacyWeapon, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
 import { SOLDIER_UPGRADE_DEFS, type SoldierUpgradeLevels } from "./SoldierUpgrades";
 import { UPGRADE_DEFS, type UpgradeId } from "./UpgradeDefinitions";
 
@@ -60,9 +60,21 @@ const VALID_WEAPONS: readonly WeaponType[] = [
   "sniper_rifle",
   "katana",
   "flamethrower",
-  "goo_mortar",
+];
+
+const VALID_MUTATIONS: readonly PrimaryMutation[] = [
+  "reverse_revolver",
+  "orbit_cylinder",
   "drone_shepherd",
-  "prism_laser",
+  "squelch",
+  "vacuum_pulse",
+  "burrower",
+  "freeze_rockets",
+  "chromatic_prism",
+  "rail_lance",
+  "gale_edge",
+  "napalm_garden",
+  "cryospray",
 ];
 const MAX_SOLDIER_SLOTS = 8;
 
@@ -100,6 +112,7 @@ export interface SaveData {
   biomass: number;
   lifetimePixels: number;
   upgrades: Record<UpgradeId, number>;
+  upgradeSpent?: Partial<Record<UpgradeId, Partial<Record<"gold" | "crystals" | "greenCrystals" | "essence" | "biomass", number>>>>;
   loadouts: SoldierLoadout[];
   bests: {
     time: number;
@@ -174,6 +187,7 @@ export function defaultSaveData(seed = randomProfileSeed()): SaveData {
     biomass: 0,
     lifetimePixels: 0,
     upgrades,
+    upgradeSpent: {},
     loadouts,
     bests: { time: 0, depth: 0, pixels: 0 },
     settings: {
@@ -257,15 +271,46 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     }
   }
 
+  if (obj.upgradeSpent && typeof obj.upgradeSpent === "object") {
+    const rawSpent = obj.upgradeSpent as Record<string, unknown>;
+    const cleanSpent: NonNullable<SaveData["upgradeSpent"]> = {};
+    for (const d of UPGRADE_DEFS) {
+      const entry = rawSpent[d.id];
+      if (!entry || typeof entry !== "object") continue;
+      const curMap: Partial<Record<"gold" | "crystals" | "greenCrystals" | "essence" | "biomass", number>> = {};
+      for (const c of ["gold", "crystals", "greenCrystals", "essence", "biomass"] as const) {
+        const val = Math.floor(finiteNonNeg((entry as Record<string, unknown>)[c], 0));
+        if (val > 0) curMap[c] = val;
+      }
+      if (Object.keys(curMap).length > 0) cleanSpent[d.id] = curMap;
+    }
+    def.upgradeSpent = cleanSpent;
+  }
+
   if (Array.isArray(obj.loadouts)) {
     for (let i = 0; i < Math.min(MAX_SOLDIER_SLOTS, obj.loadouts.length); i++) {
       const item = obj.loadouts[i] as Record<string, unknown> | null;
       if (item && typeof item === "object") {
         const w = item.weapon;
-        if (typeof w === "string" && (VALID_WEAPONS as readonly string[]).includes(w)) {
-          def.loadouts[i].weapon = w as WeaponType;
+        if (typeof w === "string") {
+          const norm = normalizeLegacyWeapon(w, item.mutation);
+          if ((VALID_WEAPONS as readonly string[]).includes(norm.weapon)) {
+            def.loadouts[i].weapon = norm.weapon;
+          }
+          // Legacy standalone variants imply their canonical base weapon is accessible if the variant was unlocked.
+          if (w === "goo_mortar" && (def.upgrades.goo_unlock ?? 0) > 0) {
+            def.upgrades.shotgun_unlock = Math.max(1, def.upgrades.shotgun_unlock ?? 0);
+          } else if (w === "prism_laser" && (def.upgrades.prism_unlock ?? 0) > 0) {
+            def.upgrades.sniper_unlock = Math.max(1, def.upgrades.sniper_unlock ?? 0);
+          }
+          def.loadouts[i].mutation = norm.mutation && (VALID_MUTATIONS as readonly string[]).includes(norm.mutation)
+            ? norm.mutation
+            : null;
+        } else {
+          def.loadouts[i].mutation = typeof item.mutation === "string" && (VALID_MUTATIONS as readonly string[]).includes(item.mutation)
+            ? (item.mutation as PrimaryMutation)
+            : null;
         }
-        def.loadouts[i].mutation = item.mutation === "reverse_revolver" || item.mutation === "gale_edge" ? item.mutation : null;
         const b = item.behavior;
         if (typeof b === "string" && (VALID_BEHAVIORS as readonly string[]).includes(b)) {
           def.loadouts[i].behavior = b as SoldierBehavior;
@@ -290,14 +335,9 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     }
   }
   // If any weapon or behavior is not unlocked in this save, fall back to safe defaults.
+  const ownedNonPistol = new Set<WeaponType>();
   for (const ld of def.loadouts) {
-    if (ld.weapon === "drone_shepherd" && (def.upgrades.drone_unlock ?? 0) === 0) {
-      ld.weapon = "pistol";
-    } else if (ld.weapon === "prism_laser" && (def.upgrades.prism_unlock ?? 0) === 0) {
-      ld.weapon = "pistol";
-    } else if (ld.weapon === "goo_mortar" && (def.upgrades.goo_unlock ?? 0) === 0) {
-      ld.weapon = "pistol";
-    } else if (ld.weapon === "shotgun" && (def.upgrades.shotgun_unlock ?? 0) === 0) {
+    if (ld.weapon === "shotgun" && (def.upgrades.shotgun_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
     } else if (ld.weapon === "assault_rifle" && (def.upgrades.ar_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
@@ -311,8 +351,28 @@ export function sanitizeSaveData(raw: unknown): SaveData {
       ld.weapon = "pistol";
     }
 
+    // Enforce unique non-Pistol primary ownership across squad slots.
+    if (ld.weapon !== "pistol") {
+      if (ownedNonPistol.has(ld.weapon)) {
+        ld.weapon = "pistol";
+        ld.mutation = null;
+      } else {
+        ownedNonPistol.add(ld.weapon);
+      }
+    }
+
     if (ld.mutation === "reverse_revolver" && (ld.weapon !== "pistol" || def.upgrades.reverse_unlock === 0)) ld.mutation = null;
-    if (ld.mutation === "gale_edge" && (ld.weapon !== "katana" || def.upgrades.gale_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "orbit_cylinder" && (ld.weapon !== "pistol" || def.upgrades.orbit_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "drone_shepherd" && (ld.weapon !== "pistol" || def.upgrades.drone_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "squelch" && (ld.weapon !== "shotgun" || def.upgrades.goo_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "vacuum_pulse" && (ld.weapon !== "shotgun" || def.upgrades.vacuum_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "burrower" && (ld.weapon !== "rocket_launcher" || def.upgrades.burrower_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "freeze_rockets" && (ld.weapon !== "rocket_launcher" || def.upgrades.freeze_rockets_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "chromatic_prism" && (ld.weapon !== "sniper_rifle" || def.upgrades.prism_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "rail_lance" && (ld.weapon !== "sniper_rifle" || def.upgrades.rail_lance_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "gale_edge" && (ld.weapon !== "katana" || def.upgrades.gale_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "napalm_garden" && (ld.weapon !== "flamethrower" || def.upgrades.napalm_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "cryospray" && (ld.weapon !== "flamethrower" || def.upgrades.cryospray_unlock === 0)) ld.mutation = null;
 
     if (ld.secondary === "grenade" && (def.upgrades.grenade_unlock ?? 0) === 0) {
       ld.secondary = null;

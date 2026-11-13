@@ -1,10 +1,20 @@
-import { DRONE, GOO, GALE, REVERSE, ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET } from "../config";
+import {
+  DRONE, GOO, GALE, REVERSE, ORBIT, VACUUM, BURROWER, FREEZE, RAIL, NAPALM, CRYO,
+  ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET,
+} from "../config";
 import { ReverseRevolver, type ReverseShot } from "./ReverseRevolver";
+import { OrbitCylinderSystem } from "./OrbitCylinder";
+import { DebrisSystem } from "./DebrisSystem";
+import { FreezeSystem } from "./FreezeSystem";
+import { BurrowerSystem } from "./BurrowerSystem";
+import { RailLanceSystem } from "./RailLanceSystem";
+import { NapalmSystem } from "./NapalmSystem";
 import { slashMomentum } from "./Momentum";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Rng } from "../core/Rng";
 import { BulletPool, type Bullet } from "../entities/Bullet";
+import type { CreatureSystem } from "../entities/Creatures";
 import type { Soldier, SoldierStats } from "../entities/Soldier";
 import { StickyGrenadePool, type StickyGrenade } from "../entities/StickyGrenade";
 import { AutoTurretPool, type AutoTurret } from "../entities/AutoTurret";
@@ -12,7 +22,7 @@ import { DroneSystem } from "./DroneSystem";
 import { LaserSystem } from "./LaserSystem";
 import type { DroneShot } from "../entities/Drone";
 import { GooOrbSystem } from "./GooOrbSystem";
-import type { PixelWorld } from "../world/PixelWorld";
+import { MAT, type PixelWorld } from "../world/PixelWorld";
 
 export interface CombatEvents {
   /** A soldier fired (once per trigger pull). */
@@ -78,9 +88,18 @@ export class CombatSystem {
   readonly drones: DroneSystem;
   readonly laser: LaserSystem;
   readonly revolver: ReverseRevolver;
+  readonly orbit: OrbitCylinderSystem;
+  readonly debris: DebrisSystem;
+  readonly freeze: FreezeSystem;
+  readonly burrower: BurrowerSystem;
+  readonly rail: RailLanceSystem;
+  readonly napalm: NapalmSystem;
   stats: SoldierStats;
   /** Creatures bullets can hit before the terrain (the Blight's flowers, worms, specimens). */
   targets: BulletTargets | null = null;
+  creatures: CreatureSystem | null = null;
+  /** Current damaging owner ID for authoritative destruction attribution. */
+  private currentOwnerId = 0;
   /** The soldier firing right now, whose own tree shapes the shots they spawn. */
   private shooter: Soldier | null = null;
 
@@ -91,17 +110,56 @@ export class CombatSystem {
     private events: CombatEvents = {},
   ) {
     this.stats = stats;
+    this.debris = new DebrisSystem(world);
+    this.freeze = new FreezeSystem(world);
+    this.orbit = new OrbitCylinderSystem();
+    this.burrower = new BurrowerSystem();
+    this.rail = new RailLanceSystem(world);
+    this.napalm = new NapalmSystem(world);
+
+    world.addDestroyListener((cx, cy, isSub, sx, sy) => {
+      if (isSub) {
+        this.debris.recordSubDestroyed(sx, sy);
+        this.freeze.onSubDestroyed(sx, sy, this.currentOwnerId);
+      } else {
+        this.debris.recordCellDestroyed(cx, cy);
+        this.freeze.onCellDestroyed(cx, cy, this.currentOwnerId);
+      }
+    });
+
+    this.freeze.onShatterHit = (cx, cy, res, isSub, sx, sy, triggerOwnerId) => {
+      const cs = this.world.cellSize;
+      const ss = this.world.subCellSize;
+      const wx = isSub ? (sx + 0.5) * ss : (cx + 0.5) * cs;
+      const wy = isSub ? (sy + 0.5) * ss : (cy + 0.5) * cs;
+      this.events.onImpact?.(wx, wy, 0, 0, cx, cy, res, isSub, triggerOwnerId);
+    };
+
+    this.napalm.onTerrainTick = (cx, cy, res, isSub, sx, sy, ownerId) => {
+      const cs = this.world.cellSize;
+      const ss = this.world.subCellSize;
+      const wx = isSub ? (sx + 0.5) * ss : (cx + 0.5) * cs;
+      const wy = isSub ? (sy + 0.5) * ss : (cy + 0.5) * cs;
+      this.events.onImpact?.(wx, wy, 0, 0, cx, cy, res, isSub, ownerId);
+    };
+
     this.revolver = new ReverseRevolver((shot,x,y,tx,ty)=>this.replaySegment(shot,x,y,tx,ty), (shot)=>this.events.onRevolverReturn?.(shot.x,shot.y));
     this.drones = new DroneSystem(world, (shot) => this.fireDroneShot(shot), (x,y) => this.events.onDroneLaunch?.(x,y));
     this.laser = new LaserSystem(world, {
-      onImpact: (...args) => this.events.onImpact?.(...args),
+      onImpact: (x, y, nx, ny, cx, cy, res, sub, ownerId) => {
+        this.napalm.igniteAt(x, y, 4, ownerId ?? 0);
+        this.events.onImpact?.(x, y, nx, ny, cx, cy, res, sub, ownerId);
+      },
       onBounce: (x,y) => this.events.onLaserBounce?.(x,y),
       onOverload: (x,y) => this.events.onLaserOverload?.(x,y),
       hitCreature: (x,y,dx,dy,distance,damage) => {
         const target = this.targets?.raycast(x,y,dx,dy,distance) ?? -1;
         if (target >= 0) {
-          this.targets?.applyHit(damage,x+dx*target,y+dy*target);
-          this.events.onCreatureHit?.(x+dx*target,y+dy*target,-dx,-dy);
+          const hx = x + dx * target;
+          const hy = y + dy * target;
+          this.targets?.applyHit(damage, hx, hy);
+          this.napalm.igniteAt(hx, hy, 4, 0);
+          this.events.onCreatureHit?.(hx, hy, -dx, -dy);
         }
         return target;
       },
@@ -122,6 +180,63 @@ export class CombatSystem {
     this.telemetry.bulletBounceHistogram.fill(0);
   }
 
+  clearAll(): void {
+    this.bullets.clear();
+    this.grenades.clear();
+    this.turrets.clear();
+    this.goo.clear();
+    this.drones.clear();
+    this.laser.clear();
+    this.revolver.clear();
+    this.orbit.clear();
+    this.debris.clear();
+    this.freeze.clear();
+    this.burrower.clear();
+    this.rail.clear();
+    this.napalm.clear();
+  }
+
+  /** Effective fire rate for a soldier, accounting for active Black Market mutation. */
+  effectiveFireRate(s: Soldier): number {
+    let rate = this.stats.fireRate;
+    switch (s.weapon) {
+      case "pistol":
+        if (s.mutation === "drone_shepherd" && this.stats.droneUnlocked) {
+          rate = 1 / this.stats.droneReleaseInterval;
+        }
+        break;
+      case "shotgun":
+        if (s.mutation === "squelch" && this.stats.gooUnlocked) {
+          rate = this.stats.gooFireRate;
+        } else if (s.mutation === "vacuum_pulse" && this.stats.vacuumUnlocked) {
+          rate = this.stats.shotgunFireRate * 0.5;
+        } else {
+          rate = this.stats.shotgunFireRate;
+        }
+        break;
+      case "assault_rifle":
+        rate = this.stats.arFireRate;
+        break;
+      case "rocket_launcher":
+        rate = this.stats.rocketFireRate;
+        break;
+      case "sniper_rifle":
+        if (s.mutation === "chromatic_prism" && this.stats.prismUnlocked) {
+          rate = this.stats.prismFireRate;
+        } else {
+          rate = this.stats.sniperFireRate;
+        }
+        break;
+      case "katana":
+        rate = this.stats.katanaFireRate;
+        break;
+      case "flamethrower":
+        rate = this.stats.flameFireRate;
+        break;
+    }
+    return rate * this.stats.globalFireRateMult * s.mods.fireRateMult;
+  }
+
   /** Tick a soldier's weapon according to its equipped weapon type. */
   updateSoldier(s: Soldier, dt: number): void {
     if (s.isManual) return; // Driven by player control in Game.step
@@ -132,39 +247,48 @@ export class CombatSystem {
       s.facingAngle += (4 * Math.PI / 3) * dt;
     }
 
-    s.fireCooldown -= dt;
-    let rate = this.stats.fireRate;
-    switch (s.weapon) {
-      case "drone_shepherd":
-        rate = 1 / this.stats.droneReleaseInterval;
-        break;
-      case "prism_laser":
-        rate = this.stats.prismFireRate;
-        break;
-      case "goo_mortar":
-        rate = this.stats.gooFireRate;
-        break;
-      case "shotgun":
-        rate = this.stats.shotgunFireRate;
-        break;
-      case "assault_rifle":
-        rate = this.stats.arFireRate;
-        break;
-      case "rocket_launcher":
-        rate = this.stats.rocketFireRate;
-        break;
-      case "sniper_rifle":
-        rate = this.stats.sniperFireRate;
-        break;
-      case "katana":
-        rate = this.stats.katanaFireRate;
-        break;
-      case "flamethrower":
-        rate = this.stats.flameFireRate;
-        break;
-    }
-    rate *= this.stats.globalFireRateMult * s.mods.fireRateMult;
+    const rate = this.effectiveFireRate(s);
     const interval = 1 / Math.max(0.05, rate);
+
+    // Rail Lance uses an explicit charge cycle with an aim-lock phase before firing once.
+    if (s.weapon === "sniper_rifle" && s.mutation === "rail_lance" && this.stats.railLanceUnlocked) {
+      if (!s.railCharging) {
+        s.railCharging = true;
+        s.railCharge = 0;
+        s.railChargeTotal = interval;
+      }
+      s.railChargeTotal = interval;
+      s.railCharge += dt;
+      const lockStart = s.railChargeTotal * (1 - RAIL.aimLockFraction);
+      if (s.railCharge < lockStart) {
+        const vlen = Math.hypot(s.vx, s.vy);
+        if (vlen > 1e-6) {
+          s.railLockDx = s.vx / vlen;
+          s.railLockDy = s.vy / vlen;
+          s.facingAngle = Math.atan2(s.railLockDy, s.railLockDx);
+        } else {
+          s.railLockDx = Math.cos(s.facingAngle);
+          s.railLockDy = Math.sin(s.facingAngle);
+        }
+      }
+      if (s.railCharge >= s.railChargeTotal) {
+        s.railCharge -= s.railChargeTotal;
+        this.fireRailLance(s, s.railLockDx, s.railLockDy);
+        if (s.mods.twinChance > 0 && this.rng.next() < s.mods.twinChance) {
+          this.fireRailLance(s, s.railLockDx, s.railLockDy);
+        }
+      }
+      return;
+    }
+
+    // Vacuum Pulse reserves in-range debris during the intake window before firing.
+    if (s.weapon === "shotgun" && s.mutation === "vacuum_pulse" && this.stats.vacuumUnlocked) {
+      if (s.fireCooldown <= VACUUM.intakeDuration) {
+        this.debris.reserveInRange(s.id, s.x, s.y, VACUUM.range);
+      }
+    }
+
+    s.fireCooldown -= dt;
     let guard = 0;
     while (s.fireCooldown <= 0 && guard++ < 8) {
       this.fire(s);
@@ -198,13 +322,15 @@ export class CombatSystem {
     s.facingAngle = Math.atan2(dy, dx);
     this.shooter = s;
 
-    if (s.weapon === "drone_shepherd") {
+    if (s.weapon === "pistol" && s.mutation === "drone_shepherd" && this.stats.droneUnlocked) {
       this.drones.release(s, this.stats);
       this.shooter = null;
       return;
-    } else if (s.weapon === "prism_laser") {
+    } else if (s.weapon === "sniper_rifle" && s.mutation === "chromatic_prism" && this.stats.prismUnlocked) {
       this.laser.traceShot(s, dx, dy, this.stats);
-    } else if (s.weapon === "goo_mortar") {
+    } else if (s.weapon === "sniper_rifle" && s.mutation === "rail_lance" && this.stats.railLanceUnlocked) {
+      this.fireRailLance(s, dx, dy);
+    } else if (s.weapon === "shotgun" && s.mutation === "squelch" && this.stats.gooUnlocked) {
       const orb = this.goo.launch({
         // Cast from the center so a muzzle beside a thin wall cannot skip it.
         x: s.x, y: s.y, dx, dy, ownerId: s.id,
@@ -219,6 +345,32 @@ export class CombatSystem {
         this.shooter = null;
         this.events.onGooLaunchBlocked?.(s.x, s.y);
         return;
+      }
+    } else if (s.weapon === "shotgun" && s.mutation === "vacuum_pulse" && this.stats.vacuumUnlocked) {
+      this.debris.reserveInRange(s.id, s.x, s.y, VACUUM.range);
+      const consumed = this.debris.consumeFor(s.id);
+      const minBasePellets = Math.max(2, Math.floor(this.stats.shotgunPellets * 0.5));
+      const rawPellets = (consumed.mass > 0 ? this.stats.shotgunPellets : minBasePellets) + Math.floor(consumed.mass * VACUUM.pelletsPerMass);
+      const n = Math.min(VACUUM.maxPellets, Math.max(2, rawPellets));
+      const overflowPellets = Math.max(0, rawPellets - VACUUM.maxPellets);
+      const dmg = this.stats.shotgunDamage + consumed.mass * VACUUM.damagePerMass + overflowPellets * VACUUM.overflowDamagePerPellet;
+      const halfSpreadRad = this.stats.shotgunSpreadDeg * DEG;
+      for (let i = 0; i < n; i++) {
+        const t = n === 1 ? 0 : (i / (n - 1)) * 2 - 1;
+        const jitter = this.rng.range(-0.18, 0.18) * halfSpreadRad;
+        const a = t * halfSpreadRad + jitter;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        const spd = this.stats.shotgunBulletSpeed * this.rng.range(0.92, 1.08);
+        const b = this.spawnBullet(
+          s.x, s.y, dx * c - dy * sn, dx * sn + dy * c,
+          spd, dmg, this.stats.shotgunLifetime, s.radius + BULLET.muzzleGap,
+          s.id, 0, 0, 0, 0,
+        );
+        if (b) {
+          b.vacuumPellet = true;
+          b.bounceLeft = 0; // Vacuum Pulse does not inherit Shotgun Rebound.
+        }
       }
     } else if (s.weapon === "shotgun") {
       const n = Math.max(1, this.stats.shotgunPellets);
@@ -267,21 +419,32 @@ export class CombatSystem {
         0,
       );
     } else if (s.weapon === "rocket_launcher") {
-      this.spawnBullet(
+      const isBurrower = s.mutation === "burrower" && this.stats.burrowerUnlocked;
+      const isFreeze = s.mutation === "freeze_rockets" && this.stats.freezeRocketsUnlocked;
+      const b = this.spawnBullet(
         s.x,
         s.y,
         dx,
         dy,
         this.stats.rocketBulletSpeed,
-        this.stats.rocketDamage,
+        isFreeze ? 0 : this.stats.rocketDamage,
         ROCKET_LAUNCHER.lifetime,
         s.radius + BULLET.muzzleGap,
         s.id,
         0,
         this.stats.rocketBlastRadius,
-        this.stats.rocketClusterCount,
+        isBurrower || isFreeze ? 0 : this.stats.rocketClusterCount,
         1,
       );
+      if (b) {
+        if (isBurrower) {
+          b.burrowerGroupId = this.burrower.allocateGroupId();
+          b.clusterCount = Math.min(BURROWER.maxMineCount, BURROWER.mineCount + this.stats.rocketClusterCount);
+        } else if (isFreeze) {
+          b.freezeRocket = true;
+          b.damage = 0;
+        }
+      }
     } else if (s.weapon === "sniper_rifle") {
       const isCrit = this.stats.sniperCritChance > 0 && this.rng.next() < this.stats.sniperCritChance;
       const dmg = isCrit ? this.stats.sniperDamage * 2 : this.stats.sniperDamage;
@@ -341,18 +504,23 @@ export class CombatSystem {
         );
       }
     } else if (s.weapon === "flamethrower") {
-      const halfSpreadRad = FLAMETHROWER.spreadDeg * DEG;
+      const isNapalm = s.mutation === "napalm_garden" && this.stats.napalmUnlocked;
+      const isCryo = s.mutation === "cryospray" && this.stats.cryosprayUnlocked;
+      const spread = isCryo ? CRYO.spreadDeg : isNapalm ? NAPALM.spreadDeg : FLAMETHROWER.spreadDeg;
+      const halfSpreadRad = spread * DEG;
       const a = this.rng.range(-halfSpreadRad, halfSpreadRad);
       const c = Math.cos(a);
       const sn = Math.sin(a);
-      this.spawnBullet(
+      const spd = (isCryo ? CRYO.speed : isNapalm ? NAPALM.spraySpeed : FLAMETHROWER.bulletSpeed) * this.rng.range(0.85, 1.15);
+      const life = (isCryo ? CRYO.lifetime : isNapalm ? NAPALM.sprayLifetime : this.stats.flameLifetime) * this.rng.range(0.85, 1.1);
+      const b = this.spawnBullet(
         s.x,
         s.y,
         dx * c - dy * sn,
         dx * sn + dy * c,
-        FLAMETHROWER.bulletSpeed * this.rng.range(0.85, 1.15),
-        this.stats.flameDamage,
-        this.stats.flameLifetime * this.rng.range(0.85, 1.1),
+        spd,
+        isCryo ? 0 : this.stats.flameDamage,
+        life,
         s.radius + BULLET.muzzleGap,
         s.id,
         0,
@@ -360,6 +528,22 @@ export class CombatSystem {
         0,
         4,
       );
+      if (b) {
+        if (isNapalm) {
+          b.napalmSpray = true;
+        } else if (isCryo) {
+          b.cryoSpray = true;
+          b.damage = 0;
+        }
+      }
+    } else if (s.weapon === "pistol" && s.mutation === "orbit_cylinder" && this.stats.orbitUnlocked) {
+      const dmg = this.stats.damage + this.stats.globalDamageBonus + s.mods.damageBonus;
+      const spd = this.stats.bulletSpeed * this.stats.globalBulletSpeedMult * s.mods.bulletSpeedMult;
+      const bounces = s.mods.pierce > 0 ? 0 : this.stats.pistolBounces;
+      this.orbit.loadRound(s, dmg, spd, bounces, s.mods.terrainDamageBonus, s.mods.blightMult, s.mods.pierce);
+      if (this.stats.multishotChance > 0 && this.rng.next() < this.stats.multishotChance) {
+        this.orbit.loadRound(s, dmg, spd, bounces, s.mods.terrainDamageBonus, s.mods.blightMult, s.mods.pierce);
+      }
     } else {
       // Pistol
       this.spawnBullet(
@@ -458,6 +642,16 @@ export class CombatSystem {
     b.bounces = 0;
     b.momentumBoosted = false;
     b.gale = false; b.galeCells.clear(); b.distanceLeft = Infinity; b.replay = null;
+    b.burrowerGroupId = 0;
+    b.burrowerDrilling = false;
+    b.burrowerDrillDist = 0;
+    b.burrowerDrilledCells = 0;
+    b.burrowerMinesPlaced = 0;
+    b.burrowerLastMineDist = -999;
+    b.freezeRocket = false;
+    b.vacuumPellet = false;
+    b.napalmSpray = false;
+    b.cryoSpray = false;
     if (weapon === "pistol" && this.shooter?.mutation === "reverse_revolver" && this.stats.reverseUnlocked) {
       b.replay=this.revolver.begin(x,y,b.speed,b.damage,b.terrainDamageBonus,b.blightMultiplier,ownerId);
       if(!b.replay){this.bullets.release(b);return null;}
@@ -520,8 +714,92 @@ export class CombatSystem {
     b.distanceLeft=b.gale?this.stats.galeDistance:Infinity;
   }
 
+  private fireRailLance(s: Soldier, dx: number, dy: number): void {
+    const isCrit = this.stats.sniperCritChance > 0 && this.rng.next() < this.stats.sniperCritChance;
+    const baseDmg = this.stats.sniperDamage + this.stats.globalDamageBonus + s.mods.damageBonus;
+    const dmg = isCrit ? baseDmg * 2 : baseDmg;
+    const pierce = this.stats.sniperPierce + RAIL.bonusPierce + s.mods.pierce;
+    const prevOwner = this.currentOwnerId;
+    this.currentOwnerId = s.id;
+    try {
+      this.rail.fireStrike(
+        s,
+        s.x,
+        s.y,
+        dx,
+        dy,
+        dmg,
+        pierce,
+        isCrit,
+        this.targets,
+        (cx, cy, res, sub, hx, hy, nx, ny, ownerId) => {
+          if (res > 0) this.napalm.igniteAt(hx, hy, 4, ownerId);
+          this.events.onImpact?.(hx, hy, nx, ny, cx, cy, res, sub, ownerId);
+        },
+        (hx, hy, nx, ny) => {
+          this.napalm.igniteAt(hx, hy, 4, s.id);
+          this.events.onCreatureHit?.(hx, hy, nx, ny);
+        },
+      );
+    } finally {
+      this.currentOwnerId = prevOwner;
+    }
+  }
+
+  /** Called by PhysicsSystem on a real reflected-wall collision (not sliding/rescue/sentry). */
+  onSoldierBounce(s: Soldier, nx: number, ny: number): void {
+    if (s.weapon === "pistol" && s.mutation === "orbit_cylinder" && this.stats.orbitUnlocked) {
+      this.orbit.releaseOnBounce(s, nx, ny, (x, y, dx, dy, speed, damage, life, ownerId, bounces, terrainDamageBonus, blightMultiplier, pierce) => {
+        const b = this.bullets.acquire();
+        if (!b) return false;
+        b.x = x; b.y = y; b.dx = dx; b.dy = dy;
+        b.speed = speed; b.damage = damage; b.life = life; b.maxLife = life;
+        b.traveled = 0; b.totalTraveled = 0; b.pendingAdvance = 0;
+        b.ownerId = ownerId; b.pierceLeft = pierce;
+        b.bounceLeft = pierce === 0 ? bounces : 0;
+        b.bounceRetention = 1; b.explosionRadius = 0; b.clusterCount = 0; b.style = 0;
+        b.terrainDamageBonus = terrainDamageBonus; b.blightMultiplier = blightMultiplier;
+        b.slashWidth = 0; b.slashAngle = 0; b.afterimage = false; b.fromDrone = false;
+        b.bounces = 0; b.momentumBoosted = false;
+        b.gale = false; b.galeCells.clear(); b.distanceLeft = Infinity; b.replay = null;
+        b.burrowerGroupId = 0; b.burrowerDrilling = false; b.burrowerDrillDist = 0;
+        b.burrowerDrilledCells = 0; b.burrowerMinesPlaced = 0; b.burrowerLastMineDist = -999;
+        b.freezeRocket = false; b.vacuumPellet = false; b.napalmSpray = false; b.cryoSpray = false;
+        this.telemetry.bulletBounceHistogram[0]++;
+        return true;
+      });
+    }
+  }
+
+  /** Release Orbit Cylinder rounds manually (e.g. when manual commander stops firing). */
+  releaseOrbitManual(s: Soldier): number {
+    if (s.weapon !== "pistol" || s.mutation !== "orbit_cylinder" || !this.stats.orbitUnlocked) return 0;
+    return this.orbit.releaseManual(s, (x, y, dx, dy, speed, damage, life, ownerId, bounces, terrainDamageBonus, blightMultiplier, pierce) => {
+      const b = this.bullets.acquire();
+      if (!b) return false;
+      b.x = x; b.y = y; b.dx = dx; b.dy = dy;
+      b.speed = speed; b.damage = damage; b.life = life; b.maxLife = life;
+      b.traveled = 0; b.totalTraveled = 0; b.pendingAdvance = 0;
+      b.ownerId = ownerId; b.pierceLeft = pierce;
+      b.bounceLeft = pierce === 0 ? bounces : 0;
+      b.bounceRetention = 1; b.explosionRadius = 0; b.clusterCount = 0; b.style = 0;
+      b.terrainDamageBonus = terrainDamageBonus; b.blightMultiplier = blightMultiplier;
+      b.slashWidth = 0; b.slashAngle = 0; b.afterimage = false; b.fromDrone = false;
+      b.bounces = 0; b.momentumBoosted = false;
+      b.gale = false; b.galeCells.clear(); b.distanceLeft = Infinity; b.replay = null;
+      b.burrowerGroupId = 0; b.burrowerDrilling = false; b.burrowerDrillDist = 0;
+      b.burrowerDrilledCells = 0; b.burrowerMinesPlaced = 0; b.burrowerLastMineDist = -999;
+      b.freezeRocket = false; b.vacuumPellet = false; b.napalmSpray = false; b.cryoSpray = false;
+      this.telemetry.bulletBounceHistogram[0]++;
+      return true;
+    });
+  }
+
   updateBullets(dt: number): void {
     this.revolver.update(dt);
+    this.freeze.update(dt);
+    this.rail.update(dt);
+    this.napalm.update(dt, this.creatures);
     const items = this.bullets.items;
     for (let i = 0; i < items.length; i++) {
       const b = items[i];
@@ -529,11 +807,28 @@ export class CombatSystem {
     }
   }
 
+  private findCreatureNear(x: number, y: number, maxR = 14) {
+    if (!this.creatures) return null;
+    const r2 = maxR * maxR;
+    for (const f of this.creatures.flowers) {
+      if (f.hp > 0 && (f.hx - x) ** 2 + (f.hy - y) ** 2 <= r2) return f;
+    }
+    for (const w of this.creatures.worms) {
+      if (w.hp > 0 && (w.seg[0] - x) ** 2 + (w.seg[1] - y) ** 2 <= r2) return w;
+    }
+    for (const s of this.creatures.specimens) {
+      if (s.free && s.hp > 0 && (s.x - x) ** 2 + (s.y - y) ** 2 <= r2) return s;
+    }
+    return null;
+  }
+
   /** Swept bullet update: supports pierce, ordinary ricochets and detonation. */
   updateBullet(b: Bullet, dt: number): void {
     b.life -= dt;
     if (b.life <= 0) {
-      if (b.explosionRadius > 0) {
+      if (b.napalmSpray) {
+        this.napalm.placeGroundPatch(b.ownerId, b.x, b.y, b.damage, b.terrainDamageBonus, b.blightMultiplier);
+      } else if (b.explosionRadius > 0) {
         this.detonateRocket(b, b.x, b.y, -b.dx, -b.dy, Math.floor(b.x / this.world.cellSize), Math.floor(b.y / this.world.cellSize));
       }
       this.finishBullet(b);
@@ -560,10 +855,18 @@ export class CombatSystem {
           const ix = curX + b.dx * ct;
           const iy = curY + b.dy * ct;
           if(!this.recordSegment(b,curX,curY,ix,iy))return;
-          if (b.explosionRadius > 0) {
+          if (b.napalmSpray) {
+            const c = this.findCreatureNear(ix, iy, 16);
+            if (c) this.napalm.placeCreaturePatch(b.ownerId, c, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier);
+            else this.napalm.placeGroundPatch(b.ownerId, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier);
+          } else if (b.cryoSpray) {
+            const c = this.findCreatureNear(ix, iy, 16);
+            if (c) this.freeze.freezeCreature(c);
+          } else if (b.explosionRadius > 0) {
             this.detonateRocket(b, ix, iy, -b.dx, -b.dy, Math.floor(ix / cs), Math.floor(iy / cs));
           } else {
             this.targets.applyHit(b.damage, ix, iy);
+            this.napalm.igniteAt(ix, iy, 4, b.ownerId);
             if (b.fromDrone) this.drones.usefulHits++;
             this.events.onCreatureHit?.(ix, iy, -b.dx, -b.dy);
           }
@@ -583,6 +886,82 @@ export class CombatSystem {
         if(!this.recordSegment(b,curX,curY,hit.x,hit.y))return;
         const hcx = hit.cx >> 1;
         const hcy = hit.cy >> 1;
+
+        // Napalm Garden spray: place unlit fuel on terrain without damaging or igniting.
+        if (b.napalmSpray) {
+          if (w.inBounds(hcx, hcy)) {
+            const isSub = w.health[hcy * w.width + hcx] === 0;
+            if (isSub) this.napalm.placeSubPatch(b.ownerId, hit.cx, hit.cy, hit.x, hit.y, b.damage, b.terrainDamageBonus, b.blightMultiplier);
+            else this.napalm.placeCellPatch(b.ownerId, hcx, hcy, hit.x, hit.y, b.damage, b.terrainDamageBonus, b.blightMultiplier);
+          }
+          this.finishBullet(b);
+          return;
+        }
+
+        // Cryospray mist: freeze terrain without dealing damage or igniting fuel/fire.
+        if (b.cryoSpray) {
+          if (w.inBounds(hcx, hcy)) {
+            if (w.health[hcy * w.width + hcx] === 0) this.freeze.freezeSubCell(hit.cx, hit.cy, b.ownerId);
+            else this.freeze.freezeCell(hcx, hcy, b.ownerId);
+          }
+          this.finishBullet(b);
+          return;
+        }
+
+        // Burrower rocket: drill through terrain, drop mines along drilled path, detonate all together.
+        if (b.burrowerGroupId > 0) {
+          const insideB = w.inBounds(hcx, hcy);
+          const cellIdxB = hcy * w.width + hcx;
+          if (!insideB) {
+            this.detonateRocket(b, hit.x, hit.y, hit.nx, hit.ny, hcx, hcy);
+            this.finishBullet(b);
+            return;
+          }
+          if (w.mat[cellIdxB] === MAT.door) {
+            const door = w.doors[w.doorId[cellIdxB] - 1];
+            if (door && !door.open) {
+              this.currentOwnerId = b.ownerId;
+              w.damage(hcx, hcy, b.damage, true);
+              this.currentOwnerId = 0;
+              if (!door.open) {
+                this.detonateRocket(b, hit.x, hit.y, hit.nx, hit.ny, hcx, hcy);
+                this.finishBullet(b);
+                return;
+              }
+            }
+          }
+          b.burrowerDrilling = true;
+          const isSubB = w.health[cellIdxB] === 0;
+          const drillDmg = Math.max(1, Math.round(b.damage * BURROWER.drillDamageRatio + b.terrainDamageBonus));
+          this.currentOwnerId = b.ownerId;
+          const drillRes = w.damageSub(hit.cx, hit.cy, drillDmg, true);
+          this.currentOwnerId = 0;
+          this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, drillRes, isSubB, b.ownerId);
+          b.burrowerDrilledCells++;
+
+          if (b.burrowerMinesPlaced < b.clusterCount && (b.burrowerMinesPlaced === 0 || b.burrowerDrillDist - b.burrowerLastMineDist >= BURROWER.mineSpacing)) {
+            this.burrower.placeMine(
+              b.burrowerGroupId, b.ownerId, hit.x, hit.y,
+              b.damage, b.explosionRadius, b.terrainDamageBonus, b.blightMultiplier, b.burrowerMinesPlaced,
+            );
+            b.burrowerMinesPlaced++;
+            b.burrowerLastMineDist = b.burrowerDrillDist;
+          }
+
+          const stepPast = isSubB ? ss * 1.05 : cs * 1.05;
+          b.burrowerDrillDist += hit.t + stepPast;
+          remDist -= Math.min(remDist, hit.t + stepPast);
+          curX = hit.x + b.dx * stepPast;
+          curY = hit.y + b.dy * stepPast;
+
+          if (b.burrowerDrilledCells >= BURROWER.maxDrillCells || b.burrowerDrillDist >= BURROWER.maxDrillDist || !w.inBounds(Math.floor(curX / cs), Math.floor(curY / cs))) {
+            this.detonateRocket(b, curX, curY, hit.nx, hit.ny, Math.floor(curX / cs), Math.floor(curY / cs));
+            this.finishBullet(b);
+            return;
+          }
+          continue;
+        }
+
         // Rocket / explosive projectile detonates on impact!
         if (b.explosionRadius > 0) {
           this.detonateRocket(b, hit.x, hit.y, hit.nx, hit.ny, hcx, hcy);
@@ -613,7 +992,10 @@ export class CombatSystem {
         const galeKey = isSub ? w.width*w.height+hit.cy*w.subWidth+hit.cx : cellIdx;
         const alreadyHit = b.gale && b.galeCells.has(galeKey);
         if(b.gale)b.galeCells.add(galeKey);
+        this.currentOwnerId = b.ownerId;
         const result = alreadyHit ? 1 : w.damageSub(hit.cx, hit.cy, hitDmg, true);
+        this.currentOwnerId = 0;
+        if (result > 0) this.napalm.igniteAt(hit.x, hit.y, 4, b.ownerId);
         const afterHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
         if (b.momentumBoosted) this.telemetry.katanaBoostedDamage += Math.max(0, beforeHp - afterHp);
         if (b.fromDrone && result > 0) this.drones.usefulHits++;
@@ -861,7 +1243,43 @@ export class CombatSystem {
   ): void {
     const cs = this.world.cellSize;
     const radCells = b.explosionRadius;
+
+    if (b.freezeRocket) {
+      const allCreatures = this.creatures
+        ? [...this.creatures.flowers, ...this.creatures.worms, ...this.creatures.specimens]
+        : undefined;
+      this.freeze.freezeArea(ix, iy, radCells * cs, b.ownerId, allCreatures);
+      this.events.onExplosion?.(ix, iy, radCells * cs, 0);
+      return;
+    }
+
+    if (b.burrowerGroupId > 0) {
+      const charges = this.burrower.detonateGroup(
+        b.burrowerGroupId,
+        ix,
+        iy,
+        b.damage,
+        radCells,
+        b.ownerId,
+        b.terrainDamageBonus,
+        b.blightMultiplier,
+      );
+      this.currentOwnerId = b.ownerId;
+      for (const ch of charges) {
+        const chCx = Math.floor(ch.x / cs);
+        const chCy = Math.floor(ch.y / cs);
+        this.damageBlast(ch, (chCx + 0.5) * cs, (chCy + 0.5) * cs, nx, ny, ch.radiusCells);
+        this.napalm.igniteAt(ch.x, ch.y, ch.radiusCells * cs, ch.ownerId);
+        this.events.onExplosion?.(ch.x, ch.y, ch.radiusCells * cs, ch.damage);
+      }
+      this.currentOwnerId = 0;
+      return;
+    }
+
+    this.currentOwnerId = b.ownerId;
     this.damageBlast(b, (centerCx + 0.5) * cs, (centerCy + 0.5) * cs, nx, ny, radCells);
+    this.currentOwnerId = 0;
+    this.napalm.igniteAt(ix, iy, radCells * cs, b.ownerId);
 
     this.events.onExplosion?.(ix, iy, radCells * cs, b.damage);
 
@@ -1042,6 +1460,7 @@ export class CombatSystem {
       }
     }
 
+    this.napalm.igniteAt(g.x, g.y, radCells * cs, g.ownerId);
     this.events.onExplosion?.(g.x, g.y, radCells * cs, g.damage);
 
     // Expel shrapnel fragments if upgraded

@@ -30,9 +30,6 @@ export type UpgradeBranch =
   | "sniper_rifle"
   | "katana"
   | "flamethrower"
-  | "goo_mortar"
-  | "drone_shepherd"
-  | "prism_laser"
   | "grenade"
   | "turret"
   | "facility"
@@ -1023,29 +1020,29 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     icon: "pellets",
   },
 
-  // SQUELCH prototype: unlock plus the two lifetime-defining upgrades.
+  // SQUELCH Shotgun mutation: unlock plus the two lifetime-defining upgrades.
   {
-    id: "goo_unlock", branch: "goo_mortar", name: "Unlock SQUELCH",
-    shortDesc: "Adhesive Rebound Mortar: sticks, sheds a mine, then rebounds",
-    color: "#9cde68", grid: { col: 0, row: 0 }, parent: null,
+    id: "goo_unlock", branch: "shotgun", name: "Unlock SQUELCH",
+    shortDesc: "Shotgun mutation: Adhesive Rebound Mortar — sticks, sheds a mine, then rebounds",
+    color: "#9cde68", grid: { col: 1, row: -1 }, parent: "shotgun_unlock",
     maxLevel: 1, baseCost: 180, costMultiplier: 1, unlockLifetimePixels: 80,
     valueAt: (lvl) => lvl, formatValue: (v) => v ? "UNLOCKED" : "LOCKED",
     formatDelta: () => "UNLOCK WEAPON",
     apply: (s, lvl) => { s.gooUnlocked = lvl > 0; }, icon: "grenade",
   },
   {
-    id: "goo_mass", branch: "goo_mortar", name: "Gel Reservoir",
+    id: "goo_mass", branch: "shotgun", name: "Gel Reservoir",
     shortDesc: "+0.15 starting slime mass per level; more material for mines",
-    color: "#9cde68", grid: { col: -1, row: 0 }, parent: "goo_unlock",
+    color: "#9cde68", grid: { col: -3, row: 2 }, parent: "goo_unlock",
     maxLevel: 6, baseCost: 65, costMultiplier: 1.7, unlockLifetimePixels: 80,
     valueAt: (lvl) => +(GOO.startingMass + 0.15 * lvl).toFixed(2),
     formatValue: (v) => `${v.toFixed(2)} MASS`, formatDelta: () => "+0.15 MASS",
     apply: (s, lvl) => { s.gooMass = GOO.startingMass + 0.15 * lvl; }, icon: "coreOrb",
   },
   {
-    id: "goo_distance", branch: "goo_mortar", name: "Long Hop",
+    id: "goo_distance", branch: "shotgun", name: "Long Hop",
     shortDesc: "+80 world units of flight per level; sticky delays consume no range",
-    color: "#38d6ff", grid: { col: 1, row: 0 }, parent: "goo_unlock",
+    color: "#38d6ff", grid: { col: -2, row: 2 }, parent: "goo_unlock",
     maxLevel: 8, baseCost: 55, costMultiplier: 1.6, unlockLifetimePixels: 80,
     valueAt: (lvl) => GOO.distance + 80 * lvl,
     formatValue: (v) => `${v} RANGE`, formatDelta: () => "+80 RANGE",
@@ -2062,7 +2059,6 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
 export const BRANCH_UNLOCK: Partial<Record<UpgradeBranch, UpgradeId>> = {
   resources: "unlock_resources", blight: "unlock_blight", formations: "unlock_formations", facility: "unlock_facility",
   pistol: "unlock_primary", shotgun: "unlock_primary", assault_rifle: "unlock_primary", rocket_launcher: "unlock_primary",
-  drone_shepherd: "unlock_primary", prism_laser: "unlock_primary", goo_mortar: "unlock_primary",
   sniper_rifle: "unlock_primary", katana: "unlock_primary", flamethrower: "unlock_primary",
   grenade: "unlock_secondary", turret: "unlock_secondary",
 };

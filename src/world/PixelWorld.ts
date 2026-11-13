@@ -125,6 +125,7 @@ export interface SpecimenSpot {
 export type CellChangeKind = "damaged" | "destroyed" | "grown" | "set";
 
 export type CellListener = (cx: number, cy: number, kind: CellChangeKind) => void;
+export type DestroyListener = (cx: number, cy: number, isSub: boolean, sx: number, sy: number) => void;
 
 export interface WorldDims {
   width: number;
@@ -223,6 +224,17 @@ export class PixelWorld implements SolidQuery {
   readonly subSolidQuery: SolidQuery;
 
   private listeners: CellListener[] = [];
+  private destroyListeners: DestroyListener[] = [];
+
+  addDestroyListener(fn: DestroyListener): void {
+    this.destroyListeners.push(fn);
+  }
+
+  private emitDestroy(cx: number, cy: number, isSub: boolean, sx: number, sy: number): void {
+    for (let i = 0; i < this.destroyListeners.length; i++) {
+      this.destroyListeners[i](cx, cy, isSub, sx, sy);
+    }
+  }
 
   constructor(dims: WorldDims) {
     this.width = dims.width;
@@ -470,7 +482,10 @@ export class PixelWorld implements SolidQuery {
     this.subHealth[row0 + 1] = 0;
     this.subHealth[row1] = 0;
     this.subHealth[row1 + 1] = 0;
-    if (!silent) this.emit(cx, cy, kind);
+    if (!silent) {
+      this.emit(cx, cy, kind);
+      if (kind === "destroyed") this.emitDestroy(cx, cy, false, cx * 2, cy * 2);
+    }
   }
 
   /**
@@ -566,6 +581,7 @@ export class PixelWorld implements SolidQuery {
     if (next === 0) {
       this.blight[i] = 0;
       this.emit(cx, cy, "destroyed");
+      this.emitDestroy(cx, cy, false, cx * 2, cy * 2);
       return 2;
     }
     this.emit(cx, cy, "damaged");
@@ -596,6 +612,7 @@ export class PixelWorld implements SolidQuery {
     if (next === 0) {
       const rubble = this.subKind[si] === SUB.rubble;
       this.emit(cx, cy, "destroyed");
+      this.emitDestroy(cx, cy, true, sx, sy);
       if (rubble && byPlayer) this.crumbleRubbleAround(sx, sy);
       return 2;
     }
@@ -620,6 +637,7 @@ export class PixelWorld implements SolidQuery {
       if (this.subKind[ni] !== SUB.rubble || this.subHealth[ni] === 0) continue;
       this.subHealth[ni] = 0;
       this.emit(ncx, ncy, "destroyed");
+      this.emitDestroy(ncx, ncy, true, nx, ny);
       this.onRubbleCrumble?.(nx, ny);
     }
   }

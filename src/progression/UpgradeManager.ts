@@ -1,4 +1,4 @@
-import { baseSoldierStats, type SoldierStats } from "../entities/Soldier";
+import { baseSoldierStats, resolvePrimaryMutation, type PrimaryMutation, type SoldierStats, type WeaponType } from "../entities/Soldier";
 import type { SaveData, SaveManager } from "./SaveManager";
 import {
   SOLDIER_UPGRADE_BY_ID,
@@ -62,12 +62,12 @@ export class UpgradeManager {
     }
     if (this.save.data.lifetimePixels < def.unlockLifetimePixels) return false;
     if (def.id === "gale_range" && this.levelOf("gale_unlock") === 0) return false;
-    if (def.branch === "drone_shepherd" && def.id !== "drone_unlock" && this.levelOf("drone_unlock") === 0) return false;
-    if (def.branch === "prism_laser" && def.id !== "prism_unlock" && this.levelOf("prism_unlock") === 0) return false;
+    if (def.id.startsWith("drone_") && def.id !== "drone_unlock" && this.levelOf("drone_unlock") === 0) return false;
+    if (def.id.startsWith("prism_") && def.id !== "prism_unlock" && this.levelOf("prism_unlock") === 0) return false;
     if ((def.id.startsWith("katana_") && ["katana_impulse", "katana_glide", "katana_kinetic", "katana_wide", "katana_recovery", "katana_perfect"].includes(def.id)) && this.levelOf("katana_dash") === 0) return false;
     if (["goo_residue", "drone_recall", "prism_overload", "katana_perfect"].includes(def.id) && def.parent && this.levelOf(def.parent) === 0) return false;
     if (def.id === "prism_overload" && this.levelOf("prism_spectrum") < 6) return false;
-    if (def.branch === "goo_mortar" && def.id !== "goo_unlock" && this.levelOf("goo_unlock") === 0) return false;
+    if (def.id.startsWith("goo_") && def.id !== "goo_unlock" && this.levelOf("goo_unlock") === 0) return false;
     if (def.branch === "shotgun" && def.id !== "shotgun_unlock") {
       if (this.levelOf("shotgun_unlock") === 0) return false;
     }
@@ -119,10 +119,98 @@ export class UpgradeManager {
 
   buy(id: UpgradeId): boolean {
     if (!this.canBuy(id)) return false;
-    this.pay(this.pricesOf(id));
+    const prices = this.pricesOf(id);
+    this.pay(prices);
     this.save.data.upgrades[id] = this.levelOf(id) + 1;
+    const spent = (this.save.data.upgradeSpent ??= {});
+    const rec = (spent[id] ??= {});
+    for (const p of prices) rec[p.currency] = (rec[p.currency] ?? 0) + p.amount;
     this.save.save();
     return true;
+  }
+
+  /** Set a soldier slot's primary weapon & mutation, enforcing unlock and non-Pistol uniqueness. */
+  setLoadoutWeapon(
+    slot: number,
+    weapon: WeaponType,
+    mutation: PrimaryMutation | null,
+    inRun = false,
+  ): { ok: true } | { ok: false; reason: "lab_only" | "invalid_slot" | "locked_weapon" | "duplicate_weapon" | "locked_mutation" } {
+    if (inRun) return { ok: false, reason: "lab_only" };
+    const ld = this.save.data.loadouts[slot];
+    if (!ld) return { ok: false, reason: "invalid_slot" };
+    const st = this.getSoldierStats();
+    const weaponUnlocked =
+      weapon === "pistol" ||
+      (weapon === "shotgun" && st.shotgunUnlocked) ||
+      (weapon === "assault_rifle" && st.arUnlocked) ||
+      (weapon === "rocket_launcher" && st.rocketUnlocked) ||
+      (weapon === "sniper_rifle" && st.sniperUnlocked) ||
+      (weapon === "katana" && st.katanaUnlocked) ||
+      (weapon === "flamethrower" && st.flameUnlocked);
+    if (!weaponUnlocked) return { ok: false, reason: "locked_weapon" };
+    if (weapon !== "pistol") {
+      for (let i = 0; i < this.save.data.loadouts.length; i++) {
+        if (i !== slot && this.save.data.loadouts[i].weapon === weapon) {
+          return { ok: false, reason: "duplicate_weapon" };
+        }
+      }
+    }
+    if (mutation !== null && !resolvePrimaryMutation(weapon, mutation, st)) {
+      return { ok: false, reason: "locked_mutation" };
+    }
+    ld.weapon = weapon;
+    ld.mutation = mutation;
+    this.save.save();
+    return { ok: true };
+  }
+
+  /**
+   * Lab-only atomic refund of all Black Market mutation research nodes,
+   * returning exact recorded spending (or deterministic historical cost fallback).
+   */
+  refundBlackMarket(inRun = false): { ok: true; refunded: Partial<Record<Currency, number>> } | { ok: false; reason: "lab_only" } {
+    if (inRun) return { ok: false, reason: "lab_only" };
+    const mutationNodeIds: UpgradeId[] = [
+      "reverse_unlock", "orbit_unlock",
+      "drone_unlock", "drone_capacity", "drone_cycle", "drone_damage", "drone_speed", "drone_aim", "drone_health", "drone_recall",
+      "goo_unlock", "goo_mass", "goo_distance", "goo_dwell", "goo_damage", "goo_radius", "goo_rate", "goo_residue",
+      "vacuum_unlock",
+      "burrower_unlock", "freeze_rockets_unlock",
+      "prism_unlock", "prism_spectrum", "prism_bounces", "prism_gain", "prism_shear", "prism_distance", "prism_overload",
+      "rail_lance_unlock",
+      "gale_unlock", "gale_range",
+      "napalm_unlock", "cryospray_unlock",
+    ];
+    const refunded: Partial<Record<Currency, number>> = {};
+    const spentMap = this.save.data.upgradeSpent ?? {};
+    for (const id of mutationNodeIds) {
+      const lvl = this.levelOf(id);
+      if (lvl <= 0) continue;
+      const recorded = spentMap[id];
+      if (recorded) {
+        for (const c of ["gold", "crystals", "greenCrystals", "essence", "biomass"] as const) {
+          const amt = recorded[c] ?? 0;
+          if (amt > 0) {
+            this.save.data[WALLET[c]] += amt;
+            refunded[c] = (refunded[c] ?? 0) + amt;
+          }
+        }
+        delete spentMap[id];
+      } else {
+        const def = UPGRADE_BY_ID[id];
+        for (let l = 0; l < lvl; l++) {
+          for (const p of upgradePrices(def, l)) {
+            this.save.data[WALLET[p.currency]] += p.amount;
+            refunded[p.currency] = (refunded[p.currency] ?? 0) + p.amount;
+          }
+        }
+      }
+      this.save.data.upgrades[id] = 0;
+    }
+    for (const ld of this.save.data.loadouts) ld.mutation = null;
+    this.save.save();
+    return { ok: true, refunded };
   }
 
   soldierLevelOf(slot: number, id: SoldierUpgradeId): number {

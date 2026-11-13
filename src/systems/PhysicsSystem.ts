@@ -333,6 +333,7 @@ export interface PhysicsStats {
 export class PhysicsSystem {
   private dashStats: SoldierStats | null = null;
   private onDash: ((s: Soldier, nx: number, ny: number) => void) | undefined;
+  private onWallBounce: ((s: Soldier, nx: number, ny: number) => void) | undefined;
   readonly stats: PhysicsStats = { relocations: 0, stuckEvents: 0 };
 
   constructor(
@@ -341,10 +342,17 @@ export class PhysicsSystem {
   ) {}
 
   /** Advance one soldier by dt using substeps. Returns number of bounces. */
-  step(s: Soldier, dt: number, stats?: SoldierStats, onDash?: (s: Soldier, nx: number, ny: number) => void): number {
+  step(
+    s: Soldier,
+    dt: number,
+    stats?: SoldierStats,
+    onDash?: (s: Soldier, nx: number, ny: number) => void,
+    onWallBounce?: (s: Soldier, nx: number, ny: number) => void,
+  ): number {
     advanceMomentum(s, dt);
     this.dashStats = stats ?? null;
     this.onDash = onDash;
+    this.onWallBounce = onWallBounce;
     const r = s.radius;
     const dist = Math.max(Math.hypot(s.vx, s.vy), stats?.katanaDash && s.weapon === "katana" ? s.speed * Math.min(3, stats.katanaDashPeak) : 0) * dt;
     const n = Math.max(1, Math.ceil(dist / (r * 0.5)));
@@ -357,6 +365,7 @@ export class PhysicsSystem {
     }
     this.dashStats = null;
     this.onDash = undefined;
+    this.onWallBounce = undefined;
     return bounces;
   }
 
@@ -471,7 +480,10 @@ export class PhysicsSystem {
       s.vy = (vy / vlen) * moveSpeed;
       s.facingAngle = Math.atan2(s.vy, s.vx);
     }
-    if (!recovered && this.dashStats && triggerMomentum(s, this.dashStats)) this.onDash?.(s, nx, ny);
+    if (!recovered) {
+      if (this.dashStats && triggerMomentum(s, this.dashStats)) this.onDash?.(s, nx, ny);
+      this.onWallBounce?.(s, nx, ny);
+    }
     return true;
   }
 

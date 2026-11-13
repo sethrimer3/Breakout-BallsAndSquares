@@ -14,7 +14,7 @@ export class DroneSystem {
     private onLaunch: (x: number, y: number) => void = () => {}) {}
 
   release(owner: Soldier, stats: SoldierStats): Drone | null {
-    if (!owner.alive || owner.weapon !== "drone_shepherd") return null;
+    if (!owner.alive || owner.weapon !== "pistol" || owner.mutation !== "drone_shepherd") return null;
     let count = 0;
     for (const drone of this.pool.items) if (drone.active && drone.ownerId === owner.id) count++;
     if (count >= Math.min(7, stats.droneCapacity)) return null;
