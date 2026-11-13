@@ -8,13 +8,13 @@ This document records the latest requested mechanics and supersedes conflicting 
 |---|---|---|---|
 | Pistol | Reverse-Playback Revolver | Orbit Cylinder | **Drone Shepherd** |
 | Shotgun | SQUELCH | **Vacuum Pulse** | — |
-| Assault Rifle | **Overcharge Conductor (working name)** | **Undecided** | — |
+| Assault Rifle | **Overcharge Conductor (working name)** | **Circuit Runner (working name)** | — |
 | Rocket Launcher | **Burrower** | **Freeze Rockets** | — |
 | Sniper Rifle | Chromatic Prism | **Rail Lance** | — |
 | Katana | Momentum Katana | Gale Edge | — |
 | Flamethrower | **Napalm Garden** | **Cryospray** | — |
 
-Drone Shepherd belongs to **Pistol**, not Assault Rifle. Do not implement Arc Leech, Splinter Engine, Recoil Engine, or another Assault Rifle mutation without an accepted design. Overcharge Conductor below is the first accepted AR concept; its second branch remains undecided. Collapse Charge, Compression Cannon and other superseded alternatives are not the active plan. Echo Stapler and Resonance Bell remain separate secondary-weapon designs.
+Drone Shepherd belongs to **Pistol**, not Assault Rifle. Do not implement Arc Leech, Splinter Engine, Recoil Engine, or another Assault Rifle mutation without an accepted design. Overcharge Conductor and Circuit Runner below are the two accepted AR concepts. Their names are provisional. Collapse Charge, Compression Cannon and other superseded alternatives are not the active plan. Echo Stapler and Resonance Bell remain separate secondary-weapon designs.
 
 Each soldier carries one base primary with at most one active mutation. Pistol mutation state is per soldier; Pistol is the only primary family allowed more than one squad owner. Other families remain unique across their mutations. Switching a mutation must never manufacture an extra copy of its base gun.
 
@@ -34,14 +34,14 @@ The two newly completed mechanics use permanent Essence unlock nodes and next-de
 ## Shared Black Market and migration work
 
 1. Retain canonical base weapon identities in saves and equip/deployment checks. Resolve a selected mutation into its firing system; migrate legacy `goo_mortar`, `prism_laser`, and `drone_shepherd` loadouts to Shotgun/Sniper/Pistol plus the matching mutation without losing purchased upgrades or currency.
-2. Expose three Pistol cards, two cards for each accepted non-AR family, and one accepted Assault Rifle branch; do not populate the remaining AR slot with an invented weapon. Hide or mark unimplemented cards rather than making them selectable.
+2. Expose three Pistol cards and two accepted cards for each other primary family, including Overcharge Conductor and Circuit Runner for Assault Rifle. Hide or mark unimplemented cards rather than making them selectable.
 3. Persist one compatible selection per slot, validate unlocks and unknown IDs, and default old saves to ordinary behavior. Mutation changes affect the next deployment, never active projectiles/soldiers retroactively.
 4. Charge Blight Essence for mutation research and show conventional-stat compatibility before purchase. Provide a lab-only atomic reconfigure/refund operation with exact recorded spending; reject insufficient funds and duplicate non-Pistol ownership. Keep existing ordinary upgrades and save-slot progression.
 5. Define compatibility deliberately: fire rate maps to actual trigger/release intervals; velocity changes cannot silently extend an explicit range budget; unavailable pellet/crit/pierce effects must be mapped or clearly disabled. Never sell an inert upgrade.
 
 ## Overcharge Conductor — Assault Rifle branch 1 (working name)
 
-**Status:** Newly accepted design; planned, not implemented. The name is provisional. The Assault Rifle's second Black Market branch remains undecided.
+**Status:** A combat implementation now exists on `main`; the follow-up code review identified correctness issues requiring regression fixes. This section remains the required design, not a claim that all acceptance checks are complete. The name is provisional. Circuit Runner below is the second accepted AR design.
 
 ### Required behavior
 
@@ -72,6 +72,40 @@ These are recommendations for implementation, not additional user-approved mecha
 - Use simulation time so pausing, upgrades and other inactive screens do not advance the quiet timer. Bound charged targets, arc hops, total arc travel, explosion work and visuals with documented overflow behavior; do not silently turn a one/two-hit target into a damaging discharge.
 - Use a steady glow and readable restrained electrical accents, with reduced-motion support. More charge should be obvious without introducing rapid brightness flashes or strobing.
 - Test: zero direct damage; harmless one/two-hit expiry; exact three-hit arming; refresh on every hit; continued firing delays discharge; independent targets and misses; monotonic charge scaling before caps; exact ±0.1-degree endpoint; existing ordinary accuracy on branch selection; both enemy systems; pooled target/projectile reuse; host death/regrowth; gates; attribution; freeze/Napalm interactions; pause; low frame rates; reset and overflow. Browser checks must show the charge ramp, quiet gap and resulting chain/blast, not just the unlock card.
+
+## Circuit Runner — Assault Rifle branch 2 (working name)
+
+**Status:** Newly accepted design; planned, not implemented. The name is provisional. This is the alternative to Overcharge Conductor, not another base weapon or an Overcharge upgrade tier.
+
+### Required behavior
+
+- Replace ordinary Assault Rifle ammunition with **laser shots with extremely high penetration and limited total range**. These are damaging shots; they do not use Overcharge's harmless charging-hit mechanic.
+- **Every block impact creates a routing decision.** Center the projectile on the impacted block, then select a random **orthogonal/cardinal** direction for its outgoing flight.
+- Exclude the direction back toward the place the projectile just came from. For a cardinal incoming leg, this leaves three choices: straight ahead, left turn or right turn. Do not mistakenly exclude straight ahead instead of excluding reversal. Define the incoming face for non-cardinal first impacts explicitly.
+- The shot can continue through the struck block because of its high penetration. It must not repeatedly hit/re-route inside that same block simply because its head is still embedded there.
+- Leave a continuous **Tron-like circuit path** behind the moving head, matching the crisp right-angle circuit aesthetic already used by the upgrade tree. Preserve the actual traveled corners; do not draw a diagonal shortcut between the start and end.
+- Shots begin **bright orange** and cool through **light blue → blue → purple** as they approach the end of their range, then fade out. The palette progression must visibly follow range consumption, rather than using a fixed orange tracer or random colors.
+- The range limit is **cumulative path length**, including all turns and centering movements, not distance from the soldier. High penetration must not create unlimited travel or extend range after each impact.
+
+### Proposed implementation defaults / tuning to document
+
+These recommendations resolve unspecified implementation details without presenting invented numbers as requirements:
+
+- Use a traveling projectile head with a bounded polyline trail. Initial travel follows the firing aim; after its first block impact, its route uses centered cardinal legs. Define a short, readable centering connector and count its actual movement against range. Centering must not teleport across a gate, world boundary or unrelated target.
+- Choose uniformly among the three non-reversing cardinal exits using the gameplay RNG. Capture the incoming face before damage changes the world; the routing decision remains valid if that impact destroys the block. Keep world generation independent of the routing RNG.
+- Route on terrain/block contacts, not enemy contacts. Proposed default: enemies take piercing damage without changing the circuit direction. Specify normal-cell vs subcell centering and hit identity deliberately, especially where a subcell raycast represents a normal solid parent.
+- Define a large but finite penetration budget, short base range, head speed, range upgrades and trail afterglow in named tuning constants. Map ordinary AR and soldier damage, fire rate, velocity, AP and accuracy research explicitly; do not silently sell ineffective stats.
+- Each projectile damages a distinct target at most once. Permit a route to revisit geometry without repeatedly damaging the same block/enemy or accumulating hits while still inside one cell. Do not invent a permanent damaging wall or repeated trail damage: the lingering trail is visual unless separately approved.
+- Tie head/tracer cooling to normalized distance consumed, with retained trail segments fading smoothly through the same palette. Document any time-based afterglow separately so pause and projectile speed cannot corrupt the physical range budget.
+
+### Integration and acceptance
+
+- Use canonical `assault_rifle` plus an exclusive selected mutation. Preserve one AR owner across the squad, Essence unlock/research and exact lab refund accounting, save sanitation, next-deployment selection and pool-reset coverage. Selecting Circuit Runner must not inherit Overcharge charge stacks, spread penalty or charge-only contacts.
+- Resolve the full swept route through normal cells, subcells and both enemy systems. Maintain the actual head position, traveled polyline and remaining distance across frames and corners. Use stable hit identities, owner attribution and ordinary freeze/Napalm/reward interactions for damaging hits.
+- Closed authoritative gates and world borders stop the shot; neither centering, extreme penetration nor a random turn may bypass access rules. An opened gate may pass the shot according to the documented collision policy.
+- Bound projectiles, route vertices, contacts per step, hit sets and retained trail segments. If a per-step work limit is reached, retain unspent travel or use another explicit policy; never replace the remaining route with an invented straight shortcut or silently grant free range. Reset all fields across every pooled acquisition path and clear actors/trails on run/world reset.
+- Use steady emissive orange/cool colors, narrow bright cores and restrained glow, with reduced-motion support. Preserve the upgrade tree's circuit feel without adding strobe-like flashes at every turn.
+- Tests must cover: extremely high penetration vs ordinary AR; exact range exhaustion along many turns; each allowed/excluded direction and controlled RNG samples; block-center/subcell-center handling; starting inside a solid cell; a surviving block producing one damage/routing contact; impact destruction; diagonal first impacts; frame subdivision; repeated geometry; aligned enemies; gates and boundaries; pooled reuse; ownership; freeze/Napalm interactions; save/reload/refund; trail bounds and reset. Browser checks must visibly demonstrate orange shots, centered right-angle routes, the cooling sequence and range expiry.
 
 ## Orbit Cylinder — Pistol branch 2
 
@@ -174,13 +208,14 @@ Replace hot flame jets with freezing mist. Apply the **same freezing/orthogonal 
 ## Implementation order and completion gates
 
 1. **Current audit repairs:** implement/verify Gale Edge and Reverse-Playback; regress Prism, Momentum and SQUELCH. Keep code-vs-plan status truthful.
-2. **Canonical Black Market model:** migrate legacy variants; move Drone Shepherd to Pistol branch 3; enforce one base identity/active branch, squad uniqueness, Essence accounting and lab-only reconfiguration. Keep the second AR branch undecided; stage the newly accepted Overcharge Conductor separately.
+2. **Canonical Black Market model:** migrate legacy variants; move Drone Shepherd to Pistol branch 3; enforce one base identity/active branch, squad uniqueness, Essence accounting and lab-only reconfiguration. Integrate the accepted Overcharge Conductor and Circuit Runner AR branches without inventing additional mutations.
 3. **Shared destruction/status infrastructure:** gameplay debris ledger, spatial queries, external ignition events, temporary freeze metadata, growth modifiers, and the glass-cadence shatter scheduler.
 4. **Orbit Cylinder and Vacuum Pulse:** actor-owned loading/release and destruction-driven suction/output scaling; deterministic pooling and source accounting.
 5. **Burrower and Freeze Rockets:** grouped simultaneous charges; cold-only projectile payloads; shared shatter tests.
 6. **Rail Lance:** charge/release state, straight swept trace, aligned multi-target and single-resolution tests.
 7. **Napalm Garden and Cryospray:** fuel lifecycle and exact tick timing, externally triggered ignition, early-death cleanup and shared freezing.
 8. **Overcharge Conductor:** per-target zero-damage hit accumulation, three-hit arming, refreshable quiet timer, scaled chain/blast discharge and wide-spread-to-±0.1-degree accuracy progression.
-9. **Progression, presentation and balance:** accepted branch cards only, compatibility labels, old saves, bounds/costs, visible tradeoffs, desktop/touch checks, telemetry and controlled open/corridor/mixed-weapon samples.
+9. **Circuit Runner:** high-penetration laser projectiles, centered non-reversing random cardinal routes, cumulative range accounting and the orange/light-blue/blue/purple circuit trail.
+10. **Progression, presentation and balance:** accepted branch cards only, compatibility labels, old saves, bounds/costs, visible tradeoffs, desktop/touch checks, telemetry and controlled open/corridor/mixed-weapon samples.
 
 Do not mark a planned branch implemented merely because its base weapon or a visual prototype exists. New feature acceptance requires collision/status/timing tests, owner credit, pool reset/overflow checks and a representative browser interaction before merging to `main`.
