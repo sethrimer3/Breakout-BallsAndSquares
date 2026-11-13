@@ -158,8 +158,9 @@ fs.mkdirSync(artifacts, { recursive: true });
    // 5. Overcharge piercing deduplication + soldier damageBonus snapshot + single integrated blast
    g.combat.clearAll();
    const pCy=Math.floor(g.world.roomCenterY/g.world.cellSize);
-   const pCx0=Math.floor(g.world.roomCenterX/g.world.cellSize)+3;
-   for(let k=0;k<3;k++)g.world.health[pCy*g.world.width+pCx0+k]=500;
+   const pCx0=Math.floor(g.world.roomCenterX/g.world.cellSize)+2;
+   for(let k=-2;k<0;k++){const ci=pCy*g.world.width+pCx0+k;g.world.health[ci]=0;g.world.mat[ci]=0;}
+   for(let k=0;k<3;k++){const ci=pCy*g.world.width+pCx0+k;g.world.health[ci]=500;g.world.mat[ci]=0;}
    const savedPierce=g.combat.stats.arPierce;const savedSpread=g.combat.stats.overchargeSpreadDeg;
    g.combat.stats.arPierce=2;g.combat.stats.overchargeSpreadDeg=0;
    const ps=new Soldier(g.world.roomCenterX,pCy*g.world.cellSize+4,1,0,0,'assault_rifle','free',4,null,'overcharge_conductor');
