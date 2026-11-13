@@ -6,6 +6,8 @@ import { Soldier, baseSoldierStats, mutationCompatibility, resolvePrimaryMutatio
 import { CreatureSystem } from "../src/entities/Creatures";
 import { CombatSystem, type BulletTargets } from "../src/systems/CombatSystem";
 import { chooseOutgoingCardinal, circuitColorAt, circuitColorRgbAt } from "../src/systems/CircuitRunnerSystem";
+import { Renderer } from "../src/rendering/Renderer";
+import { drawWeaponExpansion } from "../src/rendering/WeaponExpansionRenderer";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { UpgradeManager } from "../src/progression/UpgradeManager";
 import { MAT, PixelWorld } from "../src/world/PixelWorld";
@@ -362,11 +364,229 @@ describe("Circuit Runner — Assault Rifle branch 2", () => {
     expect(b.circuitTraveled).toBe(0);
     expect(b.circuitHitKeys.size).toBe(0);
     expect(b.circuitHitTargets.size).toBe(0);
+    expect(b.circuitPhase).toBe("flight");
+    expect(b.circuitMidX).toBe(0);
+    expect(b.circuitMidY).toBe(0);
+    expect(b.circuitCenterX).toBe(0);
+    expect(b.circuitCenterY).toBe(0);
+    expect(b.circuitOutDx).toBe(0);
+    expect(b.circuitOutDy).toBe(0);
+    expect(b.circuitExitLeft).toBe(0);
 
     combat.clearAll();
     expect(combat.circuit.segments.some((seg) => seg.active)).toBe(false);
 
     // Unused import check for CreatureSystem
     expect(typeof CreatureSystem).toBe("function");
+  });
+
+  it("Bug 1 regression: centering across split frames produces identical turn, position, and damage", () => {
+    function runWithSteps(steps: number[], blockHp: number, speed = 100) {
+      const w = makeOpenWorld();
+      setBlock(w, 12, 10, blockHp);
+      const stats = baseSoldierStats();
+      stats.arSpreadDeg = 0;
+      stats.arDamage = 10;
+      // Controlled RNG that always picks downward exit (index 1 of [(1,0),(0,1),(0,-1)])
+      const fakeRng = new Rng(1);
+      fakeRng.int = () => 1;
+      fakeRng.range = () => 0;
+
+      let impacts = 0;
+      const combat = new CombatSystem(w, fakeRng, stats, {
+        onImpact: (_x, _y, _nx, _ny, cx, cy) => {
+          if (cx === 12 && cy === 10) impacts++;
+        },
+      });
+      const s = makeCircuitSoldier(86, 84, stats);
+      combat.fire(s, 1, 0);
+      const b = combat.bullets.items.find((it) => it.active)!;
+      b.speed = speed;
+      b.x = 92;
+      b.y = 84;
+      b.circuitPrevX = 92;
+      b.circuitPrevY = 84;
+
+      for (const dt of steps) {
+        combat.updateBullets(dt);
+      }
+      return {
+        x: b.x,
+        y: b.y,
+        dx: b.dx,
+        dy: b.dy,
+        traveled: b.circuitTraveled,
+        impacts,
+        hpAfter: w.health[10 * w.width + 12],
+      };
+    }
+
+    // Surviving block: 0.1s whole step vs two 0.05s steps vs 6x (1/60s) vs 24x (1/240s)
+    const wholeSurv = runWithSteps([0.1], 100);
+    const halfSurv = runWithSteps([0.05, 0.05], 100);
+    const sixtySurv = runWithSteps(Array(6).fill(0.1 / 6), 100);
+    const tinySurv = runWithSteps(Array(24).fill(0.1 / 24), 100);
+
+    expect(wholeSurv.dy).toBe(1);
+    expect(wholeSurv.dx).toBe(0);
+    expect(wholeSurv.impacts).toBe(1);
+    for (const variant of [halfSurv, sixtySurv, tinySurv]) {
+      expect(variant.x).toBeCloseTo(wholeSurv.x, 4);
+      expect(variant.y).toBeCloseTo(wholeSurv.y, 4);
+      expect(variant.dx).toBeCloseTo(wholeSurv.dx, 5);
+      expect(variant.dy).toBeCloseTo(wholeSurv.dy, 5);
+      expect(variant.traveled).toBeCloseTo(wholeSurv.traveled, 4);
+      expect(variant.impacts).toBe(1);
+      expect(variant.hpAfter).toBe(wholeSurv.hpAfter);
+    }
+
+    // Destroyed block: whole 0.1s vs two 0.05s steps
+    const wholeDest = runWithSteps([0.1], 5);
+    const halfDest = runWithSteps([0.05, 0.05], 5);
+    expect(wholeDest.hpAfter).toBe(0);
+    expect(halfDest.x).toBeCloseTo(wholeDest.x, 4);
+    expect(halfDest.y).toBeCloseTo(wholeDest.y, 4);
+    expect(halfDest.dx).toBeCloseTo(wholeDest.dx, 5);
+    expect(halfDest.dy).toBeCloseTo(wholeDest.dy, 5);
+    expect(halfDest.impacts).toBe(1);
+  });
+
+  it("Bug 2 regression: off-center impacts use axis-aligned connectors from all sides and preserve diagonal initial flight", () => {
+    const stats = baseSoldierStats();
+    stats.arSpreadDeg = 0;
+
+    // 1) Horizontal off-center impact at y=82 into block centered at (100, 84)
+    const w1 = makeOpenWorld();
+    setBlock(w1, 12, 10, 100);
+    const fakeRng = new Rng(1);
+    fakeRng.int = () => 1;
+    fakeRng.range = () => 0;
+    const combat1 = new CombatSystem(w1, fakeRng, stats);
+    const s1 = makeCircuitSoldier(86, 82, stats);
+    combat1.fire(s1, 1, 0);
+    stepCombat(combat1, 5);
+
+    const segs1 = combat1.circuit.segments.filter((seg) => seg.active);
+    expect(segs1.length).toBeGreaterThanOrEqual(3);
+    // Every segment (initial horizontal + 2-leg connector + routed exit) must be axis-aligned (no diagonal)
+    for (const seg of segs1) {
+      const dx = Math.abs(seg.x2 - seg.x1);
+      const dy = Math.abs(seg.y2 - seg.y1);
+      expect(Math.min(dx, dy)).toBeLessThan(1e-4);
+    }
+    // Must pass through elbow (100, 82) and center (100, 84)
+    expect(segs1.some((seg) => Math.abs(seg.x2 - 100) < 1e-3 && Math.abs(seg.y2 - 82) < 1e-3)).toBe(true);
+    expect(segs1.some((seg) => Math.abs(seg.x2 - 100) < 1e-3 && Math.abs(seg.y2 - 84) < 1e-3)).toBe(true);
+
+    // 2) Vertical off-center impact at x=98 into block centered at (100, 84)
+    const w2 = makeOpenWorld();
+    setBlock(w2, 12, 10, 100);
+    const combat2 = new CombatSystem(w2, fakeRng, stats);
+    const s2 = makeCircuitSoldier(98, 70, stats);
+    combat2.fire(s2, 0, 1);
+    stepCombat(combat2, 5);
+    const segs2 = combat2.circuit.segments.filter((seg) => seg.active);
+    for (const seg of segs2) {
+      expect(Math.min(Math.abs(seg.x2 - seg.x1), Math.abs(seg.y2 - seg.y1))).toBeLessThan(1e-4);
+    }
+    expect(segs2.some((seg) => Math.abs(seg.x2 - 98) < 1e-3 && Math.abs(seg.y2 - 84) < 1e-3)).toBe(true);
+    expect(segs2.some((seg) => Math.abs(seg.x2 - 100) < 1e-3 && Math.abs(seg.y2 - 84) < 1e-3)).toBe(true);
+
+    // 3) Diagonal initial flight is preserved before impact, then connector + routed legs are strictly orthogonal
+    const w3 = makeOpenWorld();
+    setBlock(w3, 12, 10, 100);
+    const combat3 = new CombatSystem(w3, fakeRng, stats);
+    const s3 = makeCircuitSoldier(80, 68, stats);
+    const len = Math.hypot(16, 14);
+    combat3.fire(s3, 16 / len, 14 / len);
+    stepCombat(combat3, 5);
+    const segs3 = combat3.circuit.segments.filter((seg) => seg.active);
+    expect(segs3.length).toBeGreaterThanOrEqual(3);
+    // First segments before impact are diagonal initial flight
+    expect(Math.abs(segs3[0].x2 - segs3[0].x1)).toBeGreaterThan(1);
+    expect(Math.abs(segs3[0].y2 - segs3[0].y1)).toBeGreaterThan(1);
+    // Find first segment reaching the block's X/Y boundary; all subsequent connector & routed segments are strictly orthogonal
+    const postImpactStart = segs3.findIndex((seg) => Math.abs(seg.x2 - 96) < 0.1 || Math.abs(seg.y2 - 80) < 0.1) + 1;
+    expect(postImpactStart).toBeGreaterThan(0);
+    for (let i = postImpactStart; i < segs3.length; i++) {
+      expect(Math.min(Math.abs(segs3[i].x2 - segs3[i].x1), Math.abs(segs3[i].y2 - segs3[i].y1))).toBeLessThan(1e-4);
+    }
+  });
+
+  it("Bug 3 regression: ordinary bullet renderer emits zero yellow tracer pixels for Circuit shots", () => {
+    const w = makeOpenWorld();
+    const stats = baseSoldierStats();
+    stats.arSpreadDeg = 0;
+    const combat = new CombatSystem(w, new Rng(1), stats);
+    const s = makeCircuitSoldier(80, 84, stats);
+    combat.fire(s, 1, 0);
+    stepCombat(combat, 2);
+
+    const b = combat.bullets.items.find((it) => it.active)!;
+    expect(b.circuit).toBe(true);
+
+    const ordinaryFills: string[] = [];
+    const mockCtx = {
+      fillStyle: "",
+      strokeStyle: "",
+      lineWidth: 1,
+      lineCap: "butt",
+      lineJoin: "miter",
+      globalAlpha: 1,
+      save() {},
+      restore() {},
+      beginPath() {},
+      moveTo() {},
+      lineTo() {},
+      stroke() {},
+      fillRect: () => {
+        ordinaryFills.push(String(mockCtx.fillStyle));
+      },
+    } as unknown as CanvasRenderingContext2D;
+
+    const fakeCam = {
+      viewW: 800,
+      viewH: 600,
+      zoom: 2,
+      worldToScreenX: (wx: number) => wx * 2,
+      worldToScreenY: (wy: number) => wy * 2,
+      screenToWorldX: (sx: number) => sx / 2,
+      screenToWorldY: (sy: number) => sy / 2,
+    };
+    const fakeGame = {
+      world: w,
+      camera: fakeCam,
+      combat,
+      soldiers: [],
+    };
+    const fakeRenderer = {
+      ctx: mockCtx,
+      game: fakeGame,
+      fillArtPixel: () => {
+        ordinaryFills.push(String(mockCtx.fillStyle));
+      },
+      drawSlash: () => {},
+      drawRocket: () => {},
+    };
+
+    // Exercise actual Renderer.prototype.drawBullets on active Circuit bullet
+    (Renderer.prototype as unknown as { drawBullets: () => void }).drawBullets.call(fakeRenderer);
+    expect(ordinaryFills.length).toBe(0);
+
+    // Exercise dedicated Circuit renderer: emits Circuit head & trail
+    const expansionFills: string[] = [];
+    mockCtx.fillRect = () => {
+      expansionFills.push(String(mockCtx.fillStyle));
+    };
+    drawWeaponExpansion(mockCtx, fakeGame as never, false);
+    expect(expansionFills.length).toBeGreaterThan(0);
+
+    // Control: ordinary non-Circuit AR bullet still renders via Renderer.drawBullets
+    combat.clearAll();
+    const std = new Soldier(80, 84, 1, 0, 2, "assault_rifle", "free", 0, null, null);
+    combat.fire(std, 1, 0);
+    stepCombat(combat, 2);
+    (Renderer.prototype as unknown as { drawBullets: () => void }).drawBullets.call(fakeRenderer);
+    expect(ordinaryFills.some((c) => c === "#fff2c3" || c === "#ffffff")).toBe(true);
   });
 });

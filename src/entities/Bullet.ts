@@ -85,6 +85,19 @@ export class Bullet {
   /** Previous head position for recording continuous right-angled trail segments. */
   circuitPrevX = 0;
   circuitPrevY = 0;
+  /** Persistent Circuit Runner routing phase across frames. */
+  circuitPhase: "flight" | "center1" | "center2" | "exit" = "flight";
+  /** Elbow coordinate (end of first axis-aligned connector leg). */
+  circuitMidX = 0;
+  circuitMidY = 0;
+  /** Target block/subcell center coordinate. */
+  circuitCenterX = 0;
+  circuitCenterY = 0;
+  /** Pre-chosen non-reversing cardinal outgoing direction for the current impact. */
+  circuitOutDx = 0;
+  circuitOutDy = 0;
+  /** Remaining exit clearance distance inside the centered cell/subcell. */
+  circuitExitLeft = 0;
 }
 
 /** Reset all per-projectile fields on pooled Bullet reuse so no mutation state leaks. */
@@ -140,6 +153,14 @@ export function resetBulletFields(b: Bullet): void {
   b.circuitHitTargets.clear();
   b.circuitPrevX = 0;
   b.circuitPrevY = 0;
+  b.circuitPhase = "flight";
+  b.circuitMidX = 0;
+  b.circuitMidY = 0;
+  b.circuitCenterX = 0;
+  b.circuitCenterY = 0;
+  b.circuitOutDx = 0;
+  b.circuitOutDy = 0;
+  b.circuitExitLeft = 0;
 }
 
 /** Fixed-size object pool for bullets. */

@@ -825,6 +825,8 @@ export class Renderer {
       const isSlash = b.style === 3;
       // Flame jets are drawn as the fire they shed (FireRenderer).
       if (b.style === 4) continue;
+      // Circuit Runner shots are drawn exclusively by WeaponExpansionRenderer.
+      if (b.circuit) continue;
 
       if (isSlash) {
         this.drawSlash(b);

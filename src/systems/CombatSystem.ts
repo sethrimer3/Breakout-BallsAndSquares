@@ -985,6 +985,116 @@ export class CombatSystem {
 
     const maxContacts = b.circuit ? CIRCUIT.maxStepContacts : 8;
     while (remDist > 1e-4 && guard++ < maxContacts) {
+      if (b.circuit && b.circuitPhase !== "flight") {
+        if (b.circuitPhase === "center1") {
+          const dx = b.circuitMidX - curX;
+          const dy = b.circuitMidY - curY;
+          const dist = Math.hypot(dx, dy);
+          if (dist <= 1e-6) {
+            b.circuitPhase = "center2";
+          } else {
+            const step = Math.min(dist, remDist, b.distanceLeft);
+            const reached = step + 1e-6 >= dist;
+            const nx = reached ? b.circuitMidX : curX + (dx / dist) * step;
+            const ny = reached ? b.circuitMidY : curY + (dy / dist) * step;
+            this.recordCircuitSegment(b, curX, curY, nx, ny, step);
+            remDist -= step;
+            b.distanceLeft = Math.max(0, b.distanceLeft - step);
+            b.traveled += step;
+            b.totalTraveled += step;
+            curX = nx;
+            curY = ny;
+            b.circuitPrevX = curX;
+            b.circuitPrevY = curY;
+            if (b.distanceLeft <= 1e-6) {
+              b.x = curX;
+              b.y = curY;
+              this.finishBullet(b);
+              return;
+            }
+            if (reached) {
+              b.circuitPhase = "center2";
+            } else {
+              b.dx = dx / dist;
+              b.dy = dy / dist;
+              break;
+            }
+          }
+        }
+        if (b.circuitPhase === "center2") {
+          const dx = b.circuitCenterX - curX;
+          const dy = b.circuitCenterY - curY;
+          const dist = Math.hypot(dx, dy);
+          if (dist <= 1e-6) {
+            b.dx = b.circuitOutDx;
+            b.dy = b.circuitOutDy;
+            b.circuitPhase = "exit";
+          } else {
+            const step = Math.min(dist, remDist, b.distanceLeft);
+            const reached = step + 1e-6 >= dist;
+            const nx = reached ? b.circuitCenterX : curX + (dx / dist) * step;
+            const ny = reached ? b.circuitCenterY : curY + (dy / dist) * step;
+            this.recordCircuitSegment(b, curX, curY, nx, ny, step);
+            remDist -= step;
+            b.distanceLeft = Math.max(0, b.distanceLeft - step);
+            b.traveled += step;
+            b.totalTraveled += step;
+            curX = nx;
+            curY = ny;
+            b.circuitPrevX = curX;
+            b.circuitPrevY = curY;
+            if (b.distanceLeft <= 1e-6) {
+              b.x = curX;
+              b.y = curY;
+              this.finishBullet(b);
+              return;
+            }
+            if (reached) {
+              b.dx = b.circuitOutDx;
+              b.dy = b.circuitOutDy;
+              b.circuitPhase = "exit";
+            } else {
+              b.dx = dx / dist;
+              b.dy = dy / dist;
+              break;
+            }
+          }
+        }
+        if (b.circuitPhase === "exit") {
+          b.dx = b.circuitOutDx;
+          b.dy = b.circuitOutDy;
+          if (b.circuitExitLeft <= 1e-6) {
+            b.circuitPhase = "flight";
+          } else {
+            const step = Math.min(b.circuitExitLeft, remDist, b.distanceLeft);
+            const nx = curX + b.dx * step;
+            const ny = curY + b.dy * step;
+            this.recordCircuitSegment(b, curX, curY, nx, ny, step);
+            remDist -= step;
+            b.distanceLeft = Math.max(0, b.distanceLeft - step);
+            b.traveled += step;
+            b.totalTraveled += step;
+            b.circuitExitLeft = Math.max(0, b.circuitExitLeft - step);
+            curX = nx;
+            curY = ny;
+            b.circuitPrevX = curX;
+            b.circuitPrevY = curY;
+            if (b.distanceLeft <= 1e-6) {
+              b.x = curX;
+              b.y = curY;
+              this.finishBullet(b);
+              return;
+            }
+            if (b.circuitExitLeft <= 1e-6) {
+              b.circuitPhase = "flight";
+            } else {
+              break;
+            }
+          }
+        }
+        if (remDist <= 1e-4) break;
+      }
+
       // Fine-grid traversal: sees normal cells and 50% pink sub-pixels alike.
       const terrainHit = gridRaycast(w.subSolidQuery, ss, curX, curY, b.dx, b.dy, remDist, hit);
       // Creatures in front of the terrain hit take the shot instead.
@@ -1251,60 +1361,16 @@ export class CombatSystem {
 
           const centerX = isSubC ? (hit.cx + 0.5) * ss : (hcx + 0.5) * cs;
           const centerY = isSubC ? (hit.cy + 0.5) * ss : (hcy + 0.5) * cs;
-          const cDx = centerX - curX;
-          const cDy = centerY - curY;
-          const centerDist = Math.hypot(cDx, cDy);
-          if (centerDist > 1e-6) {
-            const availCenter = Math.min(centerDist, remDist, b.distanceLeft);
-            const nxCenter = curX + (cDx / centerDist) * availCenter;
-            const nyCenter = curY + (cDy / centerDist) * availCenter;
-            this.recordCircuitSegment(b, curX, curY, nxCenter, nyCenter, availCenter);
-            remDist -= availCenter;
-            b.distanceLeft = Math.max(0, b.distanceLeft - availCenter);
-            b.traveled += availCenter;
-            b.totalTraveled += availCenter;
-            curX = nxCenter;
-            curY = nyCenter;
-            b.circuitPrevX = curX;
-            b.circuitPrevY = curY;
-            if (b.distanceLeft <= 1e-6) {
-              b.x = curX;
-              b.y = curY;
-              this.finishBullet(b);
-              return;
-            }
-            if (availCenter + 1e-6 < centerDist) {
-              b.dx = cDx / centerDist;
-              b.dy = cDy / centerDist;
-              break;
-            }
-          }
-
+          const horizPrimary = Math.abs(inDx) >= Math.abs(inDy);
+          b.circuitMidX = horizPrimary ? centerX : curX;
+          b.circuitMidY = horizPrimary ? curY : centerY;
+          b.circuitCenterX = centerX;
+          b.circuitCenterY = centerY;
           const [outDx, outDy] = chooseOutgoingCardinal(inDx, inDy, this.rng);
-          b.dx = outDx;
-          b.dy = outDy;
-
-          const halfExit = (isSubC ? ss : cs) * 0.5 + 1e-3;
-          const exitStep = Math.min(remDist, b.distanceLeft, halfExit);
-          if (exitStep > 1e-6) {
-            const ex = curX + b.dx * exitStep;
-            const ey = curY + b.dy * exitStep;
-            this.recordCircuitSegment(b, curX, curY, ex, ey, exitStep);
-            remDist -= exitStep;
-            b.distanceLeft = Math.max(0, b.distanceLeft - exitStep);
-            b.traveled += exitStep;
-            b.totalTraveled += exitStep;
-            curX = ex;
-            curY = ey;
-            b.circuitPrevX = curX;
-            b.circuitPrevY = curY;
-            if (b.distanceLeft <= 1e-6) {
-              b.x = curX;
-              b.y = curY;
-              this.finishBullet(b);
-              return;
-            }
-          }
+          b.circuitOutDx = outDx;
+          b.circuitOutDy = outDy;
+          b.circuitExitLeft = (isSubC ? ss : cs) * 0.5 + 1e-3;
+          b.circuitPhase = "center1";
           continue;
         }
 
