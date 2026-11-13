@@ -382,11 +382,12 @@ export class Soldier {
     behavior: SoldierBehavior = "free",
     slotIndex = 0,
     secondary: SecondaryWeaponType | null = null,
+    mutation: PrimaryMutation | null = null,
   ) {
     this.x = x;
     this.y = y;
     this.speed = speed;
-    const norm = normalizeLegacyWeapon(weapon, null);
+    const norm = normalizeLegacyWeapon(weapon, mutation);
     this.weapon = norm.weapon;
     this.mutation = norm.mutation;
     this.secondary = secondary;

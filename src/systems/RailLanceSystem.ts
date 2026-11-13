@@ -41,7 +41,7 @@ export class RailLanceSystem {
   constructor(private world: PixelWorld) {}
 
   clear(): void {
-    this.beams.releaseAll();
+    this.beams.clear();
   }
 
   update(dt: number): void {
@@ -70,8 +70,7 @@ export class RailLanceSystem {
     onCreatureHit: (hx: number, hy: number, nx: number, ny: number) => void,
   ): { endX: number; endY: number; hits: number } {
     this.totalStrikes++;
-    const maxDist = RAIL.maxRange;
-    let remainingDist = maxDist;
+    let remainingDist: number = RAIL.maxRange;
     let remainingHits = Math.max(1, pierceBudget + 1);
     let curX = ox;
     let curY = oy;
@@ -84,8 +83,8 @@ export class RailLanceSystem {
     let guard = 0;
     while (remainingDist > 0.05 && remainingHits > 0 && guard++ < 128) {
       const tDist = targets ? targets.raycast(curX, curY, dx, dy, remainingDist, hitTargets) : -1;
-      const wHit = gridRaycast(this.world, curX, curY, dx, dy, remainingDist, rayHit);
-      const wDist = wHit ? rayHit.distance : -1;
+      const wHit = gridRaycast(this.world.subSolidQuery, this.world.subCellSize, curX, curY, dx, dy, remainingDist, rayHit);
+      const wDist = wHit ? rayHit.t : -1;
 
       if (tDist >= 0 && (wDist < 0 || tDist <= wDist)) {
         const hx = curX + dx * tDist;
@@ -106,8 +105,10 @@ export class RailLanceSystem {
       if (wHit) {
         const hx = rayHit.x;
         const hy = rayHit.y;
-        const cx = rayHit.cellX;
-        const cy = rayHit.cellY;
+        const sx = rayHit.cx;
+        const sy = rayHit.cy;
+        const cx = sx >> 1;
+        const cy = sy >> 1;
 
         // World boundary: stop immediately.
         if (!this.world.inBounds(cx, cy)) {
@@ -126,29 +127,30 @@ export class RailLanceSystem {
               // Gate or locked door remains closed: stop strike.
               curX = hx;
               curY = hy;
-              onTerrainHit(cx, cy, 0, false, hx, hy, rayHit.normalX, rayHit.normalY, owner.id);
+              onTerrainHit(cx, cy, 0, false, hx, hy, rayHit.nx, rayHit.ny, owner.id);
               break;
             }
           }
         }
 
-        const key = rayHit.sub ? -(rayHit.subY * this.world.subWidth + rayHit.subX + 1) : ci + 1;
+        const isSub = this.world.health[ci] === 0;
+        const key = isSub ? -(sy * this.world.subWidth + sx + 1) : ci + 1;
         if (!hitCells.has(key)) {
           hitCells.add(key);
-          const isPink = rayHit.sub
-            ? this.world.isPinkSub(rayHit.subY * this.world.subWidth + rayHit.subX)
+          const isPink = isSub
+            ? this.world.isPinkSub(sy * this.world.subWidth + sx)
             : this.world.blight[ci] > 0;
           const totalDmg = (damage + owner.mods.terrainDamageBonus) * (isPink ? owner.mods.blightMult : 1);
-          const res = rayHit.sub
-            ? this.world.damageSub(rayHit.subX, rayHit.subY, totalDmg, true)
+          const res = isSub
+            ? this.world.damageSub(sx, sy, totalDmg, true)
             : this.world.damage(cx, cy, totalDmg, true);
-          onTerrainHit(cx, cy, res, rayHit.sub, hx, hy, rayHit.normalX, rayHit.normalY, owner.id);
+          onTerrainHit(cx, cy, res, isSub, hx, hy, rayHit.nx, rayHit.ny, owner.id);
           remainingHits--;
           hits++;
           this.totalHits++;
         }
 
-        const adv = Math.max(stepAdvance, rayHit.distance + stepAdvance);
+        const adv = Math.max(stepAdvance, rayHit.t + stepAdvance);
         curX += dx * adv;
         curY += dy * adv;
         remainingDist -= adv;

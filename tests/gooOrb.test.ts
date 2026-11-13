@@ -290,14 +290,16 @@ describe("SQUELCH combat and progression", () => {
     expect(u.isUnlocked("goo_unlock")).toBe(false);
     unlockTabs(save); save.data.bank = 1000000; save.data.lifetimePixels = 80;
     expect(u.isUnlocked("goo_mass")).toBe(false);
+    expect(u.buy("shotgun_unlock")).toBe(true);
     expect(u.buy("goo_unlock")).toBe(true);
     for (let i = 0; i < 6; i++) expect(u.buy("goo_mass")).toBe(true);
     for (let i = 0; i < 8; i++) expect(u.buy("goo_distance")).toBe(true);
     expect(u.buy("goo_mass")).toBe(false);
     expect(u.buy("goo_distance")).toBe(false);
-    save.data.loadouts[0].weapon = "goo_mortar"; save.save();
+    (save.data.loadouts[0] as { weapon: string }).weapon = "goo_mortar"; save.save();
     const loaded = new SaveManager(storage);
-    expect(loaded.data.loadouts[0].weapon).toBe("goo_mortar");
+    expect(loaded.data.loadouts[0].weapon).toBe("shotgun");
+    expect(loaded.data.loadouts[0].mutation).toBe("squelch");
     expect(new UpgradeManager(loaded).getSoldierStats()).toMatchObject({ gooUnlocked: true, gooMass: 1.9, gooDistance: 940 });
   });
 
@@ -305,9 +307,10 @@ describe("SQUELCH combat and progression", () => {
     const storage = new MemoryStorage(); const save = new SaveManager(storage);
     const legacy = save.data.upgrades as Partial<typeof save.data.upgrades>;
     delete legacy.goo_unlock; delete legacy.goo_mass; delete legacy.goo_distance;
-    save.data.loadouts[0].weapon = "goo_mortar"; save.save();
+    (save.data.loadouts[0] as { weapon: string }).weapon = "goo_mortar"; save.save();
     const loaded = new SaveManager(storage);
     expect(loaded.data.loadouts[0].weapon).toBe("pistol");
+    expect(loaded.data.loadouts[0].mutation).toBeNull();
     expect(new UpgradeManager(loaded).getSoldierStats()).toMatchObject({ gooUnlocked: false, gooMass: 1, gooDistance: 300 });
   });
 });

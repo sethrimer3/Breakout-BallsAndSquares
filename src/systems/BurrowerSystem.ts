@@ -49,7 +49,7 @@ export class BurrowerSystem {
   totalChargesDetonated = 0;
 
   clear(): void {
-    this.mines.releaseAll();
+    this.mines.clear();
     this.nextGroupId = 1;
     this.detonatedGroups.clear();
   }

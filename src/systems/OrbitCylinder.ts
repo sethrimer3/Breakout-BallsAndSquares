@@ -157,15 +157,20 @@ export class OrbitCylinderSystem {
       if (!r.active || r.ownerId !== owner.id) continue;
       let dx = Math.cos(r.angle);
       let dy = Math.sin(r.angle);
-      const vn = dx * nx + dy * ny;
-      if (vn < 0.15) {
+      let vn = dx * nx + dy * ny;
+      if (vn < 0) {
         // Reflect into the outward hemisphere of the wall normal.
         dx = dx - 2 * vn * nx;
         dy = dy - 2 * vn * ny;
-        const len = Math.hypot(dx, dy) || 1;
-        dx /= len;
-        dy /= len;
+        vn = dx * nx + dy * ny;
       }
+      if (vn < 0.15) {
+        dx += nx * (0.15 - vn);
+        dy += ny * (0.15 - vn);
+      }
+      const len = Math.hypot(dx, dy) || 1;
+      dx /= len;
+      dy /= len;
       const sx = owner.x + dx * (owner.radius + BULLET.muzzleGap);
       const sy = owner.y + dy * (owner.radius + BULLET.muzzleGap);
       if (spawn(sx, sy, dx, dy, r.speed, r.damage, BULLET.lifetime, owner.id, r.bounces, r.terrainDamageBonus, r.blightMultiplier, r.pierce)) {

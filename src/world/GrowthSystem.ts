@@ -260,8 +260,8 @@ export class GrowthSystem {
       let tries = n * 3;
       while (n > 0 && tries-- > 0 && c.edges.length > 0) {
         const si = c.edges[this.rng.int(c.edges.length)];
-        const sx = si % w.subWidth;
-        const sy = Math.floor(si / w.subWidth);
+        const sx = si % this.world.subWidth;
+        const sy = Math.floor(si / this.world.subWidth);
         if (this.freeze?.isSubFrozen(sx, sy) && this.rng.next() >= FREEZE.blightGrowthMult) {
           n--;
           continue;

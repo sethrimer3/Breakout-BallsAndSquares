@@ -1,5 +1,5 @@
 import {
-  DRONE, GOO, GALE, REVERSE, ORBIT, VACUUM, BURROWER, FREEZE, RAIL, NAPALM, CRYO,
+  DRONE, GOO, GALE, REVERSE, VACUUM, BURROWER, RAIL, NAPALM, CRYO,
   ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET,
 } from "../config";
 import { ReverseRevolver, type ReverseShot } from "./ReverseRevolver";
@@ -201,14 +201,14 @@ export class CombatSystem {
     let rate = this.stats.fireRate;
     switch (s.weapon) {
       case "pistol":
-        if (s.mutation === "drone_shepherd" && this.stats.droneUnlocked) {
+        if (s.mutation === "drone_shepherd") {
           rate = 1 / this.stats.droneReleaseInterval;
         }
         break;
       case "shotgun":
-        if (s.mutation === "squelch" && this.stats.gooUnlocked) {
+        if (s.mutation === "squelch") {
           rate = this.stats.gooFireRate;
-        } else if (s.mutation === "vacuum_pulse" && this.stats.vacuumUnlocked) {
+        } else if (s.mutation === "vacuum_pulse") {
           rate = this.stats.shotgunFireRate * 0.5;
         } else {
           rate = this.stats.shotgunFireRate;
@@ -221,7 +221,7 @@ export class CombatSystem {
         rate = this.stats.rocketFireRate;
         break;
       case "sniper_rifle":
-        if (s.mutation === "chromatic_prism" && this.stats.prismUnlocked) {
+        if (s.mutation === "chromatic_prism") {
           rate = this.stats.prismFireRate;
         } else {
           rate = this.stats.sniperFireRate;
@@ -251,7 +251,7 @@ export class CombatSystem {
     const interval = 1 / Math.max(0.05, rate);
 
     // Rail Lance uses an explicit charge cycle with an aim-lock phase before firing once.
-    if (s.weapon === "sniper_rifle" && s.mutation === "rail_lance" && this.stats.railLanceUnlocked) {
+    if (s.weapon === "sniper_rifle" && s.mutation === "rail_lance") {
       if (!s.railCharging) {
         s.railCharging = true;
         s.railCharge = 0;
@@ -282,7 +282,7 @@ export class CombatSystem {
     }
 
     // Vacuum Pulse reserves in-range debris during the intake window before firing.
-    if (s.weapon === "shotgun" && s.mutation === "vacuum_pulse" && this.stats.vacuumUnlocked) {
+    if (s.weapon === "shotgun" && s.mutation === "vacuum_pulse") {
       if (s.fireCooldown <= VACUUM.intakeDuration) {
         this.debris.reserveInRange(s.id, s.x, s.y, VACUUM.range);
       }
@@ -322,15 +322,15 @@ export class CombatSystem {
     s.facingAngle = Math.atan2(dy, dx);
     this.shooter = s;
 
-    if (s.weapon === "pistol" && s.mutation === "drone_shepherd" && this.stats.droneUnlocked) {
+    if (s.weapon === "pistol" && s.mutation === "drone_shepherd") {
       this.drones.release(s, this.stats);
       this.shooter = null;
       return;
-    } else if (s.weapon === "sniper_rifle" && s.mutation === "chromatic_prism" && this.stats.prismUnlocked) {
+    } else if (s.weapon === "sniper_rifle" && s.mutation === "chromatic_prism") {
       this.laser.traceShot(s, dx, dy, this.stats);
-    } else if (s.weapon === "sniper_rifle" && s.mutation === "rail_lance" && this.stats.railLanceUnlocked) {
+    } else if (s.weapon === "sniper_rifle" && s.mutation === "rail_lance") {
       this.fireRailLance(s, dx, dy);
-    } else if (s.weapon === "shotgun" && s.mutation === "squelch" && this.stats.gooUnlocked) {
+    } else if (s.weapon === "shotgun" && s.mutation === "squelch") {
       const orb = this.goo.launch({
         // Cast from the center so a muzzle beside a thin wall cannot skip it.
         x: s.x, y: s.y, dx, dy, ownerId: s.id,
@@ -346,7 +346,7 @@ export class CombatSystem {
         this.events.onGooLaunchBlocked?.(s.x, s.y);
         return;
       }
-    } else if (s.weapon === "shotgun" && s.mutation === "vacuum_pulse" && this.stats.vacuumUnlocked) {
+    } else if (s.weapon === "shotgun" && s.mutation === "vacuum_pulse") {
       this.debris.reserveInRange(s.id, s.x, s.y, VACUUM.range);
       const consumed = this.debris.consumeFor(s.id);
       const minBasePellets = Math.max(2, Math.floor(this.stats.shotgunPellets * 0.5));
@@ -419,8 +419,8 @@ export class CombatSystem {
         0,
       );
     } else if (s.weapon === "rocket_launcher") {
-      const isBurrower = s.mutation === "burrower" && this.stats.burrowerUnlocked;
-      const isFreeze = s.mutation === "freeze_rockets" && this.stats.freezeRocketsUnlocked;
+      const isBurrower = s.mutation === "burrower";
+      const isFreeze = s.mutation === "freeze_rockets";
       const b = this.spawnBullet(
         s.x,
         s.y,
@@ -464,7 +464,7 @@ export class CombatSystem {
         2,
       );
     } else if (s.weapon === "katana") {
-      const gale=s.mutation === "gale_edge" && this.stats.galeUnlocked;
+      const gale=s.mutation === "gale_edge";
       if(gale && this.bullets.items.filter(b=>b.active&&b.gale).length>=GALE.poolCap){this.shooter=null;return;}
       s.slashIndex = ((s.slashIndex ?? 0) + 1) % 2;
       const tilt = (s.slashIndex === 0 ? -1 : 1) * 0.38;
@@ -504,8 +504,8 @@ export class CombatSystem {
         );
       }
     } else if (s.weapon === "flamethrower") {
-      const isNapalm = s.mutation === "napalm_garden" && this.stats.napalmUnlocked;
-      const isCryo = s.mutation === "cryospray" && this.stats.cryosprayUnlocked;
+      const isNapalm = s.mutation === "napalm_garden";
+      const isCryo = s.mutation === "cryospray";
       const spread = isCryo ? CRYO.spreadDeg : isNapalm ? NAPALM.spreadDeg : FLAMETHROWER.spreadDeg;
       const halfSpreadRad = spread * DEG;
       const a = this.rng.range(-halfSpreadRad, halfSpreadRad);
@@ -536,7 +536,7 @@ export class CombatSystem {
           b.damage = 0;
         }
       }
-    } else if (s.weapon === "pistol" && s.mutation === "orbit_cylinder" && this.stats.orbitUnlocked) {
+    } else if (s.weapon === "pistol" && s.mutation === "orbit_cylinder") {
       const dmg = this.stats.damage + this.stats.globalDamageBonus + s.mods.damageBonus;
       const spd = this.stats.bulletSpeed * this.stats.globalBulletSpeedMult * s.mods.bulletSpeedMult;
       const bounces = s.mods.pierce > 0 ? 0 : this.stats.pistolBounces;
@@ -652,7 +652,7 @@ export class CombatSystem {
     b.vacuumPellet = false;
     b.napalmSpray = false;
     b.cryoSpray = false;
-    if (weapon === "pistol" && this.shooter?.mutation === "reverse_revolver" && this.stats.reverseUnlocked) {
+    if (weapon === "pistol" && this.shooter?.mutation === "reverse_revolver") {
       b.replay=this.revolver.begin(x,y,b.speed,b.damage,b.terrainDamageBonus,b.blightMultiplier,ownerId);
       if(!b.replay){this.bullets.release(b);return null;}
       b.replay.coreDamageBonus=this.stats.coreDamageBonus;
@@ -709,7 +709,7 @@ export class CombatSystem {
     b.afterimage = this.shooter?.dashAfterimage ?? false;
     if (this.shooter) this.shooter.dashAfterimage = false;
     b.slashAngle = slashAngle;
-    b.replay=null; b.gale=this.shooter?.mutation === "gale_edge" && this.stats.galeUnlocked;
+    b.replay=null; b.gale=this.shooter?.mutation === "gale_edge";
     b.galeCells.clear();
     b.distanceLeft=b.gale?this.stats.galeDistance:Infinity;
   }
@@ -748,7 +748,7 @@ export class CombatSystem {
 
   /** Called by PhysicsSystem on a real reflected-wall collision (not sliding/rescue/sentry). */
   onSoldierBounce(s: Soldier, nx: number, ny: number): void {
-    if (s.weapon === "pistol" && s.mutation === "orbit_cylinder" && this.stats.orbitUnlocked) {
+    if (s.weapon === "pistol" && s.mutation === "orbit_cylinder") {
       this.orbit.releaseOnBounce(s, nx, ny, (x, y, dx, dy, speed, damage, life, ownerId, bounces, terrainDamageBonus, blightMultiplier, pierce) => {
         const b = this.bullets.acquire();
         if (!b) return false;
@@ -773,7 +773,7 @@ export class CombatSystem {
 
   /** Release Orbit Cylinder rounds manually (e.g. when manual commander stops firing). */
   releaseOrbitManual(s: Soldier): number {
-    if (s.weapon !== "pistol" || s.mutation !== "orbit_cylinder" || !this.stats.orbitUnlocked) return 0;
+    if (s.weapon !== "pistol" || s.mutation !== "orbit_cylinder") return 0;
     return this.orbit.releaseManual(s, (x, y, dx, dy, speed, damage, life, ownerId, bounces, terrainDamageBonus, blightMultiplier, pierce) => {
       const b = this.bullets.acquire();
       if (!b) return false;

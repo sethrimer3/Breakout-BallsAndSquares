@@ -1,6 +1,6 @@
 import {describe,expect,it} from "vitest";
 import {Rng} from "../src/core/Rng";
-import {Soldier,baseSoldierStats,type WeaponType} from "../src/entities/Soldier";
+import {Soldier,baseSoldierStats,type LegacyWeaponType,type WeaponType} from "../src/entities/Soldier";
 import {SaveManager,type StorageLike} from "../src/progression/SaveManager";
 import {UPGRADE_DEFS} from "../src/progression/UpgradeDefinitions";
 import {UpgradeManager} from "../src/progression/UpgradeManager";
@@ -13,7 +13,7 @@ const benchmark = (globalThis as typeof globalThis & { process?: { env: Record<s
 class MemoryStorage implements StorageLike{getItem(){return null;}setItem(){}}
 function upgraded(){const save=new SaveManager(new MemoryStorage());for(const d of UPGRADE_DEFS)save.data.upgrades[d.id]=d.maxLevel;return new UpgradeManager(save).getSoldierStats();}
 
-function simulate(layout:"open"|"corridor",weapon:WeaponType,maxed:boolean,squad=1){
+function simulate(layout:"open"|"corridor",weapon:WeaponType|LegacyWeaponType,maxed:boolean,squad=1){
  const world=new PixelWorld({width:64,height:64,cellSize:8,roomSize:4});
  for(let y=0;y<64;y++)for(let x=0;x<64;x++){
   const border=x<2||x>61||y<2||y>61;

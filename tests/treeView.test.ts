@@ -27,9 +27,6 @@ const BRANCHES: UpgradeBranch[] = [
   "sniper_rifle",
   "katana",
   "flamethrower",
-  "goo_mortar",
-  "drone_shepherd",
-  "prism_laser",
 ];
 
 /** A rectangular tree of `cols` by `rows` cells around the center. */
@@ -53,7 +50,8 @@ describe("tree fit", () => {
       homes.push(nodePos(0, 0)); // the center hub or unlock node
       const b = treeBounds(homes);
       const v = fitView(b);
-      expect(v.s, branch).toBe(branch === "core" ? 0.625 : 1);
+      const expanded = branch === "core" || branch === "pistol" || branch === "shotgun" || branch === "sniper_rifle";
+      expect(v.s, branch).toBe(expanded ? 0.625 : 1);
       expect(shows(v, b), branch).toBe(true);
     }
   });

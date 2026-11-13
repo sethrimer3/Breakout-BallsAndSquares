@@ -36,7 +36,7 @@ const fixed = (n: number) => `${n.toFixed(2)}×`;
 export const EXPANSION_DEFS: readonly UpgradeDef[] = [
   node("reverse_unlock","pistol","Reverse-Playback Revolver","Unlock a selectable Pistol mutation: shots pause, then rewind their exact route",1,1,1,20,
     (s,l)=>{s.reverseUnlocked=l>0;},count,unlocked,null,"essence"),
-  node("orbit_unlock","pistol","Orbit Cylinder","Unlock Pistol mutation: rounds orbit the soldier and sling outward on real wall bounces",-1,1,1,25,
+  node("orbit_unlock","pistol","Orbit Cylinder","Unlock Pistol mutation: rounds orbit the soldier and sling outward on real wall bounces",1,-1,1,25,
     (s,l)=>{s.orbitUnlocked=l>0;},count,unlocked,null,"essence"),
   node("vacuum_unlock","shotgun","Vacuum Pulse","Unlock Shotgun mutation: 0.5× fire rate, sucks in nearby debris to boost pellets & damage",-1,-1,1,30,
     (s,l)=>{s.vacuumUnlocked=l>0;},count,unlocked,"shotgun_unlock","essence"),

@@ -1,5 +1,5 @@
 import { TERRAIN } from "../config";
-import { resolvePrimaryMutation, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
+import { mutationCompatibility, resolvePrimaryMutation, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
 import type { SoldierBehavior } from "../progression/SaveManager";
 import {
@@ -100,7 +100,7 @@ export const CATEGORIES: readonly CategoryInfo[] = [
     name: "PRIMARY WEAPONS",
     icon: "rifle",
     color: "#52f296",
-    branches: ["pistol", "shotgun", "assault_rifle", "rocket_launcher", "sniper_rifle", "katana", "flamethrower", "goo_mortar", "drone_shepherd", "prism_laser"],
+    branches: ["pistol", "shotgun", "assault_rifle", "rocket_launcher", "sniper_rifle", "katana", "flamethrower"],
   },
   {
     id: "secondary",
@@ -158,9 +158,6 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   rocket_launcher: { icon: "launcher", color: "#ff5c40" },
   sniper_rifle: { icon: "sniper", color: UI_COLORS.soldier },
   katana: { icon: "katana", color: "#38d6ff" },
-  drone_shepherd: { icon: "turret", color: "#7ce4df" },
-  prism_laser: { icon: "bulletFast", color: "#d37cff" },
-  goo_mortar: { icon: "grenade", color: "#9cde68" },
   flamethrower: { icon: "flamethrower", color: "#ff7a18" },
   grenade: { icon: "grenade", color: "#ff9d3b" },
   turret: { icon: "turret", color: "#38d6ff" },
@@ -305,9 +302,6 @@ export class UpgradeTree {
                 <button class="tree-tab" data-tab="sniper_rifle"></button>
                 <button class="tree-tab" data-tab="katana"></button>
                 <button class="tree-tab" data-tab="flamethrower"></button>
-                <button class="tree-tab" data-tab="goo_mortar"></button>
-                <button class="tree-tab" data-tab="drone_shepherd"></button>
-                <button class="tree-tab" data-tab="prism_laser"></button>
               </div>
               <div class="tree-cat-panel hidden" data-cat="secondary">
                 <button class="tree-tab" data-tab="grenade"></button>
@@ -590,12 +584,6 @@ export class UpgradeTree {
         this.subEl.textContent = "SNIPER RIFLE WEAPON TREE — HIGH-VELOCITY PENETRATING ROUNDS & CRITS";
       } else if (tab === "katana") {
         this.subEl.textContent = "KATANA WEAPON TREE — RAPID HIGH-PIERCE ENERGY SLASHES & ANTI-BLIGHT CRITS";
-      } else if (tab === "drone_shepherd") {
-        this.subEl.textContent = "DRONE SHEPHERD — MINIATURE PISTOL DRONES; 24 GLOBAL, NO SOLDIER SLOTS";
-      } else if (tab === "prism_laser") {
-        this.subEl.textContent = "CHROMATIC PRISM — PIERCE WHEN CHARGED, OTHERWISE REFLECT; EDGES ABSORB";
-      } else if (tab === "goo_mortar") {
-        this.subEl.textContent = "SQUELCH — STICK, SHED A MINE, REBOUND; MASS & DISTANCE LIMIT FLIGHT";
       } else if (tab === "flamethrower") {
         this.subEl.textContent = "FLAMETHROWER WEAPON TREE — SHORT-RANGE FIRE STREAM THAT SETS RUBBLE BURNING";
       } else if (tab === "grenade") {
@@ -1060,9 +1048,9 @@ export class UpgradeTree {
     } else if (!unlocked) {
       const branch = branchOf(def);
       const needCenter =
-        (branch === "drone_shepherd" && def.id !== "drone_unlock" && u.levelOf("drone_unlock") === 0) ||
-        (branch === "prism_laser" && def.id !== "prism_unlock" && u.levelOf("prism_unlock") === 0) ||
-        (branch === "goo_mortar" && def.id !== "goo_unlock" && u.levelOf("goo_unlock") === 0) ||
+        (def.id.startsWith("drone_") && def.id !== "drone_unlock" && u.levelOf("drone_unlock") === 0) ||
+        (def.id.startsWith("prism_") && def.id !== "prism_unlock" && u.levelOf("prism_unlock") === 0) ||
+        (def.id.startsWith("goo_") && def.id !== "goo_unlock" && u.levelOf("goo_unlock") === 0) ||
         (branch === "shotgun" && def.id !== "shotgun_unlock" && u.levelOf("shotgun_unlock") === 0) ||
         (branch === "assault_rifle" && def.id !== "ar_unlock" && u.levelOf("ar_unlock") === 0) ||
         (branch === "rocket_launcher" && def.id !== "rocket_unlock" && u.levelOf("rocket_unlock") === 0) ||
@@ -1143,9 +1131,6 @@ export class UpgradeTree {
       { id: "rocket_launcher", label: "ROCKET", unlocked: st.rocketUnlocked },
       { id: "sniper_rifle", label: "SNIPER", unlocked: st.sniperUnlocked },
       { id: "katana", label: "KATANA", unlocked: st.katanaUnlocked },
-      { id: "drone_shepherd", label: "DRONES", unlocked: st.droneUnlocked },
-      { id: "prism_laser", label: "PRISM", unlocked: st.prismUnlocked },
-      { id: "goo_mortar", label: "SQUELCH", unlocked: st.gooUnlocked },
       { id: "flamethrower", label: "FLAMER", unlocked: st.flameUnlocked },
     ];
 
@@ -1173,10 +1158,37 @@ export class UpgradeTree {
       const curS: SecondaryWeaponType | null =
         ld.secondary && this.game.isSecondaryUnlocked(ld.secondary) ? ld.secondary : null;
       const curM=resolvePrimaryMutation(curW,ld.mutation,st);
-      const mutationOptions: {id: PrimaryMutation | null; label: string; unlocked: boolean}[] = curW === "pistol"
-        ? [{id:null,label:"STANDARD",unlocked:true},{id:"reverse_revolver",label:"REVERSE-PLAYBACK",unlocked:st.reverseUnlocked}]
-        : curW === "katana" ? [{id:null,label:st.katanaDash?"MOMENTUM":"STANDARD",unlocked:true},{id:"gale_edge",label:"GALE EDGE",unlocked:st.galeUnlocked}] : [];
-      const mutationHtml=mutationOptions.length?`<div class="lc-section-lbl">BLACK MARKET — NEXT DEPLOYMENT</div><div class="lc-weapons">${mutationOptions.map(m=>`<button class="btn lc-mbtn ${curM===m.id?"btn-primary":""}" data-slot="${i}" data-mutation="${m.id??""}" ${m.unlocked?"":"disabled"}>${m.label}${m.unlocked?"":" · LOCKED"}</button>`).join("")}</div>`:"";
+      const mutationOptions: {id: PrimaryMutation | null; label: string; unlocked: boolean}[] =
+        curW === "pistol" ? [
+          {id:null,label:"STANDARD",unlocked:true},
+          {id:"reverse_revolver",label:"REVERSE-PLAYBACK",unlocked:st.reverseUnlocked},
+          {id:"orbit_cylinder",label:"ORBIT CYLINDER",unlocked:st.orbitUnlocked},
+          {id:"drone_shepherd",label:"DRONE SHEPHERD",unlocked:st.droneUnlocked},
+        ] : curW === "shotgun" ? [
+          {id:null,label:"STANDARD",unlocked:true},
+          {id:"squelch",label:"SQUELCH",unlocked:st.gooUnlocked},
+          {id:"vacuum_pulse",label:"VACUUM PULSE",unlocked:st.vacuumUnlocked},
+        ] : curW === "rocket_launcher" ? [
+          {id:null,label:"STANDARD",unlocked:true},
+          {id:"burrower",label:"BURROWER",unlocked:st.burrowerUnlocked},
+          {id:"freeze_rockets",label:"FREEZE ROCKETS",unlocked:st.freezeRocketsUnlocked},
+        ] : curW === "sniper_rifle" ? [
+          {id:null,label:"STANDARD",unlocked:true},
+          {id:"chromatic_prism",label:"CHROMATIC PRISM",unlocked:st.prismUnlocked},
+          {id:"rail_lance",label:"RAIL LANCE",unlocked:st.railLanceUnlocked},
+        ] : curW === "katana" ? [
+          {id:null,label:st.katanaDash?"MOMENTUM":"STANDARD",unlocked:true},
+          {id:"gale_edge",label:"GALE EDGE",unlocked:st.galeUnlocked},
+        ] : curW === "flamethrower" ? [
+          {id:null,label:"STANDARD",unlocked:true},
+          {id:"napalm_garden",label:"NAPALM GARDEN",unlocked:st.napalmUnlocked},
+          {id:"cryospray",label:"CRYOSPRAY",unlocked:st.cryosprayUnlocked},
+        ] : [];
+      const compat = curM ? mutationCompatibility(curM) : null;
+      const compatHtml = compat && compat.inactive.length > 0
+        ? `<div class="lc-compat">Inactive: ${compat.inactive.join(", ")}</div>`
+        : "";
+      const mutationHtml=mutationOptions.length?`<div class="lc-section-lbl">BLACK MARKET — NEXT DEPLOYMENT</div><div class="lc-weapons">${mutationOptions.map(m=>`<button class="btn lc-mbtn ${curM===m.id?"btn-primary":""}" data-slot="${i}" data-mutation="${m.id??""}" ${m.unlocked?"":"disabled"}>${m.label}${m.unlocked?"":" · LOCKED"}</button>`).join("")}</div>${compatHtml}`:"";
       const curB: SoldierBehavior = this.game.isBehaviorUnlocked(ld.behavior) ? ld.behavior : "free";
 
       let wSummary = `1 round · ${st.damage} DMG · ${st.fireRate.toFixed(2)}/s`;
@@ -1190,17 +1202,21 @@ export class UpgradeTree {
         wSummary = `Sniper · ${st.sniperDamage} DMG · ${st.sniperPierce} Pierce · ${Math.round(st.sniperCritChance * 100)}% Crit`;
       } else if (curW === "katana") {
         wSummary = `${st.katanaDash ? "Rebound dash · " : ""}Slash · ${st.katanaDamage} DMG (${st.katanaBlightMultiplier}× Blight) · ${st.katanaPierce} Pierce · ${st.katanaFireRate.toFixed(1)}/s`;
-      } else if (curW === "drone_shepherd") {
-        wSummary = `Independent pistol drones · ${st.droneCapacity} cap · ${st.droneReleaseInterval.toFixed(2)}s release · ${st.droneDamage} DMG`;
-      } else if (curW === "prism_laser") {
-        wSummary = `Pierce when charged, otherwise reflect · BAND ${st.prismSpectrum+1}/7 · ${st.prismBounces} bounces · ${st.prismDamage} DMG`;
-      } else if (curW === "goo_mortar") {
-        wSummary = `Stick → mine → rebound · ${st.gooMass.toFixed(2)} mass · ${st.gooDistance} range · sticky mines`;
       } else if (curW === "flamethrower") {
         wSummary = `Flame · ${st.flameDamage} DMG · ${st.flameFireRate.toFixed(1)}/s · ignites rubble`;
       }
-      if(curM==="reverse_revolver")wSummary=`Pause → rewind exact shot path · ${st.damage} DMG` ;
-      if(curM==="gale_edge")wSummary=`Flying crescents · ${st.galeDistance} range · Momentum inactive`;
+      if(curM==="reverse_revolver")wSummary=`Pause → rewind exact shot path · ${st.damage} DMG`;
+      else if(curM==="orbit_cylinder")wSummary=`Orbit rounds (${st.damage} DMG) → sling on real wall bounce`;
+      else if(curM==="drone_shepherd")wSummary=`Independent pistol drones · ${st.droneCapacity} cap · ${st.droneReleaseInterval.toFixed(2)}s · ${st.droneDamage} DMG`;
+      else if(curM==="squelch")wSummary=`Stick → mine → rebound · ${st.gooMass.toFixed(2)} mass · ${st.gooDistance} range`;
+      else if(curM==="vacuum_pulse")wSummary=`0.5× cadence (${(st.shotgunFireRate*0.5).toFixed(2)}/s) · sucks debris → +pellets & DMG`;
+      else if(curM==="burrower")wSummary=`Drills terrain → grouped mines detonate together · ${st.rocketDamage} DMG`;
+      else if(curM==="freeze_rockets")wSummary=`Cold-only burst · 50% slow / 2× DMG / 0.5× Blight · shatter`;
+      else if(curM==="chromatic_prism")wSummary=`Prism laser · BAND ${st.prismSpectrum+1}/7 · ${st.prismBounces} bounces · ${st.prismDamage} DMG`;
+      else if(curM==="rail_lance")wSummary=`Charge → 1 ultra-long piercing strike · ${st.sniperDamage} DMG`;
+      else if(curM==="gale_edge")wSummary=`Flying crescents · ${st.galeDistance} range · Momentum inactive`;
+      else if(curM==="napalm_garden")wSummary=`Unlit fuel (10s) · lit by other weapons → 15× ${st.flameDamage} DMG / 3s`;
+      else if(curM==="cryospray")wSummary=`Freezing mist · 50% slow / 2× DMG / 0.5× Blight · shatter`;
       if (curS === "grenade") {
         wSummary += ` · NADE: ${st.grenadeBlocksRequired} blk (${st.grenadeDamage} dmg)`;
       } else if (curS === "turret") {
@@ -1208,14 +1224,17 @@ export class UpgradeTree {
       }
 
       const wBtnsHtml = weaponDefs
-        .map(
-          (w) => `
-            <button class="lc-wbtn ${curW === w.id ? "equipped" : ""} ${!w.unlocked ? "locked" : ""}" data-slot="${i}" data-weapon="${w.id}" title="${w.label}" ${!w.unlocked ? "disabled" : ""}>
-              ${sprite(TAB_ICONS[w.id].icon, { color: w.unlocked ? TAB_ICONS[w.id].color : "#6d8197", scale: 2 })}
-              ${w.unlocked ? `<span class="lc-wname">${w.label}</span>` : `<span class="lc-wname">${lockIcon()}</span>`}
+        .map((w) => {
+          const takenOther = w.id !== "pistol" && loadouts.slice(0, count).some((other, j) => j !== i && other.weapon === w.id);
+          const canEquip = w.unlocked && !takenOther;
+          const label = !w.unlocked ? lockIcon() : takenOther ? "TAKEN" : w.label;
+          return `
+            <button class="lc-wbtn ${curW === w.id ? "equipped" : ""} ${!canEquip ? "locked" : ""}" data-slot="${i}" data-weapon="${w.id}" title="${takenOther ? "Already equipped by another squad slot" : w.label}" ${!canEquip ? "disabled" : ""}>
+              ${sprite(TAB_ICONS[w.id].icon, { color: canEquip ? TAB_ICONS[w.id].color : "#6d8197", scale: 2 })}
+              <span class="lc-wname">${label}</span>
             </button>
-          `,
-        )
+          `;
+        })
         .join("");
 
       const sBtnsHtml = secondaryDefs
@@ -1269,9 +1288,21 @@ export class UpgradeTree {
         : `<div class="loadout-hint">Full 8-soldier squad unlocked!</div>`;
 
     this.loadoutWrap.innerHTML = `
+      <div class="loadout-actions" style="margin-bottom:8px;display:flex;justify-content:flex-end;">
+        <button class="btn lc-respec-btn" type="button">REFUND BLACK MARKET (LAB ONLY)</button>
+      </div>
       <div class="loadout-grid">${cardsHtml}</div>
       ${moreHint}
     `;
+
+    this.loadoutWrap.querySelector(".lc-respec-btn")?.addEventListener("click", () => {
+      const res = this.game.upgrades.refundBlackMarket(false);
+      if (res.ok) {
+        this.game.applyUpgrades();
+        this.game.audio.playPickup();
+        this.renderLoadout();
+      }
+    });
 
     this.loadoutWrap.querySelectorAll(".lc-tree-btn").forEach((btn) => {
       btn.addEventListener("click", () => this.openSoldierTree(Number((btn as HTMLElement).dataset.soldierTree)));
@@ -1283,11 +1314,10 @@ export class UpgradeTree {
         if (el.disabled) return;
         const slot = Number(el.dataset.slot);
         const weapon = el.dataset.weapon as WeaponType;
-        if (!this.game.isWeaponUnlocked(weapon)) return;
-        if (!loadouts[slot]) loadouts[slot] = { weapon: "pistol", behavior: "free", equipment: [null, null] };
-        loadouts[slot].weapon = weapon;
-        loadouts[slot].mutation=resolvePrimaryMutation(weapon,loadouts[slot].mutation,st);
-        this.game.save.save();
+        const prevMut = loadouts[slot]?.mutation ?? null;
+        const mut = resolvePrimaryMutation(weapon, prevMut, st);
+        const res = this.game.upgrades.setLoadoutWeapon(slot, weapon, mut, false);
+        if (!res.ok) return;
         this.game.audio.playPickup();
         this.renderLoadout();
       });
@@ -1371,9 +1401,6 @@ export class UpgradeTree {
       ["rocket_launcher", "ROCKET", st.rocketUnlocked],
       ["sniper_rifle", "SNIPER", st.sniperUnlocked],
       ["katana", "KATANA", st.katanaUnlocked],
-      ["drone_shepherd", "DRONES", st.droneUnlocked],
-      ["prism_laser", "PRISM", st.prismUnlocked],
-      ["goo_mortar", "SQUELCH", st.gooUnlocked],
       ["flamethrower", "FLAMER", st.flameUnlocked],
       ["grenade", "GRENADE", st.grenadeUnlocked],
       ["turret", "TURRET", st.turretUnlocked],
@@ -1412,9 +1439,6 @@ export class UpgradeTree {
       this.activeTab === "rocket_launcher" ||
       this.activeTab === "sniper_rifle" ||
       this.activeTab === "katana" ||
-      this.activeTab === "drone_shepherd" ||
-      this.activeTab === "prism_laser" ||
-      this.activeTab === "goo_mortar" ||
       this.activeTab === "flamethrower" ||
       this.activeTab === "grenade" ||
       this.activeTab === "turret";

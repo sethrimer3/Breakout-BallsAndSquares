@@ -16,7 +16,7 @@ describe("weapon expansion release progression",()=>{
   for(const def of UPGRADE_DEFS){
    const key=`${def.branch}:${def.grid.col},${def.grid.row}`;
    expect(keys.has(key),`${def.id} overlaps another node`).toBe(false);keys.add(key);
-   if(EXPANSION_DEFS.includes(def)){expect(Math.abs(def.grid.col)).toBeLessThanOrEqual(2);expect(Math.abs(def.grid.row)).toBeLessThanOrEqual(1);}
+   if(EXPANSION_DEFS.includes(def)){expect(Math.abs(def.grid.col)).toBeLessThanOrEqual(3);expect(Math.abs(def.grid.row)).toBeLessThanOrEqual(2);}
   }
  });
  it("purchases and caps every new upgrade, then restores their exact levels",()=>{
@@ -43,17 +43,17 @@ describe("weapon expansion release progression",()=>{
   expect(u.isUnlocked("drone_damage")).toBe(false);expect(u.isUnlocked("prism_shear")).toBe(false);
   save.data.upgrades.katana_unlock=1;expect(u.isUnlocked("katana_impulse")).toBe(false);
   save.data.upgrades.katana_dash=1;expect(u.isUnlocked("katana_impulse")).toBe(true);
-  save.data.upgrades.prism_unlock=1;save.data.upgrades.prism_spectrum=5;expect(u.isUnlocked("prism_overload")).toBe(false);
+  save.data.upgrades.sniper_unlock=1;save.data.upgrades.prism_unlock=1;save.data.upgrades.prism_spectrum=5;expect(u.isUnlocked("prism_overload")).toBe(false);
   save.data.upgrades.prism_spectrum=6;expect(u.isUnlocked("prism_overload")).toBe(true);
  });
  it("sanitizes locked loadouts, restores unlocked ones, and defaults new settings safely",()=>{
   const{storage,save}=scene();
-  save.data.loadouts[0].weapon="drone_shepherd";save.data.loadouts[1].weapon="prism_laser";save.save();
+  (save.data.loadouts[0] as {weapon:string}).weapon="drone_shepherd";(save.data.loadouts[1] as {weapon:string}).weapon="prism_laser";save.save();
   let loaded=new SaveManager(storage);
-  expect(loaded.data.loadouts.slice(0,2).map(l=>l.weapon)).toEqual(["pistol","pistol"]);
+  expect(loaded.data.loadouts.slice(0,2).map(l=>`${l.weapon}:${l.mutation}`)).toEqual(["pistol:null","pistol:null"]);
   save.data.upgrades.drone_unlock=1;save.data.upgrades.prism_unlock=1;save.data.settings.prismPatterns=false;save.save();
   loaded=new SaveManager(storage);
-  expect(loaded.data.loadouts.slice(0,2).map(l=>l.weapon)).toEqual(["drone_shepherd","prism_laser"]);
+  expect(loaded.data.loadouts.slice(0,2).map(l=>`${l.weapon}:${l.mutation}`)).toEqual(["pistol:drone_shepherd","sniper_rifle:chromatic_prism"]);
   expect(loaded.data.settings.prismPatterns).toBe(false);
   const legacy=loaded.data.settings as Partial<typeof loaded.data.settings>;delete legacy.prismPatterns;
   loaded.save();expect(new SaveManager(storage).data.settings.prismPatterns).toBe(true);
