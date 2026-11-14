@@ -144,6 +144,7 @@ export class LightRenderer {
   private wallCanvas: HTMLCanvasElement;
   private wallCtx: CanvasRenderingContext2D;
   private wallImage: ImageData | null = null;
+  private wallChunks = new Uint8Array(0);
   private dirtyX0 = 0;
   private dirtyY0 = 0;
   private dirtyX1 = -1;
@@ -289,7 +290,7 @@ export class LightRenderer {
 
     // 4) Light on walls, whole cells at a time.
     const wallsLit = this.updateWallLight(game);
-    if (wallsLit) game.terrain.drawCellOverlay(g, cam, this.wallCanvas);
+    if (wallsLit) game.terrain.drawCellOverlay(g, cam, this.wallCanvas, this.wallChunks);
 
     // 5) Multiply lightmap over the albedo scene -> unlit areas become dark,
     //    lit walls pop with warm color, occluded regions stay in shadow.
@@ -328,7 +329,7 @@ export class LightRenderer {
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       ctx.globalAlpha = LIGHT.wallScatter;
-      game.terrain.drawCellOverlay(ctx, cam, this.wallCanvas);
+      game.terrain.drawCellOverlay(ctx, cam, this.wallCanvas, this.wallChunks);
       ctx.restore();
     }
   }
@@ -372,6 +373,9 @@ export class LightRenderer {
       this.wallCanvas.width = world.width;
       this.wallCanvas.height = world.height;
     }
+    const chunkCount = game.terrain.chunks.cols * game.terrain.chunks.rows;
+    if (this.wallChunks.length !== chunkCount) this.wallChunks = new Uint8Array(chunkCount);
+    else this.wallChunks.fill(0);
     const data = this.wallImage.data;
     const W = world.width;
 
@@ -450,6 +454,8 @@ export class LightRenderer {
       data[p + 1] += lut[e + 1] * strength;
       data[p + 2] += lut[e + 2] * strength;
       data[p + 3] = 255;
+      const chunks = game.terrain.chunks;
+      this.wallChunks[Math.floor(cy / chunks.chunkSize) * chunks.cols + Math.floor(cx / chunks.chunkSize)] = 1;
       if (cx < this.dirtyX0) this.dirtyX0 = cx;
       if (cx > this.dirtyX1) this.dirtyX1 = cx;
       if (cy < this.dirtyY0) this.dirtyY0 = cy;

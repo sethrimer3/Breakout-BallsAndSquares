@@ -1130,10 +1130,11 @@ export class TerrainRenderer {
    * Draw a canvas holding one pixel per world cell with the exact chunk mapping of
    * `draw`, so each of its pixels covers the same screen pixels as that terrain cell.
    */
-  drawCellOverlay(ctx: CanvasRenderingContext2D, cam: CameraSystem, overlay: HTMLCanvasElement): void {
+  drawCellOverlay(ctx: CanvasRenderingContext2D, cam: CameraSystem, overlay: HTMLCanvasElement, activeChunks?: Uint8Array): void {
     const cs = this.chunks.chunkSize;
     ctx.imageSmoothingEnabled = false;
     this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      if (activeChunks && !activeChunks[ky * this.chunks.cols + kx]) return;
       ctx.drawImage(overlay, kx * cs, ky * cs, cs, cs, sx, sy, sw, sh);
     });
   }

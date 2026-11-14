@@ -172,6 +172,9 @@ export class LightingSystem {
   /** Shadow-traced ceiling panels, parallel to `world.roomLights` (null for washes and Blight glows). */
   fixtures: (FixtureLight | null)[] = [];
   private fixtureSource: RoomLight[] | null = null;
+  /** Spatial buckets contain only fixtures whose shadow radius reaches that bucket. */
+  private fixtureBuckets: FixtureLight[][] = [];
+  private readonly fixtureBucketCells = 32;
   private scratchPoly = new Float32Array(LIGHT.maxRays * 2);
   private scratchLit = makeLitCells();
 
@@ -187,8 +190,10 @@ export class LightingSystem {
     const cs = this.world.cellSize;
     const x = (cx + 0.5) * cs;
     const y = (cy + 0.5) * cs;
-    for (const f of this.fixtures) {
-      if (!f || f.dirty) continue;
+    const columns = Math.ceil(this.world.width / this.fixtureBucketCells);
+    const key = Math.floor(cy / this.fixtureBucketCells) * columns + Math.floor(cx / this.fixtureBucketCells);
+    for (const f of this.fixtureBuckets[key] ?? []) {
+      if (f.dirty) continue;
       const r = f.radius + cs;
       if (Math.abs(f.x - x) < r && Math.abs(f.y - y) < r) f.dirty = true;
     }
@@ -216,6 +221,15 @@ export class LightingSystem {
               dirty: true,
             },
       );
+      const unit = this.fixtureBucketCells * cs;
+      const columns = Math.ceil(w.width / this.fixtureBucketCells), rows = Math.ceil(w.height / this.fixtureBucketCells);
+      this.fixtureBuckets = Array.from({ length: columns * rows }, () => []);
+      for (const f of this.fixtures) if (f) {
+        const r = f.radius + cs;
+        const x0 = Math.max(0, Math.floor((f.x-r)/unit)), x1 = Math.min(columns-1, Math.floor((f.x+r)/unit));
+        const y0 = Math.max(0, Math.floor((f.y-r)/unit)), y1 = Math.min(rows-1, Math.floor((f.y+r)/unit));
+        for (let y=y0;y<=y1;y++) for (let x=x0;x<=x1;x++) this.fixtureBuckets[y*columns+x].push(f);
+      }
     }
     let budget = FACILITY.panelTracesPerFrame;
     const margin = FACILITY.panelRadiusCells * w.cellSize;
