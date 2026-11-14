@@ -151,6 +151,7 @@ export class TerrainRenderer {
   private edgeFire = document.createElement("canvas");
   private edgeFireLow = document.createElement("canvas");
   private edgeFireKey = "";
+  private edgeUnionKey = "";
   /** Per chunk: the edges of dormant Blight, drawn with a frozen, darkened fire. */
   private dormantMasks: (HTMLCanvasElement | null)[] = [];
   private dormantLive: Uint8Array;
@@ -158,6 +159,7 @@ export class TerrainRenderer {
   private dormantUnion = document.createElement("canvas");
   private dormantFire = document.createElement("canvas");
   private dormantFireKey = "";
+  private dormantUnionKey = "";
   /** True for a half-size subcell index whose colony has no living generator. */
   dormantAt: ((si: number) => boolean) | null = null;
   /** Subcell indices of every blinking status light and pulsing machine core. */
@@ -777,12 +779,15 @@ export class TerrainRenderer {
       }
     }
     this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0);
-    const outline = new Path2D();
-    const subs = cs * 2;
-    const edges = traceSurfaceOutline(world, kx * subs, ky * subs, subs, this.edgeSolid,
-      (x, y, width, height) => outline.rect(x, y, width, height));
-    this.surfaceOutlines[k] = edges ? outline : null;
-    this.buildEdgeMask(k, kx, ky);
+    if (this.chunks.geometryDirty[k]) {
+      const outline = new Path2D();
+      const subs = cs * 2;
+      const edges = traceSurfaceOutline(world, kx * subs, ky * subs, subs, this.edgeSolid,
+        (x, y, width, height) => outline.rect(x, y, width, height));
+      this.surfaceOutlines[k] = edges ? outline : null;
+      this.buildEdgeMask(k, kx, ky);
+      this.chunks.geometryDirty[k] = 0;
+    }
   }
 
   /** Albedo of a live half-size pixel, before relief shading. */
@@ -1034,7 +1039,11 @@ export class TerrainRenderer {
     if (key !== (frozen ? this.dormantFireKey : this.edgeFireKey)) {
       if (frozen) this.dormantFireKey = key;
       else this.edgeFireKey = key;
-      this.paintEdgeFire(masks, live, union, fire, kx0, ky0, kx1, ky1, w, h, frozen ? FROZEN_FIRE_TIME : seconds, shrink, frozen);
+      const maskKey = `${version}:${kx0}:${ky0}:${kx1}:${ky1}`;
+      const rebuildMask = maskKey !== (frozen ? this.dormantUnionKey : this.edgeUnionKey);
+      this.paintEdgeFire(masks, live, union, fire, kx0, ky0, kx1, ky1, w, h, frozen ? FROZEN_FIRE_TIME : seconds, shrink, frozen, rebuildMask);
+      if (frozen) this.dormantUnionKey = maskKey;
+      else this.edgeUnionKey = maskKey;
     }
     const smoothing = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
@@ -1059,21 +1068,25 @@ export class TerrainRenderer {
     seconds: number,
     shrink: number,
     frozen: boolean,
+    rebuildMask: boolean,
   ): void {
     const size = this.edgeImage.width;
     const cols = this.chunks.cols;
     if (union.width < w || union.height < h) {
       const cw = Math.max(union.width, Math.ceil(w / EDGE_CANVAS_STEP) * EDGE_CANVAS_STEP);
       const ch = Math.max(union.height, Math.ceil(h / EDGE_CANVAS_STEP) * EDGE_CANVAS_STEP);
+      rebuildMask = true;
       union.width = fire.width = cw;
       union.height = fire.height = ch;
     }
-    const u = union.getContext("2d")!;
-    u.clearRect(0, 0, union.width, union.height);
-    for (let ky = ky0; ky <= ky1; ky++) {
-      for (let kx = kx0; kx <= kx1; kx++) {
-        const k = ky * cols + kx;
-        if (live[k]) u.drawImage(masks[k]!, (kx - kx0) * size, (ky - ky0) * size);
+    if (rebuildMask) {
+      const u = union.getContext("2d")!;
+      u.clearRect(0, 0, union.width, union.height);
+      for (let ky = ky0; ky <= ky1; ky++) {
+        for (let kx = kx0; kx <= kx1; kx++) {
+          const k = ky * cols + kx;
+          if (live[k]) u.drawImage(masks[k]!, (kx - kx0) * size, (ky - ky0) * size);
+        }
       }
     }
     const f = fire.getContext("2d")!;
