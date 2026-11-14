@@ -127,6 +127,10 @@ export class LightRenderer {
   private lmCtx: CanvasRenderingContext2D;
   private layerCanvas: HTMLCanvasElement;
   private layerCtx: CanvasRenderingContext2D;
+  private maskState: {
+    terrain: Game["terrain"]; revision: number; x: number; y: number; zoom: number;
+    viewW: number; viewH: number; width: number; height: number; dpr: number;
+  } | null = null;
   private maskCanvas: HTMLCanvasElement;
   private maskCtx: CanvasRenderingContext2D;
   private vignetteCanvas: HTMLCanvasElement;
@@ -168,12 +172,21 @@ export class LightRenderer {
       }
     }
 
-    // Terrain silhouette, using the same draw as the albedo pass.
-    const mask = this.maskCtx;
-    mask.setTransform(1, 0, 0, 1, 0, 0);
-    mask.clearRect(0, 0, devW, devH);
-    mask.setTransform(dpr, 0, 0, dpr, 0, 0);
-    game.terrain.draw(mask, cam);
+    // Reuse the silhouette while the camera, device size and terrain artwork
+    // are unchanged. Pending chunk work invalidates it as each chunk is built.
+    const m = this.maskState, terrain = game.terrain;
+    if (!m || m.terrain !== terrain || m.revision !== terrain.renderRevision ||
+        m.x !== cam.x || m.y !== cam.y || m.zoom !== cam.zoom ||
+        m.viewW !== cam.viewW || m.viewH !== cam.viewH || m.dpr !== dpr ||
+        m.width !== devW || m.height !== devH) {
+      const mask = this.maskCtx;
+      mask.setTransform(1, 0, 0, 1, 0, 0);
+      mask.clearRect(0, 0, devW, devH);
+      mask.setTransform(dpr, 0, 0, dpr, 0, 0);
+      terrain.draw(mask, cam);
+      this.maskState = { terrain, revision: terrain.renderRevision, x: cam.x, y: cam.y,
+        zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: devW, height: devH, dpr };
+    }
 
     const g = this.lmCtx;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);

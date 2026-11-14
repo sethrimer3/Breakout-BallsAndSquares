@@ -128,6 +128,8 @@ function ledLevel(r: number, time: number): number {
  * nearest-neighbor sampling, so terrain stays crisp at any zoom.
  */
 export class TerrainRenderer {
+  /** Changes only when cached terrain artwork changes, for dependent raster caches. */
+  renderRevision = 0;
   readonly chunks: TerrainChunks;
   private canvases: HTMLCanvasElement[] = [];
   private surfaceOutlines: (Path2D | null)[] = [];
@@ -162,6 +164,9 @@ export class TerrainRenderer {
   private lights = new Int32Array(0);
   /** `TEX` texels per world cell: the lab's floors, under the terrain. */
   private floorCanvas: HTMLCanvasElement;
+  private floorRevision = 0;
+  private floorView = document.createElement("canvas");
+  private floorViewKey = "";
   /** Soft round light sprites (white and Blight pink) for the room lights. */
   private panelGlow: HTMLCanvasElement;
   private blightGlow: HTMLCanvasElement;
@@ -231,6 +236,7 @@ export class TerrainRenderer {
    * through dug-out rock.
    */
   private paintFloor(x0: number, y0: number, x1: number, y1: number): void {
+    this.floorRevision++;
     const w = this.world;
     x0 = Math.max(0, x0);
     y0 = Math.max(0, y0);
@@ -303,11 +309,35 @@ export class TerrainRenderer {
 
   /** Draw the lab floors. Call before `draw`, in the albedo pass. */
   drawFloor(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
-    const cs = this.chunks.chunkSize;
     ctx.imageSmoothingEnabled = false;
-    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
-      ctx.drawImage(this.floorCanvas, kx * cs * TEX, ky * cs * TEX, cs * TEX, cs * TEX, sx, sy, sw, sh);
-    });
+    const transform = ctx.getTransform();
+    // Main gameplay and the menu use an origin-aligned, uniform device scale.
+    // Keep the direct path for other transforms rather than changing their output.
+    const scale = transform.a;
+    const cacheable = scale > 0 && transform.d === scale && transform.b === 0 &&
+      transform.c === 0 && transform.e === 0 && transform.f === 0;
+    const direct = (target: CanvasRenderingContext2D): void => {
+      const cs = this.chunks.chunkSize;
+      this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+        target.drawImage(this.floorCanvas, kx * cs * TEX, ky * cs * TEX, cs * TEX, cs * TEX, sx, sy, sw, sh);
+      });
+    };
+    if (!cacheable) { direct(ctx); return; }
+    const key = [this.floorRevision, cam.x, cam.y, cam.zoom, cam.viewW, cam.viewH, scale].join(":");
+    if (key !== this.floorViewKey) {
+      const width = Math.max(1, Math.ceil(cam.viewW * scale));
+      const height = Math.max(1, Math.ceil(cam.viewH * scale));
+      if (this.floorView.width !== width) this.floorView.width = width;
+      if (this.floorView.height !== height) this.floorView.height = height;
+      const target = this.floorView.getContext("2d")!;
+      target.setTransform(1, 0, 0, 1, 0, 0);
+      target.clearRect(0, 0, width, height);
+      target.setTransform(scale, 0, 0, scale, 0, 0);
+      target.imageSmoothingEnabled = false;
+      direct(target);
+      this.floorViewKey = key;
+    }
+    ctx.drawImage(this.floorView, 0, 0, this.floorView.width / scale, this.floorView.height / scale);
   }
 
   /** Brightness (0..1) of a room light at wall-clock `t`; 0 when it is off or gone. */
@@ -554,6 +584,7 @@ export class TerrainRenderer {
   }
 
   private buildChunk(k: number): void {
+    this.renderRevision++;
     const { world } = this;
     const cs = this.chunks.chunkSize;
     const texCs = cs * TEX;
@@ -1049,6 +1080,17 @@ export class TerrainRenderer {
     f.setTransform(1, 0, 0, 1, 0, 0);
     f.globalCompositeOperation = "source-over";
     f.clearRect(0, 0, fire.width, fire.height);
+    // Clip procedural painting to occupied chunks, not the empty space between
+    // distant Blight patches. Keep world coordinates so noise remains seamless.
+    const clipChunks = (target: CanvasRenderingContext2D, worldSpace: boolean): void => {
+      target.beginPath();
+      for (let ky = ky0; ky <= ky1; ky++) for (let kx = kx0; kx <= kx1; kx++) {
+        if (live[ky * cols + kx]) target.rect((kx - (worldSpace ? 0 : kx0)) * size, (ky - (worldSpace ? 0 : ky0)) * size, size, size);
+      }
+      target.clip();
+    };
+    f.save();
+    clipChunks(f, false);
     // World-anchored: the fire stays put under the camera.
     const ox = kx0 * size;
     const oy = ky0 * size;
@@ -1061,7 +1103,10 @@ export class TerrainRenderer {
       if (low.height < lh) low.height = lh;
       const l = low.getContext("2d")!;
       l.setTransform(1 / shrink, 0, 0, 1 / shrink, -ox / shrink, -oy / shrink);
+      l.save();
+      clipChunks(l, true);
       paintPortal(l, box, seconds, EDGE_FIRE_RATIO);
+      l.restore();
       f.imageSmoothingEnabled = false;
       f.drawImage(low, 0, 0, lw, lh, 0, 0, lw * shrink, lh * shrink);
     } else {
@@ -1077,6 +1122,7 @@ export class TerrainRenderer {
     }
     f.globalCompositeOperation = "destination-in";
     f.drawImage(union, 0, 0);
+    f.restore();
     f.globalCompositeOperation = "source-over";
   }
 
