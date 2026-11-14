@@ -239,7 +239,7 @@ export class LightingSystem {
     const y1 = cam.screenToWorldY(cam.viewH) + margin;
     for (const f of this.fixtures) {
       if (budget <= 0) break;
-      if (!f || !f.dirty || f.x < x0 || f.x > x1 || f.y < y0 || f.y > y1) continue;
+      if (!f || f.light.destroyed || !f.dirty || f.x < x0 || f.x > x1 || f.y < y0 || f.y > y1) continue;
       budget--;
       f.dirty = false;
       const n = this.trace(

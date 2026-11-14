@@ -1,3 +1,4 @@
+import { WallLightFalloff } from "./WallLightFalloff";
 import { worldAtmosphere } from "../world/worldAtmosphere";
 import { GROWTH, LIGHT, SOLDIER_AMBIENT_STOPS } from "../config";
 import type { Game } from "../Game";
@@ -145,6 +146,7 @@ export class LightRenderer {
   private wallCtx: CanvasRenderingContext2D;
   private wallImage: ImageData | null = null;
   private wallChunks = new Uint8Array(0);
+  private readonly fixtureFalloff = new WallLightFalloff();
   private dirtyX0 = 0;
   private dirtyY0 = 0;
   private dirtyX1 = -1;
@@ -407,7 +409,7 @@ export class LightRenderer {
       if (f.x + f.radius < vx0 || f.y + f.radius < vy0 || f.x - f.radius > vx1 || f.y - f.radius > vy1) continue;
       const level = game.terrain.lightLevel(f.light, now);
       if (level <= 0.02) continue;
-      this.addWallLight(game, f.lit, f.x, f.y, f.radius, level, PANEL_LUTS[panelIndex(f.light.kind)]);
+      this.addWallLight(game, f.lit, f.x, f.y, f.radius, level, PANEL_LUTS[panelIndex(f.light.kind)], true);
     }
     const flashMult = game.muzzleFlashMultiplier;
     const flashLut = game.fieryMuzzleFlash ? FIERY_FLASH_LUT : FLASH_LUT;
@@ -438,17 +440,25 @@ export class LightRenderer {
     radius: number,
     strength: number,
     lut: Float32Array,
+    fixedFixture = false,
   ): void {
     const data = this.wallImage!.data;
     const W = game.world.width;
     const cs = game.world.cellSize;
+    const offsets = fixedFixture ? this.fixtureFalloff.get(lit,x,y,radius,W,cs,LUT_STEPS) : null;
     for (let i = 0; i < lit.count; i++) {
       const cell = lit.cells[i];
       const cx = cell % W;
       const cy = (cell - cx) / W;
-      const t = Math.hypot((cx + 0.5) * cs - x, (cy + 0.5) * cs - y) / radius;
-      if (t >= 1) continue;
-      const e = Math.floor(t * LUT_STEPS) * 3;
+      let e: number;
+      if (offsets) {
+        e = offsets[i];
+        if (e < 0) continue;
+      } else {
+        const t = Math.hypot((cx + 0.5) * cs - x, (cy + 0.5) * cs - y) / radius;
+        if (t >= 1) continue;
+        e = Math.floor(t * LUT_STEPS) * 3;
+      }
       const p = cell * 4;
       data[p] += lut[e] * strength;
       data[p + 1] += lut[e + 1] * strength;

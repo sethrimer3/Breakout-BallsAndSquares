@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { LightingSystem, type FixtureLight } from '../src/systems/LightingSystem';
 import { PixelWorld, LIGHT_KIND, type RoomLight } from '../src/world/PixelWorld';
 import { CameraSystem } from '../src/systems/CameraSystem';
@@ -38,4 +38,17 @@ describe('fixture shadow spatial index',()=>{
     w.health[32*w.width+32]=100;w.damage(32,32,1);
     expect(lights.fixtures.every(f=>!f||!f.dirty)).toBe(true);
   });
+});
+
+it('does not spend shadow-trace budget on destroyed fixtures',()=>{
+  const w=new PixelWorld({width:64,height:64,cellSize:8,roomSize:4});
+  w.roomLights=[{...panel(8,8),destroyed:true},panel(10,10)];
+  const lights=new LightingSystem(w),cam=new CameraSystem(w);
+  cam.x=cam.y=80;cam.viewW=cam.viewH=512;
+  const trace=vi.spyOn(lights as unknown as { trace: (...args:unknown[])=>number },'trace').mockReturnValue(0);
+  lights.updateFixtures(cam);expect(trace).toHaveBeenCalledTimes(1);
+  w.roomLights[1].destroyed=true;w.setCell(10,10,0);lights.updateFixtures(cam);
+  expect(trace).toHaveBeenCalledTimes(1);
+  w.roomLights=[panel(10,10)];lights.updateFixtures(cam);
+  expect(trace).toHaveBeenCalledTimes(2);
 });
