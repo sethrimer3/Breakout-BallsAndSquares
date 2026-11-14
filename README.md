@@ -176,3 +176,5 @@ The backdrop adapts to landscape/portrait screens, uses steady soldier lighting,
 ## Choosing a profile
 
 The main menu focuses on three profiles. Choose **Continue** or **Create Profile** to enter directly; number keys **1–3** provide quick selection. Each saved card shows its progress once, with no duplicate wallet bar or separate deploy/upgrade menu. A quiet Settings control in the header includes a profile selector for seed and speedrun settings. Deleting a profile requires explicit confirmation, and empty slots remain empty until created or configured. Keyboard Tab/Enter/Space use normal button navigation; gameplay shortcuts do not open the upgrade tree from the profile menu.
+
+Perimeter artwork is cached in visible 32-cell chunks and rebuilt after map generation. Off-screen fixtures skip wall-light accumulation. With Vite running, `node scripts/render-benchmark.cjs` measures warm perimeter CPU draw-submission times at interior, edge and overview camera positions; these are not total frame or GPU timings. `npx vitest run tests/boundaryRendering.test.ts` checks cache reuse and regeneration, and `npm run test:boundary-fog-browser` checks fog ordering.

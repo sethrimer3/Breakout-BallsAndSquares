@@ -382,8 +382,12 @@ export class LightRenderer {
       this.addWallLight(game, l.lit, l.x, l.y, l.radius, l.strength, l.warm ? FIRE_LUT : l.soldier ? SOLDIER_LUT : SOFT_LUT);
     }
     const now = performance.now() / 1000;
+    const cam = game.camera;
+    const vx0 = cam.screenToWorldX(0), vy0 = cam.screenToWorldY(0);
+    const vx1 = cam.screenToWorldX(cam.viewW), vy1 = cam.screenToWorldY(cam.viewH);
     for (const f of lighting.fixtures) {
       if (!f || !f.poly || f.lit.count === 0) continue;
+      if (f.x + f.radius < vx0 || f.y + f.radius < vy0 || f.x - f.radius > vx1 || f.y - f.radius > vy1) continue;
       const level = game.terrain.lightLevel(f.light, now);
       if (level <= 0.02) continue;
       this.addWallLight(game, f.lit, f.x, f.y, f.radius, level, PANEL_LUTS[panelIndex(f.light.kind)]);

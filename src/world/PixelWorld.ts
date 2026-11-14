@@ -197,6 +197,7 @@ export class PixelWorld implements SolidQuery {
   readonly blight: Uint8Array;
   /** Permanent perimeter layer: 0 = playable, 1..3 = wall, 255 = black void. */
   readonly boundary: Uint8Array;
+  boundaryRevision = 0;
   boundaryStone = false;
   boundaryThickness = 3;
   /** Per-cell special material (`MAT`). */

@@ -6,6 +6,7 @@ export const BOUNDARY_VOID = 255;
 
 /** Install after carving/fixtures. Gates retain their doors and a protected exit pocket. */
 export function installMapBoundary(w: PixelWorld): void {
+  w.boundaryRevision++;
   const f = w.labLayout?.frame;
   const ship = f?.def.environment === 'mothership';
   w.boundaryStone = f?.def.environment === 'forest' || f?.def.environment === 'city';
