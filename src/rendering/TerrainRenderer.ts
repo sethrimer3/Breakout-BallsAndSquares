@@ -1,3 +1,6 @@
+import { fogRegionVisible } from "./fogRegionVisible";
+import type { FogOfWar } from "../world/FogOfWar";
+import { SortedGridIndex } from "./SortedGridIndex";
 import { boundaryColor } from "../world/MapBoundary";
 import { traceSurfaceOutline } from "./surfaceOutline";
 import { COLORS, FACILITY, TERRAIN, TERRAIN as T, zoneForDepth } from "../config";
@@ -142,6 +145,7 @@ export class TerrainRenderer {
   /** Per chunk: a mask of its Blight edges, made the first time it has any. */
   private edgeMasks: (HTMLCanvasElement | null)[] = [];
   private edgeLive: Uint8Array;
+  private edgeVisibility: Uint8Array;
   private edgeBits: Uint8Array;
   private edgeSolid: Uint8Array;
   private edgeImage: ImageData;
@@ -164,6 +168,7 @@ export class TerrainRenderer {
   dormantAt: ((si: number) => boolean) | null = null;
   /** Subcell indices of every blinking status light and pulsing machine core. */
   private lights = new Int32Array(0);
+  private lightIndex: SortedGridIndex | null = null;
   /** `TEX` texels per world cell: the lab's floors, under the terrain. */
   private floorCanvas: HTMLCanvasElement;
   private floorRevision = 0;
@@ -190,6 +195,7 @@ export class TerrainRenderer {
     const edgeSize = subChunk * EDGE_PIXELS_PER_SUB;
     this.edgeMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
     this.edgeLive = new Uint8Array(n);
+    this.edgeVisibility = new Uint8Array(n);
     this.dormantMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
     this.dormantLive = new Uint8Array(n);
     this.edgeBits = new Uint8Array(edgeSize * edgeSize);
@@ -484,6 +490,7 @@ export class TerrainRenderer {
       if (subHealth[si] > 0 && (k === SUB.led || k === SUB.core)) found.push(si);
     }
     this.lights = Int32Array.from(found);
+    this.lightIndex = new SortedGridIndex(this.lights, this.world.subWidth, this.world.subHeight);
   }
 
   /**
@@ -504,32 +511,38 @@ export class TerrainRenderer {
     const t = still ? 0 : time;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    for (let n = 0; n < lights.length; n++) {
-      const si = lights[n];
-      const sx = si % sw;
-      const sy = (si - sx) / sw;
-      if (sx < x0 || sx > x1 || sy < y0 || sy > y1 || w.subHealth[si] === 0) continue;
-      const k = w.subKind[si];
-      const tint = w.subTint[si];
-      const r = tint & 63;
-      let level: number;
-      let c: RGB;
-      if (k === SUB.led) {
-        c = COLORS.labLed[tint >> 6];
-        level = still ? 0.8 : ledLevel(r, t);
-      } else if (k === SUB.core) {
-        c = COLORS.labCore[tint >> 6];
-        level = still ? 0.7 : 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * (1.2 + (r & 7) * 0.15) + (sx + sy) * 0.45 + (r >> 3)));
-      } else continue;
-      if (level <= 0.02) continue;
-      const lx = cam.worldToScreenX(sx * ss);
-      const ly = cam.worldToScreenY(sy * ss);
-      ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-      // Soft halo, then the lit pixel itself.
-      ctx.globalAlpha = level * (k === SUB.core ? 0.16 : 0.12);
-      ctx.fillRect(lx - px, ly - px, px * 3, px * 3);
-      ctx.globalAlpha = level;
-      ctx.fillRect(lx, ly, px, px);
+    const index = this.lightIndex!;
+    for (let row = Math.max(0, y0); row <= Math.min(w.subHeight-1, y1); row++) {
+      const rowStart = index.rows[row], rowEnd = index.rows[row+1];
+      if (rowStart === rowEnd) continue;
+      const start = index.lowerBound(row*sw+x0, rowStart, rowEnd);
+      const end = index.lowerBound(row*sw+x1+1, start, rowEnd);
+      for (let n = start; n < end; n++) {
+        const si = lights[n];
+        const sy = row, sx = si - row * sw;
+        if (w.subHealth[si] === 0) continue;
+        const k = w.subKind[si];
+        const tint = w.subTint[si];
+        const r = tint & 63;
+        let level: number;
+        let c: RGB;
+        if (k === SUB.led) {
+          c = COLORS.labLed[tint >> 6];
+          level = still ? 0.8 : ledLevel(r, t);
+        } else if (k === SUB.core) {
+          c = COLORS.labCore[tint >> 6];
+          level = still ? 0.7 : 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * (1.2 + (r & 7) * 0.15) + (sx + sy) * 0.45 + (r >> 3)));
+        } else continue;
+        if (level <= 0.02) continue;
+        const lx = cam.worldToScreenX(sx * ss);
+        const ly = cam.worldToScreenY(sy * ss);
+        ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+        // Soft halo, then the lit pixel itself.
+        ctx.globalAlpha = level * (k === SUB.core ? 0.16 : 0.12);
+        ctx.fillRect(lx - px, ly - px, px * 3, px * 3);
+        ctx.globalAlpha = level;
+        ctx.fillRect(lx, ly, px, px);
+      }
     }
     ctx.restore();
   }
@@ -996,10 +1009,20 @@ export class TerrainRenderer {
    * pixel size, cut to the edges and scaled up unsmoothed. It is anchored to the
    * world and emissive, so draw it after the lighting pass. `seconds` is wall clock.
    */
-  drawBlightEdges(ctx: CanvasRenderingContext2D, cam: CameraSystem, seconds: number): void {
+  drawBlightEdges(ctx: CanvasRenderingContext2D, cam: CameraSystem, seconds: number, fog?: FogOfWar): void {
+    let visible: Uint8Array | undefined;
+    if (fog) {
+      visible = this.edgeVisibility;
+      visible.fill(0);
+      const unit = this.chunks.chunkSize * this.world.cellSize;
+      this.forEachVisibleChunk(cam, (kx, ky) => {
+        const k = ky * this.chunks.cols + kx;
+        if ((this.edgeLive[k] || this.dormantLive[k]) && fogRegionVisible(fog,kx*unit,ky*unit,(kx+1)*unit,(ky+1)*unit)) visible![k] = 1;
+      });
+    }
     const shrink = cam.zoom < EDGE_FIRE_FULL_ZOOM ? 2 : 1;
-    this.drawEdgeLayer(ctx, cam, this.edgeMasks, this.edgeLive, this.edgeUnion, this.edgeFire, seconds, shrink, false);
-    this.drawEdgeLayer(ctx, cam, this.dormantMasks, this.dormantLive, this.dormantUnion, this.dormantFire, seconds, shrink, true);
+    this.drawEdgeLayer(ctx, cam, this.edgeMasks, this.edgeLive, this.edgeUnion, this.edgeFire, seconds, shrink, false, visible);
+    this.drawEdgeLayer(ctx, cam, this.dormantMasks, this.dormantLive, this.dormantUnion, this.dormantFire, seconds, shrink, true, visible);
   }
 
   /**
@@ -1016,6 +1039,7 @@ export class TerrainRenderer {
     seconds: number,
     shrink: number,
     frozen: boolean,
+    visible?: Uint8Array,
   ): void {
     const size = this.edgeImage.width;
     const cols = this.chunks.cols;
@@ -1024,7 +1048,7 @@ export class TerrainRenderer {
     let kx1 = -1;
     let ky1 = -1;
     this.forEachVisibleChunk(cam, (kx, ky) => {
-      if (!live[ky * cols + kx]) return;
+      if (!live[ky * cols + kx] || (visible && !visible[ky * cols + kx])) return;
       if (kx < kx0) kx0 = kx;
       if (ky < ky0) ky0 = ky;
       if (kx > kx1) kx1 = kx;
@@ -1048,7 +1072,7 @@ export class TerrainRenderer {
     const smoothing = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
     this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
-      if (!live[ky * cols + kx]) return;
+      if (!live[ky * cols + kx] || (visible && !visible[ky * cols + kx])) return;
       ctx.drawImage(fire, (kx - kx0) * size, (ky - ky0) * size, size, size, sx, sy, sw, sh);
     });
     ctx.imageSmoothingEnabled = smoothing;

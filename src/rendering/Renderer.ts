@@ -130,7 +130,7 @@ export class Renderer {
     this.creatureRenderer.draw(ctx, cam, game.creatures, this.motion.matches ? 0 : performance.now() / 1000);
     const wallClockMs = performance.now();
     const still = this.motion.matches;
-    game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);
+    game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000, game.devMapAccess ? undefined : game.fog);
     game.terrain.drawSurfaceOutlines(ctx, cam);
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
