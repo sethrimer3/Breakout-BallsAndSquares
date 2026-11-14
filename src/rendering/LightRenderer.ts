@@ -1,3 +1,4 @@
+import { ChunkRegions } from "./ChunkRegions";
 import { WallLightFalloff } from "./WallLightFalloff";
 import { worldAtmosphere } from "../world/worldAtmosphere";
 import { GROWTH, LIGHT, SOLDIER_AMBIENT_STOPS } from "../config";
@@ -146,6 +147,8 @@ export class LightRenderer {
   private wallCtx: CanvasRenderingContext2D;
   private wallImage: ImageData | null = null;
   private wallChunks = new Uint8Array(0);
+  private previousWallChunks = new Uint8Array(0);
+  private wallRegions: ChunkRegions | null = null;
   private readonly fixtureFalloff = new WallLightFalloff();
   private dirtyX0 = 0;
   private dirtyY0 = 0;
@@ -376,8 +379,13 @@ export class LightRenderer {
       this.wallCanvas.height = world.height;
     }
     const chunkCount = game.terrain.chunks.cols * game.terrain.chunks.rows;
-    if (this.wallChunks.length !== chunkCount) this.wallChunks = new Uint8Array(chunkCount);
-    else this.wallChunks.fill(0);
+    if (this.wallChunks.length !== chunkCount) {
+      this.wallChunks = new Uint8Array(chunkCount);
+      this.previousWallChunks = new Uint8Array(chunkCount);
+      this.wallRegions = new ChunkRegions(world.width,world.height,game.terrain.chunks.chunkSize);
+    }
+    this.previousWallChunks.set(this.wallChunks);
+    const regions = this.wallRegions!;
     const data = this.wallImage.data;
     const W = world.width;
 
@@ -386,9 +394,12 @@ export class LightRenderer {
     const prevY0 = this.dirtyY0;
     const prevX1 = this.dirtyX1;
     const prevY1 = this.dirtyY1;
-    for (let y = prevY0; y <= prevY1; y++) {
-      data.fill(0, (y * W + prevX0) * 4, (y * W + prevX1 + 1) * 4);
+    regions.update(this.previousWallChunks,undefined,prevX0,prevY0,prevX1,prevY1);
+    for(let i=0;i<regions.count;i++) {
+      const k=i*4,x=regions.rects[k],y=regions.rects[k+1],w=regions.rects[k+2],h=regions.rects[k+3];
+      for(let row=y;row<y+h;row++)data.fill(0,(row*W+x)*4,(row*W+x+w)*4);
     }
+    this.wallChunks.fill(0);
 
     this.dirtyX0 = W;
     this.dirtyY0 = world.height;
@@ -426,8 +437,10 @@ export class LightRenderer {
     const y0 = Math.min(prevY0, this.dirtyY0);
     const x1 = Math.max(prevX1, this.dirtyX1);
     const y1 = Math.max(prevY1, this.dirtyY1);
-    if (x1 >= x0 && y1 >= y0) {
-      this.wallCtx.putImageData(this.wallImage, 0, 0, x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+    regions.update(this.wallChunks,this.previousWallChunks,x0,y0,x1,y1);
+    for(let i=0;i<regions.count;i++) {
+      const k=i*4;
+      this.wallCtx.putImageData(this.wallImage,0,0,regions.rects[k],regions.rects[k+1],regions.rects[k+2],regions.rects[k+3]);
     }
     return this.dirtyX1 >= 0;
   }
