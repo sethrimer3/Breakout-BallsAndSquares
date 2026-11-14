@@ -36,7 +36,7 @@ function ridged(x: number, y: number): number {
 }
 
 /** Opaque grayscale noise, sampled on a torus so it tiles seamlessly. */
-export function portalNoiseTile(): Uint8ClampedArray {
+function generateNoiseTile(): Uint8ClampedArray {
   const d = new Uint8ClampedArray(TILE * TILE * 4), scale = 4;
   for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) {
     const a = (x / TILE) * Math.PI * 2, b = (y / TILE) * Math.PI * 2;
@@ -48,6 +48,13 @@ export function portalNoiseTile(): Uint8ClampedArray {
     d[i + 3] = 255;
   }
   return d;
+}
+
+let noisePixels: Uint8ClampedArray | null = null;
+/** Return an independent copy; callers cannot mutate the shared noise source. */
+export function portalNoiseTile(): Uint8ClampedArray {
+  noisePixels ??= generateNoiseTile();
+  return noisePixels.slice();
 }
 
 /** Scroll direction, speed (tiles' screen pixels a second), size and strength. */
@@ -65,23 +72,31 @@ const HOT = [255, 196, 70];
 // Each renderer keeps its patterns when a preview or another board draws.
 // Alternating contexts must not regenerate the tile on every frame.
 const patterns = new WeakMap<Ctx, { noise: CanvasPattern; hot: CanvasPattern }>();
+let sources: { noise: HTMLCanvasElement; hot: HTMLCanvasElement } | null = null;
+function sourceCanvases() {
+  if (sources) return sources;
+  const make = (hot: boolean) => {
+    const cv = document.createElement("canvas");
+    cv.width = cv.height = TILE;
+    const ctx = cv.getContext("2d")!;
+    const img = ctx.createImageData(TILE, TILE), d = portalNoiseTile();
+    if (hot) for (let i=0;i<d.length;i+=4) {
+      const k = Math.max(0, (d[i]/255 - 0.55)/0.45);
+      for (let j=0;j<3;j++) d[i+j] = Math.round(HOT[j]*k*k);
+    }
+    img.data.set(d);
+    ctx.putImageData(img,0,0);
+    return cv;
+  };
+  sources = { noise: make(false), hot: make(true) };
+  return sources;
+}
 function patternsFor(c: Ctx) {
   const cached = patterns.get(c);
   if (cached) return cached;
-  const make = (tint: (v: number, d: Uint8ClampedArray, i: number) => void) => {
-    const cv = document.createElement("canvas");
-    cv.width = cv.height = TILE;
-    const t = cv.getContext("2d")!;
-    const img = t.createImageData(TILE, TILE), d = portalNoiseTile();
-    for (let i = 0; i < d.length; i += 4) tint(d[i] / 255, d, i);
-    img.data.set(d);
-    t.putImageData(img, 0, 0);
-    return c.createPattern(cv, "repeat");
-  };
-  const noise = make(() => {}), hot = make((v, d, i) => {
-    const k = Math.max(0, (v - 0.55) / 0.45);
-    for (let j = 0; j < 3; j++) d[i + j] = Math.round(HOT[j] * k * k);
-  });
+  const source = sourceCanvases();
+  // Patterns retain independent transforms even though their source pixels are shared.
+  const noise = c.createPattern(source.noise,"repeat"), hot = c.createPattern(source.hot,"repeat");
   if (!noise || !hot) return null;
   const made = { noise, hot }; patterns.set(c, made); return made;
 }

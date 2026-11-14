@@ -11,7 +11,7 @@ export function fogAlpha(light: number): number {
 /**
  * Draws `FogOfWar` as one tiny canvas (one texel per fog tile), stretched over
  * the view with bilinear filtering. Only the on-screen tiles are rewritten
- * each frame, so the cost is a few thousand texels and a single drawImage.
+ * each frame; texture uploads occur only when their quantized opacity changes.
  */
 export class FogRenderer {
   private canvas: HTMLCanvasElement;
@@ -32,6 +32,7 @@ export class FogRenderer {
       px[i + 2] = b;
       px[i + 3] = 255;
     }
+    this.ctx.putImageData(this.img, 0, 0);
   }
 
   draw(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
@@ -47,12 +48,24 @@ export class FogRenderer {
     const light = fog.light;
     const px = this.img.data;
     const tw = fog.tw;
+    let dirtyX0 = fog.tw, dirtyY0 = fog.th, dirtyX1 = -1, dirtyY1 = -1;
     for (let y = ty0; y <= ty1; y++) {
       let i = y * tw + tx0;
       let p = i * 4 + 3;
-      for (let x = 0; x < w; x++, i++, p += 4) px[p] = fogAlpha(light[i]);
+      for (let x = 0; x < w; x++, i++, p += 4) {
+        const alpha = fogAlpha(light[i]);
+        if (px[p] === alpha) continue;
+        px[p] = alpha;
+        const tx = tx0 + x;
+        if (tx < dirtyX0) dirtyX0 = tx;
+        if (tx > dirtyX1) dirtyX1 = tx;
+        if (y < dirtyY0) dirtyY0 = y;
+        if (y > dirtyY1) dirtyY1 = y;
+      }
     }
-    this.ctx.putImageData(this.img, 0, 0, tx0, ty0, w, h);
+    if (dirtyX1 >= dirtyX0) {
+      this.ctx.putImageData(this.img, 0, 0, dirtyX0, dirtyY0, dirtyX1 - dirtyX0 + 1, dirtyY1 - dirtyY0 + 1);
+    }
 
     const sx = cam.worldToScreenX(tx0 * ts);
     const sy = cam.worldToScreenY(ty0 * ts);
