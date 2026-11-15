@@ -22,6 +22,7 @@ import { TIER_PAINT } from "./materials";
 import { FACILITY } from "../config";
 import { paletteColor, SPRITES } from "../ui/pixelArt";
 import type { Door } from "../world/PixelWorld";
+import { drawSpecialBlocks, drawSpecialGlow, drawSpecialNotice, drawSpecialPlinths } from "./SpecialUpgradeRenderer";
 
 /** Keycard colors by tier, as on the research-base upgrades. */
 const KEYCARD_COLORS = ["#3078ff", "#3078ff", "#ff2a2a", "#d65c12", "#8a6ad0", "#6aa040", "#d8c8a0"];
@@ -96,7 +97,7 @@ export class Renderer {
     game.terrain.drawFloor(ctx, cam);
     game.terrain.draw(ctx, cam, game.showChunkBorders);
     this.drawDoors();
-    this.drawUpgradeCaches();
+    drawSpecialPlinths(ctx, cam, game.world);
     const portal = game.labDef.teleporter, frame = game.world.labLayout?.frame;
     if (portal && frame) {
       const at = sectorSpawnCell(frame, portal.sector);
@@ -132,6 +133,7 @@ export class Renderer {
     const still = this.motion.matches;
     game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000, game.devMapAccess ? undefined : game.fog);
     game.terrain.drawSurfaceOutlines(ctx, cam);
+    drawSpecialBlocks(ctx, cam, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
@@ -151,6 +153,7 @@ export class Renderer {
     ctx.globalCompositeOperation = "lighter";
     this.drawBlightCorePulses();
     this.drawLoot();
+    drawSpecialGlow(ctx, cam, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
     this.drawGrowthPulses();
     if (fiery) this.fieryFlash.drawHotPixels(ctx, game);
     else this.drawMuzzleFlares();
@@ -173,6 +176,7 @@ export class Renderer {
     game.late.drawOverlay(ctx, cam);
     this.drawAimIndicator();
     this.drawGateNotice();
+    drawSpecialNotice(ctx, cam, game.specialNotice, game.runStats.time);
 
     this.lightRenderer.renderVignette(ctx, w, h);
   }
@@ -396,32 +400,6 @@ export class Renderer {
       else col = (ry >> 1) & 1 ? "#4a4e58" : "#585d68";
       ctx.fillStyle = col;
       ctx.fillRect(sx, sy, ex - sx, ey - sy);
-    }
-  }
-
-  /** Sealed caches marking where special upgrades will be: a dark plinth with a muted gold diamond. */
-  private drawUpgradeCaches(): void {
-    const { ctx, game } = this;
-    const w = game.world;
-    const cam = game.camera;
-    const cs = w.cellSize;
-    for (const spot of w.upgradeSpots) {
-      const x = cam.worldToScreenX((spot.cx + 0.5) * cs);
-      const y = cam.worldToScreenY((spot.cy + 0.5) * cs);
-      const r = cs * 1.5 * cam.zoom;
-      if (x < -r || y < -r || x > cam.viewW + r || y > cam.viewH + r) continue;
-      const u = Math.max(1, Math.round(r / 6));
-      ctx.fillStyle = "#101114";
-      ctx.fillRect(Math.round(x - r), Math.round(y - r), Math.round(r * 2), Math.round(r * 2));
-      ctx.fillStyle = "#2a2b30";
-      ctx.fillRect(Math.round(x - r + u), Math.round(y - r + u), Math.round(r * 2 - u * 2), Math.round(r * 2 - u * 2));
-      for (let k = -3; k <= 3; k++) {
-        const half = (3 - Math.abs(k)) * u + u / 2;
-        ctx.fillStyle = Math.abs(k) === 3 ? "#5e4a1e" : "#9c7a30";
-        ctx.fillRect(Math.round(x - half), Math.round(y + k * u - u / 2), Math.round(half * 2), u);
-      }
-      ctx.fillStyle = "#101114";
-      ctx.fillRect(Math.round(x - u / 2), Math.round(y - u / 2), u, u);
     }
   }
 
