@@ -167,18 +167,25 @@ export function resetBulletFields(b: Bullet): void {
 export class BulletPool {
   readonly items: Bullet[];
   activeCount = 0;
+  /** No free slot precedes this cursor when callers use release/clear. */
+  private firstFree = 0;
+  private readonly slots = new WeakMap<Bullet, number>();
 
   constructor(size: number) {
     this.items = new Array(size);
-    for (let i = 0; i < size; i++) this.items[i] = new Bullet();
+    for (let i = 0; i < size; i++) {
+      this.items[i] = new Bullet();
+      this.slots.set(this.items[i], i);
+    }
   }
 
   acquire(): Bullet | null {
     const items = this.items;
-    for (let i = 0; i < items.length; i++) {
+    for (let i = this.firstFree; i < items.length; i++) {
       if (!items[i].active) {
         items[i].active = true;
         this.activeCount++;
+        this.firstFree = i + 1;
         return items[i];
       }
     }
@@ -189,11 +196,14 @@ export class BulletPool {
     if (b.active) {
       b.active = false;
       this.activeCount--;
+      const slot = this.slots.get(b);
+      if (slot !== undefined && slot < this.firstFree) this.firstFree = slot;
     }
   }
 
   clear(): void {
     for (const b of this.items) b.active = false;
     this.activeCount = 0;
+    this.firstFree = 0;
   }
 }
