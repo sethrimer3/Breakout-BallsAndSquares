@@ -300,7 +300,7 @@ describe("Overcharge Conductor — Assault Rifle branch 1", () => {
     save.data.bank = 10000;
     save.data.essence = 600;
     save.data.lifetimePixels = 10000;
-    save.data.lab.worlds[3] = { discovered: [0], conquered: [0], cleared: ["0:soldier:0"], gathered: [], spawn: 0 };
+    save.data.lab.worlds[3] = { discovered: [0], conquered: [0], cleared: ["0:soldier:0"], gathered: [], specials: [], spawn: 0 };
     unlockTabs(save);
     save.save();
 

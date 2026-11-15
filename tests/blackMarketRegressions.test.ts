@@ -78,7 +78,7 @@ describe("Bug 2: Reload does not restore spent Black Market Essence", () => {
 
     // Simulate a legitimately cleared late-world encounter in world 3 (tier 8).
     const tier8Essence = CAMPAIGN[campaignTier(8)].essence;
-    save.data.lab.worlds[3] = { discovered: [0], conquered: [0], cleared: ["0:soldier:0"], gathered: [], spawn: 0 };
+    save.data.lab.worlds[3] = { discovered: [0], conquered: [0], cleared: ["0:soldier:0"], gathered: [], specials: [], spawn: 0 };
     save.data.essence = tier8Essence;
     save.save();
 

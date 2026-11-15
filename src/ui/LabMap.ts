@@ -299,14 +299,17 @@ export class LabMap {
     if (this.def.teleporter?.sector === s) {
       g.fillStyle = "#6bfff0"; g.fillRect(THUMB_SIZE/2-u*2, THUMB_SIZE/2-u*2, u*4, u*4);
     }
+    const collected = this.game.save.data.lab.worlds[this.def.id]?.specials ?? [];
     for (const spot of this.def.upgrades) {
       if (upgradeSpotSector(this.def, spot) !== s) continue;
+      // Collected specials leave a dim, hollow diamond.
+      const taken = collected.includes(spot.id);
       const at = upgradeSpotCell(frame, spot);
       const x = Math.round((at.cx - b.x0 + 0.5) * k);
       const y = Math.round((at.cy - b.y0 + 0.5) * k);
       g.fillStyle = "#05070d";
       for (let i = -4; i <= 4; i++) g.fillRect(x - (4 - Math.abs(i) + 1) * u, y + i * u - u / 2, (4 - Math.abs(i) + 1) * 2 * u, u);
-      g.fillStyle = "#b8923a";
+      g.fillStyle = taken ? "#4a3b1a" : "#e0ac2a";
       for (let i = -3; i <= 3; i++) g.fillRect(x - (3 - Math.abs(i) + 0.5) * u, y + i * u - u / 2, (3 - Math.abs(i) + 0.5) * 2 * u, u);
       g.fillStyle = "#05070d";
       for (let i = -1; i <= 1; i++) g.fillRect(x - (1 - Math.abs(i) + 0.5) * u, y + i * u - u / 2, (1 - Math.abs(i) + 0.5) * 2 * u, u);

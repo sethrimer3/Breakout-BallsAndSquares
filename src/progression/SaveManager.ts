@@ -157,12 +157,14 @@ export interface LabWorldProgress {
   spawn: number;
   cleared: string[];
   gathered: string[];
+  /** Special-upgrade blocks shattered and absorbed in this world. */
+  specials: string[];
 }
 
 /** Fresh progress for lab world `id`: only its starting sector is known and safe. */
 export function freshLabWorld(id: number): LabWorldProgress {
   const start = LAB_WORLDS[id].start;
-  return { discovered: [start], conquered: [start], spawn: start, cleared: [], gathered: [] };
+  return { discovered: [start], conquered: [start], spawn: start, cleared: [], gathered: [], specials: [] };
 }
 
 function defaultLab(): SaveData["lab"] {
@@ -225,7 +227,7 @@ function sanitizeLabWorld(v: unknown, id: number): LabWorldProgress {
   const conquered = sectorList(w.conquered, id).filter((s) => discovered.includes(s));
   const spawn = typeof w.spawn === "number" && conquered.includes(w.spawn) ? w.spawn : LAB_WORLDS[id].start;
   const ids = (v: unknown): string[] => Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && x.length < 80))].slice(0,5000) : [];
-  return { discovered, conquered, spawn, cleared: ids(w.cleared), gathered: ids(w.gathered) };
+  return { discovered, conquered, spawn, cleared: ids(w.cleared), gathered: ids(w.gathered), specials: ids(w.specials) };
 }
 
 function finiteNonNeg(v: unknown, fallback = 0, max = 1e12): number {

@@ -20,6 +20,7 @@ import { TerrainRenderer } from "./rendering/TerrainRenderer";
 import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { CombinedTargets, RoomFixtures } from "./systems/RoomFixtures";
+import { SpecialUpgradeSystem } from "./systems/SpecialUpgrades";
 import { FireSystem } from "./systems/FireSystem";
 import { Input } from "./systems/Input";
 import { LightingSystem, makeLitCells, type LitCells, type MuzzleLight } from "./systems/LightingSystem";
@@ -73,6 +74,8 @@ export class Game {
   readonly physics: PhysicsSystem;
   readonly combat: CombatSystem;
   readonly fixtures: RoomFixtures;
+  /** Glowing gold special-upgrade blocks and the motes they burst into. */
+  readonly specials: SpecialUpgradeSystem;
   readonly late: LateEncounters;
   /** Flamethrower flames and burning rubble. */
   readonly fire: FireSystem;
@@ -165,6 +168,8 @@ export class Game {
   private labCheckT = 0;
   /** The "access needed" notice over a locked world gate (run seconds it started), or null. */
   gateNotice: { door: Door; t0: number } | null = null;
+  /** "Special Upgrade Acquired" banner over the soldier who absorbed one (run seconds it started), or null. */
+  specialNotice: { soldier: Soldier; t0: number } | null = null;
   /** Recent shots on locked gates (run seconds), for when to show the notice. */
   private gateHits: number[] = [];
   /** True while the iris is closing to carry the squad through a gate. */
@@ -235,6 +240,7 @@ export class Game {
         this.creatures.explode(x, y, radius, damage);
         this.fixtures.explode(x, y, radius);
         this.late.explode(x, y, radius, damage);
+        this.specials.explode(x, y, radius);
         this.audio.playGoo("burst", x, y);
         this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.2, radius, 0xff963c, 8);
       },
@@ -331,7 +337,26 @@ export class Game {
       }
       this.audio.playDestroy(a.x, a.y);
     }, (soldier, damage, x, y) => this.hurtSoldier(soldier, damage, x, y), (x, y) => this.audio.playSpore(x, y));
-    this.combat.targets = new CombinedTargets([this.creatures, this.fixtures, this.late]);
+    this.specials = new SpecialUpgradeSystem(this.world, () => this.soldiers, {
+      onHit: (_b, x, y) => {
+        this.audio.playImpact(x, y);
+        for (let i = 0; i < 6; i++) {
+          const a = this.rng.range(0, Math.PI * 2), sp = this.rng.range(30, 90);
+          this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.1, 0.25), 1, i % 2 ? 0xffd75a : 0xfff1b0, 6);
+        }
+      },
+      onShatter: (b) => {
+        const x = (b.x0 + b.x1) / 2, y = (b.y0 + b.y1) / 2;
+        this.audio.playGlassShatter(x, y);
+        this.audio.playDestroy(x, y);
+        this.addScreenShake(5);
+        this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.18, 26, 0xffd75a, 1);
+        this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.32, 16, 0xfff1b0, 1);
+      },
+      onMoteAbsorbed: (s) => this.audio.playPickup(s.x, s.y),
+      onAbsorbed: (id, s) => this.grantSpecialUpgrade(id, s),
+    }, () => this.rng.next());
+    this.combat.targets = new CombinedTargets([this.creatures, this.fixtures, this.late, this.specials]);
     this.combat.late = this.late;
     this.camera = new CameraSystem(this.world);
     this.audio.setCamera(this.camera);
@@ -1378,6 +1403,7 @@ export class Game {
     if (!visualOnly && damage > 0) {
       this.creatures.explode(x, y, radiusWorld, damage);
       this.late.explode(x, y, radiusWorld, damage);
+      this.specials.explode(x, y, radiusWorld);
     }
     this.fixtures.explode(x, y, radiusWorld);
     this.audio.playDestroy(x, y);
@@ -1647,11 +1673,33 @@ export class Game {
     this.late.reset(this.labSave.cleared, this.labSave.gathered);
     this.labProgress.attachThreats(this.late.actors);
     this.fixtures.reset();
+    this.specials.reset(this.labSave.specials);
+    this.specialNotice = null;
     this.glass.reset();
     this.doors.reset();
     this.sentries.reset();
     this.creatures.reset();
     this.applyFacilityStats();
+  }
+
+  /**
+   * Every gold mote from a special-upgrade block reached its soldier: record
+   * it so the block stays gone, and celebrate. What each special upgrade does
+   * is still to be designed; this is where its effect will be applied.
+   */
+  private grantSpecialUpgrade(id: string, soldier: Soldier): void {
+    const list = this.labSave.specials;
+    if (!list.includes(id)) {
+      list.push(id);
+      this.save.save();
+    }
+    this.specialNotice = { soldier, t0: this.runStats.time };
+    this.audio.playPurchase(soldier.x, soldier.y);
+    for (let i = 0; i < 28; i++) {
+      const a = (i / 28) * Math.PI * 2, sp = this.rng.range(70, 130);
+      this.particles.spawn(PKind.Spark, soldier.x, soldier.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.25, 0.45), 1, i % 2 ? 0xffd75a : 0xfff1b0, 5);
+    }
+    this.particles.spawn(PKind.Burst, soldier.x, soldier.y, 0, 0, 0.3, 20, 0xffd75a, 1);
   }
 
   /** Keycards and sentry upgrades from the research-base tree. */
@@ -1867,6 +1915,7 @@ export class Game {
     this.creatures.update(dt, this.runStats.time, this.soldiers, this.growth);
     this.doors.update(dt);
     this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
+    this.specials.update(dt);
     this.updateFog(dt);
     if (!this.labDef.framework) this.growth.update(dt, this.runStats.time, this.soldiers);
     this.growthRate = this.growth.rate;
