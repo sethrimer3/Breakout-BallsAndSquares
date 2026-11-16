@@ -30,6 +30,10 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     if (!segment.active) continue;
     const x1=cam.worldToScreenX(segment.x1);const y1=cam.worldToScreenY(segment.y1);
     const x2=cam.worldToScreenX(segment.x2);const y2=cam.worldToScreenY(segment.y2);
+    // Preserve crossing beams and the reflection marker beyond the endpoint.
+    const pad = 5 + Math.max(1.5, cam.zoom * (0.8 + segment.band * 0.13));
+    if (Math.max(x1, x2) < -pad || Math.min(x1, x2) > cam.viewW + pad ||
+        Math.max(y1, y2) < -pad || Math.min(y1, y2) > cam.viewH + pad) continue;
     ctx.globalAlpha=reduced?0.85:Math.min(1,segment.life/PRISM.visualLife);
     ctx.strokeStyle=PRISM.colors[segment.band];
     ctx.lineWidth=Math.max(1.5,cam.zoom*(0.8+segment.band*0.13));

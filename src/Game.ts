@@ -2308,9 +2308,13 @@ export class Game {
     this.updateScreenShake(real);
     this.transition.update(real);
     const t1 = performance.now();
-    this.updateFlashPolygons();
-    this.terrain.update();
-    this.renderer.draw();
+    // The opaque menu has its own gameplay backdrop and animation loop.
+    // Resume all game rendering/shadow work on the first frame after it closes.
+    if (!this.mainMenu.visible) {
+      this.updateFlashPolygons();
+      this.terrain.update();
+      this.renderer.draw();
+    }
     const fireMix = this.paused || this.runOver ? { gain: 0, pan: 0 } : fireAmbienceMix(this.fire, this.world, this.camera);
     this.audio.updateFireAmbience(fireMix.gain, fireMix.pan);
     this.hud.update(this, now);

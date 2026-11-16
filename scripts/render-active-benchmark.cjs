@@ -81,6 +81,10 @@ const destination = process.env.BREACH_REPORT || '/tmp/breach-active-render-repo
      beam(-100,-100,-50,-50);g.combat.rail.beams.items.find(b=>b.active).life=.23;
      for(const reduced of [false,true])compare('offscreen-rail-frost-'+z+'-'+reduced,()=>oldWeapons(ctx,g,reduced),()=>newWeapons(ctx,g,reduced));
      g.combat.rail.clear();freeze.clear();
+     const prism=(x1,y1,x2,y2)=>Object.assign(g.combat.laser.segments.acquire(),{x1:c.screenToWorldX(x1),y1:c.screenToWorldY(y1),x2:c.screenToWorldX(x2),y2:c.screenToWorldY(y2),band:2,life:.1,reflected:true});
+     prism(-100,c.viewH/2,c.viewW+100,c.viewH/2);prism(-100,-20,-2,c.viewH/2);prism(-2000,-2000,-1900,-1900);
+     for(const reduced of [false,true])compare('prism-crossing-marker-'+z+'-'+reduced,()=>oldWeapons(ctx,g,reduced),()=>newWeapons(ctx,g,reduced));
+     g.combat.laser.clear();
     }
     // Mask invalidation follows rebuilt chunks, including budgeted publication.
     c.zoom=1.13;c.x=origin.x;c.y=origin.y;

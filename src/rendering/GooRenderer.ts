@@ -9,8 +9,11 @@ export function drawGoo(ctx: CanvasRenderingContext2D, cam: CameraSystem, goo: G
     if (!orb.active) continue;
     const x = cam.worldToScreenX(orb.x);
     const y = cam.worldToScreenY(orb.y);
-    if (x < -32 || y < -32 || x > cam.viewW + 32 || y > cam.viewH + 32) continue;
     const radius = Math.max(1.5, 3.5 * Math.sqrt(orb.mass) * cam.zoom);
+    // Spring points are bounded by [-1.7, 2.5] × [-1.7, 1.7]. Their
+    // rotated convex hull, not the collision center, determines visibility.
+    const pad = radius * 3.1 + Math.max(1, cam.zoom) + 1;
+    if (x < -pad || y < -pad || x > cam.viewW + pad || y > cam.viewH + pad) continue;
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(orb.body.angle);
@@ -46,9 +49,10 @@ export function drawGoo(ctx: CanvasRenderingContext2D, cam: CameraSystem, goo: G
     if (!mine.active) continue;
     const x = cam.worldToScreenX(mine.x);
     const y = cam.worldToScreenY(mine.y);
-    if (x < -32 || y < -32 || x > cam.viewW + 32 || y > cam.viewH + 32) continue;
-    const charge = 1 - Math.max(0, Math.min(1, mine.fuse / mine.maxFuse));
     const radius = Math.max(1.5, 2 * Math.sqrt(mine.mass / GOO.massPerMine) * cam.zoom);
+    const pad = Math.max(radius * 2.5, radius + 3) + Math.max(1, cam.zoom) + 1;
+    if (x < -pad || y < -pad || x > cam.viewW + pad || y > cam.viewH + pad) continue;
+    const charge = 1 - Math.max(0, Math.min(1, mine.fuse / mine.maxFuse));
     ctx.save();
     ctx.translate(x, y);
     ctx.rotate(Math.atan2(mine.normalY, mine.normalX));

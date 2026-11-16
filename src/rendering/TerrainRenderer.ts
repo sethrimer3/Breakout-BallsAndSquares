@@ -1,3 +1,5 @@
+import { FloorRegions } from "./FloorRegions";
+import { visibleRoomLightIndices } from "./RoomLightIndex";
 import { fogRegionVisible } from "./fogRegionVisible";
 import type { FogOfWar } from "../world/FogOfWar";
 import { SortedGridIndex } from "./SortedGridIndex";
@@ -174,6 +176,7 @@ export class TerrainRenderer {
   /** `TEX` texels per world cell: the lab's floors, under the terrain. */
   private floorCanvas: HTMLCanvasElement;
   private floorRevision = 0;
+  private readonly floorRegions: FloorRegions;
   private floorView = document.createElement("canvas");
   private floorViewKey = "";
   /** Soft round light sprites (white and Blight pink) for the room lights. */
@@ -184,6 +187,7 @@ export class TerrainRenderer {
 
   constructor(private world: PixelWorld, chunkSize: number) {
     this.chunks = new TerrainChunks(world, chunkSize);
+    this.floorRegions = new FloorRegions(world.width, world.height);
     const n = this.chunks.cols * this.chunks.rows;
     const subChunk = chunkSize * 2;
     this.surfaceOutlines = new Array<Path2D | null>(n).fill(null);
@@ -219,7 +223,7 @@ export class TerrainRenderer {
         this.glowCanvas.getContext("2d")!.clearRect(cx, cy, 1, 1);
       }
       // Walls coming down (or Blight filling in) move the floor's contact shadows.
-      if (kind !== "damaged") this.paintFloor(cx - 1, cy - 1, cx + 1, cy + 1);
+      if (kind !== "damaged") this.floorRegions.mark(cx - 1, cy - 1, cx + 1, cy + 1);
     });
   }
 
@@ -235,6 +239,7 @@ export class TerrainRenderer {
 
   /** Paint every lab floor. */
   private buildFloor(): void {
+    this.floorRegions.clear();
     this.paintFloor(0, 0, this.world.width - 1, this.world.height - 1);
   }
 
@@ -319,6 +324,7 @@ export class TerrainRenderer {
 
   /** Draw the lab floors. Call before `draw`, in the albedo pass. */
   drawFloor(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
+    this.flushFloor();
     ctx.imageSmoothingEnabled = false;
     const transform = ctx.getTransform();
     // Main gameplay and the menu use an origin-aligned, uniform device scale.
@@ -398,7 +404,7 @@ export class TerrainRenderer {
     const z = cam.zoom;
     g.save();
     g.globalCompositeOperation = "lighter";
-    for (let n = 0; n < lights.length; n++) {
+    for (const n of visibleRoomLightIndices(w, cam)) {
       const l = lights[n];
       // Panels already drawn with shadows (LightRenderer) skip the flat pool.
       if (shadowed?.[n]?.poly) continue;
@@ -450,7 +456,8 @@ export class TerrainRenderer {
     const z = cam.zoom;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    for (const l of w.roomLights) {
+    for (const n of visibleRoomLightIndices(w, cam)) {
+      const l = w.roomLights[n];
       if (l.kind === LIGHT_KIND.wash || l.kind === LIGHT_KIND.blight) continue;
       if (l.x1 < vx0 || l.y1 < vy0 || l.x0 > vx1 || l.y0 > vy1) continue;
       const level = this.lightLevel(l, time, still);
@@ -1188,6 +1195,7 @@ export class TerrainRenderer {
    * for the lab map's sector pictures; chunks must already be built.
    */
   drawRegion(ctx: CanvasRenderingContext2D, x0: number, y0: number, w: number, h: number): void {
+    this.flushFloor();
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.floorCanvas, x0 * TEX, y0 * TEX, w * TEX, h * TEX, 0, 0, w * TEX, h * TEX);
     const cs = this.chunks.chunkSize;
@@ -1202,7 +1210,12 @@ export class TerrainRenderer {
     }
   }
 
+  private flushFloor(): void {
+    this.floorRegions.flush((x0, y0, x1, y1) => this.paintFloor(x0, y0, x1, y1));
+  }
+
   update(): void {
+    this.flushFloor();
     this.chunks.take(TERRAIN.chunkRebuildBudget, this.scratch);
     this.rebuiltLastFrame = this.scratch.length;
     for (const k of this.scratch) this.buildChunk(k);

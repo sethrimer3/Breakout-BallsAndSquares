@@ -7,10 +7,11 @@ try{
  const context=await browser.newContext({viewport:{width:1440,height:900}});const page=await context.newPage();page.setDefaultTimeout(15000);
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(process.env.BREACH_BASE_URL||'http://127.0.0.1:5173');await page.locator('[data-act="play"]').waitFor({state:'visible'});
+ await page.evaluate(()=>{const g=window.__game;window.__menuRenderWork={draw:0,shadows:0,chunks:0};for(const [object,key,label]of [[g.renderer,'draw','draw'],[g,'updateFlashPolygons','shadows'],[g.terrain,'update','chunks']]){const original=object[key];object[key]=function(...args){window.__menuRenderWork[label]++;return original.apply(this,args)}}});
  const snapshot=()=>page.evaluate(()=>{const g=window.__game,b=g.mainMenu.background,d=b.demo;
   return{shots:d.shots,destroyed:d.destroyed,time:d.time,generation:d.generation,cores:d.world.blightCores.filter(c=>c.alive).length,soldiers:d.soldiers.filter(s=>s.alive).length,rooms:d.rooms.length,world:[d.world.width,d.world.height],canvas:[b.canvas.width,b.canvas.height],profile:JSON.stringify(g.save.data),runTime:g.runStats.time,speedrun:g.save.data.speedrun.elapsedMs};});
  const before=await snapshot();await page.waitForFunction(()=>{const d=window.__game.mainMenu.background.demo;return d.shots>=20&&d.destroyed>0;});
- const live=await snapshot();assert.ok(live.rooms>=4&&live.cores>=1);assert.equal(live.runTime,0);assert.equal(live.speedrun,0);assert.equal(live.profile,before.profile);
+ const live=await snapshot();assert.deepEqual(await page.evaluate(()=>window.__menuRenderWork),{draw:0,shadows:0,chunks:0},'Opaque main menu must not render the hidden game');assert.ok(live.rooms>=4&&live.cores>=1);assert.equal(live.runTime,0);assert.equal(live.speedrun,0);assert.equal(live.profile,before.profile);
 
  // Simulate a long menu session using the same fixed steps; no saves/rewards/timer may change.
  const long=await page.evaluate(()=>{const g=window.__game,d=g.mainMenu.background.demo;const saved=JSON.stringify(g.save.data);
@@ -46,6 +47,7 @@ try{
  assert.equal(await page.evaluate(()=>document.activeElement?.classList.contains('profile-open')),true,'Tab must navigate profile cards');
  // Clicking a profile now creates/opens it directly, with no second deploy button.
  await page.getByRole('button',{name:'Create Profile 1',exact:true}).click();
+ await page.waitForFunction(()=>window.__game.renderer.lightRenderer.maskState!==null);
  assert.equal(await page.evaluate(()=>window.__game.save.activeSlot),1);
  assert.equal(await page.evaluate(()=>window.__game.mainMenu.visible),false);
  await page.keyboard.press('Space');assert.equal(await page.evaluate(()=>window.__game.paused),true);

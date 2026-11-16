@@ -1,3 +1,5 @@
+import { LightRegion, type ScreenRect } from "./LightRegion";
+import { visibleRoomLightIndices } from "./RoomLightIndex";
 import { ChunkRegions } from "./ChunkRegions";
 import { WallLightFalloff } from "./WallLightFalloff";
 import { worldAtmosphere } from "../world/worldAtmosphere";
@@ -139,6 +141,13 @@ export class LightRenderer {
   private softener = new CanvasSoftener(SOFT_SHADOWS);
   /** Set per frame from the visual setting. */
   private softShadows = false;
+  private readonly layerRegion = new LightRegion();
+  private previousLayerRegion: ScreenRect | null = null;
+  private fixtureView: readonly number[] | null = null;
+  private fixtureViewChanged = true;
+  private readonly fixturePaths = new WeakMap<Float32Array, {
+    count: number; screen: Path2D; x: number; y: number; zoom: number; w: number; h: number;
+  }>();
   private vigW = 0;
   private vigH = 0;
 
@@ -167,6 +176,9 @@ export class LightRenderer {
   renderLighting(ctx: CanvasRenderingContext2D, game: Game, dpr: number): void {
     const cam = game.camera;
     this.softShadows = game.softShadows;
+    const view = this.fixtureView;
+    this.fixtureViewChanged = !view || view[0] !== cam.x || view[1] !== cam.y || view[2] !== cam.zoom || view[3] !== cam.viewW || view[4] !== cam.viewH;
+    if (this.fixtureViewChanged) this.fixtureView = [cam.x, cam.y, cam.zoom, cam.viewW, cam.viewH];
     const viewW = Math.max(1, Math.round(cam.viewW));
     const viewH = Math.max(1, Math.round(cam.viewH));
     const devW = ctx.canvas.width;
@@ -212,6 +224,8 @@ export class LightRenderer {
       const sx = cam.worldToScreenX(l.x);
       const sy = cam.worldToScreenY(l.y);
       const rad = l.radius * cam.zoom;
+      if (sx + rad < -2 || sy + rad < -2 || sx - rad > viewW + 2 || sy - rad > viewH + 2) continue;
+      this.layerRegion.include(sx, sy, rad);
       if (l.polyCount >= 3) {
         this.tracePolygonPath(air, game, l.poly, l.polyCount);
         air.fillStyle = gradientFor(air, sx, sy, rad, l.warm ? FIRE_STOPS : l.soldier ? SOLDIER_AMBIENT_STOPS : SOFT_STOPS, l.strength);
@@ -234,6 +248,7 @@ export class LightRenderer {
         const sy = cam.worldToScreenY(fl.y);
         const rad = fl.radius * cam.zoom;
         if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
+        this.layerRegion.include(sx, sy, rad);
         if (fl.hasPolygon) {
           this.tracePolygonPath(air, game, fl.poly, fl.polyCount);
           air.fillStyle = gradientFor(air, sx, sy, rad, flashStops, intensity);
@@ -248,7 +263,8 @@ export class LightRenderer {
     }
     // Ceiling panels: cached shadow-traced pools, so lab equipment and walls cast shadows.
     const now = performance.now() / 1000;
-    for (const f of game.lighting.fixtures) {
+    for (const n of visibleRoomLightIndices(game.world, cam)) {
+      const f = game.lighting.fixtures[n];
       if (!f || !f.poly) continue;
       const sx = cam.worldToScreenX(f.x);
       const sy = cam.worldToScreenY(f.y);
@@ -256,9 +272,15 @@ export class LightRenderer {
       if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
       const level = game.terrain.lightLevel(f.light, now);
       if (level <= 0.02) continue;
-      this.tracePolygonPath(air, game, f.poly, f.polyCount);
+      this.layerRegion.include(sx, sy, rad);
+      // Moving views keep the original path submission: rebuilding hundreds of
+      // cached screen paths every frame allocates more than it saves.
+      let path: Path2D | undefined;
+      if (this.fixtureViewChanged) this.tracePolygonPath(air, game, f.poly, f.polyCount);
+      else path = this.fixturePath(game, f.poly, f.polyCount);
       air.fillStyle = gradientFor(air, sx, sy, rad, PANEL_STOPS[panelIndex(f.light.kind)], level);
-      air.fill();
+      if (path) air.fill(path);
+      else air.fill();
     }
     this.finishAirLayer(g, "lighter", devW, devH, dpr);
 
@@ -318,6 +340,7 @@ export class LightRenderer {
         const rad = fl.radius * cam.zoom;
         if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
         scatter ??= this.beginLayer(devW, devH, dpr);
+        this.layerRegion.include(sx, sy, rad);
         this.tracePolygonPath(scatter, game, fl.poly, fl.polyCount);
         scatter.fillStyle = gradientFor(scatter, sx, sy, rad, scatterStops, intensity);
         scatter.fill();
@@ -340,11 +363,13 @@ export class LightRenderer {
   }
 
   /** Clear the shared light layer for additive drawing in CSS-pixel coordinates. */
-  private beginLayer(devW: number, devH: number, dpr: number): CanvasRenderingContext2D {
+  private beginLayer(_devW: number, _devH: number, dpr: number): CanvasRenderingContext2D {
     const l = this.layerCtx;
     l.setTransform(1, 0, 0, 1, 0, 0);
     l.globalCompositeOperation = "source-over";
-    l.clearRect(0, 0, devW, devH);
+    const previous = this.previousLayerRegion;
+    if (previous) l.clearRect(previous.x, previous.y, previous.width, previous.height);
+    this.layerRegion.reset();
     l.setTransform(dpr, 0, 0, dpr, 0, 0);
     l.globalCompositeOperation = "lighter";
     return l;
@@ -359,14 +384,26 @@ export class LightRenderer {
     dpr: number,
   ): void {
     const l = this.layerCtx;
-    // Soften shadow edges before the terrain cut, which stays pixel-sharp.
-    if (this.softShadows) this.softener.soften(l, devW, devH);
+    // Align every operation to the original full-canvas sampling grid. Clipping
+    // rather than resizing/cropping preserves fractional-DPR blur and mask pixels.
+    const padding = this.softShadows ? Math.ceil((SOFT_SHADOWS.blur * 6 + 3) / SOFT_SHADOWS.scale) + 2 : 2;
+    const region = this.layerRegion.resolve(devW, devH, dpr, padding);
+    this.previousLayerRegion = region;
+    if (!region) return;
+    const bounded = region.width !== devW || region.height !== devH;
+    if (this.softShadows) this.softener.soften(l, devW, devH, bounded ? region : undefined);
+    l.save();
     l.setTransform(1, 0, 0, 1, 0, 0);
+    if (bounded) { l.beginPath(); l.rect(region.x, region.y, region.width, region.height); l.clip(); }
     l.globalCompositeOperation = "destination-out";
     l.drawImage(this.maskCanvas, 0, 0, devW, devH);
+    l.restore();
     target.setTransform(1, 0, 0, 1, 0, 0);
     target.globalCompositeOperation = op;
+    target.save();
+    if (bounded) { target.beginPath(); target.rect(region.x, region.y, region.width, region.height); target.clip(); }
     target.drawImage(this.layerCanvas, 0, 0, devW, devH);
+    target.restore();
     target.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
 
@@ -508,6 +545,27 @@ export class LightRenderer {
       vg.fillRect(0, 0, w, h);
     }
     ctx.drawImage(this.vignetteCanvas, 0, 0, w, h);
+  }
+
+  /** Fixtures receive a fresh polygon array on every shadow retrace. */
+  private fixturePath(game: Game, poly: Float32Array, count: number): Path2D {
+    const cam = game.camera;
+    let cached = this.fixturePaths.get(poly);
+    if (!cached || cached.count !== count) {
+      cached = { count, screen: new Path2D(), x: NaN, y: NaN, zoom: NaN, w: NaN, h: NaN };
+      this.fixturePaths.set(poly, cached);
+    }
+    if (cached.x !== cam.x || cached.y !== cam.y || cached.zoom !== cam.zoom || cached.w !== cam.viewW || cached.h !== cam.viewH) {
+      const screen = new Path2D();
+      // Match the original subtraction-before-multiplication exactly. Native
+      // transforms of world-space paths can change fractional-zoom edge pixels.
+      screen.moveTo(cam.worldToScreenX(poly[0]), cam.worldToScreenY(poly[1]));
+      for (let i = 1; i < count; i++) screen.lineTo(cam.worldToScreenX(poly[i * 2]), cam.worldToScreenY(poly[i * 2 + 1]));
+      screen.closePath();
+      cached.screen = screen;
+      cached.x = cam.x; cached.y = cam.y; cached.zoom = cam.zoom; cached.w = cam.viewW; cached.h = cam.viewH;
+    }
+    return cached.screen;
   }
 
   tracePolygonPath(

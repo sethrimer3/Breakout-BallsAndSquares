@@ -1,3 +1,4 @@
+import type { ScreenRect } from "./LightRegion";
 /**
  * Reusable soft-light rendering helpers.
  *
@@ -221,7 +222,7 @@ export class CanvasSoftener {
   }
 
   /** Soften `ctx.canvas` in place (`w` x `h` device pixels). */
-  soften(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  soften(ctx: CanvasRenderingContext2D, w: number, h: number, region?: ScreenRect): void {
     const sw = Math.max(1, Math.ceil(w * this.opts.scale));
     const sh = Math.max(1, Math.ceil(h * this.opts.scale));
     if (this.small.width !== sw || this.small.height !== sh) {
@@ -233,14 +234,25 @@ export class CanvasSoftener {
     s.globalCompositeOperation = "source-over";
     s.clearRect(0, 0, sw, sh);
     s.imageSmoothingEnabled = true;
+    s.save();
+    if (region) {
+      // Keep the original downsample phase, including noninteger w/sw ratios.
+      const x = Math.max(0, Math.floor(region.x * sw / w) - 1);
+      const y = Math.max(0, Math.floor(region.y * sh / h) - 1);
+      const right = Math.min(sw, Math.ceil((region.x + region.width) * sw / w) + 1);
+      const bottom = Math.min(sh, Math.ceil((region.y + region.height) * sh / h) + 1);
+      s.beginPath(); s.rect(x, y, right - x, bottom - y); s.clip();
+    }
     const blur = supportsCanvasFilter(s) && this.opts.blur > 0;
     if (blur) s.filter = `blur(${this.opts.blur}px)`;
     // Without filter support the bilinear down/upsample alone does the softening.
     s.drawImage(ctx.canvas, 0, 0, w, h, 0, 0, sw, sh);
     if (blur) s.filter = "none";
+    s.restore();
 
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    if (region) { ctx.beginPath(); ctx.rect(region.x, region.y, region.width, region.height); ctx.clip(); }
     ctx.globalCompositeOperation = "copy";
     ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = true;

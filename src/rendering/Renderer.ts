@@ -800,21 +800,22 @@ export class Renderer {
       if (!b.active) continue;
       const sx = cam.worldToScreenX(b.x);
       const sy = cam.worldToScreenY(b.y);
-      if (sx < -40 || sy < -40 || sx > cam.viewW + 40 || sy > cam.viewH + 40) continue;
       const isRocket = b.style === 1;
       const isSniper = b.style === 2;
-      const isSlash = b.style === 3;
-      // Flame jets are drawn as the fire they shed (FireRenderer).
-      if (b.style === 4) continue;
-      // Circuit Runner shots are drawn exclusively by WeaponExpansionRenderer.
-      if (b.circuit) continue;
-
-      if (isSlash) {
+      // Flame jets and Circuit Runner have separate renderers.
+      if (b.style === 4 || b.circuit) continue;
+      if (b.style === 3) {
+        // The crescent has its own width-dependent bounds.
         this.drawSlash(b);
         continue;
       }
       const maxTracer = isSniper ? BULLET.tracerLength * 2.4 : isRocket ? BULLET.tracerLength * 2 : BULLET.tracerLength;
       const tLen = Math.min(maxTracer, b.traveled);
+      const tailX = cam.worldToScreenX(b.x - b.dx * tLen);
+      const tailY = cam.worldToScreenY(b.y - b.dy * tLen);
+      const pad = 3 * ART_PIXEL * cam.zoom + 2;
+      if (Math.max(sx, tailX) < -pad || Math.min(sx, tailX) > cam.viewW + pad ||
+          Math.max(sy, tailY) < -pad || Math.min(sy, tailY) > cam.viewH + pad) continue;
 
       // Head and tail in art-pixel grid coordinates.
       const hx = Math.floor(b.x / px);
@@ -964,8 +965,8 @@ export class Renderer {
       const a = Math.max(0, p.life[i] / p.maxLife[i]);
       const sx = cam.worldToScreenX(p.x[i]);
       const sy = cam.worldToScreenY(p.y[i]);
-      if (sx < -20 || sy < -20 || sx > cam.viewW + 20 || sy > cam.viewH + 20) continue;
       const sz = Math.max(1.5, p.size[i] * cam.zoom);
+      if (sx + sz + 1 < 0 || sy + sz + 1 < 0 || sx - sz - 1 > cam.viewW || sy - sz - 1 > cam.viewH) continue;
       if (k === PKind.Smoke) {
         ctx.globalAlpha = a * 0.22;
         ctx.drawImage(this.sprites.dot, sx - sz, sy - sz, sz * 2, sz * 2);
@@ -988,11 +989,13 @@ export class Renderer {
       const a = Math.max(0, p.life[i] / p.maxLife[i]);
       const sx = cam.worldToScreenX(p.x[i]);
       const sy = cam.worldToScreenY(p.y[i]);
-      if (sx < -30 || sy < -30 || sx > cam.viewW + 30 || sy > cam.viewH + 30) continue;
-      ctx.globalAlpha = a;
       if (k === PKind.Spark) {
         const tx = cam.worldToScreenX(p.x[i] - p.vx[i] * 0.026);
         const ty = cam.worldToScreenY(p.y[i] - p.vy[i] * 0.026);
+        const pad = Math.max(1, p.size[i] * 0.72 * cam.zoom) + 1;
+        if (Math.max(sx, tx) < -pad || Math.min(sx, tx) > cam.viewW + pad ||
+            Math.max(sy, ty) < -pad || Math.min(sy, ty) > cam.viewH + pad) continue;
+        ctx.globalAlpha = a;
         ctx.strokeStyle = hexColor(p.color[i]);
         ctx.lineWidth = Math.max(1, p.size[i] * 0.72 * cam.zoom);
         ctx.beginPath();
@@ -1001,6 +1004,8 @@ export class Renderer {
         ctx.stroke();
       } else {
         const r = Math.max(2, p.size[i] * cam.zoom);
+        if (sx + r + 1 < 0 || sy + r + 1 < 0 || sx - r - 1 > cam.viewW || sy - r - 1 > cam.viewH) continue;
+        ctx.globalAlpha = a;
         ctx.drawImage(this.sprites.hotGlow, sx - r, sy - r, r * 2, r * 2);
       }
     }

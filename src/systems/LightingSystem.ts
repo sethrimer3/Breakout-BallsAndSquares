@@ -1,3 +1,4 @@
+import { visibleRoomLightIndices } from "../rendering/RoomLightIndex";
 import { FACILITY, LIGHT, SOLDIER } from "../config";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Soldier } from "../entities/Soldier";
@@ -237,7 +238,8 @@ export class LightingSystem {
     const y0 = cam.screenToWorldY(0) - margin;
     const x1 = cam.screenToWorldX(cam.viewW) + margin;
     const y1 = cam.screenToWorldY(cam.viewH) + margin;
-    for (const f of this.fixtures) {
+    for (const fixtureId of visibleRoomLightIndices(w, cam)) {
+      const f = this.fixtures[fixtureId];
       if (budget <= 0) break;
       if (!f || f.light.destroyed || !f.dirty || f.x < x0 || f.x > x1 || f.y < y0 || f.y > y1) continue;
       budget--;

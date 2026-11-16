@@ -84,7 +84,7 @@ export class LabMap {
     this.tabs = this.root.querySelector(".labmap-tabs") as HTMLDivElement;
     this.info = this.root.querySelector(".labmap-info") as HTMLDivElement;
     this.deployBtn = this.root.querySelector('[data-act="deploy"]') as HTMLButtonElement;
-    this.buildGrid();
+    // Build the map only when it is first opened, rather than behind the menu.
     this.root.querySelector('[data-act="back"]')!.addEventListener("click", () => this.back());
     this.deployBtn.addEventListener("click", () => this.deploy());
     parent.append(this.root);
@@ -100,9 +100,12 @@ export class LabMap {
   }
 
   show(): void {
-    this.def = this.game.labDef;
+    const def = this.game.labDef;
+    const rebuild = this.def.id !== def.id || this.tiles.length !== def.sectors * worldRows(def);
+    this.def = def;
     this.root.querySelector(".panel-title")!.textContent = `WORLD ${this.def.id} — ${this.def.name} · ${worldZoneLabel(this.def)} · ${this.def.sectors}×${worldRows(this.def)}`;
-    this.buildGrid();
+    if (rebuild) this.buildGrid();
+    else this.buildTabs();
     const spawn = this.game.labSave.spawn;
     this.selected = this.game.canDeployInto(spawn) ? spawn : this.def.start;
     this.render();

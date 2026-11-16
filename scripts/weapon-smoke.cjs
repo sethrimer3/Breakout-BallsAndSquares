@@ -17,8 +17,12 @@ fs.mkdirSync(artifacts, { recursive: true });
   const page = await context.newPage();page.setDefaultTimeout(15000);
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base,{waitUntil:"domcontentloaded"});await page.locator('[data-act="play"]').waitFor({state:'visible'});
-  await page.evaluate(()=>{
+  await page.evaluate(async()=>{
+   const {SPECIAL_UNLOCKS,specialWorld}=await import('/src/progression/specialUnlocks.ts');
    const g=window.__game;g.save.data.upgrades.unlock_primary=1;
+   // Weapon research requires finding its gold block before buying the node.
+   // This all-weapons fixture represents a profile that has found every block.
+   for(const spot of Object.keys(SPECIAL_UNLOCKS))g.save.data.lab.worlds[specialWorld(spot)].specials.push(spot);
    g.save.data.essence=1000000;g.save.data.bank=g.save.data.crystals=g.save.data.greenCrystals=1000000;g.save.data.lifetimePixels=10000;g.openUpgrades();
    for(const id of [
      'shotgun_unlock','goo_unlock','goo_radius','goo_residue','vacuum_unlock',
