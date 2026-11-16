@@ -209,6 +209,29 @@ export class CombatSystem {
     this.circuit.clear();
   }
 
+  /** Soldier body contact removes all remaining HP from a half-size block. */
+  crushSubcell(s: Soldier, sx: number, sy: number): void {
+    const w = this.world;
+    if (!w.subInBounds(sx, sy)) return;
+    const cx = sx >> 1, cy = sy >> 1, parent = cy * w.width + cx;
+    if (w.health[parent] > 0 || w.boundary[parent]) return;
+    const hp = w.subHealth[sy * w.subWidth + sx];
+    if (hp === 0) return;
+    const prevOwner = this.currentOwnerId;
+    this.currentOwnerId = s.id;
+    try {
+      const result = w.damageSub(sx, sy, hp, true, s.vx, s.vy);
+      const speed = Math.hypot(s.vx, s.vy);
+      this.events.onImpact?.(
+        (sx + 0.5) * w.subCellSize, (sy + 0.5) * w.subCellSize,
+        speed > 0 ? -s.vx / speed : 0, speed > 0 ? -s.vy / speed : -1,
+        cx, cy, result, true, s.id,
+      );
+    } finally {
+      this.currentOwnerId = prevOwner;
+    }
+  }
+
   /** Effective fire rate for a soldier, accounting for active Black Market mutation. */
   effectiveFireRate(s: Soldier): number {
     let rate = this.stats.fireRate;

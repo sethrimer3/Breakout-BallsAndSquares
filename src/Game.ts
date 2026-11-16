@@ -1907,6 +1907,7 @@ export class Game {
         (soldier, nx, ny) => {
           this.combat.onSoldierBounce(soldier, nx, ny);
         },
+        (soldier, sx, sy) => this.combat.crushSubcell(soldier, sx, sy),
       );
       if (s.dashLeft > 0) this.combat.telemetry.katanaBoostedSeconds += dt;
       this.combat.updateSoldier(s, dt);

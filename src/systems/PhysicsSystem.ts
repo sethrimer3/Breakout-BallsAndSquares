@@ -333,6 +333,7 @@ export interface PhysicsStats {
 export class PhysicsSystem {
   private dashStats: SoldierStats | null = null;
   private onDash: ((s: Soldier, nx: number, ny: number) => void) | undefined;
+  private onCrush: ((s: Soldier, sx: number, sy: number) => void) | undefined;
   private onWallBounce: ((s: Soldier, nx: number, ny: number) => void) | undefined;
   readonly stats: PhysicsStats = { relocations: 0, stuckEvents: 0 };
 
@@ -348,11 +349,13 @@ export class PhysicsSystem {
     stats?: SoldierStats,
     onDash?: (s: Soldier, nx: number, ny: number) => void,
     onWallBounce?: (s: Soldier, nx: number, ny: number) => void,
+    onCrush?: (s: Soldier, sx: number, sy: number) => void,
   ): number {
     advanceMomentum(s, dt);
     this.dashStats = stats ?? null;
     this.onDash = onDash;
     this.onWallBounce = onWallBounce;
+    this.onCrush = onCrush;
     const r = s.radius;
     const dist = Math.max(Math.hypot(s.vx, s.vy), stats?.katanaDash && s.weapon === "katana" ? s.speed * Math.min(3, stats.katanaDashPeak) : 0) * dt;
     const n = Math.max(1, Math.ceil(dist / (r * 0.5)));
@@ -366,11 +369,30 @@ export class PhysicsSystem {
     this.dashStats = null;
     this.onDash = undefined;
     this.onWallBounce = undefined;
+    this.onCrush = undefined;
     return bounces;
+  }
+
+  /** Full-size terrain still blocks movement; half-size pixels break on contact. */
+  private crushHalfBlocks(s: Soldier): void {
+    const w = this.world, ss = w.subCellSize, r2 = s.radius * s.radius;
+    const x0 = Math.max(0, Math.floor((s.x - s.radius) / ss));
+    const x1 = Math.min(w.subWidth - 1, Math.floor((s.x + s.radius) / ss));
+    const y0 = Math.max(0, Math.floor((s.y - s.radius) / ss));
+    const y1 = Math.min(w.subHeight - 1, Math.floor((s.y + s.radius) / ss));
+    for (let sy = y0; sy <= y1; sy++) for (let sx = x0; sx <= x1; sx++) {
+      const parent = (sy >> 1) * w.width + (sx >> 1);
+      if (w.health[parent] > 0 || w.boundary[parent]) continue;
+      const hp = w.subHealth[sy * w.subWidth + sx];
+      if (hp === 0 || !boxOverlapsCircle(sx * ss, sy * ss, ss, s.x, s.y, r2)) continue;
+      if (this.onCrush) this.onCrush(s, sx, sy);
+      else w.damageSub(sx, sy, hp, true, s.vx, s.vy);
+    }
   }
 
   /** Resolve overlap and reflect velocity. Returns true if a bounce occurred. */
   resolve(s: Soldier): boolean {
+    this.crushHalfBlocks(s);
     const r = s.radius;
     const moveSpeed = s.dashLeft > 0 ? Math.hypot(s.vx, s.vy) || s.speed : s.speed;
     let firstNx = 0;
