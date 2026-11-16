@@ -6,7 +6,8 @@ export interface DamageNumber {
   amount: number;
   color: string;
   age: number;
-  drift: number;
+  dx: number;
+  dy: number;
 }
 
 /** Bounded visual feedback; never consumes the combat RNG or changes damage. */
@@ -14,16 +15,18 @@ export class DamageNumbers {
   readonly items: DamageNumber[] = [];
   readonly duration = 0.65;
   readonly capacity = 128;
-  private sequence = 0;
 
-  constructor(world: PixelWorld) {
-    world.addDamageListener((x, y, amount, sub) => {
+  constructor(world: PixelWorld, random: () => number = Math.random) {
+    world.addDamageListener((x, y, amount, sub, dx, dy) => {
       const cx = Math.floor(x / world.cellSize), cy = Math.floor(y / world.cellSize);
       const i = cy * world.width + cx;
       const color = sub ? "#ff83c8" : world.mat[i] === MAT.glass ? "#a5edff"
         : ["#ffd479", "#ffa56b", "#8fe8a9"][world.zoneAt(cx, cy)];
       if (this.items.length === this.capacity) this.items.shift();
-      this.items.push({ x, y, amount, color, age:0, drift:(this.sequence++ % 5 - 2) * 2 });
+      // A triangular spread favors the incoming direction and stays within ±10°.
+      const base = Math.hypot(dx, dy) > 1e-8 ? Math.atan2(dy, dx) : -Math.PI / 2;
+      const angle = base + (random() + random() - 1) * Math.PI / 18;
+      this.items.push({ x, y, amount, color, age: 0, dx: Math.cos(angle), dy: Math.sin(angle) });
     });
   }
 
@@ -36,5 +39,5 @@ export class DamageNumbers {
     this.items.length = keep;
   }
 
-  clear(): void { this.items.length = 0; this.sequence = 0; }
+  clear(): void { this.items.length = 0; }
 }

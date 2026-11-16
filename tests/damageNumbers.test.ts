@@ -35,6 +35,26 @@ describe('nonlethal block damage numbers',()=>{
     expect(numbers.items[0].amount).toBe(3);
     world.setCell(6,5,1);world.damage(6,5,.8,true);expect(numbers.items).toHaveLength(1);
   });
+  it('preserves attack direction through full and half-size redirection',()=>{
+    const world=new PixelWorld({width:32,height:32,cellSize:8,roomSize:4});
+    const numbers=new DamageNumbers(world,()=>0.5);
+    world.setCell(5,5,20);world.damageSub(10,10,1,true,3,4);
+    expect(numbers.items[0].dx).toBeCloseTo(.6);expect(numbers.items[0].dy).toBeCloseTo(.8);
+    world.setCell(5,5,0);
+    const i=10*world.subWidth+10;world.subKind[i]=SUB.rubble;world.subHealth[i]=20;
+    world.damage(5,5,1,true,-2,0);
+    expect(numbers.items[1].dx).toBeCloseTo(-1);expect(numbers.items[1].dy).toBeCloseTo(0);
+  });
+  it('uses a center-biased triangular spread bounded to ten degrees',()=>{
+    const world=new PixelWorld({width:32,height:32,cellSize:8,roomSize:4});
+    let sample=0;const values=[0,0, .25,.75, 1,1];
+    const numbers=new DamageNumbers(world,()=>values[sample++]);
+    world.setCell(5,5,20);
+    for(let i=0;i<3;i++)world.damage(5,5,1,true,1,0);
+    const angles=numbers.items.map(n=>Math.atan2(n.dy,n.dx)*180/Math.PI);
+    expect(angles[0]).toBeCloseTo(-10);expect(angles[1]).toBeCloseTo(0);expect(angles[2]).toBeCloseTo(10);
+    for(const n of numbers.items)expect(Math.hypot(n.dx,n.dy)).toBeCloseTo(1);
+  });
   it('bounds burst capacity, expires numbers, and clears on reset',()=>{
     const {world,numbers}=fixture();world.setCell(5,5,1000);
     for(let i=0;i<200;i++)world.damage(5,5,1,true);

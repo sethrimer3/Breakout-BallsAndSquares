@@ -889,7 +889,7 @@ export class CombatSystem {
         this.napalm.igniteAt(x, y, radius, ownerId);
         this.events.onExplosion?.(x, y, radius, damage, true);
       },
-      onChainCell: (cx, cy, x, y, damage, terrainBonus, ownerId, blightMultiplier) => {
+      onChainCell: (cx, cy, x, y, damage, terrainBonus, ownerId, blightMultiplier, dx, dy) => {
         const w = this.world;
         if (!w.inBounds(cx, cy)) return;
         const ci = cy * w.width + cx;
@@ -898,21 +898,21 @@ export class CombatSystem {
         let dmg = damage + terrainBonus + (isCore ? this.stats.coreDamageBonus : 0);
         if (isBlight && blightMultiplier > 1) dmg = Math.round(dmg * blightMultiplier);
         this.currentOwnerId = ownerId;
-        const res = w.damage(cx, cy, dmg, true);
+        const res = w.damage(cx, cy, dmg, true, dx, dy);
         this.currentOwnerId = 0;
         if (res > 0) {
           this.napalm.igniteAt(x, y, 4, ownerId);
           this.events.onImpact?.(x, y, 0, 0, cx, cy, res, false, ownerId);
         }
       },
-      onChainSub: (sx, sy, x, y, damage, terrainBonus, ownerId, blightMultiplier) => {
+      onChainSub: (sx, sy, x, y, damage, terrainBonus, ownerId, blightMultiplier, dx, dy) => {
         const w = this.world;
         if (!w.subInBounds(sx, sy)) return;
         const isBlight = w.isBlightSubAt(sx, sy);
         let dmg = damage + terrainBonus;
         if (isBlight && blightMultiplier > 1) dmg = Math.round(dmg * blightMultiplier);
         this.currentOwnerId = ownerId;
-        const res = w.damageSub(sx, sy, dmg, true);
+        const res = w.damageSub(sx, sy, dmg, true, dx, dy);
         this.currentOwnerId = 0;
         if (res > 0) {
           this.napalm.igniteAt(x, y, 4, ownerId);
@@ -1345,7 +1345,7 @@ export class CombatSystem {
           let hitDmgC = b.damage + b.terrainDamageBonus + (isCoreC ? this.stats.coreDamageBonus : 0);
           if (isBlightC && b.blightMultiplier > 1) hitDmgC = Math.round(hitDmgC * b.blightMultiplier);
           this.currentOwnerId = b.ownerId;
-          const resC = w.damageSub(hit.cx, hit.cy, hitDmgC, true);
+          const resC = w.damageSub(hit.cx, hit.cy, hitDmgC, true, b.dx, b.dy);
           this.currentOwnerId = 0;
           if (resC > 0) this.napalm.igniteAt(hit.x, hit.y, 4, b.ownerId);
           this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, resC, isSubC, b.ownerId);
@@ -1395,7 +1395,7 @@ export class CombatSystem {
             const door = w.doors[w.doorId[cellIdxB] - 1];
             if (door && !door.open) {
               this.currentOwnerId = b.ownerId;
-              w.damage(hcx, hcy, b.damage, true);
+              w.damage(hcx, hcy, b.damage, true, b.dx, b.dy);
               this.currentOwnerId = 0;
               if (!door.open) {
                 this.detonateRocket(b, hit.x, hit.y, hit.nx, hit.ny, hcx, hcy);
@@ -1408,7 +1408,7 @@ export class CombatSystem {
           const isSubB = w.health[cellIdxB] === 0;
           const drillDmg = Math.max(1, Math.round(b.damage * BURROWER.drillDamageRatio + b.terrainDamageBonus));
           this.currentOwnerId = b.ownerId;
-          const drillRes = w.damageSub(hit.cx, hit.cy, drillDmg, true);
+          const drillRes = w.damageSub(hit.cx, hit.cy, drillDmg, true, b.dx, b.dy);
           this.currentOwnerId = 0;
           this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, drillRes, isSubB, b.ownerId);
           b.burrowerDrilledCells++;
@@ -1467,7 +1467,7 @@ export class CombatSystem {
         const alreadyHit = b.gale && b.galeCells.has(galeKey);
         if(b.gale)b.galeCells.add(galeKey);
         this.currentOwnerId = b.ownerId;
-        const result = alreadyHit ? 1 : w.damageSub(hit.cx, hit.cy, hitDmg, true);
+        const result = alreadyHit ? 1 : w.damageSub(hit.cx, hit.cy, hitDmg, true, b.dx, b.dy);
         this.currentOwnerId = 0;
         if (result > 0) this.napalm.igniteAt(hit.x, hit.y, 4, b.ownerId);
         const afterHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
@@ -1612,7 +1612,7 @@ export class CombatSystem {
         shot.cells.add(key);shot.hits++;
         let damage=shot.damage+shot.terrainDamageBonus+(w.coreId[index]>0?shot.coreDamageBonus:0);
         if(sub?w.isBlightSubAt(hit.cx,hit.cy):w.isBlightAt(cx,cy))damage=Math.round(damage*shot.blightMultiplier);
-        const result=w.damageSub(hit.cx,hit.cy,damage,true);
+        const result=w.damageSub(hit.cx,hit.cy,damage,true,dx,dy);
         if(result>0)this.napalm.igniteAt(hit.x,hit.y,4,shot.ownerId);
         this.events.onImpact?.(hit.x,hit.y,hit.nx,hit.ny,cx,cy,result,sub,shot.ownerId);
       }
@@ -1673,7 +1673,7 @@ export class CombatSystem {
         if (isBlight && b.blightMultiplier > 1) {
           dmg = Math.round(dmg * b.blightMultiplier);
         }
-        const res = w.damageSub(sx, sy, dmg, true);
+        const res = w.damageSub(sx, sy, dmg, true, b.dx, b.dy);
         if (res > 0) {
           const wx = (sx + 0.5) * ss;
           const wy = (sy + 0.5) * ss;
@@ -1711,7 +1711,7 @@ export class CombatSystem {
         const isCore = !wasSub && w.coreId[idx] > 0;
         let dmg = Math.max(1, Math.round((source.damage + source.terrainDamageBonus) * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
         if (source.blightMultiplier > 1 && w.isBlightAt(cx, cy)) dmg = Math.round(dmg * source.blightMultiplier);
-        const res = w.damage(cx, cy, dmg, true);
+        const res = w.damage(cx, cy, dmg, true, (cx + 0.5) * cs - ix, (cy + 0.5) * cs - iy);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
           const wy = (cy + 0.5) * cs;
@@ -1945,7 +1945,7 @@ export class CombatSystem {
           dmg = Math.round(dmg * g.blightMultiplier);
         }
 
-        const res = w.damage(cx, cy, dmg, true);
+        const res = w.damage(cx, cy, dmg, true, (cx + 0.5) * cs - g.x, (cy + 0.5) * cs - g.y);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
           const wy = (cy + 0.5) * cs;

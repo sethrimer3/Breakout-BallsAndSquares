@@ -241,15 +241,15 @@ export class PixelWorld implements SolidQuery {
 
   private listeners: CellListener[] = [];
   private destroyListeners: DestroyListener[] = [];
-  private damageListeners: ((x: number, y: number, amount: number, sub: boolean) => void)[] = [];
+  private damageListeners: ((x: number, y: number, amount: number, sub: boolean, dx: number, dy: number) => void)[] = [];
 
   /** Actual HP lost to a player attack on a surviving full/half-size block. */
-  addDamageListener(fn: (x: number, y: number, amount: number, sub: boolean) => void): void {
+  addDamageListener(fn: (x: number, y: number, amount: number, sub: boolean, dx: number, dy: number) => void): void {
     this.damageListeners.push(fn);
   }
 
-  private emitDamage(x: number, y: number, amount: number, sub: boolean): void {
-    for (const listener of this.damageListeners) listener(x, y, amount, sub);
+  private emitDamage(x: number, y: number, amount: number, sub: boolean, dx: number, dy: number): void {
+    for (const listener of this.damageListeners) listener(x, y, amount, sub, dx, dy);
   }
 
   addDestroyListener(fn: DestroyListener): void {
@@ -588,7 +588,7 @@ export class PixelWorld implements SolidQuery {
    * Returns 0 if nothing happened, 1 if damaged, 2 if destroyed.
    * `byPlayer` marks a hit the squad dealt itself (see `damageSub`).
    */
-  damage(cx: number, cy: number, amount: number, byPlayer = false): 0 | 1 | 2 {
+  damage(cx: number, cy: number, amount: number, byPlayer = false, attackDx = 0, attackDy = -1): 0 | 1 | 2 {
     if (!this.inBounds(cx, cy)) return 0;
     const i = cy * this.width + cx;
     if (this.boundary[i]) return 0;
@@ -600,7 +600,7 @@ export class PixelWorld implements SolidQuery {
       let bestRes: 0 | 1 | 2 = 0;
       for (let dy = 0; dy < 2; dy++) {
         for (let dx = 0; dx < 2; dx++) {
-          const r = this.damageSub(sx0 + dx, sy0 + dy, amount, byPlayer);
+          const r = this.damageSub(sx0 + dx, sy0 + dy, amount, byPlayer, attackDx, attackDy);
           if (r > bestRes) bestRes = r;
         }
       }
@@ -623,7 +623,7 @@ export class PixelWorld implements SolidQuery {
       return 2;
     }
     if (byPlayer && this.health[i] > 0 && this.health[i] < hp) {
-      this.emitDamage((cx + 0.5) * this.cellSize, (cy + 0.5) * this.cellSize, hp - this.health[i], false);
+      this.emitDamage((cx + 0.5) * this.cellSize, (cy + 0.5) * this.cellSize, hp - this.health[i], false, attackDx, attackDy);
     }
     this.emit(cx, cy, "damaged");
     return 1;
@@ -636,13 +636,13 @@ export class PixelWorld implements SolidQuery {
    * Destroyed non-Blight subcells deal their full maximum HP to all eight
    * neighboring subcells. Secondary non-Blight breaks continue the cascade.
    */
-  damageSub(sx: number, sy: number, amount: number, byPlayer = false): 0 | 1 | 2 {
+  damageSub(sx: number, sy: number, amount: number, byPlayer = false, attackDx = 0, attackDy = -1): 0 | 1 | 2 {
     if (!this.subInBounds(sx, sy)) return 0;
     const cx = sx >> 1;
     const cy = sy >> 1;
     const i = cy * this.width + cx;
     if (this.health[i] > 0) {
-      return this.damage(cx, cy, amount, byPlayer);
+      return this.damage(cx, cy, amount, byPlayer, attackDx, attackDy);
     }
     const si = sy * this.subWidth + sx;
     const hp = this.subHealth[si];
@@ -658,7 +658,7 @@ export class PixelWorld implements SolidQuery {
       return 2;
     }
     if (byPlayer && this.subHealth[si] > 0 && this.subHealth[si] < hp) {
-      this.emitDamage((sx + 0.5) * this.subCellSize, (sy + 0.5) * this.subCellSize, hp - this.subHealth[si], true);
+      this.emitDamage((sx + 0.5) * this.subCellSize, (sy + 0.5) * this.subCellSize, hp - this.subHealth[si], true, attackDx, attackDy);
     }
     this.emit(cx, cy, "damaged");
     return 1;
@@ -687,7 +687,7 @@ export class PixelWorld implements SolidQuery {
           if (this.health[parent] > 0 || this.boundary[parent]) continue;
           const ni = ny * this.subWidth + nx;
           const rubble = this.subKind[ni] === SUB.rubble;
-          if (this.damageSub(nx, ny, source.damage, source.byPlayer) === 2 && rubble) {
+          if (this.damageSub(nx, ny, source.damage, source.byPlayer, dx, dy) === 2 && rubble) {
             this.onRubbleCrumble?.(nx, ny);
           }
         }

@@ -123,7 +123,7 @@ export class RailLanceSystem {
         if (this.world.mat[ci] === MAT.door) {
           const door = this.world.doors[this.world.doorId[ci] - 1];
           if (door && !door.open) {
-            this.world.damage(cx, cy, damage, true);
+            this.world.damage(cx, cy, damage, true, dx, dy);
             if (!door.open) {
               // Gate or locked door remains closed: stop strike.
               curX = hx;
@@ -143,8 +143,8 @@ export class RailLanceSystem {
             : this.world.blight[ci] > 0;
           const totalDmg = (damage + owner.mods.terrainDamageBonus) * (isPink ? owner.mods.blightMult : 1);
           const res = isSub
-            ? this.world.damageSub(sx, sy, totalDmg, true)
-            : this.world.damage(cx, cy, totalDmg, true);
+            ? this.world.damageSub(sx, sy, totalDmg, true, dx, dy)
+            : this.world.damage(cx, cy, totalDmg, true, dx, dy);
           onTerrainHit(cx, cy, res, isSub, hx, hy, rayHit.nx, rayHit.ny, owner.id);
           remainingHits--;
           hits++;

@@ -56,8 +56,8 @@ export interface OverchargeDischargeContext {
   creatures: CreatureSystem | null;
   late: LateEncounters | null;
   onBlast: (x: number, y: number, radius: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number) => void;
-  onChainCell: (cx: number, cy: number, x: number, y: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number) => void;
-  onChainSub: (sx: number, sy: number, x: number, y: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number) => void;
+  onChainCell: (cx: number, cy: number, x: number, y: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number, dx: number, dy: number) => void;
+  onChainSub: (sx: number, sy: number, x: number, y: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number, dx: number, dy: number) => void;
   onChainCreature: (c: Creature, x: number, y: number, damage: number, ownerId: number) => void;
   onChainEncounter: (enc: Encounter, x: number, y: number, damage: number, ownerId: number) => void;
 }
@@ -717,9 +717,9 @@ export class OverchargeSystem {
       } else if (next.kind === "encounter" && next.encounter) {
         ctx.onChainEncounter(next.encounter, next.x, next.y, chainDmg, ownerId);
       } else if (next.kind === "cell") {
-        ctx.onChainCell(next.cx, next.cy, next.x, next.y, chainDmg, terrainDamageBonus, ownerId, blightMultiplier);
+        ctx.onChainCell(next.cx, next.cy, next.x, next.y, chainDmg, terrainDamageBonus, ownerId, blightMultiplier, next.x - curX, next.y - curY);
       } else if (next.kind === "subcell") {
-        ctx.onChainSub(next.sx, next.sy, next.x, next.y, chainDmg, terrainDamageBonus, ownerId, blightMultiplier);
+        ctx.onChainSub(next.sx, next.sy, next.x, next.y, chainDmg, terrainDamageBonus, ownerId, blightMultiplier, next.x - curX, next.y - curY);
       }
 
       this.spawnArc(curX, curY, next.x, next.y, arcDuration, stacks);

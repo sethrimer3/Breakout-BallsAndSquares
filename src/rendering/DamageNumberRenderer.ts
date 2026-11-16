@@ -14,8 +14,8 @@ export class DamageNumberRenderer {
     ctx.imageSmoothingEnabled = true;
     for (const item of numbers.items) {
       const progress = item.age / numbers.duration;
-      const x = cam.worldToScreenX(item.x) + (reduced ? 0 : item.drift * progress);
-      const y = cam.worldToScreenY(item.y) - 6 - (reduced ? 0 : progress * 18);
+      const x = cam.worldToScreenX(item.x) + (reduced ? 0 : item.dx * progress * 18);
+      const y = cam.worldToScreenY(item.y) - 6 + (reduced ? 0 : item.dy * progress * 18);
       if (x < -40 || y < -20 || x > cam.viewW + 40 || y > cam.viewH + 20) continue;
       let visibility = 1;
       if (fog) {

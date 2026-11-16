@@ -8,12 +8,17 @@ const result=await page.evaluate(async()=>{
  const g=window.__game,raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=()=>0;g.paused=true;await new Promise(r=>raf(()=>raf(r)));
  const {DamageNumberRenderer}=await import('/src/rendering/DamageNumberRenderer.ts');const r=new DamageNumberRenderer(),w=g.world,n=g.damageNumbers,c=g.camera;
  const x=Math.floor(w.roomCenterX/w.cellSize)+2,y=Math.floor(w.roomCenterY/w.cellSize)+1;
- n.clear();w.setCell(x,y,50);w.damage(x,y,7,true);if(n.items.length!==1||n.items[0].amount!==7)throw Error('Nonlethal player hit missing');
+ n.clear();w.setCell(x,y,50);w.damage(x,y,7,true,1,0);if(n.items.length!==1||n.items[0].amount!==7)throw Error('Nonlethal player hit missing');
  const canvas=document.createElement('canvas');canvas.width=c.viewW;canvas.height=c.viewH;const ctx=canvas.getContext('2d');
  c.x=(x+.5)*w.cellSize;c.y=(y+.5)*w.cellSize;c.zoom=4;
  r.draw(ctx,c,n,false);const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
  let black=0,outline=0,glow=0;for(let i=0;i<pixels.length;i+=4){if(pixels[i+3]>230&&pixels[i]<20&&pixels[i+1]<20&&pixels[i+2]<25)black++;if(pixels[i+3]>150&&pixels[i]>100)outline++;if(pixels[i+3]>0&&pixels[i+3]<100)glow++}
  if(!black||!outline||!glow)throw Error('Black fill, colored rim or soft glow missing');
+ // Compare rendered pixel centroids: a hit arriving from the left moves right.
+ const centroid=()=>{const d=ctx.getImageData(0,0,canvas.width,canvas.height).data;let x=0,y=0,m=0;for(let i=0;i<d.length;i+=4){const a=d[i+3];m+=a;x+=((i/4)%canvas.width)*a;y+=Math.floor(i/4/canvas.width)*a;}return {x:x/m,y:y/m};};
+ const before=centroid();n.items[0].age=.3;ctx.clearRect(0,0,canvas.width,canvas.height);r.draw(ctx,c,n,false);const after=centroid();
+ const mx=after.x-before.x,my=after.y-before.y;
+ if(mx<6||Math.abs(my)>mx*Math.tan(10*Math.PI/180)+1)throw Error('Damage number did not follow incoming attack within ten degrees');
  const hidden={tileSize:16,tw:Math.ceil(w.worldWidth/16),th:Math.ceil(w.worldHeight/16),light:new Float32Array(Math.ceil(w.worldWidth/16)*Math.ceil(w.worldHeight/16))};
  ctx.clearRect(0,0,canvas.width,canvas.height);r.draw(ctx,c,n,false,hidden);
  if(ctx.getImageData(0,0,canvas.width,canvas.height).data.some(Boolean))throw Error('Numbers leaked through unseen fog');

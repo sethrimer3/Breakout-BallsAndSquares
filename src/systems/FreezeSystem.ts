@@ -5,6 +5,8 @@ import { MAT, type PixelWorld } from "../world/PixelWorld";
 
 interface PendingShatter {
   isSub: boolean;
+  dx: number;
+  dy: number;
   x: number;
   y: number;
   damage: number;
@@ -238,6 +240,8 @@ export class FreezeSystem {
       this.cellWave[ni] = waveId;
       this.pending.push({
         isSub: false,
+        dx: DX[k],
+        dy: DY[k],
         x: nx,
         y: ny,
         damage,
@@ -273,6 +277,8 @@ export class FreezeSystem {
       this.subWave[ni] = waveId;
       this.pending.push({
         isSub: true,
+        dx: DX[k],
+        dy: DY[k],
         x: nx,
         y: ny,
         damage,
@@ -357,7 +363,7 @@ export class FreezeSystem {
           const door = w.doors[w.doorId[i] - 1];
           if (door && !door.open && door.gate) return;
         }
-        const res = w.damage(cx, cy, item.damage, true);
+        const res = w.damage(cx, cy, item.damage, true, item.dx, item.dy);
         if (res === 2) {
           this.onCellDestroyed(cx, cy, item.triggerOwnerId);
         }
@@ -368,7 +374,7 @@ export class FreezeSystem {
         const sx = item.x;
         const sy = item.y;
         if (!w.subInBounds(sx, sy)) return;
-        const res = w.damageSub(sx, sy, item.damage, true);
+        const res = w.damageSub(sx, sy, item.damage, true, item.dx, item.dy);
         const cx = sx >> 1;
         const cy = sy >> 1;
         if (res === 2) {

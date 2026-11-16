@@ -63,7 +63,7 @@ export class LaserSystem {
         this.visited.add(key); hits++;
         let dealt = damage + s.mods.terrainDamageBonus + (this.world.coreId[index] > 0 ? stats.coreDamageBonus : 0);
         if (this.world.isBlightAt(cx, cy)) dealt = Math.round(dealt * s.mods.blightMult);
-        const result = this.world.damageSub(hit.cx, hit.cy, dealt, true);
+        const result = this.world.damageSub(hit.cx, hit.cy, dealt, true, dx, dy);
         this.events.onImpact(hx, hy, nx, ny, cx, cy, result, sub, s.id);
       }
       if (hits >= PRISM.maxHits) break;
