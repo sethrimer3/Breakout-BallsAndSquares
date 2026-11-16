@@ -1,3 +1,4 @@
+import { RENDER_QUALITIES, type RenderQuality } from "../rendering/RenderScale";
 import { parseProfileSeed, randomProfileSeed } from "../core/ProfileSeed";
 import type { SpeedrunData } from "../core/SpeedrunTimer";
 import { sectorCount, sectorTier } from "../world/labMap";
@@ -131,6 +132,8 @@ export interface SaveData {
     fieryMuzzleFlash: boolean;
     /** Blur shadow edges in open-air light instead of crisp lines. */
     softShadows: boolean;
+    /** Canvas pixel density: "auto" lowers it while frames run slow. */
+    renderQuality: RenderQuality;
     prismPatterns: boolean;
     autoFollowCamera: boolean;
     autoMove: boolean;
@@ -202,6 +205,7 @@ export function defaultSaveData(seed = randomProfileSeed()): SaveData {
       muzzleFlash: "brightest",
       fieryMuzzleFlash: false,
       softShadows: false,
+      renderQuality: "auto",
       prismPatterns: true,
       autoFollowCamera: false,
       autoMove: true,
@@ -420,6 +424,9 @@ export function sanitizeSaveData(raw: unknown): SaveData {
       typeof s.fieryMuzzleFlash === "boolean" ? s.fieryMuzzleFlash : false;
     def.settings.prismPatterns = typeof s.prismPatterns === "boolean" ? s.prismPatterns : true;
     def.settings.softShadows = typeof s.softShadows === "boolean" ? s.softShadows : false;
+    if (typeof s.renderQuality === "string" && (RENDER_QUALITIES as readonly string[]).includes(s.renderQuality)) {
+      def.settings.renderQuality = s.renderQuality as RenderQuality;
+    }
     def.settings.autoFollowCamera =
       typeof s.autoFollowCamera === "boolean" ? s.autoFollowCamera : false;
     def.settings.autoMove = typeof s.autoMove === "boolean" ? s.autoMove : true;

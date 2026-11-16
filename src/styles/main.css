@@ -128,6 +128,13 @@ button {
 }
 
 /* Keep the HUD clear of notches and home indicators (viewport-fit=cover). */
+/* Screen-edge vignette over the game canvas (Renderer sets its gradient). */
+.game-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
 #ui {
   position: fixed;
   top: env(safe-area-inset-top, 0px);

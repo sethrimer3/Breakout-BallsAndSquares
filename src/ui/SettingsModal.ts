@@ -1,3 +1,4 @@
+import { RENDER_QUALITIES, type RenderQuality } from "../rendering/RenderScale";
 import { formatSpeedrunTime } from "../core/SpeedrunTimer";
 import type { Game } from "../Game";
 import { MUZZLE_FLASH_LEVELS, SAVE_SLOTS_COUNT, type MuzzleFlashLevel } from "../progression/SaveManager";
@@ -280,6 +281,10 @@ export class SettingsModal {
         )
         .join("");
 
+      const resBtns = RENDER_QUALITIES.map(
+        (q) =>
+          `<button class="btn set-chip ${set.renderQuality === q ? "btn-primary" : ""}" data-res="${q}">${q.toUpperCase()}</button>`,
+      ).join("");
       const fiery = set.fieryMuzzleFlash;
       const softSh = set.softShadows;
       body.innerHTML = `
@@ -311,6 +316,11 @@ export class SettingsModal {
           <div class="set-chips">${flashBtns}</div>
         </div>
         <div class="set-group">
+          <div class="set-label">RESOLUTION</div>
+          <div class="set-desc">Canvas sharpness. AUTO lowers it when the frame rate drops</div>
+          <div class="set-chips">${resBtns}</div>
+        </div>
+        <div class="set-group">
           <div class="set-label">SHADOW RAY QUALITY</div>
           <div class="set-desc">Ray-traced visibility polygon resolution</div>
           <div class="set-chips">${qualBtns}</div>
@@ -337,6 +347,13 @@ export class SettingsModal {
           const lvl = (btn as HTMLElement).dataset.flash as MuzzleFlashLevel;
           set.muzzleFlash = lvl;
           this.game.save.save();
+          this.render();
+        });
+      });
+
+      body.querySelectorAll("[data-res]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          this.game.setRenderQuality((btn as HTMLElement).dataset.res as RenderQuality);
           this.render();
         });
       });
