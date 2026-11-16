@@ -31,6 +31,7 @@ export class FreezeSystem {
   readonly cellOwner: Int32Array;
   readonly cellWave: Uint32Array;
   private activeCells: number[] = [];
+  private readonly cellListed: Uint8Array;
 
   readonly subTimer: Float32Array;
   readonly subHalfHp: Uint16Array;
@@ -47,6 +48,7 @@ export class FreezeSystem {
 
   constructor(private world: PixelWorld) {
     const n = world.width * world.height;
+    this.cellListed = new Uint8Array(n);
     this.cellTimer = new Float32Array(n);
     this.cellHalfHp = new Uint16Array(n);
     this.cellOwner = new Int32Array(n);
@@ -65,6 +67,7 @@ export class FreezeSystem {
     this.cellOwner.fill(0);
     this.cellWave.fill(0);
     this.activeCells.length = 0;
+    this.cellListed.fill(0);
 
     this.subTimer.fill(0);
     this.subHalfHp.fill(0);
@@ -92,7 +95,7 @@ export class FreezeSystem {
   }
 
   /** Freeze a normal cell without dealing damage. Refreshes duration on overlap. */
-  freezeCell(cx: number, cy: number, ownerId: number, duration = FREEZE.duration): boolean {
+  freezeCell(cx: number, cy: number, ownerId: number, duration: number = FREEZE.duration): boolean {
     if (!this.world.inBounds(cx, cy) || this.world.boundary[cy * this.world.width + cx]) return false;
     const i = cy * this.world.width + cx;
     if (this.world.health[i] === 0) return false;
@@ -101,7 +104,10 @@ export class FreezeSystem {
       const maxHp = Math.max(1, this.world.maxHealthAt(cx, cy));
       this.cellHalfHp[i] = Math.max(1, Math.round(maxHp * 0.5));
       this.cellOwner[i] = ownerId;
-      this.activeCells.push(i);
+      if (!this.cellListed[i]) {
+        this.cellListed[i] = 1;
+        this.activeCells.push(i);
+      }
     }
     if (duration > this.cellTimer[i]) {
       this.cellTimer[i] = duration;
@@ -288,6 +294,7 @@ export class FreezeSystem {
       if (this.cellTimer[i] <= 0 || this.world.health[i] === 0) {
         this.cellTimer[i] = 0;
         this.cellHalfHp[i] = 0;
+        this.cellListed[i] = 0;
         continue;
       }
       this.cellTimer[i] -= dt;
@@ -296,6 +303,7 @@ export class FreezeSystem {
       } else {
         this.cellTimer[i] = 0;
         this.cellHalfHp[i] = 0;
+        this.cellListed[i] = 0;
       }
     }
     this.activeCells.length = keepC;
@@ -373,6 +381,11 @@ export class FreezeSystem {
     } finally {
       this.activeWaveId = prevWave;
     }
+  }
+
+  /** Read-only live indices; timers may be zero until the next update compacts them. */
+  get activeCellIndices(): readonly number[] {
+    return this.activeCells;
   }
 
   get activeFrozenCells(): number {

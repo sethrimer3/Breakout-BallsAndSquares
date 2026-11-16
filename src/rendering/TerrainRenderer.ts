@@ -133,6 +133,8 @@ function ledLevel(r: number, time: number): number {
 export class TerrainRenderer {
   /** Changes only when cached terrain artwork changes, for dependent raster caches. */
   renderRevision = 0;
+  /** Changes as chunks with potentially different alpha are published. */
+  opacityRevision = 0;
   readonly chunks: TerrainChunks;
   private canvases: HTMLCanvasElement[] = [];
   private surfaceOutlines: (Path2D | null)[] = [];
@@ -600,6 +602,10 @@ export class TerrainRenderer {
 
   private buildChunk(k: number): void {
     this.renderRevision++;
+    if (this.chunks.opacityDirty[k]) {
+      this.opacityRevision++;
+      this.chunks.opacityDirty[k] = 0;
+    }
     const { world } = this;
     const cs = this.chunks.chunkSize;
     const texCs = cs * TEX;

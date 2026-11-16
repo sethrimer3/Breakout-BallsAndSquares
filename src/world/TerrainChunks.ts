@@ -1,4 +1,4 @@
-import type { PixelWorld } from "./PixelWorld";
+import { MAT, type PixelWorld } from "./PixelWorld";
 
 /**
  * Tracks which terrain chunks need re-rendering. Pure bookkeeping (no DOM),
@@ -11,6 +11,8 @@ export class TerrainChunks {
   readonly dirty: Uint8Array;
   /** Geometry/classification changed, rather than only HP-dependent artwork. */
   readonly geometryDirty: Uint8Array;
+  /** Alpha may change, including HP-only damage to translucent glass. */
+  readonly opacityDirty: Uint8Array;
   /** Queue of dirty chunk indices (deduplicated via `dirty`). */
   private queue: number[] = [];
 
@@ -20,31 +22,36 @@ export class TerrainChunks {
     this.rows = Math.ceil(world.height / chunkSize);
     this.dirty = new Uint8Array(this.cols * this.rows);
     this.geometryDirty = new Uint8Array(this.dirty.length);
-    world.addListener((cx, cy, kind) => this.markCell(cx, cy, kind !== "damaged"));
+    this.opacityDirty = new Uint8Array(this.dirty.length);
+    world.addListener((cx, cy, kind) => {
+      const geometry = kind !== "damaged";
+      this.markCell(cx, cy, geometry, geometry || world.mat[cy * world.width + cx] === MAT.glass);
+    });
   }
 
   markAll(): void {
     this.queue.length = 0;
     for (let i = 0; i < this.dirty.length; i++) {
-      this.dirty[i] = this.geometryDirty[i] = 1;
+      this.dirty[i] = this.geometryDirty[i] = this.opacityDirty[i] = 1;
       this.queue.push(i);
     }
   }
 
   /** Edge masks read all eight neighbors, including across diagonal chunk boundaries. */
-  markCell(cx: number, cy: number, geometry = true): void {
+  markCell(cx: number, cy: number, geometry = true, opacity = geometry): void {
     for (let y = cy - 1; y <= cy + 1; y++) {
-      for (let x = cx - 1; x <= cx + 1; x++) this.markChunkAt(x, y, geometry);
+      for (let x = cx - 1; x <= cx + 1; x++) this.markChunkAt(x, y, geometry, opacity);
     }
   }
 
-  private markChunkAt(cx: number, cy: number, geometry: boolean): void {
+  private markChunkAt(cx: number, cy: number, geometry: boolean, opacity: boolean): void {
     if (cx < 0 || cy < 0) return;
     const kx = Math.floor(cx / this.chunkSize);
     const ky = Math.floor(cy / this.chunkSize);
     if (kx >= this.cols || ky >= this.rows) return;
     const k = ky * this.cols + kx;
     if (geometry) this.geometryDirty[k] = 1;
+    if (opacity) this.opacityDirty[k] = 1;
     if (!this.dirty[k]) {
       this.dirty[k] = 1;
       this.queue.push(k);

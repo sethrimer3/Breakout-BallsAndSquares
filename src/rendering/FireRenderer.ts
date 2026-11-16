@@ -16,9 +16,17 @@ const FLAME_STEPS = [0.82, 0.62, 0.44, 0.28, 0.14, -1] as const;
 export class FireRenderer {
   /** Dark, drifting smoke. Call in normal blend mode. */
   drawSmoke(ctx: CanvasRenderingContext2D, cam: CameraSystem, fire: FireSystem): void {
+    // Two artwork pixels plus screen snapping/minimum-size padding retain
+    // smoke touching an edge at any zoom without submitting distant particles.
+    const pad = ART_PIXEL * 2 + 1 / cam.zoom;
+    const x0 = cam.screenToWorldX(0) - pad;
+    const y0 = cam.screenToWorldY(0) - pad;
+    const x1 = cam.screenToWorldX(cam.viewW) + pad;
+    const y1 = cam.screenToWorldY(cam.viewH) + pad;
     ctx.fillStyle = "#1c1816";
     for (let i = 0; i < fire.count; i++) {
       if (fire.kind[i] !== FKind.Smoke) continue;
+      if (fire.x[i] < x0 || fire.x[i] > x1 || fire.y[i] < y0 || fire.y[i] > y1) continue;
       const t = fire.life[i] / fire.maxLife[i];
       // Fade in quickly, then thin out.
       const a = Math.min(1, (1 - t) * 6) * t * 0.55;

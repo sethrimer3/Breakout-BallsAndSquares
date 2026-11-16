@@ -178,10 +178,10 @@ export class LightRenderer {
       }
     }
 
-    // Reuse the silhouette while the camera, device size and terrain artwork
+    // Reuse the silhouette while the camera, device size and terrain opacity
     // are unchanged. Pending chunk work invalidates it as each chunk is built.
     const m = this.maskState, terrain = game.terrain;
-    if (!m || m.terrain !== terrain || m.revision !== terrain.renderRevision ||
+    if (!m || m.terrain !== terrain || m.revision !== terrain.opacityRevision ||
         m.x !== cam.x || m.y !== cam.y || m.zoom !== cam.zoom ||
         m.viewW !== cam.viewW || m.viewH !== cam.viewH || m.dpr !== dpr ||
         m.width !== devW || m.height !== devH) {
@@ -190,7 +190,7 @@ export class LightRenderer {
       mask.clearRect(0, 0, devW, devH);
       mask.setTransform(dpr, 0, 0, dpr, 0, 0);
       terrain.draw(mask, cam);
-      this.maskState = { terrain, revision: terrain.renderRevision, x: cam.x, y: cam.y,
+      this.maskState = { terrain, revision: terrain.opacityRevision, x: cam.x, y: cam.y,
         zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: devW, height: devH, dpr };
     }
 

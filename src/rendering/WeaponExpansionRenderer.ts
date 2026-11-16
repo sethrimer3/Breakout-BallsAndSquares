@@ -165,7 +165,13 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     const y1 = cam.worldToScreenY(b.y1);
     const x2 = cam.worldToScreenX(b.x2);
     const y2 = cam.worldToScreenY(b.y2);
+    // Reject the whole segment bounds, retaining beams crossing the viewport
+    // even when both endpoints are outside. Include stroke and antialias padding.
+    const pad = Math.max(1.5, cam.zoom * 1.6) + 1;
+    // Later frost tint inherits this alpha, even when the last beam is culled.
     ctx.globalAlpha = reduced ? 0.85 : Math.max(0, b.life / b.maxLife);
+    if (Math.max(x1, x2) < -pad || Math.min(x1, x2) > cam.viewW + pad ||
+        Math.max(y1, y2) < -pad || Math.min(y1, y2) > cam.viewH + pad) continue;
     ctx.strokeStyle = b.crit ? "#ffd25a" : "#7eeaff";
     ctx.lineWidth = Math.max(1.5, cam.zoom * 1.6);
     ctx.beginPath();
@@ -203,11 +209,25 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
   const cellPx = cs * cam.zoom;
   if (game.combat.freeze.activeFrozenCells > 0) {
     ctx.fillStyle = "rgba(130, 235, 255, 0.32)";
-    for (let cy = y0; cy <= y1; cy++) {
-      const sy = cam.worldToScreenY(cy * cs);
-      for (let cx = x0; cx <= x1; cx++) {
-        if (game.combat.freeze.cellTimer[cy * W + cx] > 0) {
-          ctx.fillRect(cam.worldToScreenX(cx * cs), sy, cellPx, cellPx);
+    const freeze = game.combat.freeze;
+    // Widespread freezing can outnumber a zoomed-in viewport. Keep that case
+    // bounded by the smaller candidate set instead of scanning the whole world.
+    const visibleCells = Math.max(0, x1 - x0 + 1) * Math.max(0, y1 - y0 + 1);
+    if (freeze.activeFrozenCells <= visibleCells) {
+      for (const i of freeze.activeCellIndices) {
+        if (freeze.cellTimer[i] <= 0) continue;
+        const cx = i % W;
+        const cy = (i - cx) / W;
+        if (cx < x0 || cx > x1 || cy < y0 || cy > y1) continue;
+        ctx.fillRect(cam.worldToScreenX(cx * cs), cam.worldToScreenY(cy * cs), cellPx, cellPx);
+      }
+    } else {
+      for (let cy = y0; cy <= y1; cy++) {
+        const sy = cam.worldToScreenY(cy * cs);
+        for (let cx = x0; cx <= x1; cx++) {
+          if (freeze.cellTimer[cy * W + cx] > 0) {
+            ctx.fillRect(cam.worldToScreenX(cx * cs), sy, cellPx, cellPx);
+          }
         }
       }
     }

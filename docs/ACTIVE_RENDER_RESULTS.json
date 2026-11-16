@@ -1,0 +1,3444 @@
+{
+  "baseline": "f55eb32c387411cfa4d656baa904b6af639386d4",
+  "status": "passed",
+  "samples": 60,
+  "browser": "156.0.8078.79",
+  "pixels": [
+    {
+      "device": "desktop",
+      "label": "frame-freeze-false-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-freeze-false-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-freeze-false-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-freeze-false-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-freeze-true-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-freeze-true-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-freeze-true-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-freeze-true-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-lighting-false-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-lighting-false-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-lighting-false-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-lighting-false-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-lighting-true-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-lighting-true-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-lighting-true-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-lighting-true-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-freeze-false-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-freeze-false-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-freeze-false-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-freeze-false-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-freeze-true-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-freeze-true-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-freeze-true-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-freeze-true-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-lighting-false-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-lighting-false-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-lighting-false-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-lighting-false-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-lighting-true-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-lighting-true-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-lighting-true-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-lighting-true-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-0.5-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-0.5-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "thaw-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-pending-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-compacted-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "smoke-edges-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "rail-crossing-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-0.5-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-0.5-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-1.13-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-1.13-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "thaw-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-pending-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-compacted-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "smoke-edges-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "rail-crossing-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-1.13-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-1.13-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-2.75-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-2.75-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "thaw-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-pending-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-compacted-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "smoke-edges-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "rail-crossing-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-2.75-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-2.75-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-glass",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-destruction",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-growth",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-pan",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-zoom",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-regeneration",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-resize",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-smoke-rail-false-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-smoke-rail-false-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-smoke-rail-false-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-smoke-rail-false-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-smoke-rail-true-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-smoke-rail-true-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-smoke-rail-true-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-smoke-rail-true-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-false-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-false-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-false-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-false-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-true-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-true-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-true-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-true-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-0.5-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-0.5-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "thaw-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-pending-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-compacted-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "smoke-edges-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "rail-crossing-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-0.5-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-0.5-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-1.13-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-1.13-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "thaw-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-pending-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-compacted-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "smoke-edges-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "rail-crossing-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-1.13-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-1.13-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-2.75-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-2.75-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "thaw-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-pending-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-compacted-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "smoke-edges-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "rail-crossing-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-2.75-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-2.75-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-glass",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-destruction",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-growth",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-pan",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-zoom",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-regeneration",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-resize",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-smoke-rail-false-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-smoke-rail-false-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-smoke-rail-false-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-smoke-rail-false-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-smoke-rail-true-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-smoke-rail-true-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-smoke-rail-true-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-smoke-rail-true-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-false-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-false-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-false-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-false-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-true-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-true-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-true-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-true-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    }
+  ],
+  "invalidation": {
+    "ordinaryDamageRebuilds": 0,
+    "checks": [
+      "glass",
+      "destruction",
+      "growth",
+      "pan",
+      "zoom",
+      "regeneration",
+      "resize"
+    ],
+    "maskRebuilds": 8
+  },
+  "scenarios": [
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "freeze",
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.800000000046566,
+          "p95": 20,
+          "p99": 22.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000000546,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.9000000001397,
+          "p95": 21,
+          "p99": 28
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "freeze",
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.600000000093132,
+          "p95": 16.4000000001397,
+          "p99": 19.0999999998603
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000000728,
+          "p95": 33.399999999999636,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 14.200000000186265,
+          "p95": 21.699999999953434,
+          "p99": 31.100000000093132
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.20000000000073,
+          "p95": 33.399999999999636,
+          "p99": 50.100000000000364
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "freeze",
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 22.100000000093132,
+          "p95": 38.199999999953434,
+          "p99": 78.5
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999782,
+          "p95": 50.10000000000218,
+          "p99": 100
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 20.199999999953434,
+          "p95": 34.60000000009313,
+          "p99": 46.199999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 50.10000000000218,
+          "p99": 66.70000000000073
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "freeze",
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.100000000093132,
+          "p95": 22.199999999953434,
+          "p99": 26.399999999906868
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.300000000046566,
+          "p95": 31.199999999953434,
+          "p99": 38
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 50,
+          "p99": 66.70000000000073
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "freeze",
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 36.5,
+          "p95": 43.89999999990687,
+          "p99": 56
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999782,
+          "p95": 50.099999999998545,
+          "p99": 66.79999999999927
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 37.199999999953434,
+          "p95": 79.10000000009313,
+          "p99": 150.30000000004657
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.400000000001455,
+          "p95": 83.29999999999927,
+          "p99": 150
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "freeze",
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 18.899999999906868,
+          "p95": 23.600000000093132,
+          "p99": 24.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.399999999906868,
+          "p95": 20,
+          "p99": 20.299999999813735
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "freeze",
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 38.5,
+          "p95": 46.800000000046566,
+          "p99": 56.199999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 49.900000000001455,
+          "p95": 50.099999999998545,
+          "p99": 66.79999999999563
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 37.799999999813735,
+          "p95": 45.199999999953434,
+          "p99": 57.89999999990687
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.400000000001455,
+          "p95": 50.099999999998545,
+          "p99": 66.60000000000582
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "freeze",
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 19.699999999953434,
+          "p95": 23.300000000046566,
+          "p99": 28.5
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 19.300000000046566,
+          "p95": 21.4000000001397,
+          "p99": 23.300000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "lighting",
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.100000000093132,
+          "p95": 20,
+          "p99": 21.5
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.0999999998603,
+          "p95": 18.899999999906868,
+          "p99": 22
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "lighting",
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 14.100000000093132,
+          "p95": 17.4000000001397,
+          "p99": 36.60000000009313
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000004366,
+          "p95": 33.400000000001455,
+          "p99": 49.900000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.700000000186265,
+          "p95": 16.800000000046566,
+          "p99": 18.5
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000004366,
+          "p95": 33.400000000001455,
+          "p99": 33.5
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "lighting",
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.199999999953434,
+          "p95": 22.4000000001397,
+          "p99": 29.5999999998603
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.899999999906868,
+          "p95": 20.300000000046566,
+          "p99": 20.9000000001397
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.200000000004366,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "lighting",
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 15.5,
+          "p95": 26.899999999906868,
+          "p99": 44.10000000009313
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 50,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 15.5,
+          "p95": 19.800000000046566,
+          "p99": 34.39999999990687
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.80000000000291,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "lighting",
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 19.5,
+          "p95": 28.199999999953434,
+          "p99": 48.39999999990687
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 66.60000000000582
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 18.5,
+          "p95": 23.5,
+          "p99": 27.0999999998603
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.400000000001455,
+          "p99": 33.40000000000873
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "lighting",
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 19,
+          "p95": 21.699999999953434,
+          "p99": 23.0999999998603
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.40000000000873,
+          "p99": 33.40000000000873
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.5999999998603,
+          "p95": 21.699999999953434,
+          "p99": 30.300000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.40000000000873,
+          "p99": 49.89999999999418
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "lighting",
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 19,
+          "p95": 26.700000000186265,
+          "p99": 39.200000000186265
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 66.59999999999127
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 19.100000000093132,
+          "p95": 25.800000000046566,
+          "p99": 47.0999999998603
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.40000000000873,
+          "p99": 50
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "lighting",
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 18.700000000186265,
+          "p95": 19.600000000093132,
+          "p99": 20.100000000093132
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999998836,
+          "p95": 33.40000000000873,
+          "p99": 33.40000000000873
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 18.399999999906868,
+          "p95": 22.699999999953434,
+          "p99": 23.300000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.40000000000873,
+          "p99": 33.40000000000873
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "freeze",
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 14.200000000186265,
+          "p95": 16.399999999906868,
+          "p99": 23
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.799999999999272,
+          "p95": 33.399999999999636,
+          "p99": 33.399999999999636
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 14.300000000046566,
+          "p95": 17.600000000093132,
+          "p99": 23.9000000001397
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000000728,
+          "p95": 33.399999999999636,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "freeze",
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 14,
+          "p95": 17.5,
+          "p99": 21.600000000093132
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000000728,
+          "p95": 33.399999999999636,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.799999999813735,
+          "p95": 15.700000000186265,
+          "p99": 16.300000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000000728,
+          "p95": 33.399999999999636,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "freeze",
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.199999999953434,
+          "p95": 20.399999999906868,
+          "p99": 37.300000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.600000000093132,
+          "p95": 20.199999999953434,
+          "p99": 34.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50.099999999998545
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "freeze",
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.600000000093132,
+          "p95": 20.5,
+          "p99": 28.600000000093132
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 16,
+          "p95": 18.199999999953434,
+          "p99": 19.5
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 33.5
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "freeze",
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 14.800000000046566,
+          "p95": 18.899999999906868,
+          "p99": 25.0999999998603
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 33.5
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 14.899999999906868,
+          "p95": 18.399999999906868,
+          "p99": 26.600000000093132
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "freeze",
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 20.899999999906868,
+          "p95": 24.299999999813735,
+          "p99": 32.9000000001397
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 50,
+          "p99": 50.099999999998545
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 20.800000000046566,
+          "p95": 25.0999999998603,
+          "p99": 104.89999999990687
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 116.59999999999854
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "freeze",
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 20.100000000093132,
+          "p95": 24.600000000093132,
+          "p99": 37.9000000001397
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 20.100000000093132,
+          "p95": 24.199999999953434,
+          "p99": 34.199999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "freeze",
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 24.399999999906868,
+          "p95": 28.5999999998603,
+          "p99": 32.5
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.099999999998545
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 24.300000000046566,
+          "p95": 27.800000000046566,
+          "p99": 28.299999999813735
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.099999999998545
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "lighting",
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.399999999906868,
+          "p95": 19.600000000093132,
+          "p99": 27.9000000001397
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.899999999906868,
+          "p95": 18.5,
+          "p99": 27.200000000186265
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.80000000000291,
+          "p95": 33.400000000001455,
+          "p99": 133.3000000000029
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "lighting",
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 14.700000000186265,
+          "p95": 17.100000000093132,
+          "p99": 19.199999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000004366,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.699999999953434,
+          "p95": 16.799999999813735,
+          "p99": 34.300000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.69999999999709,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "lighting",
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.800000000046566,
+          "p95": 19.300000000046566,
+          "p99": 34
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.700000000186265,
+          "p95": 20,
+          "p99": 25.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "lighting",
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.399999999906868,
+          "p95": 20,
+          "p99": 21
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.399999999906868,
+          "p95": 25.699999999953434,
+          "p99": 69
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 83.40000000000146
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "lighting",
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 18.600000000093132,
+          "p95": 20.5,
+          "p99": 22.100000000093132
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 33.5
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 17,
+          "p95": 20.0999999998603,
+          "p99": 21.0999999998603
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "lighting",
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 23.800000000046566,
+          "p95": 30.0999999998603,
+          "p99": 52.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 66.60000000000582
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 22,
+          "p95": 23.899999999906868,
+          "p99": 25.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.40000000000873,
+          "p99": 33.5
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "lighting",
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 19.899999999906868,
+          "p95": 22.899999999906868,
+          "p99": 43.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.40000000000873,
+          "p99": 66.60000000000582
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 19.800000000046566,
+          "p95": 22.899999999906868,
+          "p99": 26.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.40000000000873,
+          "p99": 50.09999999999127
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "lighting",
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 0,
+      "beams": 0,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 24.5,
+          "p95": 27,
+          "p99": 28.5
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.10000000000582
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 24.5,
+          "p95": 28.5,
+          "p99": 44.200000000186265
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.10000000000582
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "smoke-rail",
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 16,
+          "p95": 21.800000000046566,
+          "p99": 25.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.399999999999636,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 15.800000000046566,
+          "p95": 21.4000000001397,
+          "p99": 21.899999999906868
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.399999999999636,
+          "p99": 33.5
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "smoke-rail",
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.800000000046566,
+          "p95": 29.199999999953434,
+          "p99": 37.799999999813735
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.799999999999272,
+          "p95": 50,
+          "p99": 50.100000000000364
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 14.800000000046566,
+          "p95": 31.300000000046566,
+          "p99": 42.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 50,
+          "p99": 50.10000000000218
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "smoke-rail",
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 18,
+          "p95": 23.300000000046566,
+          "p99": 25.100000000093132
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 18.199999999953434,
+          "p95": 32.60000000009313,
+          "p99": 98.30000000004657
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 116.70000000000073
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "smoke-rail",
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 22.5,
+          "p95": 29.399999999906868,
+          "p99": 47.4000000001397
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 50.10000000000218,
+          "p99": 66.59999999999854
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 24.800000000046566,
+          "p95": 29.699999999953434,
+          "p99": 63
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50.099999999998545,
+          "p99": 83.20000000000073
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "smoke-rail",
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 24,
+          "p95": 34.10000000009313,
+          "p99": 64
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 83.40000000000146
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 23.299999999813735,
+          "p95": 35.700000000186265,
+          "p99": 54
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 66.70000000000073,
+          "p99": 99.90000000000146
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "smoke-rail",
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 18.899999999906868,
+          "p95": 25.300000000046566,
+          "p99": 37.300000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.400000000001455,
+          "p99": 50.10000000000582
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 18.800000000046566,
+          "p95": 24.9000000001397,
+          "p99": 35.199999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.400000000001455,
+          "p99": 49.900000000001455
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "smoke-rail",
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 21.300000000046566,
+          "p95": 30.299999999813735,
+          "p99": 41.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.099999999998545
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 21.300000000046566,
+          "p95": 28.4000000001397,
+          "p99": 38.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.099999999998545
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "smoke-rail",
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 21,
+          "p95": 29,
+          "p99": 38.10000000009313
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 66.69999999999709
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 21.199999999953434,
+          "p95": 27.5,
+          "p99": 108.19999999995343
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.5,
+          "p99": 66.69999999999709
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 24.5999999998603,
+          "p95": 33.199999999953434,
+          "p99": 40.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.400000000001455,
+          "p95": 50.10000000000582,
+          "p99": 83.19999999999709
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 23.100000000093132,
+          "p95": 31.300000000046566,
+          "p99": 40.300000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.400000000001455,
+          "p95": 50.099999999998545,
+          "p99": 100
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 25.199999999953434,
+          "p95": 32.39999999990687,
+          "p99": 56.199999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.400000000001455,
+          "p95": 50.099999999998545,
+          "p99": 83.40000000000146
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 20.5999999998603,
+          "p95": 31.4000000001397,
+          "p99": 36.300000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999418,
+          "p95": 50,
+          "p99": 66.59999999999854
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 30.0999999998603,
+          "p95": 45.299999999813735,
+          "p99": 62.39999999990687
+        },
+        "interval": {
+          "n": 60,
+          "p50": 50,
+          "p95": 66.70000000000437,
+          "p99": 83.40000000000146
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 27.300000000046566,
+          "p95": 42.60000000009313,
+          "p99": 108.60000000009313
+        },
+        "interval": {
+          "n": 60,
+          "p50": 50,
+          "p95": 66.69999999999709,
+          "p99": 133.20000000000437
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 21.5,
+          "p95": 25.700000000186265,
+          "p99": 28
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.10000000000582
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 22.5,
+          "p95": 27.700000000186265,
+          "p99": 33.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.10000000000582
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 37.39999999990687,
+          "p95": 51.199999999953434,
+          "p99": 82.39999999990687
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999418,
+          "p95": 50.10000000000582,
+          "p99": 99.89999999999418
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 38.10000000009313,
+          "p95": 74.29999999981374,
+          "p99": 79.30000000004657
+        },
+        "interval": {
+          "n": 60,
+          "p50": 49.89999999999418,
+          "p95": 66.70000000001164,
+          "p99": 83.40000000000873
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 22.300000000046566,
+          "p95": 24.899999999906868,
+          "p99": 27.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 66.69999999999709
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 22.800000000046566,
+          "p95": 27.100000000093132,
+          "p99": 29.199999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999418,
+          "p95": 50,
+          "p99": 50.09999999999127
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 53.199999999953434,
+          "p95": 75.5999999998603,
+          "p99": 94.89999999990687
+        },
+        "interval": {
+          "n": 60,
+          "p50": 66.59999999999127,
+          "p95": 83.30000000000291,
+          "p99": 100
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 51.299999999813735,
+          "p95": 63,
+          "p99": 85.80000000004657
+        },
+        "interval": {
+          "n": 60,
+          "p50": 50,
+          "p95": 66.69999999999709,
+          "p99": 83.40000000000873
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 22.700000000186265,
+          "p95": 28.300000000046566,
+          "p99": 35
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 23,
+          "p95": 30.199999999953434,
+          "p99": 55.199999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999418,
+          "p95": 50.10000000000582,
+          "p99": 66.59999999999127
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "smoke-rail",
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.400000000139698,
+          "p95": 17.699999999953434,
+          "p99": 41
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000000728,
+          "p95": 33.399999999999636,
+          "p99": 66.70000000000073
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.399999999906868,
+          "p95": 15.800000000046566,
+          "p99": 98.4000000001397
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000000728,
+          "p95": 33.400000000000546,
+          "p99": 100
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "smoke-rail",
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.399999999906868,
+          "p95": 16.399999999906868,
+          "p99": 21.600000000093132
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000000728,
+          "p95": 33.399999999999636,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.600000000093132,
+          "p95": 17.300000000046566,
+          "p99": 46.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000000728,
+          "p95": 33.399999999999636,
+          "p99": 66.70000000000073
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "smoke-rail",
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 17.300000000046566,
+          "p95": 20.4000000001397,
+          "p99": 23.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.800000000046566,
+          "p95": 19.300000000046566,
+          "p99": 49.4000000001397
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 66.69999999999709
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "smoke-rail",
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 2,
+      "activeFrozen": 0,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.699999999953434,
+          "p95": 20,
+          "p99": 22.700000000186265
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 16.5999999998603,
+          "p95": 18.899999999906868,
+          "p99": 59.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 83.40000000000146
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "smoke-rail",
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 15.5,
+          "p95": 18.800000000046566,
+          "p99": 23.399999999906868
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 15.199999999953434,
+          "p95": 17.5,
+          "p99": 43.5
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.20000000000073,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "smoke-rail",
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 19.5,
+          "p95": 27.399999999906868,
+          "p99": 36.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.5,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 19.600000000093132,
+          "p95": 21.5,
+          "p99": 34.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50.099999999998545
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "smoke-rail",
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 18.399999999906868,
+          "p95": 22.899999999906868,
+          "p99": 55.5
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 66.59999999999854
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 18.199999999953434,
+          "p95": 20.699999999953434,
+          "p99": 23.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "smoke-rail",
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 0,
+      "softLights": 21,
+      "activeFrozen": 0,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 23,
+          "p95": 27.300000000046566,
+          "p99": 42.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.099999999998545
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 23,
+          "p95": 26.0999999998603,
+          "p99": 39.60000000009313
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 33.400000000001455,
+          "p99": 50.10000000000582
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 15.5,
+          "p95": 18,
+          "p99": 20
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.299999999995634,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.900000000139698,
+          "p95": 16.800000000046566,
+          "p99": 22.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000004366,
+          "p95": 33.400000000001455,
+          "p99": 66.70000000000437
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 15.199999999953434,
+          "p95": 17.800000000046566,
+          "p99": 20.600000000093132
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.200000000004366,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 13.600000000093132,
+          "p95": 16.5,
+          "p99": 27.5999999998603
+        },
+        "interval": {
+          "n": 60,
+          "p50": 16.700000000004366,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 21.4000000001397,
+          "p95": 33.300000000046566,
+          "p99": 37.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.099999999998545
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 19.699999999953434,
+          "p95": 31.5,
+          "p99": 60.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 83.30000000000291
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 21.600000000093132,
+          "p95": 27.800000000046566,
+          "p99": 34.0999999998603
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.099999999998545
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 23.199999999953434,
+          "p95": 28.199999999953434,
+          "p99": 43.800000000046566
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999418,
+          "p95": 50,
+          "p99": 50.10000000000582
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 24.300000000046566,
+          "p95": 35.89999999990687,
+          "p99": 55.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.400000000001455,
+          "p95": 50.10000000000582,
+          "p99": 66.80000000000291
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 23.300000000046566,
+          "p95": 28.600000000093132,
+          "p99": 39.4000000001397
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.400000000001455,
+          "p95": 50.099999999998545,
+          "p99": 66.69999999999709
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 24.100000000093132,
+          "p95": 27.0999999998603,
+          "p99": 34.60000000009313
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 50.10000000000582
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 24.5999999998603,
+          "p95": 35,
+          "p99": 105.69999999995343
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999418,
+          "p95": 50.10000000000582,
+          "p99": 116.69999999999709
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 22.700000000186265,
+          "p95": 30.0999999998603,
+          "p99": 34.699999999953434
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999418,
+          "p95": 50.09999999999127,
+          "p99": 66.59999999999127
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 21.300000000046566,
+          "p95": 39,
+          "p99": 67.89999999990687
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999418,
+          "p95": 66.69999999999709,
+          "p99": 100
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155602,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 60,
+          "p50": 24.699999999953434,
+          "p95": 50.700000000186265,
+          "p99": 60.9000000001397
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.39999999999418,
+          "p95": 66.69999999999709,
+          "p99": 83.40000000000873
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 60,
+          "p50": 23.600000000093132,
+          "p95": 32.5,
+          "p99": 55.89999999990687
+        },
+        "interval": {
+          "n": 60,
+          "p50": 33.30000000000291,
+          "p95": 50,
+          "p99": 83.40000000000873
+        }
+      }
+    }
+  ],
+  "notes": [
+    "Freeze and lighting timings retained from the full matrix; smoke-rail and combined timings rerun after the rail alpha-state correction.",
+    "CPU times include Renderer.draw and common terrain updates on a shared terrain cache; simulation and shadow tracing are excluded.",
+    "Mobile emulates viewport/device scale on the same cloud CPU; it is not physical mobile hardware."
+  ]
+}
