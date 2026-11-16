@@ -156,6 +156,8 @@ export class TerrainRenderer {
   private edgeImage: ImageData;
   /** Bumped whenever a chunk's mask changes, so the fire knows to repaint. */
   private edgeVersion = 0;
+  private edgeChunkVersion: Uint32Array;
+  private dormantChunkVersion: Uint32Array;
   private edgeUnion = document.createElement("canvas");
   private edgeFire = document.createElement("canvas");
   private edgeFireLow = document.createElement("canvas");
@@ -203,6 +205,8 @@ export class TerrainRenderer {
     const edgeSize = subChunk * EDGE_PIXELS_PER_SUB;
     this.edgeMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
     this.edgeLive = new Uint8Array(n);
+    this.edgeChunkVersion = new Uint32Array(n);
+    this.dormantChunkVersion = new Uint32Array(n);
     this.edgeVisibility = new Uint8Array(n);
     this.dormantMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
     this.dormantLive = new Uint8Array(n);
@@ -812,15 +816,16 @@ export class TerrainRenderer {
     // Reuse the albedo pixels, masking everything except living Blight.
     // This cache changes with its terrain chunk, never by scanning the view.
     let hasBlight = false;
-    for (let ty = 0; ty < texCs; ty++) for (let tx = 0; tx < texCs; tx++) {
-      const cx = kx * cs + Math.floor(tx / TEX), cy = ky * cs + Math.floor(ty / TEX);
-      const i = cy * W + cx;
-      const sx = cx * 2 + Math.floor((tx % TEX) / (TEX / 2));
-      const sy = cy * 2 + Math.floor((ty % TEX) / (TEX / 2));
-      const blight = world.inBounds(cx, cy) && (health[i] > 0
-        ? !!world.blight[i] : world.isBlightSubAt(sx, sy));
-      if (blight) hasBlight = true;
-      else data[(ty * texCs + tx) * 4 + 3] = 0;
+    // Classify once per half-cell, rather than once for every albedo texel.
+    const halfTex = TEX / 2;
+    for (let ly = 0; ly < cs * 2; ly++) for (let lx = 0; lx < cs * 2; lx++) {
+      const sx = kx * cs * 2 + lx, sy = ky * cs * 2 + ly;
+      const blight = world.isBlightSubAt(sx, sy);
+      if (blight) { hasBlight = true; continue; }
+      const tx = lx * halfTex, ty = ly * halfTex;
+      for (let oy = 0; oy < halfTex; oy++) for (let ox = 0; ox < halfTex; ox++) {
+        data[((ty + oy) * texCs + tx + ox) * 4 + 3] = 0;
+      }
     }
     if (hasBlight) {
       const canvas = this.blightCanvases[k] ?? document.createElement("canvas");
@@ -1005,12 +1010,12 @@ export class TerrainRenderer {
     if (count === 0) {
       if (this.edgeLive[k]) {
         this.edgeLive[k] = 0;
-        this.edgeVersion++;
+        this.edgeChunkVersion[k] = ++this.edgeVersion;
       }
     } else {
       this.edgeMasks[k] = this.writeMask(this.edgeMasks[k]);
       this.edgeLive[k] = 1;
-      this.edgeVersion++;
+      this.edgeChunkVersion[k] = ++this.edgeVersion;
     }
     const dCount = dormant
       ? markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid, (sx, sy) => dormant(sy * sw + sx))
@@ -1018,12 +1023,12 @@ export class TerrainRenderer {
     if (dCount === 0) {
       if (this.dormantLive[k]) {
         this.dormantLive[k] = 0;
-        this.dormantVersion++;
+        this.dormantChunkVersion[k] = ++this.dormantVersion;
       }
     } else {
       this.dormantMasks[k] = this.writeMask(this.dormantMasks[k]);
       this.dormantLive[k] = 1;
-      this.dormantVersion++;
+      this.dormantChunkVersion[k] = ++this.dormantVersion;
     }
   }
 
@@ -1105,7 +1110,10 @@ export class TerrainRenderer {
     if (kx1 < 0) return;
     const w = (kx1 - kx0 + 1) * size;
     const h = (ky1 - ky0 + 1) * size;
-    const version = frozen ? this.dormantVersion : this.edgeVersion;
+    // Growth outside this view must not invalidate the visible fire/mask cache.
+    const revisions = frozen ? this.dormantChunkVersion : this.edgeChunkVersion;
+    let version = "";
+    for (let ky = ky0; ky <= ky1; ky++) for (let kx = kx0; kx <= kx1; kx++) version += revisions[ky * cols + kx] + ",";
     const tick = frozen ? "frozen" : `${Math.floor(seconds * EDGE_FIRE_FPS)}`;
     const key = `${tick}:${version}:${kx0}:${ky0}:${kx1}:${ky1}:${shrink}`;
     if (key !== (frozen ? this.dormantFireKey : this.edgeFireKey)) {

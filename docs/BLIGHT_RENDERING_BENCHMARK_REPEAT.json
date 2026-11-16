@@ -1,0 +1,450 @@
+[
+  {
+    "device": {
+      "name": "desktop",
+      "width": 1200,
+      "height": 800,
+      "scale": 1,
+      "cpu": 1
+    },
+    "zoom": 0.5,
+    "moving": false,
+    "growth": "visible",
+    "baseline": {
+      "p50": 3.899999998509884,
+      "p95": 4.800000000745058,
+      "p99": 5.400000002235174
+    },
+    "updated": {
+      "p50": 3.5,
+      "p95": 6,
+      "p99": 7
+    },
+    "paints": [
+      68,
+      68
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "desktop",
+      "width": 1200,
+      "height": 800,
+      "scale": 1,
+      "cpu": 1
+    },
+    "zoom": 0.5,
+    "moving": false,
+    "growth": "offscreen",
+    "baseline": {
+      "p50": 2.100000001490116,
+      "p95": 4.099999997764826,
+      "p99": 4.899999998509884
+    },
+    "updated": {
+      "p50": 0.5999999977648258,
+      "p95": 2.199999999254942,
+      "p99": 4.199999999254942
+    },
+    "paints": [
+      68,
+      20
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "desktop",
+      "width": 1200,
+      "height": 800,
+      "scale": 1,
+      "cpu": 1
+    },
+    "zoom": 0.5,
+    "moving": true,
+    "growth": "visible",
+    "baseline": {
+      "p50": 3.300000000745058,
+      "p95": 6.100000001490116,
+      "p99": 7
+    },
+    "updated": {
+      "p50": 3.100000001490116,
+      "p95": 5.600000001490116,
+      "p99": 5.900000002235174
+    },
+    "paints": [
+      68,
+      68
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "desktop",
+      "width": 1200,
+      "height": 800,
+      "scale": 1,
+      "cpu": 1
+    },
+    "zoom": 0.5,
+    "moving": true,
+    "growth": "offscreen",
+    "baseline": {
+      "p50": 2.300000000745058,
+      "p95": 4.600000001490116,
+      "p99": 6.200000002980232
+    },
+    "updated": {
+      "p50": 0.6999999992549419,
+      "p95": 4,
+      "p99": 5.800000000745058
+    },
+    "paints": [
+      68,
+      20
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "desktop",
+      "width": 1200,
+      "height": 800,
+      "scale": 1,
+      "cpu": 1
+    },
+    "zoom": 1.13,
+    "moving": false,
+    "growth": "visible",
+    "baseline": {
+      "p50": 3,
+      "p95": 4.399999998509884,
+      "p99": 5.900000002235174
+    },
+    "updated": {
+      "p50": 2.7999999970197678,
+      "p95": 4.100000001490116,
+      "p99": 4.699999999254942
+    },
+    "paints": [
+      68,
+      68
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "desktop",
+      "width": 1200,
+      "height": 800,
+      "scale": 1,
+      "cpu": 1
+    },
+    "zoom": 1.13,
+    "moving": false,
+    "growth": "offscreen",
+    "baseline": {
+      "p50": 2.100000001490116,
+      "p95": 3.600000001490116,
+      "p99": 20.800000000745058
+    },
+    "updated": {
+      "p50": 0.5,
+      "p95": 3.600000001490116,
+      "p99": 19.5
+    },
+    "paints": [
+      68,
+      20
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "desktop",
+      "width": 1200,
+      "height": 800,
+      "scale": 1,
+      "cpu": 1
+    },
+    "zoom": 1.13,
+    "moving": true,
+    "growth": "visible",
+    "baseline": {
+      "p50": 2.800000000745058,
+      "p95": 3.300000000745058,
+      "p99": 3.5
+    },
+    "updated": {
+      "p50": 2.699999999254942,
+      "p95": 3.300000000745058,
+      "p99": 3.600000001490116
+    },
+    "paints": [
+      68,
+      68
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "desktop",
+      "width": 1200,
+      "height": 800,
+      "scale": 1,
+      "cpu": 1
+    },
+    "zoom": 1.13,
+    "moving": true,
+    "growth": "offscreen",
+    "baseline": {
+      "p50": 2,
+      "p95": 2.5,
+      "p99": 5.100000001490116
+    },
+    "updated": {
+      "p50": 0.5,
+      "p95": 1.9000000022351742,
+      "p99": 2
+    },
+    "paints": [
+      68,
+      20
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "scale": 2,
+      "cpu": 4
+    },
+    "zoom": 0.5,
+    "moving": false,
+    "growth": "visible",
+    "baseline": {
+      "p50": 15,
+      "p95": 21.399999998509884,
+      "p99": 22.100000001490116
+    },
+    "updated": {
+      "p50": 15.100000001490116,
+      "p95": 20.599999997764826,
+      "p99": 48.599999997764826
+    },
+    "paints": [
+      68,
+      68
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "scale": 2,
+      "cpu": 4
+    },
+    "zoom": 0.5,
+    "moving": false,
+    "growth": "offscreen",
+    "baseline": {
+      "p50": 11.5,
+      "p95": 17.399999998509884,
+      "p99": 21
+    },
+    "updated": {
+      "p50": 3.2000000029802322,
+      "p95": 13.600000001490116,
+      "p99": 45.30000000074506
+    },
+    "paints": [
+      68,
+      20
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "scale": 2,
+      "cpu": 4
+    },
+    "zoom": 0.5,
+    "moving": true,
+    "growth": "visible",
+    "baseline": {
+      "p50": 15.599999997764826,
+      "p95": 20.199999999254942,
+      "p99": 74.09999999776483
+    },
+    "updated": {
+      "p50": 15.300000000745058,
+      "p95": 19.900000002235174,
+      "p99": 24.800000000745058
+    },
+    "paints": [
+      68,
+      68
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "scale": 2,
+      "cpu": 4
+    },
+    "zoom": 0.5,
+    "moving": true,
+    "growth": "offscreen",
+    "baseline": {
+      "p50": 10.800000000745058,
+      "p95": 12.800000000745058,
+      "p99": 13.599999997764826
+    },
+    "updated": {
+      "p50": 2.899999998509884,
+      "p95": 11.800000000745058,
+      "p99": 12.100000001490116
+    },
+    "paints": [
+      68,
+      20
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "scale": 2,
+      "cpu": 4
+    },
+    "zoom": 1.13,
+    "moving": false,
+    "growth": "visible",
+    "baseline": {
+      "p50": 13.200000002980232,
+      "p95": 20.800000000745058,
+      "p99": 23.600000001490116
+    },
+    "updated": {
+      "p50": 13.299999997019768,
+      "p95": 16.599999997764826,
+      "p99": 21.899999998509884
+    },
+    "paints": [
+      68,
+      68
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "scale": 2,
+      "cpu": 4
+    },
+    "zoom": 1.13,
+    "moving": false,
+    "growth": "offscreen",
+    "baseline": {
+      "p50": 9.600000001490116,
+      "p95": 16.199999999254942,
+      "p99": 17.600000001490116
+    },
+    "updated": {
+      "p50": 2.600000001490116,
+      "p95": 9.5,
+      "p99": 49.600000001490116
+    },
+    "paints": [
+      68,
+      20
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "scale": 2,
+      "cpu": 4
+    },
+    "zoom": 1.13,
+    "moving": true,
+    "growth": "visible",
+    "baseline": {
+      "p50": 14,
+      "p95": 18.300000000745058,
+      "p99": 27.800000000745058
+    },
+    "updated": {
+      "p50": 13.699999999254942,
+      "p95": 21.800000000745058,
+      "p99": 87.30000000074506
+    },
+    "paints": [
+      68,
+      68
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  },
+  {
+    "device": {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "scale": 2,
+      "cpu": 4
+    },
+    "zoom": 1.13,
+    "moving": true,
+    "growth": "offscreen",
+    "baseline": {
+      "p50": 9.100000001490116,
+      "p95": 10.5,
+      "p99": 10.800000000745058
+    },
+    "updated": {
+      "p50": 2.199999999254942,
+      "p95": 9.299999997019768,
+      "p99": 10.199999999254942
+    },
+    "paints": [
+      68,
+      20
+    ],
+    "changedChannels": 0,
+    "maxDelta": 0
+  }
+]
