@@ -133,14 +133,14 @@ export class LightRenderer {
   private layerCtx: CanvasRenderingContext2D;
   private maskState: {
     terrain: Game["terrain"]; revision: number; x: number; y: number; zoom: number;
-    viewW: number; viewH: number; width: number; height: number; dpr: number;
+    viewW: number; viewH: number; width: number; height: number; dpr: number; ambient: string;
   } | null = null;
   private maskCanvas: HTMLCanvasElement;
   private maskCtx: CanvasRenderingContext2D;
-  private vignetteCanvas: HTMLCanvasElement;
   private softener = new CanvasSoftener(SOFT_SHADOWS);
   /** Set per frame from the visual setting. */
   private softShadows = false;
+  private emptyLightmap: { mask: object; soft: boolean } | null = null;
   private readonly layerRegion = new LightRegion();
   private previousLayerRegion: ScreenRect | null = null;
   private fixtureView: readonly number[] | null = null;
@@ -148,8 +148,6 @@ export class LightRenderer {
   private readonly fixturePaths = new WeakMap<Float32Array, {
     count: number; screen: Path2D; x: number; y: number; zoom: number; w: number; h: number;
   }>();
-  private vigW = 0;
-  private vigH = 0;
 
   /** One pixel per world cell: light added to wall cells this frame. */
   private wallCanvas: HTMLCanvasElement;
@@ -169,7 +167,6 @@ export class LightRenderer {
     [this.layerCanvas, this.layerCtx] = makeLayer(true);
     [this.maskCanvas, this.maskCtx] = makeLayer(true);
     [this.wallCanvas, this.wallCtx] = makeLayer(true);
-    this.vignetteCanvas = document.createElement("canvas");
   }
 
   /** Build the lightmap and composite it onto the scene in `ctx`. */
@@ -190,34 +187,64 @@ export class LightRenderer {
       }
     }
 
-    // Reuse the silhouette while the camera, device size and terrain opacity
+    const [ar, ag, ab] = worldAtmosphere(game.world, cam.x, cam.y)?.ambient ?? LIGHT.ambientRgb;
+    const ambient = `rgb(${ar}, ${ag}, ${ab})`;
+
+    // Reuse the ambient-colored silhouette while camera, size and terrain opacity
     // are unchanged. Pending chunk work invalidates it as each chunk is built.
     const m = this.maskState, terrain = game.terrain;
     if (!m || m.terrain !== terrain || m.revision !== terrain.opacityRevision ||
         m.x !== cam.x || m.y !== cam.y || m.zoom !== cam.zoom ||
         m.viewW !== cam.viewW || m.viewH !== cam.viewH || m.dpr !== dpr ||
-        m.width !== devW || m.height !== devH) {
+        m.width !== devW || m.height !== devH || m.ambient !== ambient) {
       const mask = this.maskCtx;
       mask.setTransform(1, 0, 0, 1, 0, 0);
+      mask.globalCompositeOperation = "source-over";
       mask.clearRect(0, 0, devW, devH);
       mask.setTransform(dpr, 0, 0, dpr, 0, 0);
       terrain.draw(mask, cam);
+      mask.setTransform(1, 0, 0, 1, 0, 0);
+      mask.globalCompositeOperation = "source-in";
+      mask.fillStyle = ambient;
+      mask.fillRect(0, 0, devW, devH);
+      mask.globalCompositeOperation = "source-over";
       this.maskState = { terrain, revision: terrain.opacityRevision, x: cam.x, y: cam.y,
-        zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: devW, height: devH, dpr };
+        zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: devW, height: devH, dpr, ambient };
     }
+
+    // Empty views need only the ambient/terrain result. Reuse that exact
+    // upstream composite, including its blurred screen edges, instead of
+    // repeating the full-screen primary pass. Any possible light disables it.
+    let empty = game.world.roomLights.length === 0 && game.flashes.length === 0 && game.growth.glowCount === 0;
+    for (let i = 0; empty && i < game.lighting.softCount; i++) {
+      const light = game.lighting.softLights[i];
+      const x = cam.worldToScreenX(light.x), y = cam.worldToScreenY(light.y), r = light.radius * cam.zoom;
+      if (light.lit.count > 0 || (x + r >= -2 && y + r >= -2 && x - r <= viewW + 2 && y - r <= viewH + 2)) empty = false;
+    }
+    if (empty && this.emptyLightmap?.mask === this.maskState && this.emptyLightmap.soft === this.softShadows) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = "multiply";
+      ctx.drawImage(this.lmCanvas, 0, 0);
+      ctx.restore();
+      return;
+    }
+    this.emptyLightmap = null;
 
     const g = this.lmCtx;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // 1) Fill with dark ambient illumination.
-    const [ar, ag, ab] = worldAtmosphere(game.world, cam.x, cam.y)?.ambient ?? LIGHT.ambientRgb;
     g.globalCompositeOperation = "source-over";
     g.globalAlpha = 1;
-    g.fillStyle = `rgb(${ar}, ${ag}, ${ab})`;
+    g.fillStyle = ambient;
     g.fillRect(0, 0, viewW, viewH);
 
     // 2) Light in open air: glows and muzzle flashes, each clipped by its polygon.
-    const air = this.beginLayer(devW, devH, dpr);
+    // Primary air lights use the upstream direct ambient-lightmap path. Only
+    // the separate muzzle-scatter layer needs a temporary cropped buffer.
+    const air = g;
+    air.globalCompositeOperation = "lighter";
     const soft = game.lighting.softLights;
     for (let i = 0; i < game.lighting.softCount; i++) {
       const l = soft[i];
@@ -225,7 +252,6 @@ export class LightRenderer {
       const sy = cam.worldToScreenY(l.y);
       const rad = l.radius * cam.zoom;
       if (sx + rad < -2 || sy + rad < -2 || sx - rad > viewW + 2 || sy - rad > viewH + 2) continue;
-      this.layerRegion.include(sx, sy, rad);
       if (l.polyCount >= 3) {
         this.tracePolygonPath(air, game, l.poly, l.polyCount);
         air.fillStyle = gradientFor(air, sx, sy, rad, l.warm ? FIRE_STOPS : l.soldier ? SOLDIER_AMBIENT_STOPS : SOFT_STOPS, l.strength);
@@ -248,8 +274,7 @@ export class LightRenderer {
         const sy = cam.worldToScreenY(fl.y);
         const rad = fl.radius * cam.zoom;
         if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
-        this.layerRegion.include(sx, sy, rad);
-        if (fl.hasPolygon) {
+          if (fl.hasPolygon) {
           this.tracePolygonPath(air, game, fl.poly, fl.polyCount);
           air.fillStyle = gradientFor(air, sx, sy, rad, flashStops, intensity);
           air.fill();
@@ -272,7 +297,6 @@ export class LightRenderer {
       if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
       const level = game.terrain.lightLevel(f.light, now);
       if (level <= 0.02) continue;
-      this.layerRegion.include(sx, sy, rad);
       // Moving views keep the original path submission: rebuilding hundreds of
       // cached screen paths every frame allocates more than it saves.
       let path: Path2D | undefined;
@@ -282,7 +306,11 @@ export class LightRenderer {
       if (path) air.fill(path);
       else air.fill();
     }
-    this.finishAirLayer(g, "lighter", devW, devH, dpr);
+    if (this.softShadows) this.softener.soften(g, devW, devH);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = "source-over";
+    g.drawImage(this.maskCanvas, 0, 0, devW, devH);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     g.globalCompositeOperation = "lighter";
 
@@ -360,6 +388,7 @@ export class LightRenderer {
       game.terrain.drawCellOverlay(ctx, cam, this.wallCanvas, this.wallChunks);
       ctx.restore();
     }
+    if (empty && this.maskState) this.emptyLightmap = { mask: this.maskState, soft: this.softShadows };
   }
 
   /** Clear the shared light layer for additive drawing in CSS-pixel coordinates. */
@@ -521,30 +550,6 @@ export class LightRenderer {
       if (cy < this.dirtyY0) this.dirtyY0 = cy;
       if (cy > this.dirtyY1) this.dirtyY1 = cy;
     }
-  }
-
-  /** Draw a subtle screen-edge vignette for depth. */
-  renderVignette(ctx: CanvasRenderingContext2D, viewW: number, viewH: number): void {
-    const w = Math.max(1, Math.round(viewW));
-    const h = Math.max(1, Math.round(viewH));
-    if (this.vigW !== w || this.vigH !== h) {
-      this.vigW = w;
-      this.vigH = h;
-      this.vignetteCanvas.width = w;
-      this.vignetteCanvas.height = h;
-      const vg = this.vignetteCanvas.getContext("2d")!;
-      const cx = w / 2;
-      const cy = h / 2;
-      const r0 = Math.min(w, h) * 0.36;
-      const r1 = Math.hypot(cx, cy);
-      const grad = vg.createRadialGradient(cx, cy, r0, cx, cy, r1);
-      grad.addColorStop(0, "rgba(0, 0, 0, 0)");
-      grad.addColorStop(0.7, "rgba(2, 4, 10, 0.28)");
-      grad.addColorStop(1, "rgba(1, 2, 6, 0.72)");
-      vg.fillStyle = grad;
-      vg.fillRect(0, 0, w, h);
-    }
-    ctx.drawImage(this.vignetteCanvas, 0, 0, w, h);
   }
 
   /** Fixtures receive a fresh polygon array on every shadow retrace. */

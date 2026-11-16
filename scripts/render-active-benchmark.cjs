@@ -26,7 +26,7 @@ const destination = process.env.BREACH_REPORT || '/tmp/breach-active-render-repo
    await page.goto(process.env.BREACH_BASE_URL || 'http://127.0.0.1:5173');
    await page.locator('[data-act="play"]').click();
    const checks = await page.evaluate(async ({baselineUrl})=>{
-    const g=window.__game;g.paused=true;g.save.data.seed='RENDER01';g.startRun();g.paused=true;
+    const g=window.__game;g.paused=true;g.save.data.settings.renderQuality='high';g.renderer.resize();g.save.data.seed='RENDER01';g.startRun();g.paused=true;
     // Retain native rAF for the harness, stop automatic game/UI callbacks.
     const raf=window.requestAnimationFrame.bind(window);window.requestAnimationFrame=()=>0;
     await new Promise(resolve=>raf(()=>raf(resolve)));

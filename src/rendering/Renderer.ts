@@ -22,6 +22,7 @@ import { TIER_PAINT } from "./materials";
 import { FACILITY } from "../config";
 import { paletteColor, SPRITES } from "../ui/pixelArt";
 import type { Door } from "../world/PixelWorld";
+import { autoStartIndex, densityFor, FIXED_CAPS, RenderScaleGovernor } from "./RenderScale";
 import { drawSpecialBlocks, drawSpecialGlow, drawSpecialNotice, drawSpecialPlinths } from "./SpecialUpgradeRenderer";
 
 /** Keycard colors by tier, as on the research-base upgrades. */
@@ -44,6 +45,12 @@ export class Renderer {
   private essenceShown = -1;
   private ctx: CanvasRenderingContext2D;
   private dpr = 1;
+  /** Adjusts the canvas density in "auto" render quality; null when pinned. */
+  private governor: RenderScaleGovernor | null = null;
+  /** The canvas was resized (and cleared) since the last full draw. */
+  needsDraw = true;
+  /** CSS overlay standing in for a full-screen vignette pass on the canvas. */
+  private vignette: HTMLDivElement;
   private sprites: Sprites;
   private creatureRenderer = new CreatureRenderer();
   private lightRenderer: LightRenderer;
@@ -60,16 +67,69 @@ export class Renderer {
     this.lightRenderer = new LightRenderer(this.sprites);
     this.fieryFlash = new FieryFlashRenderer(this.lightRenderer);
     this.fogRenderer = new FogRenderer(game.fog);
+    this.vignette = document.createElement("div");
+    this.vignette.className = "game-vignette";
+    canvas.after(this.vignette);
+  }
+
+  /** Backing-store pixels per CSS pixel currently in use. */
+  get density(): number {
+    return this.dpr;
   }
 
   resize(): void {
-    this.dpr = Math.min(2, window.devicePixelRatio || 1);
+    const deviceRatio = window.devicePixelRatio || 1;
     const w = window.innerWidth;
     const h = window.innerHeight;
+    const quality = this.game.renderQuality;
+    let cap: number;
+    if (quality === "auto") {
+      this.governor ??= new RenderScaleGovernor(
+        autoStartIndex(window.matchMedia("(pointer: coarse)").matches, w * h),
+        deviceRatio,
+      );
+      this.governor.reset();
+      cap = this.governor.cap;
+    } else {
+      this.governor = null;
+      cap = FIXED_CAPS[quality];
+    }
+    this.dpr = densityFor(cap, deviceRatio);
     this.canvas.style.width = `${w}px`;
     this.canvas.style.height = `${h}px`;
-    this.canvas.width = Math.round(w * this.dpr);
-    this.canvas.height = Math.round(h * this.dpr);
+    // Below native density, keep upscaled pixel art crisp rather than blurred.
+    this.canvas.style.imageRendering = this.dpr < deviceRatio ? "pixelated" : "";
+    const cw = Math.round(w * this.dpr);
+    const ch = Math.round(h * this.dpr);
+    if (this.canvas.width !== cw || this.canvas.height !== ch) {
+      this.canvas.width = cw;
+      this.canvas.height = ch;
+      this.needsDraw = true;
+    }
+    this.updateVignette(w, h);
+  }
+
+  /** Feed one active-gameplay frame interval to the auto quality governor. */
+  sampleFrame(intervalMs: number): void {
+    if (this.governor?.sample(intervalMs)) this.resize();
+  }
+
+  /** Pause measuring (menus, pauses) so their frames don't count as gameplay. */
+  resetFrameSampling(): void {
+    this.governor?.reset();
+  }
+
+  /**
+   * Same falloff the canvas vignette used (clear inside 36% of the short side,
+   * darkest at the corners), as a compositor layer instead of a full-screen blend.
+   */
+  private updateVignette(w: number, h: number): void {
+    const r1 = Math.hypot(w / 2, h / 2) || 1;
+    const t0 = Math.min(1, (Math.min(w, h) * 0.36) / r1);
+    const pct = (t: number): string => `${((t0 + (1 - t0) * t) * 100).toFixed(2)}%`;
+    this.vignette.style.background =
+      `radial-gradient(circle farthest-corner at 50% 50%, rgba(0,0,0,0) ${pct(0)}, ` +
+      `rgba(2,4,10,0.28) ${pct(0.7)}, rgba(1,2,6,0.72) 100%)`;
   }
 
   draw(): void {
@@ -177,8 +237,7 @@ export class Renderer {
     this.drawAimIndicator();
     this.drawGateNotice();
     drawSpecialNotice(ctx, cam, game.specialNotice, game.runStats.time);
-
-    this.lightRenderer.renderVignette(ctx, w, h);
+    this.needsDraw = false;
   }
 
   /**

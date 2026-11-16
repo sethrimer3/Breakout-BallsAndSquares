@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process');
 let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/node_modules/playwright')}
 const root=path.resolve(__dirname,'..');fs.mkdirSync(path.join(root,'node_modules/.cache'),{recursive:true});const dir=fs.mkdtempSync(path.join(root,'node_modules/.cache/effect-oracle-'));
-execFileSync('tar',['-x','-C',dir],{input:execFileSync('git',['archive',process.env.BREACH_BASELINE_REF||'4bb50da','src'],{cwd:root,maxBuffer:32*1024*1024})});
+execFileSync('tar',['-x','-C',dir],{input:execFileSync('git',['archive',process.env.BREACH_BASELINE_REF||'a56afb1','src'],{cwd:root,maxBuffer:32*1024*1024})});
 for(const file of ['Renderer.ts','GooRenderer.ts']){const target=path.join(dir,'src/rendering',file);const text=fs.readFileSync(target,'utf8').split('\n').filter(line=>!(/if \(sx < -(20|30|40) \|\| sy/.test(line)||line.includes('if (x < -32 || y < -32'))).join('\n');fs.writeFileSync(target,text)}
 (async()=>{const browser=await pw.chromium.launch({executablePath:process.env.BREACH_CHROMIUM||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});try{
 const page=await browser.newPage();await page.goto(process.env.BREACH_BASE_URL||'http://127.0.0.1:5173');await page.locator('[data-act="play"]').click();

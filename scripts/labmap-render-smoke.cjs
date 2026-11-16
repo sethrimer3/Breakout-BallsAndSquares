@@ -3,9 +3,9 @@
 const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process');
 let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/node_modules/playwright')}
 const root=path.resolve(__dirname,'..');fs.mkdirSync(path.join(root,'node_modules/.cache'),{recursive:true});const dir=fs.mkdtempSync(path.join(root,'node_modules/.cache/map-oracle-'));
-execFileSync('tar',['-x','-C',dir],{input:execFileSync('git',['archive',process.env.BREACH_BASELINE_REF||'4bb50da','src'],{cwd:root,maxBuffer:32*1024*1024})});
+execFileSync('tar',['-x','-C',dir],{input:execFileSync('git',['archive',process.env.BREACH_BASELINE_REF||'a56afb1','src'],{cwd:root,maxBuffer:32*1024*1024})});
 (async()=>{const browser=await pw.chromium.launch({executablePath:process.env.BREACH_CHROMIUM||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});try{
-const page=await browser.newPage();await page.goto(process.env.BREACH_BASE_URL||'http://127.0.0.1:5173');await page.locator('[data-act="play"]').click();
+const page=await browser.newPage({viewport:{width:1000,height:700},deviceScaleFactor:2});await page.goto(process.env.BREACH_BASE_URL||'http://127.0.0.1:5173');await page.locator('[data-act="play"]').click();
 const result=await page.evaluate(async base=>{
  const g=window.__game,raf=requestAnimationFrame.bind(window);window.requestAnimationFrame=()=>0;g.paused=true;await new Promise(r=>raf(()=>raf(r)));
  const {LabMap}=await import(base+'/src/ui/LabMap.ts'),map=g.labMap,clock=performance.now.bind(performance);
@@ -22,7 +22,19 @@ const result=await page.evaluate(async base=>{
  g.save.data.settings.devMode=true;g.save.data.settings.devMapAccess=true;
  g.selectLabWorld(5);map.show();reference.setThumbs(map.thumbs);reference.show();compare();
  if(map.tiles[0]===tile||map.canvases.length!==21)throw Error('World switch did not rebuild the rectangular map');
- return{status:'passed',pixelChecks,initialHiddenTileCanvases:0,reusedTileIdentity:true,reopenedMaps:5,reusedMs,referenceRebuildMs:rebuiltMs,switchedWorldTiles:map.canvases.length};
+ const scales=[];
+ for(const [quality,cap]of [['low',1],['medium',1.25],['high',2]]){
+  g.setRenderQuality(quality);const density=Math.min(cap,devicePixelRatio);
+  if(g.renderer.density!==density||g.canvas.width!==Math.round(innerWidth*density)||g.canvas.height!==Math.round(innerHeight*density))throw Error('Density/viewport mismatch: '+quality);
+  if(!g.renderer.needsDraw)throw Error('Resize did not request redraw');
+  g.updateFlashPolygons();g.renderer.draw();if(g.renderer.needsDraw)throw Error('Redraw flag not cleared');
+  scales.push({quality,density});
+ }
+ g.setRenderQuality('auto');const beforeAuto=g.renderer.density;
+ for(let i=0;i<140;i++)g.renderer.sampleFrame(40);
+ if(g.renderer.density>=beforeAuto)throw Error('Auto quality did not step down');
+ scales.push({quality:'auto-after-slow-frames',density:g.renderer.density});
+ return{status:'passed',scales,pixelChecks,initialHiddenTileCanvases:0,reusedTileIdentity:true,reopenedMaps:5,reusedMs,referenceRebuildMs:rebuiltMs,switchedWorldTiles:map.canvases.length};
 },'/'+path.relative(root,dir).split(path.sep).join('/'));
 fs.writeFileSync('/tmp/breach-labmap-render.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result));
 }finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>fs.rmSync(dir,{recursive:true,force:true}));

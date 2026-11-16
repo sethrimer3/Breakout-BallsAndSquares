@@ -1,5 +1,7 @@
 # Rendering changes 1–3: measurements and validation
 
+Historical results for commit `4bb50da`, before subsequent lighting-pipeline and resolution changes. Reproduce these exact measurements using that commit and its script. For the current merged renderer, use [RENDERING_AUDIT.md](RENDERING_AUDIT.md).
+
 Implemented sparse frost iteration, opacity-specific lighting-mask invalidation, and conservative smoke/rail rejection. Items 4–6 remain unchanged.
 
 Frost uses the read-only active list when it has fewer candidates than the visible grid. Widespread freezing uses the bounded viewport scan: an initial all-active prototype scanned 155,602 cells even in a close view and regressed render CPU time. Active-list membership also prevents a destroyed/re-frozen cell from being tinted or ticked twice before compaction.

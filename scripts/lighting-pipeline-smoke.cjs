@@ -2,7 +2,7 @@
  * optimized pipeline. Requires Vite. Baseline is the completed items 1–3. */
 const fs=require('node:fs'),path=require('node:path'),{execFileSync}=require('node:child_process');
 let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/node_modules/playwright')}
-const root=path.resolve(__dirname,'..'),ref=process.env.BREACH_BASELINE_REF||'4bb50da';
+const root=path.resolve(__dirname,'..'),ref=process.env.BREACH_BASELINE_REF||'a56afb1';
 fs.mkdirSync(path.join(root,'node_modules/.cache'),{recursive:true});
 const dir=fs.mkdtempSync(path.join(root,'node_modules/.cache/lighting-oracle-'));
 execFileSync('tar',['-x','-C',dir],{input:execFileSync('git',['archive',ref,'src'],{cwd:root,maxBuffer:32*1024*1024})});
@@ -16,17 +16,21 @@ execFileSync('tar',['-x','-C',dir],{input:execFileSync('git',['archive',ref,'src
   const terrain=g.terrain,oldTerrain=new TerrainRenderer(g.world,32),c=g.camera,w=g.world;oldTerrain.dormantAt=terrain.dormantAt;
   const a=document.createElement('canvas'),b=document.createElement('canvas'),ac=a.getContext('2d'),bc=b.getContext('2d');
   const clock=performance.now.bind(performance);performance.now=()=>123456;
-  const comparisons=[];let regionCases=0;
+  const comparisons=[];let regionCases=0,emptyReuseCases=0,boundedCalls=0;
+  const finish=current.finishAirLayer;
+  current.finishAirLayer=function(...args){const result=finish.apply(this,args);const r=this.previousLayerRegion;if(r&&r.width*r.height<args[2]*args[3])boundedCalls++;return result};
   function compare(label,dpr){
    function draw(t,lr,canvas,ctx){g.terrain=t;ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.fillStyle='#34495e';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.setTransform(dpr,0,0,dpr,0,0);t.drawFloor(ctx,c);t.draw(ctx,c);lr.renderLighting(ctx,g,dpr);t.drawPanels(ctx,c,123.456)}
    // The original lightmap leaves nearest-neighbor sampling enabled after its
    // first wall pass. Equalize this pre-existing first-frame context state.
    if (!comparisons.length) { draw(oldTerrain,reference,a,ac);draw(terrain,current,b,bc); }
+   const previousBounds=boundedCalls,previousEmpty=current.emptyLightmap;
    draw(oldTerrain,reference,a,ac);draw(terrain,current,b,bc);
+   if(boundedCalls>previousBounds)regionCases++;
+   if(previousEmpty&&previousEmpty===current.emptyLightmap)emptyReuseCases++;
    const aa=ac.getImageData(0,0,a.width,a.height).data,bb=bc.getImageData(0,0,b.width,b.height).data;
    let channels=0,maxDelta=0;for(let i=0;i<aa.length;i++){const d=Math.abs(aa[i]-bb[i]);if(d){channels++;maxDelta=Math.max(maxDelta,d)}}
    comparisons.push({label,dpr,channels,maxDelta});
-   const r=current.previousLayerRegion;if(r&&r.width*r.height<a.width*a.height)regionCases++;
    if(channels){const diff=(x,y,alpha=false)=>{const xx=x.getContext('2d').getImageData(0,0,x.width,x.height).data,yy=y.getContext('2d').getImageData(0,0,y.width,y.height).data;let n=0;for(let i=alpha?3:0;i<xx.length;i+=alpha?4:1)if(xx[i]!==yy[i])n++;return n};throw Error(JSON.stringify({...comparisons.at(-1),maskAlpha:diff(reference.maskCanvas,current.maskCanvas,true),lightmap:diff(reference.lmCanvas,current.lmCanvas),air:diff(reference.layerCanvas,current.layerCanvas)}))}
   }
   const resize=(width,height,dpr)=>{c.viewW=width;c.viewH=height;a.width=b.width=Math.round(width*dpr);a.height=b.height=Math.round(height*dpr)};
@@ -53,7 +57,7 @@ execFileSync('tar',['-x','-C',dir],{input:execFileSync('git',['archive',ref,'src
    for(const dpr of [1,1.25,2])for(const soft of [false,true]){
     resize(1001,703,dpr);c.x=w.roomCenterX;c.y=w.roomCenterY;c.zoom=1.13;g.save.data.settings.softShadows=soft;
     const source=(x,y,r=50)=>({x:c.screenToWorldX(x),y:c.screenToWorldY(y),radius:r/c.zoom,strength:.6,warm:true});
-    const states=[[source(100,150)],[source(120,160),source(140,180)],[],[source(-20,300)],[source(1000,500)],[source(400,300,1000)],[],[source(800,650)]];
+    const states=[[source(100,150)],[source(120,160),source(140,180)],[],[],[source(-20,300)],[source(1000,500)],[source(400,300,1000)],[],[source(800,650)]];
     for(let i=0;i<states.length;i++){
      g.lighting.updateSoftLights([],c.screenToWorldX(-2000),c.screenToWorldY(-2000),c,states[i]);
      compare('bounded-'+soft+'-'+i,dpr);
@@ -72,8 +76,8 @@ execFileSync('tar',['-x','-C',dir],{input:execFileSync('git',['archive',ref,'src
     for(let i=0;i<events;i++)w.setCell(w.roomX0+i%24,w.roomY0+Math.floor(i/24)%24,i%2?10:0);
     compare('floor-burst-'+events,1.25);
    }
-   return{status:'passed',comparisons,regionCases};
+   return{status:'passed',comparisons,regionCases,emptyReuseCases};
   }finally{g.terrain=terrain;performance.now=clock}
  },{base:'/'+path.relative(root,dir).split(path.sep).join('/')});
- fs.writeFileSync(process.env.BREACH_LIGHT_REPORT||'/tmp/breach-lighting-pixels.json',JSON.stringify(result,null,2));console.log(JSON.stringify({status:result.status,pixelComparisons:result.comparisons.length,boundedCases:result.regionCases}));
+ fs.writeFileSync(process.env.BREACH_LIGHT_REPORT||'/tmp/breach-lighting-pixels.json',JSON.stringify(result,null,2));console.log(JSON.stringify({status:result.status,pixelComparisons:result.comparisons.length,boundedCases:result.regionCases,emptyReuseCases:result.emptyReuseCases}));
 }finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>fs.rmSync(dir,{recursive:true,force:true}));

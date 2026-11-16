@@ -24,8 +24,8 @@ for(const device of [{name:'desktop',width:1440,height:900,dpr:1},{name:'mobile'
  await page.goto(appUrl);await page.locator('[data-act="play"]').waitFor();
  const menu=await page.evaluate(async()=>{
   const g=window.__game,raf=requestAnimationFrame.bind(window),now=performance.now.bind(performance);
-  const data={gameDraw:{calls:0,ms:0},shadow:{calls:0,ms:0},menuDraw:{calls:0,ms:0}};
-  for(const [o,key,name]of [[g.renderer,'draw','gameDraw'],[g,'updateFlashPolygons','shadow'],[g.mainMenu.background,'render','menuDraw']]){const f=o[key];o[key]=function(...a){const start=now();try{return f.apply(this,a)}finally{data[name].calls++;data[name].ms+=now()-start}}}
+  const data={gameDraw:{calls:0,ms:0},shadow:{calls:0,ms:0},chunks:{calls:0,ms:0},menuDraw:{calls:0,ms:0}};
+  for(const [o,key,name]of [[g.renderer,'draw','gameDraw'],[g,'updateFlashPolygons','shadow'],[g.terrain,'update','chunks'],[g.mainMenu.background,'render','menuDraw']]){const f=o[key];o[key]=function(...a){const start=now();try{return f.apply(this,a)}finally{data[name].calls++;data[name].ms+=now()-start}}}
   const stamps=[];for(let i=0;i<40;i++)stamps.push(await new Promise(resolve=>raf(resolve)));
   return{...data,intervals:stamps.slice(1).map((v,i)=>v-stamps[i]),opaqueMenu:getComputedStyle(g.mainMenu.root).backgroundColor};
  });
@@ -33,7 +33,7 @@ for(const device of [{name:'desktop',width:1440,height:900,dpr:1},{name:'mobile'
  await page.locator('[data-act="play"]').click();
  await page.evaluate(async()=>{
   const g=window.__game,raf=requestAnimationFrame.bind(window);window.__auditRaf=raf;window.requestAnimationFrame=()=>0;await new Promise(r=>raf(()=>raf(r)));
-  g.paused=true;g.save.data.seed='AUDIT01';g.save.data.settings.devMode=true;g.save.data.settings.devMapAccess=true;
+  g.paused=true;g.save.data.settings.renderQuality='high';g.renderer.resize();g.save.data.seed='AUDIT01';g.save.data.settings.devMode=true;g.save.data.settings.devMapAccess=true;
   const clock=performance.now.bind(performance),stack=[],stats={};
   function wrap(o,key,label){const original=o[key];if(typeof original!=='function')return;o[key]=function(...args){const parent=stack.at(-1),entry={label,child:0},start=clock();stack.push(entry);try{return original.apply(this,args)}finally{const ms=clock()-start;stack.pop();if(parent)parent.child+=ms;const row=stats[label]??=( {inclusive:0,self:0,calls:0});row.inclusive+=ms;row.self+=ms-entry.child;row.calls++}}}
   for(const [object,prefix,names]of [
