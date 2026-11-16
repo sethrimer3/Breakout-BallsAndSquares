@@ -1,5 +1,5 @@
-import { BlackMarketTree } from "./BlackMarketTree";
 import { marketFor, marketNode, WEAPON_MARKETS } from "../progression/BlackMarket";
+import { marketLayout } from "./marketLayout";
 import { CIRCUIT, TERRAIN } from "../config";
 import { mutationCompatibility, resolvePrimaryMutation, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
@@ -60,6 +60,20 @@ const HUB_ID = "hub";
 const DRAG_THRESHOLD = 5;
 /** Outward push (CSS px/s) on a node's children when it is bought. */
 const BUY_KICK = 420;
+/** How long (ms) a Black Market path takes to fold back into its root. */
+const COLLAPSE_MS = 420;
+/** Hub color on Black Market trees. */
+const MARKET_COLOR = "#ff4b8b";
+
+/** A research node folding back into its path's root after a switch. */
+interface Collapse {
+  id: string;
+  root: string;
+  parent: string;
+  x: number;
+  y: number;
+  start: number;
+}
 
 interface NodeDrag {
   id: string;
@@ -200,8 +214,10 @@ function tabHtml(tab: UpgradeBranch, label: string, locked = false): string {
 export class UpgradeTree {
   readonly root: HTMLDivElement;
   private stageEl: HTMLDivElement;
-  private marketTree: BlackMarketTree;
   private marketView = false;
+  /** The active path root the Black Market tree was laid out for. */
+  private marketRoot: UpgradeId | null = null;
+  private collapsing: Collapse[] = [];
   private loadoutWrap: HTMLDivElement;
   private linksEl: HTMLCanvasElement;
   private nodesWrap: HTMLDivElement;
@@ -359,8 +375,6 @@ export class UpgradeTree {
       if (this.visible) this.fitToScreen();
     });
     this.stageEl = this.root.querySelector(".tree-stage") as HTMLDivElement;
-    this.marketTree = new BlackMarketTree(game, () => this.refresh());
-    this.stageEl.append(this.marketTree.root);
     this.root.querySelectorAll<HTMLButtonElement>("[data-market]").forEach(button => {
       button.addEventListener("click", () => {
         const weapon = button.dataset.market as WeaponType;
@@ -439,6 +453,11 @@ export class UpgradeTree {
 
   /** The nodes on the active tab. */
   private activeDefs(): readonly TreeDef[] {
+    if (this.marketView) {
+      const market = marketFor(this.activeTab)!;
+      const active = this.game.upgrades.activeMarketPath(market.weapon)?.root ?? null;
+      return [...marketLayout(market, active).keys()].map((id) => UPGRADE_BY_ID[id]);
+    }
     return this.activeTab === "soldier" ? SOLDIER_UPGRADE_DEFS : UPGRADE_DEFS.filter((d) => d.branch === this.activeTab && !marketNode(d.id));
   }
 
@@ -629,8 +648,10 @@ export class UpgradeTree {
       const to = nodePos(def.grid.col, def.grid.row);
       const btn = document.createElement("button");
       // The weapon-unlock node at the center of a tree gets a round frame.
-      const round = branchOf(def) !== "core" && def.grid.col === 0 && def.grid.row === 0;
+      const round =
+        (branchOf(def) !== "core" && def.grid.col === 0 && def.grid.row === 0) || marketNode(def.id)?.path.root === def.id;
       btn.className = round ? "tree-node round" : "tree-node";
+      btn.dataset.id = def.id;
       btn.style.setProperty("--node-color", def.color);
       const ring = round
         ? sprite("ring", { color: def.color, scale: 3, cls: "node-ring ring-empty" }) +
@@ -728,7 +749,6 @@ export class UpgradeTree {
   private attachPanZoom(): void {
     const stage = this.stageEl;
     stage.addEventListener("pointerdown", (e) => {
-      if (this.marketView) return;
       if (e.button !== 0) return;
       if (e.pointerType !== "mouse") {
         this.stagePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -781,7 +801,6 @@ export class UpgradeTree {
     stage.addEventListener(
       "wheel",
       (e) => {
-        if (this.marketView) return;
         e.preventDefault();
         if (e.deltaY === 0) return;
         const rect = stage.getBoundingClientRect();
@@ -872,8 +891,7 @@ export class UpgradeTree {
   private activateBranch(sprout: boolean): void {
     this.drag = null;
     this.cycles.reset();
-    const defs = this.activeDefs();
-    const ids = defs.map((d) => d.id as string);
+    this.endCollapse();
     const core = this.activeTab === "core";
     const hub = this.bodies.get(HUB_ID)!;
     const home = core ? nodePos(CORE_HUB_GRID.col, CORE_HUB_GRID.row) : nodePos(0, 0);
@@ -882,16 +900,8 @@ export class UpgradeTree {
     hub.vx = hub.vy = 0;
     this.coreHubEl.style.pointerEvents = core ? "none" : "";
     this.coreHubEl.setAttribute("aria-hidden", String(core));
-    if (core || (defs.length > 0 && !defs.some((d) => d.grid.col === 0 && d.grid.row === 0))) ids.push(HUB_ID);
-    this.activeBodies = ids.map((id) => this.bodies.get(id)!);
-
-    const neighbors = new Map<string, string[]>(ids.map((id) => [id, []]));
-    for (const b of this.activeBodies) {
-      if (!b.parent) continue;
-      neighbors.get(b.id)!.push(b.parent);
-      neighbors.get(b.parent)!.push(b.id);
-    }
-    this.circuit = { nodes: new Map(), neighbors };
+    if (this.marketView) this.layoutMarket();
+    this.collectBodies();
 
     // Every tree opens fitted to the stage (see the rules in treeView.ts).
     if (this.activeBodies.length > 0) {
@@ -909,6 +919,128 @@ export class UpgradeTree {
       b.vy = 0;
     }
     this.placeNodes();
+  }
+
+  /** The active tab's bodies (plus the hub where (0,0) has no node) and their circuit. */
+  private collectBodies(): void {
+    const defs = this.activeDefs();
+    const ids = defs.map((d) => d.id as string);
+    const core = this.activeTab === "core";
+    if (core || (defs.length > 0 && !defs.some((d) => !this.marketView && d.grid.col === 0 && d.grid.row === 0))) ids.push(HUB_ID);
+    this.activeBodies = ids.map((id) => this.bodies.get(id)!);
+    const neighbors = new Map<string, string[]>(ids.map((id) => [id, []]));
+    for (const b of this.activeBodies) {
+      if (!b.parent) continue;
+      neighbors.get(b.id)!.push(b.parent);
+      neighbors.get(b.parent)!.push(b.id);
+    }
+    this.circuit = { nodes: new Map(), neighbors };
+  }
+
+  /**
+   * Black Market trees keep their own shape (see marketLayout.ts): path roots
+   * around the weapon hub, research fanning out of the active root only.
+   */
+  private layoutMarket(): void {
+    const market = marketFor(this.activeTab)!;
+    this.marketRoot = this.game.upgrades.activeMarketPath(market.weapon)?.root ?? null;
+    for (const [id, cell] of marketLayout(market, this.marketRoot)) {
+      const b = this.bodies.get(id)!;
+      const home = nodePos(cell.col, cell.row);
+      b.hx = home.x;
+      b.hy = home.y;
+      b.parent = cell.parent;
+    }
+  }
+
+  /**
+   * A different Black Market path was bought: the old path's research shrinks
+   * back into its root while the new path grows out of its own.
+   */
+  private switchMarketPath(): void {
+    const oldRoot = this.marketRoot;
+    const leaving = this.activeBodies.filter((b) => b.id !== HUB_ID && b.parent !== HUB_ID);
+    const before = new Set(this.activeBodies.map((b) => b.id));
+    this.drag = null;
+    this.cycles.reset();
+    this.endCollapse();
+    this.layoutMarket();
+    this.collectBodies();
+    const animate = !reducedMotion();
+    const now = performance.now();
+    for (const b of leaving) {
+      if (animate && oldRoot) {
+        this.collapsing.push({ id: b.id, root: oldRoot, parent: b.parent!, x: b.x, y: b.y, start: now });
+      } else {
+        this.nodeEls.get(b.id)!.classList.add("hidden");
+      }
+    }
+    const newRoot = this.marketRoot ? this.bodies.get(this.marketRoot)! : null;
+    for (const b of this.activeBodies) {
+      if (before.has(b.id)) continue;
+      b.x = animate && newRoot ? newRoot.x : b.hx;
+      b.y = animate && newRoot ? newRoot.y : b.hy;
+      b.vx = 0;
+      b.vy = 0;
+    }
+    // Re-fit to the new shape, gliding the camera there instead of jumping.
+    const seen = [...this.activeBodies, ...leaving].map((b) => ({ x: b.hx, y: b.hy }));
+    this.bounds = treeBounds(seen);
+    this.sizeLinkCanvas();
+    this.bounds = treeBounds(this.activeBodies.map((b) => ({ x: b.hx, y: b.hy })));
+    if (animate) {
+      this.viewEl.classList.add("view-glide");
+      window.setTimeout(() => this.viewEl.classList.remove("view-glide"), COLLAPSE_MS + 80);
+    }
+    this.setView(this.fittedView(), false);
+    this.placeNodes();
+  }
+
+  /** Shrink each folding node toward its root; hide it once it has arrived. */
+  private stepCollapse(time: number): void {
+    if (this.collapsing.length === 0) return;
+    const done: Collapse[] = [];
+    for (const c of this.collapsing) {
+      const el = this.nodeEls.get(c.id)!;
+      const b = this.bodies.get(c.id)!;
+      const root = this.bodies.get(c.root)!;
+      const t = Math.min(1, Math.max(0, (time - c.start) / COLLAPSE_MS));
+      // Eases in, so the branch gathers speed as it is pulled home.
+      const e = t * t;
+      b.x = c.x + (root.x - c.x) * e;
+      b.y = c.y + (root.y - c.y) * e;
+      el.style.left = `${toArt(b.x) * LINK_PIXEL}px`;
+      el.style.top = `${toArt(b.y) * LINK_PIXEL}px`;
+      el.style.scale = String(Math.max(0, 1 - e));
+      if (t >= 1) done.push(c);
+    }
+    if (done.length === 0) return;
+    this.collapsing = this.collapsing.filter((c) => !done.includes(c));
+    for (const c of done) {
+      const el = this.nodeEls.get(c.id)!;
+      el.classList.add("hidden");
+      el.style.scale = "";
+      // The root takes in the last of its branch with a flash.
+      if (!this.collapsing.some((o) => o.root === c.root)) this.flashNode(c.root);
+    }
+  }
+
+  /** Drop any folding animation and its nodes at once. */
+  private endCollapse(): void {
+    for (const c of this.collapsing) {
+      const el = this.nodeEls.get(c.id)!;
+      el.classList.add("hidden");
+      el.style.scale = "";
+    }
+    this.collapsing = [];
+  }
+
+  private flashNode(id: string): void {
+    const el = this.nodeEls.get(id);
+    if (!el) return;
+    el.classList.remove("bought-flash");
+    void el.offsetWidth;
+    el.classList.add("bought-flash");
   }
 
   /** The link canvas covers the tree plus room to stretch, on the art grid. */
@@ -940,7 +1072,7 @@ export class UpgradeTree {
     const u = this.source;
     for (const b of this.activeBodies) {
       const def = b.id === HUB_ID ? null : treeDef(b.id);
-      const hubColor = TAB_ICONS[this.activeTab].color;
+      const hubColor = this.marketView ? MARKET_COLOR : TAB_ICONS[this.activeTab].color;
       const node: CircuitNode = {
         id: b.id,
         x: toArt(b.x),
@@ -959,7 +1091,6 @@ export class UpgradeTree {
     const dt = this.lastFrame ? Math.min(1 / 30, (time - this.lastFrame) / 1000) : 0;
     this.lastFrame = time;
     if (this.inLoadoutScreen) return;
-    if (this.marketView) { this.marketTree.frame(time); return; }
     const heldId = this.drag?.moved ? this.drag.id : null;
     if (reducedMotion() || this.activeTab === "core") {
       for (const b of this.activeBodies) {
@@ -971,6 +1102,7 @@ export class UpgradeTree {
       stepElastic(this.activeBodies, dt, heldId);
     }
     this.placeNodes();
+    this.stepCollapse(time);
     this.drawCircuit(reducedMotion() ? 0 : dt);
   };
 
@@ -1000,6 +1132,22 @@ export class UpgradeTree {
         g.fillRect(p.x, p.y, 1, 1);
       }
     }
+    // Folding branches keep their traces until they are home.
+    for (const c of this.collapsing) {
+      const b = this.bodies.get(c.id)!;
+      const p = this.bodies.get(c.parent)!;
+      const def = treeDef(c.id);
+      const from = { x: toArt(p.x), y: toArt(p.y) };
+      const to = { x: toArt(b.x), y: toArt(b.y) };
+      g.fillStyle = paletteColor(u.levelOf(def.id) > 0 ? "#" : "-", def.color) as string;
+      const path = trace(from, to, Math.abs(b.hx - p.hx) >= Math.abs(b.hy - p.hy));
+      const len = pathLength(path);
+      const gap = u.levelOf(def.id) > 0 ? 1 : LINK_DOT_GAP;
+      for (let i = 0; i <= len; i += gap) {
+        const pt = pointAt(path, i);
+        g.fillRect(pt.x, pt.y, 1, 1);
+      }
+    }
     if (dt > 0) this.cycles.step(dt, this.circuit);
     this.cycles.draw(g, this.circuit);
   }
@@ -1008,12 +1156,7 @@ export class UpgradeTree {
     if (this.source.buy(def.id)) {
       this.game.applyUpgrades();
       this.game.onUpgradePurchased?.();
-      const el = this.nodeEls.get(def.id);
-      if (el) {
-        el.classList.remove("bought-flash");
-        void el.offsetWidth;
-        el.classList.add("bought-flash");
-      }
+      this.flashNode(def.id);
       this.refresh();
       if (this.hoveredId === def.id) this.showTooltip(def);
       this.kickChildren(def.id);
@@ -1063,6 +1206,14 @@ export class UpgradeTree {
         <div class="tt-desc">Hidden in a glowing gold block somewhere in the lab. Shoot it open to unlock this upgrade.</div>
         <div class="tt-lock tt-find">FIND UPGRADE</div>
       `;
+    } else if (unlocked && marketNode(def.id)?.path.root === def.id) {
+      // Black Market path roots: one is active; any other can be bought (again) to switch.
+      const on = this.marketRoot === def.id;
+      const status = on
+        ? `<div class="tt-compare"><span class="tt-max-tag">ACTIVE PATH</span></div>`
+        : `<div class="tt-delta">${lvl > 0 ? "RE-BUY TO SWITCH" : this.marketRoot ? "BUY TO SWITCH" : "CHOOSE THIS PATH"} — research on every path is kept</div>
+           <div class="tt-cost ${canBuy ? "affordable" : "expensive"}">${this.priceHtml(u.pricesOf(def.id))}</div>`;
+      bodyHtml = `<div class="tt-desc">${def.shortDesc}</div>${status}`;
     } else if (def.placeholder) {
       bodyHtml = `<div class="tt-desc">${def.shortDesc}</div>`;
     } else if (!unlocked && "tier" in def) {
@@ -1119,7 +1270,7 @@ export class UpgradeTree {
 
     this.tooltipEl.style.setProperty("--tt-color", def.color);
     this.tooltipEl.innerHTML = `
-      <div class="tt-title">${find ? "???" : def.name} <span class="tt-lvl">${find ? "" : `LV ${lvl}/${def.maxLevel}`}</span></div>
+      <div class="tt-title">${find ? "???" : def.name} <span class="tt-lvl">${find || marketNode(def.id)?.path.root === def.id ? "" : `LV ${lvl}/${def.maxLevel}`}</span></div>
       ${tier}
       ${bodyHtml}
     `;
@@ -1470,13 +1621,11 @@ export class UpgradeTree {
       button.setAttribute("aria-label", button.disabled ? "Locked category" : category.name);
     }
     this.updateHeaderAndScreen();
-    this.marketTree.root.classList.toggle("hidden", !this.marketView || this.inLoadoutScreen);
-    this.stageEl.classList.toggle("market-view", this.marketView && !this.inLoadoutScreen);
     if (this.marketView && !this.inLoadoutScreen) {
       this.titleEl.textContent = "BLACK MARKET";
-      this.subEl.textContent = "ONE ACTIVE PATH · RE-BUY ANOTHER PATH TO SWITCH";
-      this.marketTree.render(this.activeTab as WeaponType);
-      return;
+      this.subEl.textContent = "ONE ACTIVE PATH — RE-BUY ANOTHER PATH TO SWITCH; RESEARCH IS KEPT";
+      const active = this.game.upgrades.activeMarketPath(this.activeTab as WeaponType)?.root ?? null;
+      if (active !== this.marketRoot) this.switchMarketPath();
     }
 
     if (this.inLoadoutScreen) {
@@ -1487,16 +1636,21 @@ export class UpgradeTree {
     // Center hub ball is shown on Core, Resources, Blight & Pistol (where 0,0 has no upgrade node),
     // and hidden on weapon trees where their unlock node sits at (0,0).
     const hasCenterUnlockNode =
-      this.activeTab === "shotgun" ||
+      !this.marketView && (this.activeTab === "shotgun" ||
       this.activeTab === "assault_rifle" ||
       this.activeTab === "rocket_launcher" ||
       this.activeTab === "sniper_rifle" ||
       this.activeTab === "katana" ||
       this.activeTab === "flamethrower" ||
       this.activeTab === "grenade" ||
-      this.activeTab === "turret";
+      this.activeTab === "turret");
     this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);
-    if (!hasCenterUnlockNode) {
+    if (this.marketView) {
+      // The weapon itself sits at the heart of its Black Market tree.
+      this.coreHubEl.innerHTML =
+        sprite("ring", { color: MARKET_COLOR, scale: 3, cls: "node-ring" }) +
+        sprite(TAB_ICONS[this.activeTab].icon, { color: MARKET_COLOR, scale: 3 });
+    } else if (!hasCenterUnlockNode) {
       const hubSpec = TAB_ICONS[this.activeTab];
       this.coreHubEl.innerHTML =
         sprite("ring", { color: hubSpec.color, scale: 3, cls: "node-ring" }) +
@@ -1505,9 +1659,11 @@ export class UpgradeTree {
     this.drawCircuit(0);
 
     const u = this.source;
+    const shown = new Set<string>(this.activeBodies.map((b) => b.id));
+    const folding = new Set(this.collapsing.map((c) => c.id));
     for (const def of TREE_DEFS) {
       const btn = this.nodeEls.get(def.id)!;
-      const inBranch = branchOf(def) === this.activeTab && !marketNode(def.id);
+      const inBranch = shown.has(def.id) || folding.has(def.id);
       btn.classList.toggle("hidden", !inBranch);
       if (!inBranch) continue;
 
@@ -1525,7 +1681,14 @@ export class UpgradeTree {
       btn.classList.toggle("affordable", canBuy);
 
       const lvlEl = btn.querySelector(".node-lvl") as HTMLSpanElement;
-      if (find) lvlEl.textContent = "FIND";
+      const market = marketNode(def.id);
+      if (market && market.path.root === def.id && !find && unlocked) {
+        // A path root reads ACTIVE, or SWAP once bought but switched away from.
+        const on = this.marketRoot === def.id;
+        btn.classList.toggle("owned", on);
+        btn.classList.toggle("maxed", on);
+        lvlEl.textContent = on ? "ACTIVE" : lvl > 0 ? "SWAP" : `0/${def.maxLevel}`;
+      } else if (find) lvlEl.textContent = "FIND";
       else if (!unlocked) lvlEl.innerHTML = lockIcon();
       else lvlEl.textContent = maxed ? "MAX" : `${lvl}/${def.maxLevel}`;
     }

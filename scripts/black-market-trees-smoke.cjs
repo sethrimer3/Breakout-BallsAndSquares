@@ -2,11 +2,15 @@
 const assert=require('node:assert/strict');
 let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/node_modules/playwright')}
 (async()=>{
- const browser=await pw.chromium.launch({executablePath:process.env.BREACH_CHROMIUM||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+ const fs=require('node:fs'),exe=process.env.BREACH_CHROMIUM||['/usr/bin/chromium','/opt/pw-browsers/chromium'].find(p=>fs.existsSync(p));
+ const browser=await pw.chromium.launch({executablePath:exe,headless:true,args:['--no-sandbox']});
  try{
   for(const [width,height,deviceScaleFactor] of [[1280,900,1],[390,844,3]]){
    const context=await browser.newContext({viewport:{width,height},deviceScaleFactor,hasTouch:width<700}),page=await context.newPage(),errors=[];
    page.on('pageerror',e=>errors.push(e.message));
+   const node=id=>page.locator(`.tree-node[data-id="${id}"]:not(.hidden)`);
+   const buy=async id=>{const n=node(id);if(width<700){await n.tap();await n.tap()}else await n.click();await page.waitForTimeout(60)};
+   const shown=()=>page.evaluate(()=>[...window.__game.upgradeTree.nodeEls].filter(([,el])=>!el.classList.contains('hidden')).map(([id])=>id));
    await page.goto(process.env.BREACH_BASE_URL||'http://127.0.0.1:5173');
    await page.locator('.main-settings-btn').click();
    await page.locator('.settings-panel:not(.hidden) [data-tab="dev"]').click();
@@ -34,23 +38,30 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
    const after=await page.evaluate(()=>[...window.__game.upgradeTree.nodeEls].filter(([,el])=>!el.classList.contains('hidden')).map(([id])=>id));
    assert.deepEqual(after,initial.ids); // access never sprouts mutation nodes onto the ordinary tree
    if(width<700)await page.locator('[data-market="pistol"]').tap();else await page.locator('[data-market="pistol"]').click();
-   assert.equal(await page.locator('.bm-upward [data-market-buy="drone_unlock"]').count(),1);
-   const artwork=await page.evaluate(()=>{
-    const c=document.querySelector('canvas.bm-weapon'),px=c.getContext('2d').getImageData(0,0,144,144).data;
-    let black=0,rim=0;for(let i=0;i<px.length;i+=4){if(px[i+3]===255&&px[i]===0&&px[i+1]===0&&px[i+2]===0)black++;if(px[i]===255&&px[i+3]>0)rim++;}
-    return {black,rim};
-   });assert(artwork.black>500&&artwork.rim>100);
-   if(width<700)await page.locator('[data-market-buy="reverse_unlock"]').tap();else await page.locator('[data-market-buy="reverse_unlock"]').click();
-   await page.locator('[data-market-buy="orbit_unlock"]').click();
+   // The Black Market draws on the ordinary tree stage: hub plus the three path roots.
+   assert.deepEqual((await shown()).sort(),['drone_unlock','orbit_unlock','reverse_unlock']);
+   assert(await page.locator('.tree-core:not(.hidden)').isVisible());
+   await buy('reverse_unlock');
+   await buy('orbit_unlock');
    const before=await page.evaluate(()=>window.__game.save.data.essence);
-   if(width<700)await page.locator('[data-market-buy="reverse_unlock"]').tap();else await page.locator('[data-market-buy="reverse_unlock"]').click();
+   await buy('reverse_unlock');
    assert.equal(await page.evaluate(()=>window.__game.save.data.essence),before-20);
-   await page.locator('[data-market-buy="drone_unlock"]').click();
-   await page.locator('[data-market-buy="drone_damage"]').click();
+   await buy('drone_unlock');
+   await page.waitForTimeout(500);
+   assert((await shown()).includes('drone_damage')); // the active path grows its research
+   await buy('drone_damage');
    const ownedDamage=await page.evaluate(()=>window.__game.stats.droneDamage);
-   await page.locator('[data-market-buy="orbit_unlock"]').click();
-   assert.equal(await page.locator('[data-market-buy="drone_damage"]').count(),0);
-   await page.locator('[data-market-buy="drone_unlock"]').click();
+   await page.waitForTimeout(400);
+   await page.screenshot({path:`/tmp/black-market-drone-${width}.png`});
+   await buy('orbit_unlock');
+   // Mid-fold: the drone research is still on screen, shrinking into its root.
+   await page.waitForTimeout(150);
+   const folding=await page.evaluate(()=>{const el=window.__game.upgradeTree.nodeEls.get('drone_damage');return {hidden:el.classList.contains('hidden'),scale:Number(el.style.scale)}});
+   assert(!folding.hidden&&folding.scale>0&&folding.scale<1,JSON.stringify(folding));
+   await page.screenshot({path:`/tmp/black-market-fold-${width}.png`});
+   await page.waitForTimeout(500);
+   assert(!(await shown()).includes('drone_damage'));
+   await buy('drone_unlock');
    assert.equal(await page.evaluate(()=>window.__game.stats.droneDamage),ownedDamage);
    const state=await page.evaluate(()=>{
     const g=window.__game;g.save.save();
@@ -59,18 +70,21 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
    assert.deepEqual([state.path,state.reverse,state.orbit,state.drone,state.level],['drone_unlock',false,false,true,1]);
    // Capture the clean three-way choice layout, then check reduced motion.
    await page.evaluate(()=>{const g=window.__game;g.save.data.blackMarketPaths.pistol='reverse_unlock';g.upgradeTree.refresh();g.transition.update(10)});
-   await page.locator('.bm-tree').evaluate(el=>el.scrollTop=0);
+   await page.waitForTimeout(700);
    await page.screenshot({path:`/tmp/black-market-trees-${width}.png`});
+   // Reduced motion: a switch hides the old research at once.
    await page.emulateMedia({reducedMotion:'reduce'});
-   await page.waitForTimeout(100);
-   const pixels=()=>page.locator('canvas.bm-weapon').evaluate(c=>c.toDataURL());
-   const still=await pixels();await page.waitForTimeout(200);assert.equal(await pixels(),still);
+   await buy('drone_unlock');await page.waitForTimeout(50);
+   assert((await shown()).includes('drone_damage'));
+   await buy('reverse_unlock');
+   assert(!(await shown()).includes('drone_damage'));
+   await page.emulateMedia({reducedMotion:'no-preference'});
    // Restore the actual choice before reload.
-   await page.evaluate(()=>{const g=window.__game;g.save.data.blackMarketPaths.pistol='drone_unlock';g.save.save()});
+   await page.evaluate(essence=>{const g=window.__game;g.save.data.blackMarketPaths.pistol='drone_unlock';g.save.data.essence=essence;g.save.save()},state.essence);
    await page.reload();await page.locator('[data-act="play"]').click();
    const restored=await page.evaluate(()=>{const g=window.__game;return {path:g.save.data.blackMarketPaths.pistol,essence:g.save.data.essence,damage:g.stats.droneDamage}});
    assert.equal(restored.path,state.path);assert.equal(restored.essence,state.essence);assert.equal(restored.damage,state.damage);
-   assert.deepEqual(errors,[]);console.log(JSON.stringify({width,deviceScaleFactor,artwork,state,restored,pageErrors:errors}));
+   assert.deepEqual(errors,[]);console.log(JSON.stringify({width,deviceScaleFactor,state,restored,pageErrors:errors}));
    await context.close();
   }
  }finally{await browser.close()}

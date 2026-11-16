@@ -44,7 +44,8 @@ fs.mkdirSync(artifacts, { recursive: true });
     g.applyUpgrades();g.upgradeTree.switchTab(node.market.weapon,true);return true;
     function assertPurchase(ok){if(!ok)throw Error('Could not open Black Market');}
    },id);
-   const node=page.locator(market?`[data-market-buy="${id}"]`:`[data-smoke="${id}"]`);
+   const node=page.locator(market?`.tree-node[data-id="${id}"]:not(.hidden)`:`[data-smoke="${id}"]`);
+   if(market)await page.waitForTimeout(500); // let a new path grow out of its root
    await node.hover();await node.click();
   }
   async function activate(weapon,mutation){
@@ -228,8 +229,8 @@ fs.mkdirSync(artifacts, { recursive: true });
     const cdp=await profile.newCDPSession(p);await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
     await p.evaluate(async()=>{const{UPGRADE_DEFS}=await import('/src/progression/UpgradeDefinitions.ts');const g=window.__game;for(const d of UPGRADE_DEFS)g.save.data.upgrades[d.id]=d.maxLevel;g.save.data.lifetimePixels=10000;g.save.data.blackMarketPaths.sniper_rifle='prism_unlock';g.applyUpgrades();g.openUpgrades();});
     await p.locator('.tree-cat-btn[data-cat="primary"]').tap();await p.locator('[data-market="sniper_rifle"]').tap();
-    await p.locator('[data-market-buy="prism_spectrum"]').scrollIntoViewIfNeeded();
-    await p.locator('[data-market-buy="prism_spectrum"] strong').filter({hasText:'Spectrum Ascension'}).waitFor({state:'visible'});
+    await p.locator('.tree-node[data-id="prism_spectrum"]:not(.hidden)').tap();
+    await p.locator('.tree-tooltip:not(.hidden)').filter({hasText:'Spectrum Ascension'}).waitFor({state:'visible'});
     await p.screenshot({path:path.join(artifacts,'mobile-prism-upgrades.png')});
     await p.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
     await p.locator('[data-slot="0"][data-weapon="sniper_rifle"]').tap();
