@@ -154,6 +154,7 @@ export interface WorldDims {
  * Cells outside the world are solid and indestructible (the world border).
  */
 export class PixelWorld implements SolidQuery {
+  startingTube: { x0: number; y0: number; x1: number; y1: number; coreId: number } | null = null;
   readonly width: number;
   readonly height: number;
   readonly cellSize: number;
@@ -202,6 +203,8 @@ export class PixelWorld implements SolidQuery {
   boundaryThickness = 3;
   /** Per-cell special material (`MAT`). */
   readonly mat: Uint8Array;
+  /** Glass weakened by sustained overdrive contact; independent of HP. */
+  readonly glassCracked: Uint8Array;
   /** Per-cell door id (`0` = none, `id >= 1` = `doors[id - 1]`). */
   readonly doorId: Uint16Array;
   /** Per-subcell kind (`SUB`): pink blight or collapsed rubble. */
@@ -252,6 +255,14 @@ export class PixelWorld implements SolidQuery {
     for (const listener of this.damageListeners) listener(x, y, amount, sub, dx, dy);
   }
 
+  setGlassCracked(cx: number, cy: number, cracked: boolean): void {
+    if (!this.inBounds(cx, cy)) return;
+    const i = cy * this.width + cx, value = cracked ? 1 : 0;
+    if (this.glassCracked[i] === value) return;
+    this.glassCracked[i] = value;
+    this.emit(cx, cy, "damaged");
+  }
+
   addDestroyListener(fn: DestroyListener): void {
     this.destroyListeners.push(fn);
   }
@@ -285,6 +296,7 @@ export class PixelWorld implements SolidQuery {
     this.decor = new Uint8Array(dims.width * dims.height);
     this.coreId = new Uint8Array(dims.width * dims.height);
     this.blight = new Uint8Array(dims.width * dims.height);
+    this.glassCracked = new Uint8Array(dims.width * dims.height);
     this.boundary = new Uint8Array(dims.width * dims.height);
     this.mat = new Uint8Array(dims.width * dims.height);
     this.doorId = new Uint16Array(dims.width * dims.height);
@@ -501,6 +513,7 @@ export class PixelWorld implements SolidQuery {
     const idx = cy * this.width + cx;
     if (this.boundary[idx]) return;
     this.health[idx] = hp;
+    if (hp === 0 || kind === "grown") this.glassCracked[idx] = 0;
     if (kind === "grown") {
       this.blight[idx] = 1;
       // Blight replaces whatever material was here.

@@ -1,3 +1,4 @@
+import { buildStartingTube } from "./StartingTube";
 import { installMapBoundary } from "./MapBoundary";
 import { designLateSpaces, fortifyLateSpaces } from "./LateWorldLayouts";
 import { FACILITY, TERRAIN, zoneForDepth } from "../config";
@@ -113,6 +114,8 @@ interface ZoneBand {
  */
 export function generateWorld(world: PixelWorld, seed: number, options: GenerateOptions = {}): void {
   const { width, height, health, tint, wall } = world;
+  world.startingTube = null;
+  world.glassCracked.fill(0);
   wall.fill(0);
   world.decor.fill(0);
   world.coreId.fill(0);
@@ -286,6 +289,9 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     placeCrystalVeins(world, frame, runSeed);
     if (options.conquered) clearConqueredSectors(world, frame, options.conquered);
   }
+  // The opening encounter is live even though A1 is unlocked/conquered by
+  // default in both new and existing saves.
+  if (frame?.def.id === 1 && (options.spawn ?? def.start) === def.start) buildStartingTube(world);
   ensureRoomFixtures(world, layout);
   installMapBoundary(world);
 }

@@ -146,7 +146,7 @@ export class Game {
   /** Flush time at state transitions as well as frames, without simulation scaling. */
   syncSpeedrun(now = performance.now()): void {
     if (!this.save) return;
-    const running = this.runStarted && !this.paused && !this.runOver && !document.hidden
+    const running = this.runStarted && this.runStats?.soldiersDeployed > 0 && !this.paused && !this.runOver && !document.hidden
       && !this.mainMenu?.visible && !this.pauseMenu?.visible && !this.upgradeTree?.visible
       && !this.labMap?.visible && !this.resultsScreen?.visible;
     this.speedrunClock.sync(now, this.save.data.speedrun, running);
@@ -579,6 +579,7 @@ export class Game {
     this.casings.clear();
     this.loot.clear();
     this.runStats.reset();
+    this.acc = 0;
     this.reserves = this.stats.maxSoldiers;
     this.canDeploy = true;
     this.growthRate = 0;
@@ -1773,6 +1774,13 @@ export class Game {
     room.x = w.roomCenterX;
     room.y = w.roomCenterY;
     room.radiusCells = w.roomSize * 0.5 + 2;
+    if (w.startingTube) {
+      const core = w.blightCores[w.startingTube.coreId - 1];
+      const containment = take();
+      containment.x = (core.cx + 0.5) * w.cellSize;
+      containment.y = (core.cy + 0.5) * w.cellSize;
+      containment.radiusCells = 7;
+    }
     if (!roomOnly) {
       for (const s of this.soldiers) {
         if (!s.alive) continue;
@@ -1803,6 +1811,7 @@ export class Game {
   }
 
   step(dt: number): void {
+    if (this.runStats.soldiersDeployed === 0) return;
     this.runStats.time += dt;
     this.updateLabProgress(dt);
     this.updateGates();
@@ -1934,7 +1943,7 @@ export class Game {
     this.combat.drones.update(dt);
     this.combat.laser.update(dt);
     this.combat.updateTurrets(dt);
-    this.glass.update(dt);
+    this.glass.update(dt, this.growth.overdrive);
     this.late.update(dt, this.soldiers);
     this.creatures.update(dt, this.runStats.time, this.soldiers, this.growth);
     this.doors.update(dt);
@@ -2312,13 +2321,13 @@ export class Game {
     const real = this.last ? Math.min(0.1, intervalMs / 1000) : SIM.dt;
     this.last = now;
     // Only live gameplay frames tune the auto render quality.
-    const playing = this.runStarted && !this.paused && !this.runOver && !document.hidden;
+    const playing = this.runStarted && this.runStats.soldiersDeployed > 0 && !this.paused && !this.runOver && !document.hidden;
     if (playing && this.wasPlaying) this.renderer.sampleFrame(intervalMs);
     else if (!playing && this.wasPlaying) this.renderer.resetFrameSampling();
     this.wasPlaying = playing;
     const t0 = performance.now();
     if (!this.paused) {
-      this.acc += real * this.timeScale * this.deathTimeScale;
+      if (this.runStats.soldiersDeployed > 0) this.acc += real * this.timeScale * this.deathTimeScale;
       const maxSteps = SIM.maxStepsPerFrame * Math.max(1, this.timeScale);
       let steps = 0;
       while (this.acc >= SIM.dt && steps < maxSteps) {

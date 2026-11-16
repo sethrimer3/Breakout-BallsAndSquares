@@ -20,6 +20,8 @@ export class GlassSystem {
   private pendingCell: number[] = [];
   private pendingAt: number[] = [];
   private time = 0;
+  private panes = new Set<number>();
+  private contact = new Map<number, number>();
   private queue: Int32Array;
 
   constructor(
@@ -30,11 +32,15 @@ export class GlassSystem {
     this.claimed = new Uint8Array(n);
     this.queue = new Int32Array(n);
     world.addListener((cx, cy, kind) => {
+      const changed = cy * world.width + cx;
+      if (world.mat[changed] === MAT.glass && world.health[changed] > 0) this.panes.add(changed);
+      else { this.panes.delete(changed); this.contact.delete(changed); }
       if (kind !== "destroyed") return;
       const i = cy * world.width + cx;
       if (world.mat[i] !== MAT.glass || this.claimed[i] || world.health[i] > 0) return;
       this.startChain(i);
     });
+    this.reset();
   }
 
   reset(): void {
@@ -42,6 +48,12 @@ export class GlassSystem {
     this.pendingCell.length = 0;
     this.pendingAt.length = 0;
     this.time = 0;
+    this.panes.clear();
+    this.contact.clear();
+    this.world.glassCracked.fill(0);
+    for (let i = 0; i < this.world.health.length; i++) {
+      if (this.world.mat[i] === MAT.glass && this.world.health[i] > 0) this.panes.add(i);
+    }
   }
 
   /** Panes still waiting to burst. */
@@ -81,8 +93,46 @@ export class GlassSystem {
     }
   }
 
-  update(dt: number): void {
+  /** Only face-sharing Blight counts; rubble and diagonal contact do not. */
+  private touchesBlight(cx: number, cy: number): boolean {
+    const w = this.world;
+    for (let k = 0; k < 4; k++) {
+      const nx = cx + DX[k], ny = cy + DY[k];
+      if (!w.inBounds(nx, ny)) continue;
+      const i = ny * w.width + nx;
+      if (w.health[i] > 0 && w.blight[i]) return true;
+      // Only the two subcells on the face actually touching this pane.
+      for (let side = 0; side < 2; side++) {
+        const sx = DX[k] ? nx * 2 + (DX[k] < 0 ? 1 : 0) : cx * 2 + side;
+        const sy = DY[k] ? ny * 2 + (DY[k] < 0 ? 1 : 0) : cy * 2 + side;
+        if (w.isBlightSubAt(sx, sy)) return true;
+      }
+    }
+    return false;
+  }
+
+  update(dt: number, overdrive = false): void {
     this.time += dt;
+    // Evaluate contact before shattering anything, so newly exposed layers
+    // cannot inherit elapsed time from this step.
+    const shatter: number[] = [];
+    if (overdrive || this.contact.size > 0) for (const i of this.panes) {
+      const cx = i % this.world.width, cy = Math.floor(i / this.world.width);
+      if (!overdrive || !this.touchesBlight(cx, cy)) {
+        this.contact.delete(i);
+        this.world.setGlassCracked(cx, cy, false);
+        continue;
+      }
+      const elapsed = (this.contact.get(i) ?? 0) + dt;
+      this.contact.set(i, elapsed);
+      if (elapsed >= 1 - 1e-8) this.world.setGlassCracked(cx, cy, true);
+      if (elapsed >= 2 - 1e-8) shatter.push(i);
+    }
+    for (const i of shatter) {
+      const cx = i % this.world.width, cy = Math.floor(i / this.world.width);
+      this.world.setCell(cx, cy, 0, "destroyed");
+      this.events.onShatter?.(cx, cy);
+    }
     if (this.pendingCell.length === 0) return;
     const w = this.world;
     let keep = 0;

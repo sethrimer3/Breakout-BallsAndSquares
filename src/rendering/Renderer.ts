@@ -149,11 +149,13 @@ export class Renderer {
     // The spawn room's bare concrete slab.
     {
       const cs = game.world.cellSize;
-      const sx = cam.worldToScreenX(game.world.roomX0 * cs);
-      const sy = cam.worldToScreenY(game.world.roomY0 * cs);
-      const sw = game.world.roomSize * cs * cam.zoom;
+      const tube = game.world.startingTube;
+      const sx = cam.worldToScreenX((tube?.x0 ?? game.world.roomX0) * cs);
+      const sy = cam.worldToScreenY((tube?.y0 ?? game.world.roomY0) * cs);
+      const sw = (tube ? tube.x1 - tube.x0 + 1 : game.world.roomSize) * cs * cam.zoom;
+      const sh = (tube ? tube.y1 - tube.y0 + 1 : game.world.roomSize) * cs * cam.zoom;
       ctx.fillStyle = COLORS.spawnFloor;
-      ctx.fillRect(sx, sy, sw, sw);
+      ctx.fillRect(sx, sy, sw, sh);
     }
 
     game.terrain.drawFloor(ctx, cam);
@@ -193,7 +195,6 @@ export class Renderer {
     this.creatureRenderer.draw(ctx, cam, game.creatures, this.motion.matches ? 0 : performance.now() / 1000);
     const wallClockMs = performance.now();
     const still = this.motion.matches;
-    game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000, game.devMapAccess ? undefined : game.fog);
     game.terrain.drawSurfaceOutlines(ctx, cam);
     drawSpecialBlocks(ctx, cam, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
 
@@ -227,7 +228,11 @@ export class Renderer {
     drawMapBoundary(ctx, game.world, cam);
 
     // 4) Fog of war over the whole world; the aim indicator stays readable on top.
-    if (!game.devMapAccess) this.fogRenderer.draw(ctx, cam);
+    if (!game.devMapAccess) {
+      this.fogRenderer.draw(ctx, cam);
+      game.terrain.drawBlightThroughFog(ctx, cam);
+    }
+    game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);
     // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
     // its full palette even when it outruns the light creeping after it.
     drawWeaponExpansion(ctx, game, still);

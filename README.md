@@ -63,6 +63,8 @@ Every living soldier has a steady, shadow-casting visibility light, independent 
 
 ## Core Mechanics
 
+The first lab landing is a horizontal tube with a Blight generator to the left, enclosed by three separate glass shells. Simulation time waits for the first successful soldier placement each run. Blight blocks and their burning outlines remain visible through fog; other terrain still requires sight. During overdrive, continuous Blight contact cracks a glass pane after one second and shatters it after two. Losing contact or leaving overdrive resets that timer.
+
 - **World & Starting Room:** Each run generates a fresh `512 × 512`-cell world (`4096 × 4096` logical units at `8 × 8` units/cell) with a `10 × 10`-cell empty chamber at the exact center.
 - **Distance-Based Pixel Hardness:** Terrain health increases in concentric Chebyshev bands outward from the starting room:
   $$\text{maxHealth} = \min\!\left(12,\; 1 + \left\lfloor \frac{\max(0, \text{distance} - 5)}{12} \right\rfloor\right)$$

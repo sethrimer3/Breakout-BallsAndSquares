@@ -139,6 +139,7 @@ export class TerrainRenderer {
   opacityRevision = 0;
   readonly chunks: TerrainChunks;
   private canvases: HTMLCanvasElement[] = [];
+  private blightCanvases: (HTMLCanvasElement | null)[] = [];
   private surfaceOutlines: (Path2D | null)[] = [];
   /** One pixel per world cell: what the lab's emergency power keeps lit. */
   private glowCanvas: HTMLCanvasElement;
@@ -197,6 +198,7 @@ export class TerrainRenderer {
       c.height = chunkSize * TEX;
       this.canvases.push(c);
     }
+    this.blightCanvases = new Array<HTMLCanvasElement | null>(n).fill(null);
     this.image = new ImageData(chunkSize * TEX, chunkSize * TEX);
     const edgeSize = subChunk * EDGE_PIXELS_PER_SUB;
     this.edgeMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
@@ -712,14 +714,16 @@ export class TerrainRenderer {
           const g = COLORS.glass;
           const edge = up || left || down || right;
           const maxHpG = world.maxHealthAt(cx, cy);
-          const crack = hp < maxHpG ? 1 - hp / maxHpG : 0;
+          const crack = Math.max(world.glassCracked[i] ? 0.65 : 0, hp < maxHpG ? 1 - hp / maxHpG : 0);
           const a = Math.min(255, COLORS.glassAlpha + (edge ? 40 : 0) + crack * 90);
           for (let t = 0; t < TEX * TEX; t++) {
             const ox = t % TEX;
             const oy = (t - ox) / TEX;
             // A thin diagonal glint across each pane.
             const glint = (cx * TEX + ox + cy * TEX + oy) % 6 === 0 ? 26 : 0;
-            put(tx0 + ox, ty0 + oy, g[0] + glint, g[1] + glint, g[2] + glint, a);
+            const fracture = crack > 0 ? crackTexelAt(cx, cy, ox, oy, crack) : 0;
+            const light = fracture ? (fracture === 2 ? 100 : 55) : glint;
+            put(tx0 + ox, ty0 + oy, g[0] + light, g[1] + light, g[2] + light, fracture ? 240 : a);
           }
           continue;
         }
@@ -805,6 +809,26 @@ export class TerrainRenderer {
       }
     }
     this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0);
+    // Reuse the albedo pixels, masking everything except living Blight.
+    // This cache changes with its terrain chunk, never by scanning the view.
+    let hasBlight = false;
+    for (let ty = 0; ty < texCs; ty++) for (let tx = 0; tx < texCs; tx++) {
+      const cx = kx * cs + Math.floor(tx / TEX), cy = ky * cs + Math.floor(ty / TEX);
+      const i = cy * W + cx;
+      const sx = cx * 2 + Math.floor((tx % TEX) / (TEX / 2));
+      const sy = cy * 2 + Math.floor((ty % TEX) / (TEX / 2));
+      const blight = world.inBounds(cx, cy) && (health[i] > 0
+        ? !!world.blight[i] : world.isBlightSubAt(sx, sy));
+      if (blight) hasBlight = true;
+      else data[(ty * texCs + tx) * 4 + 3] = 0;
+    }
+    if (hasBlight) {
+      const canvas = this.blightCanvases[k] ?? document.createElement("canvas");
+      if (!this.blightCanvases[k]) canvas.width = canvas.height = texCs;
+      canvas.getContext("2d")!.putImageData(this.image, 0, 0);
+      this.blightCanvases[k] = canvas;
+    } else this.blightCanvases[k] = null;
+
     if (this.chunks.geometryDirty[k]) {
       const outline = new Path2D();
       const subs = cs * 2;
@@ -1014,6 +1038,17 @@ export class TerrainRenderer {
     for (let i = 0; i < bits.length; i++) data[i * 4 + 3] = bits[i] * 255;
     mask.getContext("2d")!.putImageData(this.edgeImage, 0, 0);
     return mask;
+  }
+
+  /** Cached Blight albedo, drawn after fog without exposing other terrain. */
+  drawBlightThroughFog(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
+    const smoothing = ctx.imageSmoothingEnabled;
+    ctx.imageSmoothingEnabled = false;
+    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      const canvas = this.blightCanvases[ky * this.chunks.cols + kx];
+      if (canvas) ctx.drawImage(canvas, sx, sy, sw, sh);
+    });
+    ctx.imageSmoothingEnabled = smoothing;
   }
 
   /**
