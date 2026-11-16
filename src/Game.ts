@@ -509,6 +509,7 @@ export class Game {
     for (const s of this.soldiers) {
       if (!s.alive) continue;
       s.mods = this.upgrades.soldierMods(s.slotIndex);
+      s.mutation = resolvePrimaryMutation(s.weapon, s.mutation, this.stats);
       const speed = this.stats.speed * s.mods.speedMult;
       const len = Math.hypot(s.vx, s.vy) || 1;
       s.vx = (s.vx / len) * speed;

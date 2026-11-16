@@ -9,7 +9,7 @@ import { CombatSystem } from "../src/systems/CombatSystem";
 import { PhysicsSystem } from "../src/systems/PhysicsSystem";
 import { GrowthSystem } from "../src/world/GrowthSystem";
 import { MAT, PixelWorld } from "../src/world/PixelWorld";
-import { unlockTabs, findAllSpecials } from "./helpers/progression";
+import { openBlackMarkets, unlockTabs, findAllSpecials } from "./helpers/progression";
 
 class MemoryStorage implements StorageLike {
   private map = new Map<string, string>();
@@ -320,11 +320,11 @@ describe("Napalm Garden (Flamethrower branch 1)", () => {
 });
 
 describe("Canonical Black Market integration & lab-only refund", () => {
-  it("enforces unique non-Pistol primaries across squad, independent Pistol mutations, and exact lab-only Black Market refunds", () => {
+  it("enforces unique non-Pistol primaries across squad, one active Pistol path, and exact lab-only Black Market refunds", () => {
     const storage = new MemoryStorage();
     const save = new SaveManager(storage);
     const u = new UpgradeManager(save); findAllSpecials(save.data);
-    unlockTabs(save);
+    unlockTabs(save); openBlackMarkets(save);
     save.data.lifetimePixels = 10000;
     save.data.bank = 100000;
     save.data.crystals = 10000;
@@ -337,8 +337,8 @@ describe("Canonical Black Market integration & lab-only refund", () => {
     expect(u.buy("katana_unlock")).toBe(true);
     expect(u.buy("gale_unlock")).toBe(true);
 
-    // Multiple soldiers can pick independent Pistol mutations.
-    expect(u.setLoadoutWeapon(0, "pistol", "reverse_revolver", false).ok).toBe(true);
+    // Multiple soldiers can pick one active Pistol path.
+    expect(u.setLoadoutWeapon(0, "pistol", "reverse_revolver", false).ok).toBe(false);
     expect(u.setLoadoutWeapon(1, "pistol", "orbit_cylinder", false).ok).toBe(true);
 
     // Non-Pistol primary cannot be duplicated across slots even with different mutations.

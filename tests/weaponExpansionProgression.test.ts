@@ -1,9 +1,10 @@
+import { marketNode } from "../src/progression/BlackMarket";
 import {describe,expect,it} from "vitest";
 import {SaveManager,type StorageLike} from "../src/progression/SaveManager";
 import {UpgradeManager} from "../src/progression/UpgradeManager";
 import {UPGRADE_DEFS} from "../src/progression/UpgradeDefinitions";
 import {EXPANSION_DEFS} from "../src/progression/WeaponExpansionUpgrades";
-import {unlockTabs} from "./helpers/progression";
+import {openBlackMarkets,unlockTabs} from "./helpers/progression";
 
 class MemoryStorage implements StorageLike{
  private data=new Map<string,string>();getItem(k:string){return this.data.get(k)??null;}setItem(k:string,v:string){this.data.set(k,v);}
@@ -11,9 +12,10 @@ class MemoryStorage implements StorageLike{
 function scene(){const storage=new MemoryStorage();const save=new SaveManager(storage);const u=new UpgradeManager(save);return{storage,save,u};}
 
 describe("weapon expansion release progression",()=>{
- it("keeps every tree node distinct, visible and within the existing 5×3 stage",()=>{
+ it("keeps standard tree nodes distinct and moves mutation research into separate paths",()=>{
   const keys=new Set<string>();
   for(const def of UPGRADE_DEFS){
+   if(marketNode(def.id))continue;
    const key=`${def.branch}:${def.grid.col},${def.grid.row}`;
    expect(keys.has(key),`${def.id} overlaps another node`).toBe(false);keys.add(key);
    if(EXPANSION_DEFS.includes(def)){expect(Math.abs(def.grid.col)).toBeLessThanOrEqual(3);expect(Math.abs(def.grid.row)).toBeLessThanOrEqual(2);}
@@ -25,11 +27,14 @@ describe("weapon expansion release progression",()=>{
   for(const def of UPGRADE_DEFS)save.data.upgrades[def.id]=def.maxLevel;
   for(const def of EXPANSION_DEFS){
    save.data.upgrades[def.id]=0;
+   const node=marketNode(def.id);
+   if(node)save.data.blackMarketPaths[node.market.weapon]=node.path.root;
    for(let level=0;level<def.maxLevel;level++)expect(u.buy(def.id),`${def.id} level ${level+1}`).toBe(true);
    expect(u.buy(def.id)).toBe(false);
   }
   const loaded=new SaveManager(storage);
   for(const def of EXPANSION_DEFS)expect(loaded.data.upgrades[def.id],def.id).toBe(def.maxLevel);
+  loaded.data.blackMarketPaths={shotgun:"goo_unlock",pistol:"drone_unlock",sniper_rifle:"prism_unlock",katana:"katana_dash"};
   const stats=new UpgradeManager(loaded).getSoldierStats();
   expect(stats).toMatchObject({gooDwell:0.08,gooDamage:11,gooResidue:true,droneCapacity:7,droneDamage:7,droneHealth:5,droneAim:20,droneRecall:true,
    prismDamage:9,prismSpectrum:6,prismBounces:7,prismShear:6,prismDistance:600,prismOverload:true,
@@ -39,7 +44,7 @@ describe("weapon expansion release progression",()=>{
  it("enforces category, weapon, dash and capstone prerequisites",()=>{
   const{save,u}=scene();save.data.lifetimePixels=10000;
   expect(u.isUnlocked("drone_unlock")).toBe(false);expect(u.isUnlocked("prism_unlock")).toBe(false);
-  unlockTabs(save);expect(u.isUnlocked("drone_unlock")).toBe(true);
+  unlockTabs(save);openBlackMarkets(save);expect(u.isUnlocked("drone_unlock")).toBe(true);
   expect(u.isUnlocked("drone_damage")).toBe(false);expect(u.isUnlocked("prism_shear")).toBe(false);
   save.data.upgrades.katana_unlock=1;expect(u.isUnlocked("katana_impulse")).toBe(false);
   save.data.upgrades.katana_dash=1;expect(u.isUnlocked("katana_impulse")).toBe(true);

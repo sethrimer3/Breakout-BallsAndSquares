@@ -1,3 +1,4 @@
+import { BLACK_MARKET_DEFS, marketNode, type BlackMarketAccessId } from "./BlackMarket";
 import { EXPANSION_DEFS, type ExpansionUpgradeId } from "./WeaponExpansionUpgrades";
 import {
   ASSAULT_RIFLE,
@@ -36,6 +37,7 @@ export type UpgradeBranch =
   | "soldier";
 
 export type UpgradeId =
+  | BlackMarketAccessId
   | ExpansionUpgradeId
   | "goo_unlock" | "goo_mass" | "goo_distance"
   | "keycard_t6" | "keycard_t9"
@@ -2054,7 +2056,16 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
   }),
   ...EXISTING_DEFS.filter((d) => !CORE_PATH.includes(d.id)),
   ...EXPANSION_DEFS,
+  ...BLACK_MARKET_DEFS,
 ];
+
+// Mutation nodes live on separate trees, so only standard nodes reserve slots here.
+for (const access of BLACK_MARKET_DEFS) {
+  const occupied = UPGRADE_DEFS.filter(d => d.branch === access.branch && d.id !== access.id && !marketNode(d.id));
+  let row = -1;
+  while (occupied.some(d => d.grid.col === 2 && d.grid.row === row)) row--;
+  access.grid = {col:2,row};
+}
 
 export const BRANCH_UNLOCK: Partial<Record<UpgradeBranch, UpgradeId>> = {
   resources: "unlock_resources", blight: "unlock_blight", formations: "unlock_formations", facility: "unlock_facility",

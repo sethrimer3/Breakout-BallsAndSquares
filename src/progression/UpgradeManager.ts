@@ -1,3 +1,4 @@
+import { accessId, marketFor, marketNode, WEAPON_MARKETS, type MarketPath } from "./BlackMarket";
 import { baseSoldierStats, resolvePrimaryMutation, type PrimaryMutation, type SoldierStats, type WeaponType } from "../entities/Soldier";
 import type { SaveData, SaveManager } from "./SaveManager";
 import { needsSpecial } from "./specialUnlocks";
@@ -11,7 +12,6 @@ import {
   UPGRADE_BY_ID,
   UPGRADE_DEFS,
   BRANCH_UNLOCK,
-  upgradeCost,
   upgradePrices,
   type Currency,
   type Price,
@@ -50,12 +50,19 @@ export class UpgradeManager {
 
   isMaxed(id: UpgradeId): boolean {
     const def = UPGRADE_BY_ID[id];
+    if (this.isPathSwitch(id)) return false;
     return this.levelOf(id) >= def.maxLevel;
   }
 
   isUnlocked(id: UpgradeId): boolean {
     const def = UPGRADE_BY_ID[id];
     if (!def || def.placeholder || !this.isBranchUnlocked(def.branch)) return false;
+    const node = marketNode(id);
+    if (node) {
+      if (!this.marketOpen(node.market.weapon)) return false;
+      // Path roots can always be re-bought to switch; upgrades require their active root.
+      if (id !== node.path.root && this.activeMarketPath(node.market.weapon)?.root !== node.path.root) return false;
+    }
     // Hidden in a gold special-upgrade block until the squad finds it.
     if (needsSpecial(this.save.data, id)) return false;
     if (def.branch === "core") {
@@ -102,7 +109,9 @@ export class UpgradeManager {
 
   /** True while `id` is still hidden in an unfound gold special-upgrade block. */
   needsFinding(id: UpgradeId): boolean {
-    return needsSpecial(this.save.data, id);
+    const market = marketFor(UPGRADE_BY_ID[id].branch);
+    const discovery = market?.unlock ?? (UPGRADE_BY_ID[id].branch === "grenade" ? "grenade_unlock" : null);
+    return needsSpecial(this.save.data, id) || !!(discovery && needsSpecial(this.save.data, discovery));
   }
 
   isBranchUnlocked(branch: UpgradeBranch): boolean {
@@ -113,10 +122,15 @@ export class UpgradeManager {
   /** The next level's cost in the node's main currency. */
   costOf(id: UpgradeId): number {
     const def = UPGRADE_BY_ID[id];
-    return upgradeCost(def, this.levelOf(id));
+    return this.pricesOf(id).find(p => p.currency === (marketNode(id)?.path.root === id ? "essence" : def.currency ?? "gold"))?.amount ?? 0;
   }
 
   pricesOf(id: UpgradeId): Price[] {
+    const node = marketNode(id);
+    if (node?.path.root === id) {
+      const cost = id === "goo_unlock" || id === "katana_dash" ? 30 : id === "prism_unlock" ? 40 : id === "drone_unlock" ? 35 : UPGRADE_BY_ID[id].baseCost;
+      return [{currency:"essence",amount:cost}];
+    }
     return upgradePrices(UPGRADE_BY_ID[id], this.levelOf(id));
   }
 
@@ -129,12 +143,41 @@ export class UpgradeManager {
     if (!this.canBuy(id)) return false;
     const prices = this.pricesOf(id);
     this.pay(prices);
-    this.save.data.upgrades[id] = this.levelOf(id) + 1;
+    const market = marketNode(id);
+    this.save.data.upgrades[id] = Math.min(UPGRADE_BY_ID[id].maxLevel, this.levelOf(id) + 1);
+    if (market?.path.root === id) {
+      this.save.data.blackMarketPaths[market.market.weapon] = id;
+      // The new choice applies to the next deployment, including equipped slots.
+      for (const ld of this.save.data.loadouts) if (ld.weapon === market.market.weapon) ld.mutation = market.path.mutation;
+    }
     const spent = (this.save.data.upgradeSpent ??= {});
     const rec = (spent[id] ??= {});
     for (const p of prices) rec[p.currency] = (rec[p.currency] ?? 0) + p.amount;
     this.save.save();
     return true;
+  }
+
+  marketOpen(weapon: WeaponType): boolean {
+    // Existing research grants access without charging for it a second time.
+    return this.levelOf(accessId(weapon)) > 0 || this.activeMarketPath(weapon) !== undefined;
+  }
+
+  activeMarketPath(weapon: WeaponType): MarketPath | undefined {
+    const market = marketFor(weapon);
+    if (!market) return undefined;
+    const saved = this.save.data.blackMarketPaths[weapon];
+    if (saved) {
+      const node = marketNode(saved);
+      if (node?.market.weapon === weapon && this.levelOf(node.path.root) > 0) return node.path;
+    }
+    const equipped = this.save.data.loadouts.find(ld => ld.weapon === weapon && ld.mutation)?.mutation;
+    return market.paths.find(p => p.mutation === equipped && this.levelOf(p.root) > 0)
+      ?? market.paths.find(p => this.levelOf(p.root) > 0);
+  }
+
+  isPathSwitch(id: UpgradeId): boolean {
+    const node = marketNode(id);
+    return !!node && node.path.root === id && this.activeMarketPath(node.market.weapon)?.root !== id;
   }
 
   /** Set a soldier slot's primary weapon & mutation, enforcing unlock and non-Pistol uniqueness. */
@@ -180,6 +223,8 @@ export class UpgradeManager {
   refundBlackMarket(inRun = false): { ok: true; refunded: Partial<Record<Currency, number>> } | { ok: false; reason: "lab_only" } {
     if (inRun) return { ok: false, reason: "lab_only" };
     const mutationNodeIds: UpgradeId[] = [
+      ...WEAPON_MARKETS.map(m => accessId(m.weapon)),
+      "katana_dash", "katana_impulse", "katana_glide", "katana_kinetic", "katana_wide", "katana_recovery", "katana_perfect",
       "reverse_unlock", "orbit_unlock",
       "drone_unlock", "drone_capacity", "drone_cycle", "drone_damage", "drone_speed", "drone_aim", "drone_health", "drone_recall",
       "goo_unlock", "goo_mass", "goo_distance", "goo_dwell", "goo_damage", "goo_radius", "goo_rate", "goo_residue",
@@ -217,6 +262,7 @@ export class UpgradeManager {
       }
       this.save.data.upgrades[id] = 0;
     }
+    this.save.data.blackMarketPaths = {};
     for (const ld of this.save.data.loadouts) ld.mutation = null;
     this.save.save();
     return { ok: true, refunded };
@@ -269,7 +315,9 @@ export class UpgradeManager {
   getSoldierStats(): SoldierStats {
     const stats = baseSoldierStats();
     for (const def of UPGRADE_DEFS) {
-      def.apply(stats, this.levelOf(def.id));
+      const node = marketNode(def.id);
+      const active = !node || this.activeMarketPath(node.market.weapon)?.root === node.path.root;
+      def.apply(stats, active ? this.levelOf(def.id) : 0);
     }
     return stats;
   }

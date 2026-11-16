@@ -11,7 +11,7 @@ import { drawWeaponExpansion } from "../src/rendering/WeaponExpansionRenderer";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { UpgradeManager } from "../src/progression/UpgradeManager";
 import { MAT, PixelWorld } from "../src/world/PixelWorld";
-import { unlockTabs, findAllSpecials } from "./helpers/progression";
+import { openBlackMarkets, unlockTabs, findAllSpecials } from "./helpers/progression";
 
 class MemoryStorage implements StorageLike {
   private map = new Map<string, string>();
@@ -54,7 +54,7 @@ describe("Circuit Runner — Assault Rifle branch 2", () => {
   it("supports Essence unlock, refundBlackMarket, SaveManager sanitation, and compatibility", () => {
     const storage = new MemoryStorage();
     const save = new SaveManager(storage);
-    unlockTabs(save);
+    unlockTabs(save); openBlackMarkets(save);
     save.data.lifetimePixels = 10000;
     save.data.bank = 5000;
     save.data.essence = 100;

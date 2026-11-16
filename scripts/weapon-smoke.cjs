@@ -35,7 +35,26 @@ fs.mkdirSync(artifacts, { recursive: true });
    ])g.upgradeTree.nodeEls.get(id).dataset.smoke=id;
   });
   await page.locator('.tree-cat-btn[data-cat="primary"]').click();
-  async function buy(id) { const node=page.locator(`[data-smoke="${id}"]`);await node.hover();await node.click(); }
+  async function buy(id) {
+   const market = await page.evaluate(async id=>{
+    const {marketNode,accessId}=await import('/src/progression/BlackMarket.ts');
+    const g=window.__game,node=marketNode(id);
+    if(!node){g.upgradeTree.switchTab(g.upgrades.defs.find(d=>d.id===id).branch);return false;}
+    if(!g.upgrades.marketOpen(node.market.weapon))assertPurchase(g.upgrades.buy(accessId(node.market.weapon)));
+    g.applyUpgrades();g.upgradeTree.switchTab(node.market.weapon,true);return true;
+    function assertPurchase(ok){if(!ok)throw Error('Could not open Black Market');}
+   },id);
+   const node=page.locator(market?`[data-market-buy="${id}"]`:`[data-smoke="${id}"]`);
+   await node.hover();await node.click();
+  }
+  async function activate(weapon,mutation){
+   await page.evaluate(async({weapon,mutation})=>{
+    const{marketFor}=await import('/src/progression/BlackMarket.ts');const g=window.__game;
+    const path=marketFor(weapon).paths.find(p=>p.mutation===mutation);
+    if(path&&g.upgrades.activeMarketPath(weapon)?.root!==path.root&&!g.upgrades.buy(path.root))throw Error('Could not switch mutation path');
+    g.applyUpgrades();
+   },{weapon,mutation});
+  }
   await page.locator('[data-tab="shotgun"]').click();await buy('shotgun_unlock');await buy('goo_unlock');await buy('goo_radius');await buy('goo_residue');await buy('vacuum_unlock');
   await page.locator('[data-tab="assault_rifle"]').click();await buy('ar_unlock');for(let i=0;i<6;i++)await buy('ar_stabilizer');await buy('overcharge_unlock');
   assert.equal(await page.evaluate(()=>window.__game.upgrades.getSoldierStats().overchargeSpreadDeg),10.5);
@@ -67,6 +86,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     ['flamethrower','cryospray'],
   ];
   for(const [weapon,mutation] of roster) {
+   await activate(weapon,mutation);
    await page.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
    await page.locator(`[data-slot="0"][data-weapon="${weapon}"]`).click();
    await page.locator(`.lc-mbtn[data-slot="0"][data-mutation="${mutation}"]`).click();
@@ -105,6 +125,7 @@ fs.mkdirSync(artifacts, { recursive: true });
   assert.equal(mutations.length,14);
   const live=[];
   for(const [weapon,mutation] of [['shotgun','squelch'],['pistol','drone_shepherd'],['sniper_rifle','chromatic_prism'],['katana',null]]) {
+   await activate(weapon,mutation);
    await page.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
    await page.locator(`[data-slot="0"][data-weapon="${weapon}"]`).click();
    await page.locator(`.lc-mbtn[data-slot="0"][data-mutation="${mutation ?? ''}"]`).click();
@@ -205,10 +226,10 @@ fs.mkdirSync(artifacts, { recursive: true });
    const p=await profile.newPage();p.on('pageerror',e=>errors.push(e.message));await p.goto(base,{waitUntil:"domcontentloaded"});await p.locator('[data-act="play"]').waitFor({state:'visible'});
    if(mobile){
     const cdp=await profile.newCDPSession(p);await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
-    await p.evaluate(async()=>{const{UPGRADE_DEFS}=await import('/src/progression/UpgradeDefinitions.ts');const g=window.__game;for(const d of UPGRADE_DEFS)g.save.data.upgrades[d.id]=d.maxLevel;g.save.data.lifetimePixels=10000;g.applyUpgrades();g.openUpgrades();g.upgradeTree.nodeEls.get('prism_spectrum').dataset.mobileSmoke='spectrum';});
-    await p.locator('.tree-cat-btn[data-cat="primary"]').tap();await p.locator('[data-tab="sniper_rifle"]').tap();
-    await p.locator('[data-mobile-smoke="spectrum"]').tap();
-    await p.locator('.tt-title').filter({hasText:'Spectrum Ascension'}).waitFor({state:'visible'});
+    await p.evaluate(async()=>{const{UPGRADE_DEFS}=await import('/src/progression/UpgradeDefinitions.ts');const g=window.__game;for(const d of UPGRADE_DEFS)g.save.data.upgrades[d.id]=d.maxLevel;g.save.data.lifetimePixels=10000;g.save.data.blackMarketPaths.sniper_rifle='prism_unlock';g.applyUpgrades();g.openUpgrades();});
+    await p.locator('.tree-cat-btn[data-cat="primary"]').tap();await p.locator('[data-market="sniper_rifle"]').tap();
+    await p.locator('[data-market-buy="prism_spectrum"]').scrollIntoViewIfNeeded();
+    await p.locator('[data-market-buy="prism_spectrum"] strong').filter({hasText:'Spectrum Ascension'}).waitFor({state:'visible'});
     await p.screenshot({path:path.join(artifacts,'mobile-prism-upgrades.png')});
     await p.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
     await p.locator('[data-slot="0"][data-weapon="sniper_rifle"]').tap();
@@ -226,6 +247,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     for(let y=0;y<64;y++)for(let x=0;x<64;x++)world.health[y*64+x]=x<2||x>61||y<30||y>33?1000:0;
     const storage={getItem:()=>null,setItem:()=>{}};const save=new SaveManager(storage);
     for(const def of UPGRADE_DEFS)save.data.upgrades[def.id]=def.maxLevel;
+    save.data.blackMarketPaths={pistol:"drone_unlock",shotgun:"goo_unlock",sniper_rifle:"prism_unlock",katana:"katana_dash"};
     const stats=new UpgradeManager(save).getSoldierStats();const rng=new Rng(17);const combat=new CombatSystem(world,rng,stats);const physics=new PhysicsSystem(world,rng);
     const soldiers=Array.from({length:8},(_,i)=>new Soldier(240+i*2,256,1,0.2,stats.speed,['goo_mortar','drone_shepherd','prism_laser','katana'][i%4],'free',i));
     const camera=new CameraSystem(world);camera.viewW=mobile?390:1440;camera.viewH=mobile?844:900;camera.x=256;camera.y=256;camera.zoom=mobile?2:3;

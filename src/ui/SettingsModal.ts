@@ -237,6 +237,9 @@ export class SettingsModal {
         <div class="set-row"><div class="set-info"><div class="set-label">FULL MAP &amp; FREE DEPLOYMENT</div>
           <div class="set-desc">Reveal all worlds and sectors, hide fog, and allow deployment in unconquered sectors. Requires Dev mode.</div></div>
           <button class="btn" data-set="dev-map" ${set.devMode ? "" : "disabled"}>${set.devMapAccess ? "ON" : "OFF"}</button></div>
+        <div class="set-row"><div class="set-info"><div class="set-label">BYPASS MAP UPGRADE DISCOVERY</div>
+          <div class="set-desc">Show and research upgrades without finding their gold blocks. Prices and prerequisites still apply. Requires Dev mode.</div></div>
+          <button class="btn" data-set="dev-find" ${set.devMode ? "" : "disabled"}>${set.devFindUpgrades ? "ON" : "OFF"}</button></div>
         <div class="set-row"><div class="set-info"><div class="set-label">TEST CURRENCY</div>
           <div class="set-desc">Add 1,000 gold, orange crystals, green crystals and essence to this slot.</div></div>
           <button class="btn" data-set="funds" ${set.devMode ? "" : "disabled"}>+1,000</button></div>
@@ -253,6 +256,11 @@ export class SettingsModal {
       body.querySelector('[data-set="dev-map"]')!.addEventListener("click", () => {
         if (!set.devMode) return;
         set.devMapAccess = !set.devMapAccess;
+        this.game.save.save(); this.render();
+      });
+      body.querySelector('[data-set="dev-find"]')!.addEventListener("click", () => {
+        if (!set.devMode) return;
+        set.devFindUpgrades = !set.devFindUpgrades;
         this.game.save.save(); this.render();
       });
       body.querySelector('[data-set="funds"]')!.addEventListener("click", () => {

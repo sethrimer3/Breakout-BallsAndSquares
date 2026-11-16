@@ -8,7 +8,7 @@ import { LateEncounters, type Encounter } from "../src/systems/LateEncounters";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { UpgradeManager } from "../src/progression/UpgradeManager";
 import { MAT, PixelWorld, SUB } from "../src/world/PixelWorld";
-import { unlockTabs, findAllSpecials } from "./helpers/progression";
+import { openBlackMarkets, unlockTabs, findAllSpecials } from "./helpers/progression";
 
 class MemoryStorage implements StorageLike {
   private map = new Map<string, string>();
@@ -179,7 +179,7 @@ describe("Overcharge Conductor — Assault Rifle branch 1", () => {
     save.data.crystals = 10000;
     save.data.essence = 10000;
     save.data.lifetimePixels = 10000;
-    unlockTabs(save);
+    unlockTabs(save); openBlackMarkets(save);
 
     const um = new UpgradeManager(save); findAllSpecials(save.data);
     expect(um.buy("ar_unlock")).toBe(true);
@@ -301,7 +301,7 @@ describe("Overcharge Conductor — Assault Rifle branch 1", () => {
     save.data.essence = 600;
     save.data.lifetimePixels = 10000;
     save.data.lab.worlds[3] = { discovered: [0], conquered: [0], cleared: ["0:soldier:0"], gathered: [], specials: [], spawn: 0 };
-    unlockTabs(save);
+    unlockTabs(save); openBlackMarkets(save);
     save.save();
 
     const um = new UpgradeManager(save); findAllSpecials(save.data);

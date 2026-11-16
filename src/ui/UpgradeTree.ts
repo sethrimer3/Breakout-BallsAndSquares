@@ -1,3 +1,5 @@
+import { BlackMarketTree } from "./BlackMarketTree";
+import { marketFor, marketNode, WEAPON_MARKETS } from "../progression/BlackMarket";
 import { CIRCUIT, TERRAIN } from "../config";
 import { mutationCompatibility, resolvePrimaryMutation, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
@@ -198,6 +200,8 @@ function tabHtml(tab: UpgradeBranch, label: string, locked = false): string {
 export class UpgradeTree {
   readonly root: HTMLDivElement;
   private stageEl: HTMLDivElement;
+  private marketTree: BlackMarketTree;
+  private marketView = false;
   private loadoutWrap: HTMLDivElement;
   private linksEl: HTMLCanvasElement;
   private nodesWrap: HTMLDivElement;
@@ -297,13 +301,10 @@ export class UpgradeTree {
                 <button class="tree-tab" data-tab="facility">${tabHtml("facility", "RESEARCH BASE")}</button>
               </div>
               <div class="tree-cat-panel hidden" data-cat="primary">
-                <button class="tree-tab" data-tab="pistol">${tabHtml("pistol", "PISTOL")}</button>
-                <button class="tree-tab" data-tab="shotgun"></button>
-                <button class="tree-tab" data-tab="assault_rifle"></button>
-                <button class="tree-tab" data-tab="rocket_launcher"></button>
-                <button class="tree-tab" data-tab="sniper_rifle"></button>
-                <button class="tree-tab" data-tab="katana"></button>
-                <button class="tree-tab" data-tab="flamethrower"></button>
+                ${WEAPON_MARKETS.map(m => `<div class="tree-weapon-tab">
+                  <button class="tree-tab" data-tab="${m.weapon}">${tabHtml(m.weapon,m.label.toUpperCase())}</button>
+                  <button class="tree-market-tab" data-market="${m.weapon}" title="Black Market">${essenceIcon(1)}<span>BLACK MARKET</span></button>
+                </div>`).join("")}
               </div>
               <div class="tree-cat-panel hidden" data-cat="secondary">
                 <button class="tree-tab" data-tab="grenade"></button>
@@ -358,6 +359,14 @@ export class UpgradeTree {
       if (this.visible) this.fitToScreen();
     });
     this.stageEl = this.root.querySelector(".tree-stage") as HTMLDivElement;
+    this.marketTree = new BlackMarketTree(game, () => this.refresh());
+    this.stageEl.append(this.marketTree.root);
+    this.root.querySelectorAll<HTMLButtonElement>("[data-market]").forEach(button => {
+      button.addEventListener("click", () => {
+        const weapon = button.dataset.market as WeaponType;
+        if (game.upgrades.marketOpen(weapon)) this.switchTab(weapon, true);
+      });
+    });
     // The stage takes whatever room the layout grid leaves it.
     new ResizeObserver(() => {
       const w = this.stageEl.clientWidth;
@@ -430,7 +439,7 @@ export class UpgradeTree {
 
   /** The nodes on the active tab. */
   private activeDefs(): readonly TreeDef[] {
-    return this.activeTab === "soldier" ? SOLDIER_UPGRADE_DEFS : UPGRADE_DEFS.filter((d) => d.branch === this.activeTab);
+    return this.activeTab === "soldier" ? SOLDIER_UPGRADE_DEFS : UPGRADE_DEFS.filter((d) => d.branch === this.activeTab && !marketNode(d.id));
   }
 
   private get source(): TreeSource {
@@ -496,7 +505,7 @@ export class UpgradeTree {
     });
 
     this.root.querySelectorAll(".tree-tab").forEach((btn) => {
-      btn.classList.toggle("active", (btn as HTMLElement).dataset.tab === this.activeTab);
+      btn.classList.toggle("active", !this.marketView && (btn as HTMLElement).dataset.tab === this.activeTab);
     });
   }
 
@@ -544,10 +553,11 @@ export class UpgradeTree {
     this.refresh();
   }
 
-  switchTab(tab: UpgradeBranch): void {
+  switchTab(tab: UpgradeBranch, blackMarket = false): void {
     if (!this.game.upgrades.isBranchUnlocked(tab)) return;
     this.inLoadoutScreen = false;
     this.activeTab = tab;
+    this.marketView = blackMarket;
     this.expandedCategory = categoryForBranch(tab);
     this.hideTooltip();
     this.activateBranch(true);
@@ -595,6 +605,9 @@ export class UpgradeTree {
         this.subEl.textContent = "AUTOTURRET SECONDARY WEAPON TREE — AUTOMATED TARGET-LOCKING FIRE SUPPORT";
       }
     }
+    const market = marketFor(tab);
+    const discovery = market?.unlock ?? (tab === "grenade" ? "grenade_unlock" : null);
+    if (!this.inLoadoutScreen && discovery && this.game.upgrades.needsFinding(discovery)) this.subEl.textContent = "??? — FIND UPGRADE IN THE LAB";
     this.tabsEl.classList.toggle("hidden", this.inLoadoutScreen);
     // Keeps its height on other tabs so the panel doesn't jump when switching.
     this.legendEl.classList.toggle("hidden", this.inLoadoutScreen);
@@ -715,6 +728,7 @@ export class UpgradeTree {
   private attachPanZoom(): void {
     const stage = this.stageEl;
     stage.addEventListener("pointerdown", (e) => {
+      if (this.marketView) return;
       if (e.button !== 0) return;
       if (e.pointerType !== "mouse") {
         this.stagePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -767,6 +781,7 @@ export class UpgradeTree {
     stage.addEventListener(
       "wheel",
       (e) => {
+        if (this.marketView) return;
         e.preventDefault();
         if (e.deltaY === 0) return;
         const rect = stage.getBoundingClientRect();
@@ -944,6 +959,7 @@ export class UpgradeTree {
     const dt = this.lastFrame ? Math.min(1 / 30, (time - this.lastFrame) / 1000) : 0;
     this.lastFrame = time;
     if (this.inLoadoutScreen) return;
+    if (this.marketView) { this.marketTree.frame(time); return; }
     const heldId = this.drag?.moved ? this.drag.id : null;
     if (reducedMotion() || this.activeTab === "core") {
       for (const b of this.activeBodies) {
@@ -1243,9 +1259,10 @@ export class UpgradeTree {
         .map((w) => {
           const takenOther = w.id !== "pistol" && loadouts.slice(0, count).some((other, j) => j !== i && other.weapon === w.id);
           const canEquip = w.unlocked && !takenOther;
-          const label = !w.unlocked ? lockIcon() : takenOther ? "TAKEN" : w.label;
+          const unknown = !!marketFor(w.id)?.unlock && this.game.upgrades.needsFinding(marketFor(w.id)!.unlock!);
+          const label = unknown ? "???" : !w.unlocked ? lockIcon() : takenOther ? "TAKEN" : w.label;
           return `
-            <button class="lc-wbtn ${curW === w.id ? "equipped" : ""} ${!canEquip ? "locked" : ""}" data-slot="${i}" data-weapon="${w.id}" title="${takenOther ? "Already equipped by another squad slot" : w.label}" ${!canEquip ? "disabled" : ""}>
+            <button class="lc-wbtn ${curW === w.id ? "equipped" : ""} ${!canEquip ? "locked" : ""}" data-slot="${i}" data-weapon="${w.id}" title="${unknown ? "???" : takenOther ? "Already equipped by another squad slot" : w.label}" ${!canEquip ? "disabled" : ""}>
               ${sprite(TAB_ICONS[w.id].icon, { color: canEquip ? TAB_ICONS[w.id].color : "#6d8197", scale: 2 })}
               <span class="lc-wname">${label}</span>
             </button>
@@ -1256,9 +1273,9 @@ export class UpgradeTree {
       const sBtnsHtml = secondaryDefs
         .map(
           (sec) => `
-            <button class="lc-sbtn ${curS === sec.id ? "equipped" : ""} ${!sec.unlocked ? "locked" : ""}" data-slot="${i}" data-secondary="${sec.id ?? ""}" title="${sec.label}" ${!sec.unlocked ? "disabled" : ""}>
+            <button class="lc-sbtn ${curS === sec.id ? "equipped" : ""} ${!sec.unlocked ? "locked" : ""}" data-slot="${i}" data-secondary="${sec.id ?? ""}" title="${sec.id === "grenade" && this.game.upgrades.needsFinding("grenade_unlock") ? "???" : sec.label}" ${!sec.unlocked ? "disabled" : ""}>
               ${sprite(sec.icon, { color: sec.unlocked ? (curS === sec.id ? "#ffd84d" : "#ff9d3b") : "#6d8197", scale: 1 })}
-              ${sec.unlocked ? `<span class="lc-sname">${sec.label}</span>` : `<span class="lc-sname">${lockIcon()}</span>`}
+              ${sec.unlocked ? `<span class="lc-sname">${sec.label}</span>` : `<span class="lc-sname">${sec.id === "grenade" && this.game.upgrades.needsFinding("grenade_unlock") ? "???" : lockIcon()}</span>`}
             </button>
           `,
         )
@@ -1427,9 +1444,21 @@ export class UpgradeTree {
       button.dataset.label = label;
       const weapon = tabLocks.find(([id]) => id === branch);
       button.disabled = !this.game.upgrades.isBranchUnlocked(branch);
-      button.innerHTML = button.disabled ? `${lockIcon()} ???` : tabHtml(branch, weapon?.[1] ?? label, weapon ? !weapon[2] : false);
+      const market = marketFor(branch);
+      const discovery = market?.unlock ?? (branch === "grenade" ? "grenade_unlock" : null);
+      const unknown = !!discovery && this.game.upgrades.needsFinding(discovery);
+      button.innerHTML = button.disabled || unknown ? `${lockIcon()} ???` : tabHtml(branch, weapon?.[1] ?? label, weapon ? !weapon[2] : false);
       button.title = button.disabled ? "Locked — unlock on the Core path" : "";
-      button.setAttribute("aria-label", button.disabled ? "Locked category" : weapon?.[1] ?? label);
+      button.setAttribute("aria-label", button.disabled || unknown ? "???" : weapon?.[1] ?? label);
+    }
+    for (const button of this.root.querySelectorAll<HTMLButtonElement>("[data-market]")) {
+      const weapon = button.dataset.market as WeaponType, market = marketFor(weapon)!;
+      const unknown = !!market.unlock && this.game.upgrades.needsFinding(market.unlock);
+      button.disabled = !this.game.upgrades.isBranchUnlocked(weapon) || !this.game.upgrades.marketOpen(weapon);
+      button.classList.toggle("active", this.marketView && this.activeTab === weapon);
+      button.innerHTML = unknown ? `${lockIcon()} <span>???</span>` : `${essenceIcon(1)}<span>BLACK MARKET</span>`;
+      button.title = unknown ? "???" : button.disabled ? "Purchase Black Market access on the standard tree" : `${market.label} Black Market`;
+      button.setAttribute("aria-label", unknown ? "???" : `${market.label} Black Market`);
     }
     for (const button of this.root.querySelectorAll<HTMLButtonElement>(".tree-cat-btn")) {
       const category = CATEGORIES.find((c) => c.id === button.dataset.cat)!;
@@ -1441,6 +1470,14 @@ export class UpgradeTree {
       button.setAttribute("aria-label", button.disabled ? "Locked category" : category.name);
     }
     this.updateHeaderAndScreen();
+    this.marketTree.root.classList.toggle("hidden", !this.marketView || this.inLoadoutScreen);
+    this.stageEl.classList.toggle("market-view", this.marketView && !this.inLoadoutScreen);
+    if (this.marketView && !this.inLoadoutScreen) {
+      this.titleEl.textContent = "BLACK MARKET";
+      this.subEl.textContent = "ONE ACTIVE PATH · RE-BUY ANOTHER PATH TO SWITCH";
+      this.marketTree.render(this.activeTab as WeaponType);
+      return;
+    }
 
     if (this.inLoadoutScreen) {
       this.renderLoadout();
@@ -1470,7 +1507,7 @@ export class UpgradeTree {
     const u = this.source;
     for (const def of TREE_DEFS) {
       const btn = this.nodeEls.get(def.id)!;
-      const inBranch = branchOf(def) === this.activeTab;
+      const inBranch = branchOf(def) === this.activeTab && !marketNode(def.id);
       btn.classList.toggle("hidden", !inBranch);
       if (!inBranch) continue;
 
@@ -1482,6 +1519,7 @@ export class UpgradeTree {
       const find = u.needsFinding?.(def.id) ?? false;
       btn.classList.toggle("locked", !unlocked);
       btn.classList.toggle("find", find);
+      btn.setAttribute("aria-label", find ? "???" : def.name);
       btn.classList.toggle("owned", lvl > 0);
       btn.classList.toggle("maxed", maxed);
       btn.classList.toggle("affordable", canBuy);

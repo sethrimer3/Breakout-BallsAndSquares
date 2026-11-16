@@ -36,6 +36,7 @@ export function specialFound(data: SaveData, spot: string): boolean {
 
 /** True while `id` is still hidden in an unfound gold block. */
 export function needsSpecial(data: SaveData, id: UpgradeId): boolean {
+  if (data.settings.devMode && data.settings.devFindUpgrades) return false;
   const spot = SPOT_FOR.get(id);
   return !!spot && (data.upgrades[id] ?? 0) === 0 && !specialFound(data, spot);
 }

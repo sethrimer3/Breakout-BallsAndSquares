@@ -8,7 +8,7 @@ import { CombatSystem } from "../src/systems/CombatSystem";
 import { LateEncounters, type Encounter } from "../src/systems/LateEncounters";
 import { CAMPAIGN, campaignTier } from "../src/world/campaignBalance";
 import { MAT, PixelWorld } from "../src/world/PixelWorld";
-import { unlockTabs } from "./helpers/progression";
+import { openBlackMarkets, unlockTabs } from "./helpers/progression";
 
 class MemoryStorage implements StorageLike {
   private map = new Map<string, string>();
@@ -73,7 +73,7 @@ describe("Bug 2: Reload does not restore spent Black Market Essence", () => {
     const storage = new MemoryStorage();
     const save = new SaveManager(storage);
     const u = new UpgradeManager(save);
-    unlockTabs(save);
+    unlockTabs(save); openBlackMarkets(save);
     save.data.lifetimePixels = 10000;
 
     // Simulate a legitimately cleared late-world encounter in world 3 (tier 8).

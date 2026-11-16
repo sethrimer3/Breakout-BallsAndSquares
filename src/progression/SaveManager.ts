@@ -1,3 +1,4 @@
+import { accessId, WEAPON_MARKETS } from "./BlackMarket";
 import { RENDER_QUALITIES, type RenderQuality } from "../rendering/RenderScale";
 import { parseProfileSeed, randomProfileSeed } from "../core/ProfileSeed";
 import type { SpeedrunData } from "../core/SpeedrunTimer";
@@ -115,6 +116,7 @@ export interface SaveData {
   biomass: number;
   lifetimePixels: number;
   upgrades: Record<UpgradeId, number>;
+  blackMarketPaths: Partial<Record<WeaponType, UpgradeId>>;
   upgradeSpent?: Partial<Record<UpgradeId, Partial<Record<"gold" | "crystals" | "greenCrystals" | "essence" | "biomass", number>>>>;
   loadouts: SoldierLoadout[];
   bests: {
@@ -125,6 +127,7 @@ export interface SaveData {
   settings: {
     devMode: boolean;
     devMapAccess: boolean;
+    devFindUpgrades: boolean;
     muted: boolean;
     volume: number;
     muzzleFlash: MuzzleFlashLevel;
@@ -195,11 +198,13 @@ export function defaultSaveData(seed = randomProfileSeed()): SaveData {
     lifetimePixels: 0,
     upgrades,
     upgradeSpent: {},
+    blackMarketPaths: {},
     loadouts,
     bests: { time: 0, depth: 0, pixels: 0 },
     settings: {
       devMode: false,
       devMapAccess: false,
+      devFindUpgrades: false,
       muted: false,
       volume: 0.6,
       muzzleFlash: "brightest",
@@ -290,7 +295,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
         const val = Math.floor(finiteNonNeg((entry as Record<string, unknown>)[c], 0));
         if (val > 0) curMap[c] = val;
       }
-      if (Object.keys(curMap).length > 0) cleanSpent[d.id] = curMap;
+      if (Object.keys(curMap).length > 0 || d.id.startsWith("black_market_")) cleanSpent[d.id] = curMap;
     }
     def.upgradeSpent = cleanSpent;
   }
@@ -412,6 +417,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     const s = obj.settings as Record<string, unknown>;
     def.settings.devMode = s.devMode === true;
     def.settings.devMapAccess = s.devMapAccess === true;
+    def.settings.devFindUpgrades = s.devFindUpgrades === true;
     def.settings.muted = typeof s.muted === "boolean" ? s.muted : false;
     def.settings.volume = finiteNonNeg(s.volume, 0.6, 1);
     if (
@@ -516,6 +522,25 @@ export function sanitizeSaveData(raw: unknown): SaveData {
 
   if (typeof obj.lastSaved === "number" && Number.isFinite(obj.lastSaved)) {
     def.lastSaved = obj.lastSaved;
+  }
+
+  const savedPaths = obj.blackMarketPaths && typeof obj.blackMarketPaths === "object"
+    ? obj.blackMarketPaths as Record<string, unknown> : {};
+  for (const market of WEAPON_MARKETS) {
+    const paths = market.paths;
+    const preferred = savedPaths[market.weapon];
+    const equipped = def.loadouts.find(ld => ld.weapon === market.weapon && ld.mutation)?.mutation;
+    const purchased = paths.filter(p => p.nodes.some(id => def.upgrades[id] > 0));
+    const selected = purchased.find(p => p.root === preferred)
+      ?? purchased.find(p => p.mutation === equipped) ?? purchased[0];
+    if (selected) {
+      def.blackMarketPaths[market.weapon] = selected.root;
+      const access = accessId(market.weapon);
+      if (def.upgrades[access] === 0) {
+        def.upgrades[access] = 1;
+        (def.upgradeSpent ??= {})[access] = {};
+      }
+    }
   }
 
   return def;

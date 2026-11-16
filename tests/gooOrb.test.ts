@@ -8,7 +8,7 @@ import { UpgradeManager } from "../src/progression/UpgradeManager";
 import { CombatSystem } from "../src/systems/CombatSystem";
 import { GooOrbSystem, type GooLaunch } from "../src/systems/GooOrbSystem";
 import { PixelWorld, SUB } from "../src/world/PixelWorld";
-import { unlockTabs, findAllSpecials } from "./helpers/progression";
+import { openBlackMarkets, unlockTabs, findAllSpecials } from "./helpers/progression";
 
 function fixture() {
   const world = new PixelWorld({ width: 16, height: 16, cellSize: 8, roomSize: 4 });
@@ -288,7 +288,7 @@ describe("SQUELCH combat and progression", () => {
     const storage = new MemoryStorage();
     const save = new SaveManager(storage); const u = new UpgradeManager(save); findAllSpecials(save.data); findAllSpecials(save.data);
     expect(u.isUnlocked("goo_unlock")).toBe(false);
-    unlockTabs(save); save.data.bank = 1000000; save.data.lifetimePixels = 80;
+    unlockTabs(save); openBlackMarkets(save); save.data.bank = 1000000; save.data.essence = 10000; save.data.lifetimePixels = 80;
     expect(u.isUnlocked("goo_mass")).toBe(false);
     expect(u.buy("shotgun_unlock")).toBe(true);
     expect(u.buy("goo_unlock")).toBe(true);

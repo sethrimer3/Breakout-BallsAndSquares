@@ -1,3 +1,4 @@
+import { accessId, WEAPON_MARKETS } from "../../src/progression/BlackMarket";
 import { SPECIAL_UNLOCKS, specialWorld } from "../../src/progression/specialUnlocks";
 import type { SaveManager } from "../../src/progression/SaveManager";
 
@@ -13,5 +14,14 @@ export function findAllSpecials(data: import("../../src/progression/SaveManager"
   for (const spot of Object.keys(SPECIAL_UNLOCKS)) {
     const w = data.lab.worlds[specialWorld(spot)];
     if (w && !w.specials.includes(spot)) w.specials.push(spot);
+  }
+}
+
+/** Existing mutation tests start inside the market; access purchases have dedicated coverage. */
+export function openBlackMarkets(save: SaveManager): void {
+  for (const market of WEAPON_MARKETS) {
+    const id = accessId(market.weapon);
+    save.data.upgrades[id] = 1;
+    (save.data.upgradeSpent ??= {})[id] = {};
   }
 }

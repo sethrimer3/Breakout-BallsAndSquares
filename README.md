@@ -133,7 +133,7 @@ The project is configured with `base: "./"` in [`vite.config.ts`](vite.config.ts
 
 ## Black Market weapon expansion
 
-The Primary Arsenal now uses canonical base weapon identities (`pistol`, `shotgun`, `assault_rifle`, `rocket_launcher`, `sniper_rifle`, `katana`, `flamethrower`) with per-soldier Black Market mutations unlocked via Essence and Gold/Crystals in their base weapon tabs:
+The Primary Arsenal now uses canonical base weapon identities (`pistol`, `shotgun`, `assault_rifle`, `rocket_launcher`, `sniper_rifle`, `katana`, `flamethrower`) with separate Black Market trees. Each standard weapon tree has one **Black Market** access node (20 Essence). Weapon navigation buttons are split vertically: the left half opens standard research, and the right opens its Black Market tree after access is purchased. A black weapon silhouette with an animated Perlin-noise Blight perimeter sits between the paths:
 
 - **Pistol:** **Reverse-Playback Revolver** (pauses then rewinds its exact bankshot path), **Orbit Cylinder** (rounds orbit the soldier and sling outward on real wall reflections), and **Drone Shepherd** (independent miniature pistol drones; supports multiple carriers within per-owner and global caps).
 - **Shotgun:** **SQUELCH** (elastic slime orb that sticks, lays timed mines, and rebounds) and **Vacuum Pulse** (half fire rate; pulls in authoritative debris from all destroyed blocks in range to scale pellets and damage).
@@ -143,9 +143,11 @@ The Primary Arsenal now uses canonical base weapon identities (`pistol`, `shotgu
 - **Katana:** **Momentum Katana** (rebound dash with velocity-scaled slash damage/width) and **Gale Edge** (long-range flying crescents; mutually exclusive with Momentum dash/scaling).
 - **Flamethrower:** **Napalm Garden** (sprays 10 s unlit fuel patches that must be ignited by another weapon for a 3 s / 15-tick burn) and **Cryospray** (freezing mist sharing the Freeze & Orthogonal Shatter system).
 
-Non-Pistol primary weapons remain unique across the squad (including alternate mutations of the same base weapon), while Pistol mutations are selectable independently per slot. Legacy standalone saves (`goo_mortar`, `drone_shepherd`, `prism_laser`) migrate automatically to their canonical Shotgun/Pistol/Sniper mutations, and a lab-only **Refund Black Market** action atomically refunds recorded Black Market spending.
+Non-Pistol primary weapons remain unique across the squad (including alternate mutations of the same base weapon), while multiple soldiers may carry Pistols. Each weapon has one active Black Market path shared across the squad. Choose left or right (or the upward Drone path for Pistol); buying another path disables the previous one. Re-buying a researched path charges its root price again to switch back. Inactive research stays saved and resumes when reactivated. Legacy standalone saves (`goo_mortar`, `drone_shepherd`, `prism_laser`) migrate automatically to their canonical Shotgun/Pistol/Sniper mutations, and a lab-only **Refund Black Market** action atomically refunds recorded Black Market spending.
 
-See [the revised Black Market plan](docs/BLACK_MARKET_IMPLEMENTATION_PLAN.md) and [validation / playtest notes](docs/WEAPON_VALIDATION.md). Run `npm run test:weapons` for focused coverage and `npm run test:weapon-browser` against a running Vite server for browser validation.
+Unfound map upgrades and weapon names show **???** until discovered. **Settings → Dev → Bypass Map Upgrade Discovery** skips finding their gold blocks while Dev mode is enabled; normal prices, weapon unlocks and Core prerequisites still apply.
+
+See [the revised Black Market plan](docs/BLACK_MARKET_IMPLEMENTATION_PLAN.md) and [validation / playtest notes](docs/WEAPON_VALIDATION.md). Run `npm run test:black-market-browser` for the split-tree, discovery-setting, paid-switching and reload checks. Run `npm run test:weapons` for focused coverage and `npm run test:weapon-browser` against a running Vite server for browser validation.
 
 The Research Lab's starting sector and the next two sectors in either map direction use tier 1 terrain, including room and corridor walls. Sectors three through five use tier 2, and the outer sectors use tier 3. These bands stay anchored to the original starting sector when deploying elsewhere. Keycard doors, glass, Blight and the invincible perimeter retain their special behavior.
 
