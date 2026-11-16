@@ -34,7 +34,7 @@ describe("weapon expansion release progression",()=>{
   }
   const loaded=new SaveManager(storage);
   for(const def of EXPANSION_DEFS)expect(loaded.data.upgrades[def.id],def.id).toBe(def.maxLevel);
-  loaded.data.blackMarketPaths={shotgun:"goo_unlock",pistol:"drone_unlock",sniper_rifle:"prism_unlock",katana:"katana_dash"};
+  loaded.data.blackMarketPaths={pistol:"drone_unlock",sniper_rifle:"prism_unlock",katana:"katana_dash"};
   const stats=new UpgradeManager(loaded).getSoldierStats();
   expect(stats).toMatchObject({gooDwell:0.08,gooDamage:11,gooResidue:true,droneCapacity:7,droneDamage:7,droneHealth:5,droneAim:20,droneRecall:true,
    prismDamage:9,prismSpectrum:6,prismBounces:7,prismShear:6,prismDistance:600,prismOverload:true,

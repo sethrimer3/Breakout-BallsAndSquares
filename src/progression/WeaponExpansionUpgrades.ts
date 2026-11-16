@@ -10,7 +10,7 @@ export function overchargeSpreadAt(level: number): number {
 
 export type ExpansionUpgradeId =
   | "reverse_unlock" | "orbit_unlock"
-  | "vacuum_unlock"
+  | "vacuum_unlock" | "homing_shotgun_unlock"
   | "overcharge_unlock" | "overcharge_accuracy" | "circuit_unlock"
   | "burrower_unlock" | "freeze_rockets_unlock"
   | "rail_lance_unlock"
@@ -45,6 +45,8 @@ export const EXPANSION_DEFS: readonly UpgradeDef[] = [
     (s,l)=>{s.reverseUnlocked=l>0;},count,unlocked,null,"essence"),
   node("orbit_unlock","pistol","Orbit Cylinder","Unlock Pistol mutation: rounds orbit the soldier and sling outward on real wall bounces",1,-1,1,25,
     (s,l)=>{s.orbitUnlocked=l>0;},count,unlocked,null,"essence"),
+  node("homing_shotgun_unlock","shotgun","Homing Bullets","Shotgun pellets steer toward nearby visible enemies and Blight; terrain still blocks them",-1,-1,1,30,
+    (s,l)=>{s.homingShotgunUnlocked=l>0;},count,unlocked,"shotgun_unlock","essence"),
   node("vacuum_unlock","shotgun","Vacuum Pulse","Unlock Shotgun mutation: 0.5× fire rate, sucks in nearby debris to boost pellets & damage",-1,-1,1,30,
     (s,l)=>{s.vacuumUnlocked=l>0;},count,unlocked,"shotgun_unlock","essence"),
   node("overcharge_unlock","assault_rifle","Overcharge Conductor","Unlock Assault Rifle mutation: zero-damage charging rounds (3+ hits arm delayed chain + blast)",-1,-1,1,35,
@@ -68,15 +70,15 @@ export const EXPANSION_DEFS: readonly UpgradeDef[] = [
   node("cryospray_unlock","flamethrower","Cryospray","Unlock Flamethrower mutation: freezing mist chills enemies, halves Blight growth & primes shatter",1,-1,1,35,
     (s,l)=>{s.cryosprayUnlocked=l>0;},count,unlocked,"flame_unlock","essence"),
 
-  node("goo_dwell", "shotgun", "Elastic Recall", "-0.02s contact dwell per level (minimum 0.08s)", -1,2,5,70,
+  node("goo_dwell", "squelch", "Elastic Recall", "-0.02s contact dwell per level (minimum 0.08s)", -1,2,5,70,
     (s,l)=>{s.gooDwell=Math.max(0.08,GOO.dwell-l*0.02);}, l=>Math.max(0.08,GOO.dwell-l*0.02),seconds,"goo_unlock"),
-  node("goo_damage", "shotgun", "Volatile Droplets", "+1 mine center damage per level", 0,2,6,85,
+  node("goo_damage", "squelch", "Volatile Droplets", "+1 mine center damage per level", 0,2,6,85,
     (s,l)=>{s.gooDamage=GOO.mineDamage+l;},l=>GOO.mineDamage+l,n=>`${n} DMG`,"goo_unlock"),
-  node("goo_radius", "shotgun", "Glow Bloom", "+0.25 cells mine blast radius per level", 1,2,5,25,
+  node("goo_radius", "squelch", "Glow Bloom", "+0.25 cells mine blast radius per level", 1,2,5,25,
     (s,l)=>{s.gooRadius=GOO.mineRadiusCells+l*0.25;},l=>GOO.mineRadiusCells+l*0.25,n=>`${n.toFixed(2)} CELLS`,"goo_unlock","crystals"),
-  node("goo_rate", "shotgun", "Rapid Culture", "+10% orb launch frequency per level", 2,2,5,75,
+  node("goo_rate", "squelch", "Rapid Culture", "+10% orb launch frequency per level", 2,2,5,75,
     (s,l)=>{s.gooFireRate=GOO.fireRate*(1+l*0.1);},l=>1+l*0.1,pct,"goo_unlock"),
-  node("goo_residue", "shotgun", "Living Residue", "Nearby bursts shorten mine fuses by 0.12s (minimum 0.04s)", 3,2,1,100,
+  node("goo_residue", "squelch", "Living Residue", "Nearby bursts shorten mine fuses by 0.12s (minimum 0.04s)", 3,2,1,100,
     (s,l)=>{s.gooResidue=l>0;},count,unlocked,"goo_radius","crystals"),
 
   node("katana_dash","katana","Rebound Dash","Autonomous wall reflection triggers a 2.25× dash",-1,1,1,120,

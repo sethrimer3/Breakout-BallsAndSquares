@@ -57,6 +57,7 @@ export const VALID_SECONDARY_WEAPONS: readonly SecondaryWeaponType[] = ["grenade
 const VALID_WEAPONS: readonly WeaponType[] = [
   "pistol",
   "shotgun",
+  "squelch",
   "assault_rifle",
   "rocket_launcher",
   "sniper_rifle",
@@ -70,6 +71,7 @@ const VALID_MUTATIONS: readonly PrimaryMutation[] = [
   "drone_shepherd",
   "squelch",
   "vacuum_pulse",
+  "homing_shotgun",
   "overcharge_conductor",
   "circuit_runner",
   "burrower",
@@ -311,9 +313,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
             def.loadouts[i].weapon = norm.weapon;
           }
           // Legacy standalone variants imply their canonical base weapon is accessible if the variant was unlocked.
-          if (w === "goo_mortar" && (def.upgrades.goo_unlock ?? 0) > 0) {
-            def.upgrades.shotgun_unlock = Math.max(1, def.upgrades.shotgun_unlock ?? 0);
-          } else if (w === "prism_laser" && (def.upgrades.prism_unlock ?? 0) > 0) {
+          if (w === "prism_laser" && (def.upgrades.prism_unlock ?? 0) > 0) {
             def.upgrades.sniper_unlock = Math.max(1, def.upgrades.sniper_unlock ?? 0);
           }
           def.loadouts[i].mutation = norm.mutation && (VALID_MUTATIONS as readonly string[]).includes(norm.mutation)
@@ -350,7 +350,9 @@ export function sanitizeSaveData(raw: unknown): SaveData {
   // If any weapon or behavior is not unlocked in this save, fall back to safe defaults.
   const ownedNonPistol = new Set<WeaponType>();
   for (const ld of def.loadouts) {
-    if (ld.weapon === "shotgun" && (def.upgrades.shotgun_unlock ?? 0) === 0) {
+    if (ld.weapon === "squelch" && (def.upgrades.goo_unlock ?? 0) === 0) {
+      ld.weapon = "pistol";
+    } else if (ld.weapon === "shotgun" && (def.upgrades.shotgun_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
     } else if (ld.weapon === "assault_rifle" && (def.upgrades.ar_unlock ?? 0) === 0) {
       ld.weapon = "pistol";
@@ -377,7 +379,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     if (ld.mutation === "reverse_revolver" && (ld.weapon !== "pistol" || def.upgrades.reverse_unlock === 0)) ld.mutation = null;
     else if (ld.mutation === "orbit_cylinder" && (ld.weapon !== "pistol" || def.upgrades.orbit_unlock === 0)) ld.mutation = null;
     else if (ld.mutation === "drone_shepherd" && (ld.weapon !== "pistol" || def.upgrades.drone_unlock === 0)) ld.mutation = null;
-    else if (ld.mutation === "squelch" && (ld.weapon !== "shotgun" || def.upgrades.goo_unlock === 0)) ld.mutation = null;
+    else if (ld.mutation === "homing_shotgun" && (ld.weapon !== "shotgun" || def.upgrades.homing_shotgun_unlock === 0)) ld.mutation = null;
     else if (ld.mutation === "vacuum_pulse" && (ld.weapon !== "shotgun" || def.upgrades.vacuum_unlock === 0)) ld.mutation = null;
     else if (ld.mutation === "overcharge_conductor" && (ld.weapon !== "assault_rifle" || def.upgrades.overcharge_unlock === 0)) ld.mutation = null;
     else if (ld.mutation === "circuit_runner" && (ld.weapon !== "assault_rifle" || def.upgrades.circuit_unlock === 0)) ld.mutation = null;

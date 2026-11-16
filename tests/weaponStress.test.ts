@@ -11,7 +11,7 @@ import {PixelWorld} from "../src/world/PixelWorld";
 const benchmark = (globalThis as typeof globalThis & { process?: { env: Record<string,string|undefined> } }).process?.env.BREACH_BENCHMARK === "1";
 
 class MemoryStorage implements StorageLike{getItem(){return null;}setItem(){}}
-function upgraded(){const save=new SaveManager(new MemoryStorage());for(const d of UPGRADE_DEFS)save.data.upgrades[d.id]=d.maxLevel;save.data.blackMarketPaths={pistol:"drone_unlock",shotgun:"goo_unlock",sniper_rifle:"prism_unlock"};return new UpgradeManager(save).getSoldierStats();}
+function upgraded(){const save=new SaveManager(new MemoryStorage());for(const d of UPGRADE_DEFS)save.data.upgrades[d.id]=d.maxLevel;save.data.blackMarketPaths={pistol:"drone_unlock",sniper_rifle:"prism_unlock"};return new UpgradeManager(save).getSoldierStats();}
 
 function simulate(layout:"open"|"corridor",weapon:WeaponType|LegacyWeaponType,maxed:boolean,squad=1){
  const world=new PixelWorld({width:64,height:64,cellSize:8,roomSize:4});

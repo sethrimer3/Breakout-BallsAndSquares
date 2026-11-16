@@ -21,7 +21,7 @@ export const DRONE_PATH: MarketPath = path("drone_unlock","drone_shepherd",["dro
 export const WEAPON_MARKETS: readonly WeaponMarket[] = [
   {weapon:"pistol",label:"Pistol",icon:"pistol",unlock:null,paths:[path("reverse_unlock","reverse_revolver"),path("orbit_unlock","orbit_cylinder"),DRONE_PATH]},
   {weapon:"shotgun",label:"Shotgun",icon:"shotgun",unlock:"shotgun_unlock",paths:[
-    path("goo_unlock","squelch",["goo_mass","goo_distance","goo_dwell","goo_damage","goo_radius","goo_rate","goo_residue"]),path("vacuum_unlock","vacuum_pulse")]},
+    path("homing_shotgun_unlock","homing_shotgun"),path("vacuum_unlock","vacuum_pulse")]},
   {weapon:"assault_rifle",label:"Assault Rifle",icon:"rifle",unlock:"ar_unlock",paths:[
     path("overcharge_unlock","overcharge_conductor",["overcharge_accuracy"]),path("circuit_unlock","circuit_runner")]},
   {weapon:"rocket_launcher",label:"Rocket",icon:"launcher",unlock:"rocket_unlock",paths:[path("burrower_unlock","burrower"),path("freeze_rockets_unlock","freeze_rockets")]},

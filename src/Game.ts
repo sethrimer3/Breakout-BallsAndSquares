@@ -1111,6 +1111,8 @@ export class Game {
         return true;
       case "shotgun":
         return this.stats.shotgunUnlocked;
+      case "squelch":
+        return this.stats.gooUnlocked;
       case "assault_rifle":
         return this.stats.arUnlocked;
       case "rocket_launcher":
@@ -1221,7 +1223,7 @@ export class Game {
     this.runStats.shotsFired++;
     if (s.weapon === "sniper_rifle" && s.mutation === "chromatic_prism") { this.audio.playPrism(mx, my); return; }
     if (s.weapon === "pistol" && s.mutation === "drone_shepherd") return;
-    if (s.weapon === "shotgun" && s.mutation === "squelch") {
+    if (s.weapon === "squelch") {
       this.audio.playGoo("launch", mx, my);
       return;
     }

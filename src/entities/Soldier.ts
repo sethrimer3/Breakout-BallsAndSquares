@@ -24,6 +24,7 @@ import { baseSoldierMods, type SoldierMods } from "../progression/SoldierUpgrade
 export type WeaponType =
   | "pistol"
   | "shotgun"
+  | "squelch"
   | "assault_rifle"
   | "rocket_launcher"
   | "sniper_rifle"
@@ -37,7 +38,8 @@ export type PrimaryMutation =
   | "reverse_revolver"
   | "orbit_cylinder"
   | "drone_shepherd"
-  | "squelch"
+  | "squelch" // Legacy save value; normalized to the SQUELCH base weapon.
+  | "homing_shotgun"
   | "vacuum_pulse"
   | "overcharge_conductor"
   | "circuit_runner"
@@ -80,6 +82,7 @@ export interface SoldierStats {
   circuitUnlocked: boolean;
   // Shotgun stats
   shotgunUnlocked: boolean;
+  homingShotgunUnlocked: boolean;
   shotgunFireRate: number;
   shotgunDamage: number;
   shotgunPellets: number;
@@ -226,6 +229,7 @@ export function baseSoldierStats(): SoldierStats {
     vacuumUnlocked: false, burrowerUnlocked: false, freezeRocketsUnlocked: false,
     railLanceUnlocked: false, napalmUnlocked: false, cryosprayUnlocked: false, circuitUnlocked: false,
     shotgunUnlocked: false,
+    homingShotgunUnlocked: false,
     shotgunFireRate: SHOTGUN.fireRate,
     shotgunDamage: SHOTGUN.damage,
     shotgunPellets: SHOTGUN.pellets,
@@ -439,7 +443,7 @@ export function normalizeLegacyWeapon(
   weapon: string,
   mutation: unknown,
 ): { weapon: WeaponType; mutation: PrimaryMutation | null } {
-  if (weapon === "goo_mortar") return { weapon: "shotgun", mutation: "squelch" };
+  if (weapon === "goo_mortar" || weapon === "squelch" || (weapon === "shotgun" && mutation === "squelch")) return { weapon: "squelch", mutation: null };
   if (weapon === "drone_shepherd") return { weapon: "pistol", mutation: "drone_shepherd" };
   if (weapon === "prism_laser") return { weapon: "sniper_rifle", mutation: "chromatic_prism" };
   const validMutation = typeof mutation === "string" ? (mutation as PrimaryMutation) : null;
@@ -452,7 +456,7 @@ export function resolvePrimaryMutation(weapon: WeaponType, mutation: unknown, st
     if (mutation === "orbit_cylinder" && stats.orbitUnlocked) return mutation;
     if (mutation === "drone_shepherd" && stats.droneUnlocked) return mutation;
   } else if (weapon === "shotgun") {
-    if (mutation === "squelch" && stats.gooUnlocked) return mutation;
+    if (mutation === "homing_shotgun" && stats.homingShotgunUnlocked) return mutation;
     if (mutation === "vacuum_pulse" && stats.vacuumUnlocked) return mutation;
   } else if (weapon === "assault_rifle") {
     if (mutation === "overcharge_conductor" && stats.overchargeUnlocked) return mutation;
@@ -488,6 +492,8 @@ export function mutationCompatibility(mutation: PrimaryMutation | null): Mutatio
       return { active: ["Drone Capacity/Cycle/Caliber/Speed/Optics/Frame/Recall"], inactive: ["Pistol Bankshot", "Pistol Multishot"] };
     case "squelch":
       return { active: ["SQUELCH Mass/Range/Dwell/Damage/Radius/Rate/Residue"], inactive: ["Shotgun Pellets", "Shotgun Spread", "Shotgun Rebound"] };
+    case "homing_shotgun":
+      return { active: ["Pellets", "Damage", "Spread", "Bullet Speed", "Range", "Rebound", "Homing"], inactive: [] };
     case "vacuum_pulse":
       return { active: ["Fire Rate (0.5×)", "Damage", "Pellets (base min)", "Spread", "Bullet Speed", "Range"], inactive: ["Shotgun Rebound"] };
     case "overcharge_conductor":

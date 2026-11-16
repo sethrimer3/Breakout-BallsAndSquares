@@ -1,6 +1,11 @@
 import type { ReverseShot } from "../systems/ReverseRevolver";
 
 export class Bullet {
+  homing = false;
+  homingCooldown = 0;
+  homingLocked = false;
+  homingX = 0;
+  homingY = 0;
   active = false;
   replay: ReverseShot | null = null;
   gale = false;
@@ -102,6 +107,10 @@ export class Bullet {
 
 /** Reset all per-projectile fields on pooled Bullet reuse so no mutation state leaks. */
 export function resetBulletFields(b: Bullet): void {
+  b.homing = false;
+  b.homingCooldown = 0;
+  b.homingLocked = false;
+  b.homingX = b.homingY = 0;
   b.replay = null;
   b.gale = false;
   b.galeCells.clear();

@@ -298,8 +298,8 @@ describe("SQUELCH combat and progression", () => {
     expect(u.buy("goo_distance")).toBe(false);
     (save.data.loadouts[0] as { weapon: string }).weapon = "goo_mortar"; save.save();
     const loaded = new SaveManager(storage);
-    expect(loaded.data.loadouts[0].weapon).toBe("shotgun");
-    expect(loaded.data.loadouts[0].mutation).toBe("squelch");
+    expect(loaded.data.loadouts[0].weapon).toBe("squelch");
+    expect(loaded.data.loadouts[0].mutation).toBeNull();
     expect(new UpgradeManager(loaded).getSoldierStats()).toMatchObject({ gooUnlocked: true, gooMass: 1.9, gooDistance: 940 });
   });
 

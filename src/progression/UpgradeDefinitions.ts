@@ -26,6 +26,7 @@ export type UpgradeBranch =
   | "blight"
   | "pistol"
   | "shotgun"
+  | "squelch"
   | "assault_rifle"
   | "rocket_launcher"
   | "sniper_rifle"
@@ -1024,16 +1025,16 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
 
   // SQUELCH Shotgun mutation: unlock plus the two lifetime-defining upgrades.
   {
-    id: "goo_unlock", branch: "shotgun", name: "Unlock SQUELCH",
-    shortDesc: "Shotgun mutation: Adhesive Rebound Mortar — sticks, sheds a mine, then rebounds",
-    color: "#9cde68", grid: { col: 1, row: -1 }, parent: "shotgun_unlock",
+    id: "goo_unlock", branch: "squelch", name: "Unlock SQUELCH",
+    shortDesc: "Sticky mine launcher — sticks, sheds a mine, then rebounds",
+    color: "#9cde68", grid: { col: 0, row: 0 }, parent: null,
     maxLevel: 1, baseCost: 180, costMultiplier: 1, unlockLifetimePixels: 80,
     valueAt: (lvl) => lvl, formatValue: (v) => v ? "UNLOCKED" : "LOCKED",
     formatDelta: () => "UNLOCK WEAPON",
     apply: (s, lvl) => { s.gooUnlocked = lvl > 0; }, icon: "grenade",
   },
   {
-    id: "goo_mass", branch: "shotgun", name: "Gel Reservoir",
+    id: "goo_mass", branch: "squelch", name: "Gel Reservoir",
     shortDesc: "+0.15 starting slime mass per level; more material for mines",
     color: "#9cde68", grid: { col: -3, row: 2 }, parent: "goo_unlock",
     maxLevel: 6, baseCost: 65, costMultiplier: 1.7, unlockLifetimePixels: 80,
@@ -1042,7 +1043,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     apply: (s, lvl) => { s.gooMass = GOO.startingMass + 0.15 * lvl; }, icon: "coreOrb",
   },
   {
-    id: "goo_distance", branch: "shotgun", name: "Long Hop",
+    id: "goo_distance", branch: "squelch", name: "Long Hop",
     shortDesc: "+80 world units of flight per level; sticky delays consume no range",
     color: "#38d6ff", grid: { col: -2, row: 2 }, parent: "goo_unlock",
     maxLevel: 8, baseCost: 55, costMultiplier: 1.6, unlockLifetimePixels: 80,
@@ -2069,7 +2070,7 @@ for (const access of BLACK_MARKET_DEFS) {
 
 export const BRANCH_UNLOCK: Partial<Record<UpgradeBranch, UpgradeId>> = {
   resources: "unlock_resources", blight: "unlock_blight", formations: "unlock_formations", facility: "unlock_facility",
-  pistol: "unlock_primary", shotgun: "unlock_primary", assault_rifle: "unlock_primary", rocket_launcher: "unlock_primary",
+  pistol: "unlock_primary", shotgun: "unlock_primary", squelch: "unlock_primary", assault_rifle: "unlock_primary", rocket_launcher: "unlock_primary",
   sniper_rifle: "unlock_primary", katana: "unlock_primary", flamethrower: "unlock_primary",
   grenade: "unlock_secondary", turret: "unlock_secondary",
 };

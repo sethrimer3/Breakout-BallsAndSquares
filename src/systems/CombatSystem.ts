@@ -1,3 +1,4 @@
+import { steerHomingBullet } from "./HomingSystem";
 import {
   DRONE, GOO, GALE, REVERSE, VACUUM, BURROWER, RAIL, NAPALM, CRYO, CIRCUIT,
   ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET,
@@ -241,10 +242,11 @@ export class CombatSystem {
           rate = 1 / this.stats.droneReleaseInterval;
         }
         break;
+      case "squelch":
+        rate = this.stats.gooFireRate;
+        break;
       case "shotgun":
-        if (s.mutation === "squelch") {
-          rate = this.stats.gooFireRate;
-        } else if (s.mutation === "vacuum_pulse") {
+        if (s.mutation === "vacuum_pulse") {
           rate = this.stats.shotgunFireRate * 0.5;
         } else {
           rate = this.stats.shotgunFireRate;
@@ -349,7 +351,7 @@ export class CombatSystem {
       }
       this.shooter = null;
       return;
-    } else if (s.weapon === "shotgun" && s.mutation === "squelch") {
+    } else if (s.weapon === "squelch") {
       const orb = this.goo.launch({
         // Cast from the center so a muzzle beside a thin wall cannot skip it.
         x: s.x, y: s.y, dx, dy, ownerId: s.id,
@@ -663,6 +665,7 @@ export class CombatSystem {
     // Snapshot eligibility at launch: spending a piercing budget must never
     // turn the same round into ricochet ammunition later in its flight.
     const weapon = this.shooter?.weapon;
+    b.homing = weapon === "shotgun" && this.shooter?.mutation === "homing_shotgun";
     b.bounceLeft = style === 0 && explosionRadius === 0 && b.pierceLeft === 0
       ? weapon === "pistol" ? this.stats.pistolBounces : weapon === "shotgun" ? this.stats.shotgunBounces : 0
       : 0;
@@ -996,6 +999,7 @@ export class CombatSystem {
       return;
     }
 
+    steerHomingBullet(b, dt, this.world, this.creatures, this.late);
     let remDist = Math.min(b.distanceLeft, b.speed * dt + b.pendingAdvance);
     if(remDist<=1e-6){this.finishBullet(b);return;}
     b.pendingAdvance = 0;

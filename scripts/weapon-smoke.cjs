@@ -25,7 +25,7 @@ fs.mkdirSync(artifacts, { recursive: true });
    for(const spot of Object.keys(SPECIAL_UNLOCKS))g.save.data.lab.worlds[specialWorld(spot)].specials.push(spot);
    g.save.data.essence=1000000;g.save.data.bank=g.save.data.crystals=g.save.data.greenCrystals=1000000;g.save.data.lifetimePixels=10000;g.openUpgrades();
    for(const id of [
-     'shotgun_unlock','goo_unlock','goo_radius','goo_residue','vacuum_unlock',
+     'shotgun_unlock','homing_shotgun_unlock','goo_unlock','goo_radius','goo_residue','vacuum_unlock',
      'ar_unlock','ar_stabilizer','overcharge_unlock','overcharge_accuracy','circuit_unlock',
      'katana_unlock','katana_dash','gale_unlock',
      'drone_unlock','drone_capacity','orbit_unlock','reverse_unlock',
@@ -50,12 +50,12 @@ fs.mkdirSync(artifacts, { recursive: true });
   async function activate(weapon,mutation){
    await page.evaluate(async({weapon,mutation})=>{
     const{marketFor}=await import('/src/progression/BlackMarket.ts');const g=window.__game;
-    const path=marketFor(weapon).paths.find(p=>p.mutation===mutation);
+    const path=marketFor(weapon)?.paths.find(p=>p.mutation===mutation);
     if(path&&g.upgrades.activeMarketPath(weapon)?.root!==path.root&&!g.upgrades.buy(path.root))throw Error('Could not switch mutation path');
     g.applyUpgrades();
    },{weapon,mutation});
   }
-  await page.locator('[data-tab="shotgun"]').click();await buy('shotgun_unlock');await buy('goo_unlock');await buy('goo_radius');await buy('goo_residue');await buy('vacuum_unlock');
+  await page.locator('[data-tab="shotgun"]').click();await buy('shotgun_unlock');await buy('goo_unlock');await buy('goo_radius');await buy('goo_residue');await buy('homing_shotgun_unlock');await buy('vacuum_unlock');
   await page.locator('[data-tab="assault_rifle"]').click();await buy('ar_unlock');for(let i=0;i<6;i++)await buy('ar_stabilizer');await buy('overcharge_unlock');
   assert.equal(await page.evaluate(()=>window.__game.upgrades.getSoldierStats().overchargeSpreadDeg),10.5);
   for(let i=0;i<6;i++)await buy('overcharge_accuracy');
@@ -73,8 +73,9 @@ fs.mkdirSync(artifacts, { recursive: true });
     ['pistol','reverse_revolver'],
     ['pistol','orbit_cylinder'],
     ['pistol','drone_shepherd'],
-    ['shotgun','squelch'],
+    ['squelch',null],
     ['shotgun','vacuum_pulse'],
+    ['shotgun','homing_shotgun'],
     ['assault_rifle','overcharge_conductor'],
     ['assault_rifle','circuit_runner'],
     ['rocket_launcher','burrower'],
@@ -89,7 +90,7 @@ fs.mkdirSync(artifacts, { recursive: true });
    await activate(weapon,mutation);
    await page.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
    await page.locator(`[data-slot="0"][data-weapon="${weapon}"]`).click();
-   await page.locator(`.lc-mbtn[data-slot="0"][data-mutation="${mutation}"]`).click();
+   if(weapon!=="squelch")await page.locator(`.lc-mbtn[data-slot="0"][data-mutation="${mutation}"]`).click();
    assert.equal(await page.evaluate(()=>window.__game.save.data.loadouts[0].mutation),mutation);
    await page.evaluate(()=>{
     const g=window.__game;g.startRun();g.growth.graceSeconds=1000;
@@ -102,7 +103,8 @@ fs.mkdirSync(artifacts, { recursive: true });
     if(m==='reverse_revolver')ready=c.revolver.pool.items.some(s=>s.active&&s.phase!=='recording');
     else if(m==='orbit_cylinder')ready=c.orbit.totalReleased>0||c.orbit.totalLoaded>=2;
     else if(m==='drone_shepherd')ready=c.drones.shots>0;
-    else if(m==='squelch')ready=c.goo.bursts>0;
+    else if(m===null)ready=c.goo.bursts>0;
+    else if(m==='homing_shotgun')ready=c.bullets.items.some(b=>b.active&&b.homing);
     else if(m==='vacuum_pulse')ready=c.bullets.items.some(b=>b.active&&b.vacuumPellet);
     else if(m==='overcharge_conductor')ready=c.overcharge.totalCharges>0;
     else if(m==='circuit_runner')ready=c.circuit.segments.some(s=>s.active);
@@ -116,19 +118,19 @@ fs.mkdirSync(artifacts, { recursive: true });
     if(ready)g.paused=true;return ready;
    },mutation);
    assert.equal(await page.evaluate(()=>window.__game.soldiers[0].mutation),mutation);
-   mutations.push(mutation);await page.screenshot({path:path.join(artifacts,`${mutation}.png`)});
+   mutations.push(mutation??weapon);await page.screenshot({path:path.join(artifacts,`${mutation??weapon}.png`)});
    await page.evaluate(()=>{const g=window.__game;g.openUpgrades();g.upgradeTree.openLoadoutScreen();});
-   await page.locator('.lc-mbtn[data-slot="0"][data-mutation=""]').click();
+   if(weapon!=="squelch")await page.locator('.lc-mbtn[data-slot="0"][data-mutation=""]').click();
    assert.equal(await page.evaluate(()=>window.__game.save.data.loadouts[0].mutation),null);
    await page.evaluate(()=>window.__game.openUpgrades());
   }
-  assert.equal(mutations.length,14);
+  assert.equal(mutations.length,15);
   const live=[];
-  for(const [weapon,mutation] of [['shotgun','squelch'],['pistol','drone_shepherd'],['sniper_rifle','chromatic_prism'],['katana',null]]) {
+  for(const [weapon,mutation] of [['squelch',null],['pistol','drone_shepherd'],['sniper_rifle','chromatic_prism'],['katana',null]]) {
    await activate(weapon,mutation);
    await page.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
    await page.locator(`[data-slot="0"][data-weapon="${weapon}"]`).click();
-   await page.locator(`.lc-mbtn[data-slot="0"][data-mutation="${mutation ?? ''}"]`).click();
+   if(weapon!=="squelch")await page.locator(`.lc-mbtn[data-slot="0"][data-mutation="${mutation ?? ''}"]`).click();
    assert.equal(await page.evaluate(()=>window.__game.save.data.loadouts[0].weapon),weapon);
    await page.evaluate(()=>{
     const g=window.__game;g.startRun();g.growth.graceSeconds=1000;
@@ -137,7 +139,7 @@ fs.mkdirSync(artifacts, { recursive: true });
    });
    await page.waitForFunction((m)=>{
     const g=window.__game;
-    const ready=m==='squelch'?g.combat.goo.bursts>0:m==='drone_shepherd'?g.combat.drones.shots>0:m==='chromatic_prism'?g.combat.laser.hits>0:g.combat.telemetry.katanaDashes>0;
+    const ready=m===null&&g.soldiers[0].weapon==='squelch'?g.combat.goo.bursts>0:m==='drone_shepherd'?g.combat.drones.shots>0:m==='chromatic_prism'?g.combat.laser.hits>0:g.combat.telemetry.katanaDashes>0;
     if(ready)g.paused=true;return ready;
    },mutation);
    live.push(await page.evaluate(()=>{const g=window.__game;return{weapon:g.soldiers[0].weapon,mutation:g.soldiers[0].mutation,soldiers:g.soldiers.length,deployed:g.runStats.soldiersDeployed,drones:g.combat.drones.pool.activeCount,telemetry:JSON.parse(g.exportTelemetryJson()).weapons};}));
@@ -247,7 +249,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     for(let y=0;y<64;y++)for(let x=0;x<64;x++)world.health[y*64+x]=x<2||x>61||y<30||y>33?1000:0;
     const storage={getItem:()=>null,setItem:()=>{}};const save=new SaveManager(storage);
     for(const def of UPGRADE_DEFS)save.data.upgrades[def.id]=def.maxLevel;
-    save.data.blackMarketPaths={pistol:"drone_unlock",shotgun:"goo_unlock",sniper_rifle:"prism_unlock",katana:"katana_dash"};
+    save.data.blackMarketPaths={pistol:"drone_unlock",sniper_rifle:"prism_unlock",katana:"katana_dash"};
     const stats=new UpgradeManager(save).getSoldierStats();const rng=new Rng(17);const combat=new CombatSystem(world,rng,stats);const physics=new PhysicsSystem(world,rng);
     const soldiers=Array.from({length:8},(_,i)=>new Soldier(240+i*2,256,1,0.2,stats.speed,['goo_mortar','drone_shepherd','prism_laser','katana'][i%4],'free',i));
     const camera=new CameraSystem(world);camera.viewW=mobile?390:1440;camera.viewH=mobile?844:900;camera.x=256;camera.y=256;camera.zoom=mobile?2:3;

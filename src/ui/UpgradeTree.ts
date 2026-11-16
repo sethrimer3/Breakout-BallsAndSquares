@@ -102,7 +102,7 @@ export const CATEGORIES: readonly CategoryInfo[] = [
     name: "PRIMARY WEAPONS",
     icon: "rifle",
     color: "#52f296",
-    branches: ["pistol", "shotgun", "assault_rifle", "rocket_launcher", "sniper_rifle", "katana", "flamethrower"],
+    branches: ["pistol", "shotgun", "squelch", "assault_rifle", "rocket_launcher", "sniper_rifle", "katana", "flamethrower"],
   },
   {
     id: "secondary",
@@ -158,6 +158,7 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   blight: { icon: "warn", color: UI_COLORS.blight },
   pistol: { icon: "pistol", color: "#ff9d3b" },
   shotgun: { icon: "shotgun", color: "#ff7832" },
+  squelch: { icon: "coreOrb", color: "#9cde68" },
   assault_rifle: { icon: "rifle", color: "#52f296" },
   rocket_launcher: { icon: "launcher", color: "#ff5c40" },
   sniper_rifle: { icon: "sniper", color: UI_COLORS.soldier },
@@ -304,7 +305,7 @@ export class UpgradeTree {
                 ${WEAPON_MARKETS.map(m => `<div class="tree-weapon-tab">
                   <button class="tree-tab" data-tab="${m.weapon}">${tabHtml(m.weapon,m.label.toUpperCase())}</button>
                   <button class="tree-market-tab" data-market="${m.weapon}" title="Black Market">${essenceIcon(1)}<span>BLACK MARKET</span></button>
-                </div>`).join("")}
+                </div>${m.weapon === "shotgun" ? `<button class="tree-tab" data-tab="squelch">${tabHtml("squelch","SQUELCH")}</button>` : ""}`).join("")}
               </div>
               <div class="tree-cat-panel hidden" data-cat="secondary">
                 <button class="tree-tab" data-tab="grenade"></button>
@@ -521,6 +522,7 @@ export class UpgradeTree {
     return (
       st.maxSoldiers > 1 ||
       st.shotgunUnlocked ||
+      st.gooUnlocked ||
       st.arUnlocked ||
       st.rocketUnlocked ||
       st.sniperUnlocked ||
@@ -557,7 +559,7 @@ export class UpgradeTree {
     if (!this.game.upgrades.isBranchUnlocked(tab)) return;
     this.inLoadoutScreen = false;
     this.activeTab = tab;
-    this.marketView = blackMarket;
+    this.marketView = blackMarket && !!marketFor(tab);
     this.expandedCategory = categoryForBranch(tab);
     this.hideTooltip();
     this.activateBranch(true);
@@ -587,6 +589,8 @@ export class UpgradeTree {
         this.subEl.textContent = "RESEARCH BASE SYSTEMS — DORMANT SENTRIES & FACILITY MAPPING";
       } else if (tab === "pistol") {
         this.subEl.textContent = "SIDEARM WEAPON TREE — STANDARD ISSUE (UNLOCKED)";
+      } else if (tab === "squelch") {
+        this.subEl.textContent = "SQUELCH — STICKY MINES & REBOUNDING ORBS";
       } else if (tab === "shotgun") {
         this.subEl.textContent = "SCATTER SHOTGUN WEAPON TREE — CLOSE-RANGE CONE EXCAVATOR";
       } else if (tab === "assault_rifle") {
@@ -1153,6 +1157,7 @@ export class UpgradeTree {
     const weaponDefs: { id: WeaponType & UpgradeBranch; label: string; unlocked: boolean }[] = [
       { id: "pistol", label: "PISTOL", unlocked: true },
       { id: "shotgun", label: "SHOTGUN", unlocked: st.shotgunUnlocked },
+      { id: "squelch", label: "SQUELCH", unlocked: st.gooUnlocked },
       { id: "assault_rifle", label: "ASSAULT", unlocked: st.arUnlocked },
       { id: "rocket_launcher", label: "ROCKET", unlocked: st.rocketUnlocked },
       { id: "sniper_rifle", label: "SNIPER", unlocked: st.sniperUnlocked },
@@ -1192,7 +1197,7 @@ export class UpgradeTree {
           {id:"drone_shepherd",label:"DRONE SHEPHERD",unlocked:st.droneUnlocked},
         ] : curW === "shotgun" ? [
           {id:null,label:"STANDARD",unlocked:true},
-          {id:"squelch",label:"SQUELCH",unlocked:st.gooUnlocked},
+          {id:"homing_shotgun",label:"HOMING BULLETS",unlocked:st.homingShotgunUnlocked},
           {id:"vacuum_pulse",label:"VACUUM PULSE",unlocked:st.vacuumUnlocked},
         ] : curW === "assault_rifle" ? [
           {id:null,label:"STANDARD",unlocked:true},
@@ -1238,7 +1243,8 @@ export class UpgradeTree {
       if(curM==="reverse_revolver")wSummary=`Pause → rewind exact shot path · ${st.damage} DMG`;
       else if(curM==="orbit_cylinder")wSummary=`Orbit rounds (${st.damage} DMG) → sling on real wall bounce`;
       else if(curM==="drone_shepherd")wSummary=`Independent pistol drones · ${st.droneCapacity} cap · ${st.droneReleaseInterval.toFixed(2)}s · ${st.droneDamage} DMG`;
-      else if(curM==="squelch")wSummary=`Stick → mine → rebound · ${st.gooMass.toFixed(2)} mass · ${st.gooDistance} range`;
+      else if(curW==="squelch")wSummary=`Stick → mine → rebound · ${st.gooMass.toFixed(2)} mass · ${st.gooDistance} range`;
+      else if(curM==="homing_shotgun")wSummary=`Homing pellets · ${st.shotgunPellets} pellets · ${st.shotgunDamage} DMG`;
       else if(curM==="vacuum_pulse")wSummary=`0.5× cadence (${(st.shotgunFireRate*0.5).toFixed(2)}/s) · sucks debris → +pellets & DMG`;
       else if(curM==="overcharge_conductor")wSummary=`Charging rounds (0 hit DMG) · 3+ hits arm delayed chain + blast · ±${st.overchargeSpreadDeg<=0.2?st.overchargeSpreadDeg.toFixed(1):st.overchargeSpreadDeg.toFixed(2)}°`;
       else if(curM==="circuit_runner")wSummary=`Laser turns 90° at blocks · ${st.arDamage} DMG · ${CIRCUIT.pierce+st.arPierce} Pierce · ${CIRCUIT.baseRange} range`;
@@ -1430,6 +1436,7 @@ export class UpgradeTree {
     // Update weapon tab lock indicators.
     const tabLocks: [UpgradeBranch, string, boolean][] = [
       ["shotgun", "SHOTGUN", st.shotgunUnlocked],
+      ["squelch", "SQUELCH", st.gooUnlocked],
       ["assault_rifle", "ASSAULT RIFLE", st.arUnlocked],
       ["rocket_launcher", "ROCKET", st.rocketUnlocked],
       ["sniper_rifle", "SNIPER", st.sniperUnlocked],
@@ -1488,6 +1495,7 @@ export class UpgradeTree {
     // and hidden on weapon trees where their unlock node sits at (0,0).
     const hasCenterUnlockNode =
       this.activeTab === "shotgun" ||
+      this.activeTab === "squelch" ||
       this.activeTab === "assault_rifle" ||
       this.activeTab === "rocket_launcher" ||
       this.activeTab === "sniper_rifle" ||

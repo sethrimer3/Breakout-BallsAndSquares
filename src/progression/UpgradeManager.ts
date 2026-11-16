@@ -128,7 +128,7 @@ export class UpgradeManager {
   pricesOf(id: UpgradeId): Price[] {
     const node = marketNode(id);
     if (node?.path.root === id) {
-      const cost = id === "goo_unlock" || id === "katana_dash" ? 30 : id === "prism_unlock" ? 40 : id === "drone_unlock" ? 35 : UPGRADE_BY_ID[id].baseCost;
+      const cost = id === "katana_dash" ? 30 : id === "prism_unlock" ? 40 : id === "drone_unlock" ? 35 : UPGRADE_BY_ID[id].baseCost;
       return [{currency:"essence",amount:cost}];
     }
     return upgradePrices(UPGRADE_BY_ID[id], this.levelOf(id));
@@ -194,6 +194,7 @@ export class UpgradeManager {
     const weaponUnlocked =
       weapon === "pistol" ||
       (weapon === "shotgun" && st.shotgunUnlocked) ||
+      (weapon === "squelch" && st.gooUnlocked) ||
       (weapon === "assault_rifle" && st.arUnlocked) ||
       (weapon === "rocket_launcher" && st.rocketUnlocked) ||
       (weapon === "sniper_rifle" && st.sniperUnlocked) ||
@@ -227,7 +228,7 @@ export class UpgradeManager {
       "katana_dash", "katana_impulse", "katana_glide", "katana_kinetic", "katana_wide", "katana_recovery", "katana_perfect",
       "reverse_unlock", "orbit_unlock",
       "drone_unlock", "drone_capacity", "drone_cycle", "drone_damage", "drone_speed", "drone_aim", "drone_health", "drone_recall",
-      "goo_unlock", "goo_mass", "goo_distance", "goo_dwell", "goo_damage", "goo_radius", "goo_rate", "goo_residue",
+      "homing_shotgun_unlock",
       "vacuum_unlock",
       "overcharge_unlock", "overcharge_accuracy", "circuit_unlock",
       "burrower_unlock", "freeze_rockets_unlock",
