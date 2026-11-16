@@ -60,7 +60,7 @@ export class DebugOverlay {
     const lt = g.lighting;
     const near = g.growth.nearSoldierPercent(g.runStats.time);
     this.textEl.textContent =
-      `FPS ${d.fps.toFixed(0)}  frame ${d.frameMs.toFixed(1)}ms  sim ${d.simMs.toFixed(2)}ms  light ${d.lightMs.toFixed(2)}ms (${lt.quality})  speed ${g.timeScale}×\n` +
+      `FPS ${d.fps.toFixed(0)}  frame ${d.frameMs.toFixed(1)}ms  sim ${d.simMs.toFixed(2)}ms  light ${d.lightMs.toFixed(2)}ms (${lt.quality})  res ×${g.renderer.density.toFixed(2)}  speed ${g.timeScale}×\n` +
       `lights ${lt.lastShadowLights}/${g.flashes.length}  rays ${lt.lastRaysCast}  ` +
       `frontier ${g.growth.frontier.size}  near-soldier ${near.toFixed(0)}%\n` +
       `goo ${g.combat.goo.orbs.activeCount}/${g.combat.goo.orbs.items.length}  mines ${g.combat.goo.mines.activeCount}/${g.combat.goo.mines.items.length}  dropped ${g.combat.goo.droppedOrbs} orbs / ${g.combat.goo.droppedMines} fragments\n` +

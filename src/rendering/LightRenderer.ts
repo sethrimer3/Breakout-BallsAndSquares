@@ -131,16 +131,13 @@ export class LightRenderer {
   private layerCtx: CanvasRenderingContext2D;
   private maskState: {
     terrain: Game["terrain"]; revision: number; x: number; y: number; zoom: number;
-    viewW: number; viewH: number; width: number; height: number; dpr: number;
+    viewW: number; viewH: number; width: number; height: number; dpr: number; ambient: string;
   } | null = null;
   private maskCanvas: HTMLCanvasElement;
   private maskCtx: CanvasRenderingContext2D;
-  private vignetteCanvas: HTMLCanvasElement;
   private softener = new CanvasSoftener(SOFT_SHADOWS);
   /** Set per frame from the visual setting. */
   private softShadows = false;
-  private vigW = 0;
-  private vigH = 0;
 
   /** One pixel per world cell: light added to wall cells this frame. */
   private wallCanvas: HTMLCanvasElement;
@@ -160,7 +157,6 @@ export class LightRenderer {
     [this.layerCanvas, this.layerCtx] = makeLayer(true);
     [this.maskCanvas, this.maskCtx] = makeLayer(true);
     [this.wallCanvas, this.wallCtx] = makeLayer(true);
-    this.vignetteCanvas = document.createElement("canvas");
   }
 
   /** Build the lightmap and composite it onto the scene in `ctx`. */
@@ -178,34 +174,47 @@ export class LightRenderer {
       }
     }
 
-    // Reuse the silhouette while the camera, device size and terrain artwork
-    // are unchanged. Pending chunk work invalidates it as each chunk is built.
+    const [ar, ag, ab] = worldAtmosphere(game.world, cam.x, cam.y)?.ambient ?? LIGHT.ambientRgb;
+    const ambient = `rgb(${ar}, ${ag}, ${ab})`;
+
+    // The terrain silhouette, filled with the ambient color. Reused while the
+    // camera, device size, ambient and terrain artwork are unchanged. Pending
+    // chunk work invalidates it as each chunk is built.
     const m = this.maskState, terrain = game.terrain;
     if (!m || m.terrain !== terrain || m.revision !== terrain.renderRevision ||
         m.x !== cam.x || m.y !== cam.y || m.zoom !== cam.zoom ||
         m.viewW !== cam.viewW || m.viewH !== cam.viewH || m.dpr !== dpr ||
-        m.width !== devW || m.height !== devH) {
+        m.width !== devW || m.height !== devH || m.ambient !== ambient) {
       const mask = this.maskCtx;
       mask.setTransform(1, 0, 0, 1, 0, 0);
+      mask.globalCompositeOperation = "source-over";
       mask.clearRect(0, 0, devW, devH);
       mask.setTransform(dpr, 0, 0, dpr, 0, 0);
       terrain.draw(mask, cam);
+      mask.setTransform(1, 0, 0, 1, 0, 0);
+      mask.globalCompositeOperation = "source-in";
+      mask.fillStyle = ambient;
+      mask.fillRect(0, 0, devW, devH);
+      mask.globalCompositeOperation = "source-over";
       this.maskState = { terrain, revision: terrain.renderRevision, x: cam.x, y: cam.y,
-        zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: devW, height: devH, dpr };
+        zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: devW, height: devH, dpr, ambient };
     }
 
     const g = this.lmCtx;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // 1) Fill with dark ambient illumination.
-    const [ar, ag, ab] = worldAtmosphere(game.world, cam.x, cam.y)?.ambient ?? LIGHT.ambientRgb;
     g.globalCompositeOperation = "source-over";
     g.globalAlpha = 1;
-    g.fillStyle = `rgb(${ar}, ${ag}, ${ab})`;
+    g.fillStyle = ambient;
     g.fillRect(0, 0, viewW, viewH);
 
-    // 2) Light in open air: glows and muzzle flashes, each clipped by its polygon.
-    const air = this.beginLayer(devW, devH, dpr);
+    // 2) Light in open air: glows and muzzle flashes, each clipped by its polygon,
+    //    added straight onto the ambient fill. Walls are reset to ambient below
+    //    by stamping the ambient-colored silhouette over them, which takes one
+    //    full-screen pass instead of a separate layer's clear + cut + composite.
+    const air = g;
+    air.globalCompositeOperation = "lighter";
     const soft = game.lighting.softLights;
     for (let i = 0; i < game.lighting.softCount; i++) {
       const l = soft[i];
@@ -260,7 +269,13 @@ export class LightRenderer {
       air.fillStyle = gradientFor(air, sx, sy, rad, PANEL_STOPS[panelIndex(f.light.kind)], level);
       air.fill();
     }
-    this.finishAirLayer(g, "lighter", devW, devH, dpr);
+    // Soften shadow edges before the terrain stamp, which stays pixel-sharp.
+    // The ambient fill is uniform, so blurring it along with the light is harmless.
+    if (this.softShadows) this.softener.soften(g, devW, devH);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = "source-over";
+    g.drawImage(this.maskCanvas, 0, 0, devW, devH);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     g.globalCompositeOperation = "lighter";
 
@@ -484,30 +499,6 @@ export class LightRenderer {
       if (cy < this.dirtyY0) this.dirtyY0 = cy;
       if (cy > this.dirtyY1) this.dirtyY1 = cy;
     }
-  }
-
-  /** Draw a subtle screen-edge vignette for depth. */
-  renderVignette(ctx: CanvasRenderingContext2D, viewW: number, viewH: number): void {
-    const w = Math.max(1, Math.round(viewW));
-    const h = Math.max(1, Math.round(viewH));
-    if (this.vigW !== w || this.vigH !== h) {
-      this.vigW = w;
-      this.vigH = h;
-      this.vignetteCanvas.width = w;
-      this.vignetteCanvas.height = h;
-      const vg = this.vignetteCanvas.getContext("2d")!;
-      const cx = w / 2;
-      const cy = h / 2;
-      const r0 = Math.min(w, h) * 0.36;
-      const r1 = Math.hypot(cx, cy);
-      const grad = vg.createRadialGradient(cx, cy, r0, cx, cy, r1);
-      grad.addColorStop(0, "rgba(0, 0, 0, 0)");
-      grad.addColorStop(0.7, "rgba(2, 4, 10, 0.28)");
-      grad.addColorStop(1, "rgba(1, 2, 6, 0.72)");
-      vg.fillStyle = grad;
-      vg.fillRect(0, 0, w, h);
-    }
-    ctx.drawImage(this.vignetteCanvas, 0, 0, w, h);
   }
 
   tracePolygonPath(

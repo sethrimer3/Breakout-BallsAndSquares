@@ -14,6 +14,7 @@ import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, resolvePrimaryMutation, baseSoldierStats, type SecondaryWeaponType, type SoldierStats } from "./entities/Soldier";
 import { MUZZLE_FLASH_MULTIPLIER, SaveManager, type SoldierBehavior } from "./progression/SaveManager";
 import { UpgradeManager } from "./progression/UpgradeManager";
+import type { RenderQuality } from "./rendering/RenderScale";
 import { Renderer } from "./rendering/Renderer";
 import { ScreenTransition } from "./rendering/ScreenTransition";
 import { TerrainRenderer } from "./rendering/TerrainRenderer";
@@ -122,6 +123,8 @@ export class Game {
   private readonly speedrunClock = new SpeedrunTimer();
   private speedrunSavedAt = 0;
   private runStarted = false;
+  /** Last frame was live gameplay (for render quality sampling). */
+  private wasPlaying = false;
   private _paused = false;
   private _runOver = false;
   get paused(): boolean { return this._paused; }
@@ -458,6 +461,18 @@ export class Game {
   /** Soft, orange "fiery" muzzle flashes (visual setting). */
   get fieryMuzzleFlash(): boolean {
     return this.save.data.settings.fieryMuzzleFlash;
+  }
+
+  /** Canvas pixel density setting ("auto" adapts to the frame rate). */
+  get renderQuality(): RenderQuality {
+    return this.save.data.settings.renderQuality;
+  }
+
+  /** Apply a new render quality setting to the canvas. */
+  setRenderQuality(q: RenderQuality): void {
+    this.save.data.settings.renderQuality = q;
+    this.save.save();
+    this.resize();
   }
 
   /** Blurred shadow edges in the open-air light (visual setting). */
@@ -2287,8 +2302,14 @@ export class Game {
       this.speedrunSavedAt = now;
       this.save.save();
     }
-    const real = this.last ? Math.min(0.1, (now - this.last) / 1000) : SIM.dt;
+    const intervalMs = this.last ? now - this.last : 0;
+    const real = this.last ? Math.min(0.1, intervalMs / 1000) : SIM.dt;
     this.last = now;
+    // Only live gameplay frames tune the auto render quality.
+    const playing = this.runStarted && !this.paused && !this.runOver && !document.hidden;
+    if (playing && this.wasPlaying) this.renderer.sampleFrame(intervalMs);
+    else if (!playing && this.wasPlaying) this.renderer.resetFrameSampling();
+    this.wasPlaying = playing;
     const t0 = performance.now();
     if (!this.paused) {
       this.acc += real * this.timeScale * this.deathTimeScale;
@@ -2308,9 +2329,15 @@ export class Game {
     this.updateScreenShake(real);
     this.transition.update(real);
     const t1 = performance.now();
-    this.updateFlashPolygons();
     this.terrain.update();
-    this.renderer.draw();
+    // A paused scene under a full menu doesn't change: keep its last frame
+    // instead of re-rendering the whole lit world behind the overlay.
+    const covered = this.paused && (this.mainMenu.visible || this.upgradeTree.visible ||
+      this.labMap?.visible || this.resultsScreen.visible);
+    if (!covered || this.renderer.needsDraw) {
+      this.updateFlashPolygons();
+      this.renderer.draw();
+    }
     const fireMix = this.paused || this.runOver ? { gain: 0, pan: 0 } : fireAmbienceMix(this.fire, this.world, this.camera);
     this.audio.updateFireAmbience(fireMix.gain, fireMix.pan);
     this.hud.update(this, now);
