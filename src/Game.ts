@@ -1,3 +1,4 @@
+import { DamageNumbers } from "./entities/DamageNumbers";
 import { LateEncounters } from "./systems/LateEncounters";
 import { lateBlockReward } from "./world/campaignBalance";
 import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
@@ -94,6 +95,7 @@ export class Game {
   readonly camera: CameraSystem;
   readonly terrain: TerrainRenderer;
   readonly renderer: Renderer;
+  readonly damageNumbers: DamageNumbers;
   readonly particles = new ParticleSystem(3000);
   readonly casings = new CasingSystem();
   readonly loot = new LootSystem();
@@ -210,6 +212,7 @@ export class Game {
   constructor(canvas: HTMLCanvasElement, uiRoot: HTMLElement) {
     this.canvas = canvas;
     this.world = new PixelWorld(WORLD);
+    this.damageNumbers = new DamageNumbers(this.world);
     if (2 * SOLDIER.collisionRadius >= WORLD.cellSize) {
       console.warn("Soldier collision diameter >= cell size: soldiers cannot fit 1-cell tunnels.");
     }
@@ -570,6 +573,7 @@ export class Game {
     this.combat.clearAll();
     this.combat.resetTelemetry();
     this.particles.clear();
+    this.damageNumbers.clear();
     this.fire.clear();
     this.fire.burnMult = this.stats.flameBurnMult;
     this.casings.clear();
@@ -756,6 +760,7 @@ export class Game {
       this.combat.clearAll();
       this.combat.resetTelemetry();
       this.particles.clear();
+      this.damageNumbers.clear();
       this.fire.clear();
       this.casings.clear();
       this.loot.clear();
@@ -1940,6 +1945,7 @@ export class Game {
     this.growthRate = this.growth.rate;
     this.runStats.recordSampleIfDue(this.growthRate);
     this.particles.update(dt);
+    this.damageNumbers.update(dt);
     this.casings.update(dt, this.world);
     const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
     if (collected > 0) {

@@ -1,3 +1,4 @@
+import { DamageNumberRenderer } from "./DamageNumberRenderer";
 import { drawMapBoundary } from "./MapBoundaryRenderer";
 import { drawWeaponExpansion } from "./WeaponExpansionRenderer";
 import { drawGoo } from "./GooRenderer";
@@ -55,6 +56,7 @@ export class Renderer {
   private creatureRenderer = new CreatureRenderer();
   private lightRenderer: LightRenderer;
   private fieryFlash: FieryFlashRenderer;
+  private damageNumberRenderer = new DamageNumberRenderer();
   private fireRenderer = new FireRenderer();
   private fogRenderer: FogRenderer;
 
@@ -234,6 +236,7 @@ export class Renderer {
     drawGoo(ctx, cam, game.combat.goo, still, game.lighting.quality === "low");
     this.drawTurrets();
     game.late.drawOverlay(ctx, cam);
+    this.damageNumberRenderer.draw(ctx, cam, game.damageNumbers, this.motion.matches, game.devMapAccess ? undefined : game.fog);
     this.drawAimIndicator();
     this.drawGateNotice();
     drawSpecialNotice(ctx, cam, game.specialNotice, game.runStats.time);

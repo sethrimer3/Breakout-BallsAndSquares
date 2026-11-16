@@ -241,6 +241,16 @@ export class PixelWorld implements SolidQuery {
 
   private listeners: CellListener[] = [];
   private destroyListeners: DestroyListener[] = [];
+  private damageListeners: ((x: number, y: number, amount: number, sub: boolean) => void)[] = [];
+
+  /** Actual HP lost to a player attack on a surviving full/half-size block. */
+  addDamageListener(fn: (x: number, y: number, amount: number, sub: boolean) => void): void {
+    this.damageListeners.push(fn);
+  }
+
+  private emitDamage(x: number, y: number, amount: number, sub: boolean): void {
+    for (const listener of this.damageListeners) listener(x, y, amount, sub);
+  }
 
   addDestroyListener(fn: DestroyListener): void {
     this.destroyListeners.push(fn);
@@ -612,6 +622,9 @@ export class PixelWorld implements SolidQuery {
       this.emitDestroy(cx, cy, false, cx * 2, cy * 2);
       return 2;
     }
+    if (byPlayer && this.health[i] > 0 && this.health[i] < hp) {
+      this.emitDamage((cx + 0.5) * this.cellSize, (cy + 0.5) * this.cellSize, hp - this.health[i], false);
+    }
     this.emit(cx, cy, "damaged");
     return 1;
   }
@@ -643,6 +656,9 @@ export class PixelWorld implements SolidQuery {
       this.emitDestroy(cx, cy, true, sx, sy);
       if (spreads) this.spreadDebrisDamage(sx, sy, debrisDamage, byPlayer);
       return 2;
+    }
+    if (byPlayer && this.subHealth[si] > 0 && this.subHealth[si] < hp) {
+      this.emitDamage((sx + 0.5) * this.subCellSize, (sy + 0.5) * this.subCellSize, hp - this.subHealth[si], true);
     }
     this.emit(cx, cy, "damaged");
     return 1;
