@@ -9,7 +9,7 @@ import { CombatSystem } from "../src/systems/CombatSystem";
 import { PhysicsSystem } from "../src/systems/PhysicsSystem";
 import { GrowthSystem } from "../src/world/GrowthSystem";
 import { MAT, PixelWorld } from "../src/world/PixelWorld";
-import { unlockTabs } from "./helpers/progression";
+import { unlockTabs, findAllSpecials } from "./helpers/progression";
 
 class MemoryStorage implements StorageLike {
   private map = new Map<string, string>();
@@ -323,7 +323,7 @@ describe("Canonical Black Market integration & lab-only refund", () => {
   it("enforces unique non-Pistol primaries across squad, independent Pistol mutations, and exact lab-only Black Market refunds", () => {
     const storage = new MemoryStorage();
     const save = new SaveManager(storage);
-    const u = new UpgradeManager(save);
+    const u = new UpgradeManager(save); findAllSpecials(save.data);
     unlockTabs(save);
     save.data.lifetimePixels = 10000;
     save.data.bank = 100000;

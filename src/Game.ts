@@ -21,6 +21,8 @@ import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { CombinedTargets, RoomFixtures } from "./systems/RoomFixtures";
 import { SpecialUpgradeSystem } from "./systems/SpecialUpgrades";
+import { SPECIAL_UNLOCKS } from "./progression/specialUnlocks";
+import { UPGRADE_BY_ID } from "./progression/UpgradeDefinitions";
 import { FireSystem } from "./systems/FireSystem";
 import { Input } from "./systems/Input";
 import { LightingSystem, makeLitCells, type LitCells, type MuzzleLight } from "./systems/LightingSystem";
@@ -169,7 +171,7 @@ export class Game {
   /** The "access needed" notice over a locked world gate (run seconds it started), or null. */
   gateNotice: { door: Door; t0: number } | null = null;
   /** "Special Upgrade Acquired" banner over the soldier who absorbed one (run seconds it started), or null. */
-  specialNotice: { soldier: Soldier; t0: number } | null = null;
+  specialNotice: { soldier: Soldier; t0: number; label: string } | null = null;
   /** Recent shots on locked gates (run seconds), for when to show the notice. */
   private gateHits: number[] = [];
   /** True while the iris is closing to carry the squad through a gate. */
@@ -1684,8 +1686,8 @@ export class Game {
 
   /**
    * Every gold mote from a special-upgrade block reached its soldier: record
-   * it so the block stays gone, and celebrate. What each special upgrade does
-   * is still to be designed; this is where its effect will be applied.
+   * it so the block stays gone (and its upgrade can now be bought in the
+   * upgrade tree, see progression/specialUnlocks.ts), and celebrate.
    */
   private grantSpecialUpgrade(id: string, soldier: Soldier): void {
     const list = this.labSave.specials;
@@ -1693,7 +1695,9 @@ export class Game {
       list.push(id);
       this.save.save();
     }
-    this.specialNotice = { soldier, t0: this.runStats.time };
+    const unlock = SPECIAL_UNLOCKS[id];
+    const label = unlock ? UPGRADE_BY_ID[unlock].name.replace(/^Unlock /, "") : "Special Upgrade";
+    this.specialNotice = { soldier, t0: this.runStats.time, label: label.toUpperCase() };
     this.audio.playPurchase(soldier.x, soldier.y);
     for (let i = 0; i < 28; i++) {
       const a = (i / 28) * Math.PI * 2, sp = this.rng.range(70, 130);

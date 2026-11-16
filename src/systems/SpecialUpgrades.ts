@@ -5,11 +5,11 @@ import type { BulletTargets } from "./CombatSystem";
 /** Tuning for the glowing gold special-upgrade blocks. */
 export const SPECIAL_UPGRADE = {
   /** Block size in cells (square). */
-  size: 3,
+  size: 2,
   /** Bullet/explosion hits it takes to shatter. */
   hits: 4,
   /** Gold motes the block bursts into. */
-  motes: 72,
+  motes: 56,
   /** Seconds the motes fly outward before homing. */
   burstTime: 0.6,
   /** Homing acceleration (world units / s²) and top speed. */
@@ -67,7 +67,7 @@ export interface SpecialUpgradeEvents {
 }
 
 /**
- * Special upgrades: 3x3 glowing gold blocks in lab rooms. Shooting one enough
+ * Special upgrades: 2x2 glowing gold blocks in lab rooms. Shooting one enough
  * shatters it into golden motes that burst out, then home into the nearest
  * soldier; once they have all been absorbed the upgrade is granted.
  */

@@ -1,4 +1,4 @@
-import { unlockTabs } from "./helpers/progression";
+import { unlockTabs, findAllSpecials } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { KATANA } from "../src/config";
 import { Rng } from "../src/core/Rng";
@@ -23,7 +23,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
   it("gates Katana unlock and scales upgrades through the UpgradeManager", () => {
     const save = new SaveManager(new MemStorage());
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     save.data.bank = 100_000; save.data.crystals = 100_000;
     save.data.lifetimePixels = 500;
 
@@ -72,7 +72,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     const stats = upg.getSoldierStats();
     stats.katanaUnlocked = true;
 
@@ -105,7 +105,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     const stats = upg.getSoldierStats();
     stats.katanaUnlocked = true;
     stats.katanaDamage = 3;
@@ -184,7 +184,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     const stats = upg.getSoldierStats();
     stats.katanaUnlocked = true;
     stats.katanaDamage = 2;
@@ -212,7 +212,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     const stats = upg.getSoldierStats();
     stats.damage = 3; // Pistol damage = 3
 
@@ -236,7 +236,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     const stats = upg.getSoldierStats();
     stats.katanaUnlocked = true;
     stats.katanaDamage = 5;
@@ -265,7 +265,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     const stats = upg.getSoldierStats();
     stats.katanaUnlocked = true;
     stats.multishotChance = 1.0; // 100% multishot

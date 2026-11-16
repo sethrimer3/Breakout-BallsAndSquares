@@ -8,7 +8,7 @@ import { LateEncounters, type Encounter } from "../src/systems/LateEncounters";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { UpgradeManager } from "../src/progression/UpgradeManager";
 import { MAT, PixelWorld, SUB } from "../src/world/PixelWorld";
-import { unlockTabs } from "./helpers/progression";
+import { unlockTabs, findAllSpecials } from "./helpers/progression";
 
 class MemoryStorage implements StorageLike {
   private map = new Map<string, string>();
@@ -181,7 +181,7 @@ describe("Overcharge Conductor — Assault Rifle branch 1", () => {
     save.data.lifetimePixels = 10000;
     unlockTabs(save);
 
-    const um = new UpgradeManager(save);
+    const um = new UpgradeManager(save); findAllSpecials(save.data);
     expect(um.buy("ar_unlock")).toBe(true);
     for (let i = 0; i < 6; i++) expect(um.buy("ar_stabilizer")).toBe(true);
     expect(um.buy("overcharge_unlock")).toBe(true);
@@ -304,7 +304,7 @@ describe("Overcharge Conductor — Assault Rifle branch 1", () => {
     unlockTabs(save);
     save.save();
 
-    const um = new UpgradeManager(save);
+    const um = new UpgradeManager(save); findAllSpecials(save.data);
     expect(um.buy("ar_unlock")).toBe(true);
     expect(um.buy("overcharge_unlock")).toBe(true);
     expect(um.buy("overcharge_accuracy")).toBe(true);
@@ -318,7 +318,7 @@ describe("Overcharge Conductor — Assault Rifle branch 1", () => {
     expect(reloaded.data.essence).toBe(560);
     expect(reloaded.data.loadouts[0].mutation).toBe("overcharge_conductor");
 
-    const um2 = new UpgradeManager(reloaded);
+    const um2 = new UpgradeManager(reloaded); findAllSpecials(reloaded.data);
     const refund = um2.refundBlackMarket(false);
     expect(refund.ok).toBe(true);
     if (refund.ok) expect(refund.refunded.essence).toBe(spentEssence);

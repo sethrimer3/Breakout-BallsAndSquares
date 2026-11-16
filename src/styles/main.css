@@ -1339,6 +1339,29 @@ button {
 .tree-node.locked:hover {
   --fc: #33465a;
 }
+/* Hidden in an unfound gold special-upgrade block: a lock reading FIND. */
+.tree-node .node-find {
+  display: none;
+}
+.tree-node.find .node-icon {
+  display: none;
+}
+.tree-node.find .node-find {
+  display: block;
+}
+.tree-node.find {
+  --fc: #4a3a14;
+  color: #c99a2e;
+}
+.tree-node.round.find .node-icon {
+  display: none;
+}
+.tt-lock.tt-find {
+  color: #ffd75a;
+}
+.tree-node.round .node-find {
+  position: relative;
+}
 .tree-node.bought-flash {
   animation: nodeFlash 0.3s steps(3);
 }

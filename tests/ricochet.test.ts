@@ -5,7 +5,7 @@ import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { UpgradeManager } from "../src/progression/UpgradeManager";
 import { CombatSystem } from "../src/systems/CombatSystem";
 import { PixelWorld, SUB } from "../src/world/PixelWorld";
-import { unlockTabs } from "./helpers/progression";
+import { unlockTabs, findAllSpecials } from "./helpers/progression";
 
 function fixture() {
   const world = new PixelWorld({ width: 16, height: 16, cellSize: 8, roomSize: 4 });
@@ -201,7 +201,7 @@ describe("ricochet progression", () => {
   it("gates purchases, caps levels, and reloads the new upgrades", () => {
     const storage = new MemoryStorage();
     const save = new SaveManager(storage);
-    const upgrades = new UpgradeManager(save);
+    const upgrades = new UpgradeManager(save); findAllSpecials(save.data);
     expect(upgrades.isUnlocked("pistol_bankshot")).toBe(false);
     unlockTabs(save);
     save.data.bank = 100000;

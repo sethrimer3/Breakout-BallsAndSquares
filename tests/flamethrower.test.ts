@@ -1,4 +1,4 @@
-import { unlockTabs } from "./helpers/progression";
+import { unlockTabs, findAllSpecials } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { FIRE, FLAMETHROWER } from "../src/config";
 import { Rng } from "../src/core/Rng";
@@ -35,7 +35,7 @@ describe("Flamethrower weapon", () => {
   it("gates its tree behind the unlock and applies upgrades", () => {
     const save = new SaveManager(new MemStorage());
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     save.data.bank = 100_000;
     save.data.crystals = 100_000;
     save.data.lifetimePixels = 500;

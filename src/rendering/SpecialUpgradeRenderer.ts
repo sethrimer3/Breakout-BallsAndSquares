@@ -5,7 +5,7 @@ import type { PixelWorld } from "../world/PixelWorld";
 import { radialSprite } from "./sprites";
 
 /**
- * Special upgrades are the one deliberate exception to the matte lab: a 3x3
+ * Special upgrades are the one deliberate exception to the matte lab: a 2x2
  * block of glowing gold, ringed by drifting gold motes, that bursts into a
  * stream of motes flying into the nearest soldier when shot open.
  */
@@ -16,25 +16,21 @@ const ART = SPECIAL_UPGRADE.size * 4;
 // 0 outline, 1 deep shadow, 2 shadow, 3 base, 4 light, 5 highlight.
 const PALETTE = ["#4a2c05", "#8a5a0c", "#b9800f", "#e3ac25", "#f8d34f", "#fff4bd"];
 const BLOCK_ART = [
-  "000000000000",
-  "055555555440",
-  "054444444320",
-  "054333333320",
-  "054355553220",
-  "054354443220",
-  "054354433220",
-  "054354333220",
-  "054333332220",
-  "043222222210",
-  "032222222110",
-  "000000000000",
+  "00000000",
+  "05555540",
+  "05444320",
+  "05455220",
+  "05453220",
+  "05432220",
+  "04222210",
+  "00000000",
 ];
 
 /** Crack texels revealed as the block takes hits (index = hits taken - 1). */
 const CRACKS: readonly (readonly [number, number])[][] = [
-  [[8, 2], [8, 3], [9, 4]],
-  [[3, 8], [4, 7], [4, 9], [2, 9]],
-  [[6, 1], [6, 2], [7, 3], [5, 3], [9, 8], [10, 7], [8, 9]],
+  [[5, 2], [6, 3]],
+  [[2, 5], [3, 6], [1, 6]],
+  [[4, 1], [4, 2], [5, 4], [3, 4], [6, 5]],
 ];
 
 let blockCanvas: HTMLCanvasElement | null = null;
@@ -154,21 +150,21 @@ export function drawSpecialGlow(ctx: CanvasRenderingContext2D, cam: CameraSystem
     const wx = (b.x0 + b.x1) / 2, wy = (b.y0 + b.y1) / 2;
     const sx = cam.worldToScreenX(wx), sy = cam.worldToScreenY(wy);
     const pulse = 0.5 + 0.5 * Math.sin(t * 2.4 + b.cx);
-    let r = (46 + 6 * pulse) * z;
+    let r = (36 + 5 * pulse) * z;
     ctx.globalAlpha = 0.5 + 0.2 * pulse;
     ctx.drawImage(glow, sx - r, sy - r, r * 2, r * 2);
-    r = 20 * z;
+    r = 15 * z;
     ctx.globalAlpha = 0.22 + 0.14 * pulse + (b.flash > 0 ? 0.4 : 0);
     ctx.drawImage(glow, sx - r, sy - r, r * 2, r * 2);
     // Ambient motes: rise from round the block, sway, twinkle out.
     const seed = b.cx * 31 + b.cy * 17;
-    for (let i = 0; i < 18; i++) {
+    for (let i = 0; i < 14; i++) {
       const h1 = hash(seed + i), h2 = hash(seed + i * 7.3), h3 = hash(seed + i * 13.1);
       const p = (t * (0.28 + 0.3 * h2) + h1) % 1;
       const ang = h3 * Math.PI * 2;
-      const rad = 10 + 10 * h1 + 4 * p;
+      const rad = 7 + 8 * h1 + 3 * p;
       const mx = wx + Math.cos(ang) * rad + Math.sin(t * 1.7 + i) * 2.5;
-      const my = wy + Math.sin(ang) * rad * 0.8 - p * 16;
+      const my = wy + Math.sin(ang) * rad * 0.8 - p * 13;
       const a = Math.sin(p * Math.PI) * (0.55 + 0.45 * Math.sin(t * 9 + i * 2.1));
       if (a <= 0.02) continue;
       const qx = cam.worldToScreenX(mx), qy = cam.worldToScreenY(my);
@@ -218,11 +214,11 @@ function drawSoldierShimmer(ctx: CanvasRenderingContext2D, cam: CameraSystem, s:
 /** Seconds the "Special Upgrade" banner rises, holds and fades. */
 const NOTICE = { rise: 0.35, hold: 1.6, fade: 0.6, lift: 22 };
 
-/** "SPECIAL UPGRADE ACQUIRED" rising over the soldier who absorbed it. */
+/** "UPGRADE FOUND" and the upgrade's name rising over the soldier who absorbed it. */
 export function drawSpecialNotice(
   ctx: CanvasRenderingContext2D,
   cam: CameraSystem,
-  notice: { soldier: Soldier; t0: number } | null,
+  notice: { soldier: Soldier; t0: number; label: string } | null,
   now: number,
 ): void {
   if (!notice) return;
@@ -242,13 +238,13 @@ export function drawSpecialNotice(
   const big = 10 * scale, small = 7 * scale;
   ctx.font = `${big}px Silkscreen, "Press Start 2P", monospace`;
   ctx.fillStyle = "#2a1702";
-  ctx.fillText("SPECIAL UPGRADE", x + scale, y + scale);
+  ctx.fillText(notice.label, x + scale, y + scale);
   ctx.fillStyle = "#ffd75a";
-  ctx.fillText("SPECIAL UPGRADE", x, y);
+  ctx.fillText(notice.label, x, y);
   ctx.font = `${small}px Silkscreen, "Press Start 2P", monospace`;
   ctx.fillStyle = "#2a1702";
-  ctx.fillText("ACQUIRED", x + scale, y + big + scale);
+  ctx.fillText("UPGRADE FOUND", x + scale, y + big + scale);
   ctx.fillStyle = "#fff4bd";
-  ctx.fillText("ACQUIRED", x, y + big);
+  ctx.fillText("UPGRADE FOUND", x, y + big);
   ctx.restore();
 }
