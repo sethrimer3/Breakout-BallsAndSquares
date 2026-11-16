@@ -2,18 +2,30 @@ import { describe, expect, it } from "vitest";
 import { SPECIAL_UPGRADE, SpecialUpgradeSystem, rayBox } from "../src/systems/SpecialUpgrades";
 import type { PixelWorld } from "../src/world/PixelWorld";
 import type { Soldier } from "../src/entities/Soldier";
+import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
+import { UpgradeManager } from "../src/progression/UpgradeManager";
+import { SPECIAL_UNLOCKS, specialWorld } from "../src/progression/specialUnlocks";
+import { UPGRADE_BY_ID } from "../src/progression/UpgradeDefinitions";
+import { LAB_WORLDS } from "../src/world/labMap";
+import { unlockTabs } from "./helpers/progression";
+
+class MemStorage implements StorageLike {
+  map = new Map<string, string>();
+  getItem(k: string): string | null { return this.map.get(k) ?? null; }
+  setItem(k: string, v: string): void { this.map.set(k, v); }
+}
 
 const world = { cellSize: 8, upgradeSpots: [{ id: "z1:a", cx: 10, cy: 10, sector: 0 }, { id: "z1:b", cx: 40, cy: 10, sector: 0 }] } as unknown as PixelWorld;
 const soldier = (x: number, y: number) => ({ x, y, vx: 0, vy: 0, radius: 3, alive: true }) as unknown as Soldier;
 
 describe("special upgrade blocks", () => {
-  it("are 3x3 cells and skip collected spots", () => {
+  it("are 2x2 cells and skip collected spots", () => {
     const sys = new SpecialUpgradeSystem(world, () => []);
     sys.reset(["z1:b"]);
     expect(sys.blocks).toHaveLength(1);
     const b = sys.blocks[0];
-    expect(b.x1 - b.x0).toBe(24);
-    expect(b.x0).toBe(9 * 8);
+    expect(b.x1 - b.x0).toBe(16);
+    expect(b.x0).toBe(9.5 * 8);
   });
 
   it("take bullet hits via raycast, then shatter into motes absorbed by the nearest soldier", () => {
@@ -24,7 +36,7 @@ describe("special upgrade blocks", () => {
     sys.reset([]);
     for (let i = 0; i < SPECIAL_UPGRADE.hits; i++) {
       const t = sys.raycast(84, 140, 0, -1, 200);
-      expect(t).toBeCloseTo(140 - 96);
+      expect(t).toBeCloseTo(140 - 92);
       expect(sys.applyHit(1, 84, 96)).toBe(true);
     }
     expect(sys.blocks[0].broken).toBe(true);
@@ -50,5 +62,40 @@ describe("special upgrade blocks", () => {
   it("rayBox misses parallel rays outside the box", () => {
     expect(rayBox(0, 0, 1, 0, 5, 5, 10, 10)).toBe(-1);
     expect(rayBox(0, 7, 1, 0, 5, 5, 10, 10)).toBe(5);
+  });
+});
+
+describe("special upgrade unlocks", () => {
+  it("map every lab spot to a real upgrade, each at most once", () => {
+    const spots = Object.values(LAB_WORLDS).flatMap((w) => w.upgrades.map((u) => u.id));
+    for (const [spot, id] of Object.entries(SPECIAL_UNLOCKS)) {
+      expect(spots).toContain(spot);
+      expect(UPGRADE_BY_ID[id]).toBeDefined();
+      expect(LAB_WORLDS[specialWorld(spot)].upgrades.some((u) => u.id === spot)).toBe(true);
+    }
+    expect(new Set(Object.values(SPECIAL_UNLOCKS)).size).toBe(Object.keys(SPECIAL_UNLOCKS).length);
+  });
+
+  it("keep an upgrade unbuyable until its block is found, and survive a reload", () => {
+    const store = new MemStorage();
+    const save = new SaveManager(store);
+    save.data.lifetimePixels = 1e6;
+    save.data.bank = 1e6;
+    unlockTabs(save);
+    const upg = new UpgradeManager(save);
+    expect(upg.needsFinding("shotgun_unlock")).toBe(true);
+    expect(upg.canBuy("shotgun_unlock")).toBe(false);
+    save.data.lab.worlds[1].specials.push("z1-special-1");
+    save.save();
+    const again = new UpgradeManager(new SaveManager(store));
+    expect(again.needsFinding("shotgun_unlock")).toBe(false);
+    expect(again.canBuy("shotgun_unlock")).toBe(true);
+  });
+
+  it("never re-locks an upgrade an older save already owns", () => {
+    const save = new SaveManager(new MemStorage());
+    unlockTabs(save);
+    save.data.upgrades.ar_unlock = 1;
+    expect(new UpgradeManager(save).needsFinding("ar_unlock")).toBe(false);
   });
 });

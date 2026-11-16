@@ -1,3 +1,4 @@
+import { findAllSpecials } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { ACTIVE_SLOT_KEY, defaultSaveData, getSlotKey, sanitizeSaveData, SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { CORE_HUB_GRID, CORE_PATH, UPGRADE_BY_ID, UPGRADE_DEFS } from "../src/progression/UpgradeDefinitions";
@@ -19,6 +20,7 @@ function setup() {
   const save = new SaveManager(storage);
   save.data.biomass = save.data.bank = save.data.crystals = save.data.greenCrystals = save.data.essence = 1e6;
   save.data.lifetimePixels = 1e6;
+  findAllSpecials(save.data);
   return { storage, save, upg: new UpgradeManager(save) };
 }
 

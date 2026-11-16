@@ -11,7 +11,7 @@ import { drawWeaponExpansion } from "../src/rendering/WeaponExpansionRenderer";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { UpgradeManager } from "../src/progression/UpgradeManager";
 import { MAT, PixelWorld } from "../src/world/PixelWorld";
-import { unlockTabs } from "./helpers/progression";
+import { unlockTabs, findAllSpecials } from "./helpers/progression";
 
 class MemoryStorage implements StorageLike {
   private map = new Map<string, string>();
@@ -58,7 +58,7 @@ describe("Circuit Runner — Assault Rifle branch 2", () => {
     save.data.lifetimePixels = 10000;
     save.data.bank = 5000;
     save.data.essence = 100;
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
 
     expect(upg.buy("ar_unlock")).toBe(true);
     const res = upg.buy("circuit_unlock");

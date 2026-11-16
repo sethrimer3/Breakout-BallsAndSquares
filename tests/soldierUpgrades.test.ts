@@ -1,4 +1,4 @@
-import { unlockTabs } from "./helpers/progression";
+import { unlockTabs, findAllSpecials } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { growthRateAt, LOOT } from "../src/config";
 import { Rng } from "../src/core/Rng";
@@ -25,6 +25,7 @@ function fresh(): { save: SaveManager; upg: UpgradeManager } {
   const save = new SaveManager(new MemStorage());
   save.data.lifetimePixels = 100_000;
   unlockTabs(save);
+  findAllSpecials(save.data);
   return { save, upg: new UpgradeManager(save) };
 }
 

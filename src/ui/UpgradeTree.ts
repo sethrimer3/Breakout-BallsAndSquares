@@ -137,6 +137,8 @@ interface TreeSource {
   canBuy(id: string): boolean;
   pricesOf(id: string): Price[];
   buy(id: string): boolean;
+  /** True while the node is hidden in an unfound gold special-upgrade block. */
+  needsFinding?(id: string): boolean;
 }
 
 export function categoryForBranch(b: UpgradeBranch): UpgradeCategory {
@@ -441,6 +443,7 @@ export class UpgradeTree {
         canBuy: (id) => u.canBuy(id as UpgradeId),
         pricesOf: (id) => u.pricesOf(id as UpgradeId),
         buy: (id) => u.buy(id as UpgradeId),
+        needsFinding: (id) => u.needsFinding(id as UpgradeId),
       };
     }
     const slot = this.soldierSlot;
@@ -624,6 +627,7 @@ export class UpgradeTree {
       btn.innerHTML = `
         ${ring}
         ${sprite(def.icon, { color: def.color, scale: 3, cls: "node-icon" })}
+        ${sprite("lock", { color: "#c99a2e", scale: 3, cls: "node-find" })}
         ${paidIn === "gold" ? "" : `<span class="node-cur">${currencyIcon(paidIn, 1)}</span>`}
         <span class="node-lvl"></span>
         <span class="node-pip">${sprite("plus", { color: def.color, scale: 1 })}</span>
@@ -1037,7 +1041,13 @@ export class UpgradeTree {
     const nextVal = def.formatValue(def.valueAt(Math.min(def.maxLevel, lvl + 1)));
 
     let bodyHtml: string;
-    if (def.placeholder) {
+    const find = u.needsFinding?.(def.id) ?? false;
+    if (find) {
+      bodyHtml = `
+        <div class="tt-desc">Hidden in a glowing gold block somewhere in the lab. Shoot it open to unlock this upgrade.</div>
+        <div class="tt-lock tt-find">FIND UPGRADE</div>
+      `;
+    } else if (def.placeholder) {
       bodyHtml = `<div class="tt-desc">${def.shortDesc}</div>`;
     } else if (!unlocked && "tier" in def) {
       const parentName = def.parent ? SOLDIER_UPGRADE_BY_ID[def.parent].name : "";
@@ -1093,7 +1103,7 @@ export class UpgradeTree {
 
     this.tooltipEl.style.setProperty("--tt-color", def.color);
     this.tooltipEl.innerHTML = `
-      <div class="tt-title">${def.name} <span class="tt-lvl">LV ${lvl}/${def.maxLevel}</span></div>
+      <div class="tt-title">${find ? "???" : def.name} <span class="tt-lvl">${find ? "" : `LV ${lvl}/${def.maxLevel}`}</span></div>
       ${tier}
       ${bodyHtml}
     `;
@@ -1469,13 +1479,16 @@ export class UpgradeTree {
       const maxed = u.isMaxed(def.id);
       const canBuy = u.canBuy(def.id);
 
+      const find = u.needsFinding?.(def.id) ?? false;
       btn.classList.toggle("locked", !unlocked);
+      btn.classList.toggle("find", find);
       btn.classList.toggle("owned", lvl > 0);
       btn.classList.toggle("maxed", maxed);
       btn.classList.toggle("affordable", canBuy);
 
       const lvlEl = btn.querySelector(".node-lvl") as HTMLSpanElement;
-      if (!unlocked) lvlEl.innerHTML = lockIcon();
+      if (find) lvlEl.textContent = "FIND";
+      else if (!unlocked) lvlEl.innerHTML = lockIcon();
       else lvlEl.textContent = maxed ? "MAX" : `${lvl}/${def.maxLevel}`;
     }
   }

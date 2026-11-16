@@ -1,4 +1,4 @@
-import { unlockTabs } from "./helpers/progression";
+import { unlockTabs, findAllSpecials } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { GRENADE, TURRET, WORLD } from "../src/config";
 import { Rng } from "../src/core/Rng";
@@ -54,7 +54,7 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
 
     // Initial state: 0 pixels destroyed, 0 bank
     expect(upg.isUnlocked("grenade_unlock")).toBe(false);
@@ -312,7 +312,7 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const mgr = new UpgradeManager(save);
+    const mgr = new UpgradeManager(save); findAllSpecials(save.data);
 
     // Lifetime pixels 0 -> unlock node locked
     expect(mgr.canBuy("turret_unlock")).toBe(false);

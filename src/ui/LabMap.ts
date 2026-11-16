@@ -1,4 +1,7 @@
 import type { Game } from "../Game";
+import { SPECIAL_UNLOCKS } from "../progression/specialUnlocks";
+import { UPGRADE_BY_ID } from "../progression/UpgradeDefinitions";
+import { SPRITES, type SpriteName } from "./pixelArt";
 import { THUMB_SIZE, renderUncharted } from "../rendering/SectorThumbs";
 import { TIER_PAINT } from "../rendering/materials";
 import {
@@ -267,8 +270,8 @@ export class LabMap {
 
   /**
    * Map markings that show whether or not a sector is explored: world gates
-   * (a heavy door in their tier's paint on the lab's edge) and the sealed
-   * caches where special upgrades will be (a muted gold diamond).
+   * (a heavy door in their tier's paint on the lab's edge) and gold
+   * silhouettes of the upgrade hidden in each special-upgrade block.
    */
   private drawMarkers(g: CanvasRenderingContext2D, s: number): void {
     const frame = this.game.world.labLayout?.frame;
@@ -302,17 +305,16 @@ export class LabMap {
     const collected = this.game.save.data.lab.worlds[this.def.id]?.specials ?? [];
     for (const spot of this.def.upgrades) {
       if (upgradeSpotSector(this.def, spot) !== s) continue;
-      // Collected specials leave a dim, hollow diamond.
-      const taken = collected.includes(spot.id);
       const at = upgradeSpotCell(frame, spot);
-      const x = Math.round((at.cx - b.x0 + 0.5) * k);
-      const y = Math.round((at.cy - b.y0 + 0.5) * k);
-      g.fillStyle = "#05070d";
-      for (let i = -4; i <= 4; i++) g.fillRect(x - (4 - Math.abs(i) + 1) * u, y + i * u - u / 2, (4 - Math.abs(i) + 1) * 2 * u, u);
-      g.fillStyle = taken ? "#4a3b1a" : "#e0ac2a";
-      for (let i = -3; i <= 3; i++) g.fillRect(x - (3 - Math.abs(i) + 0.5) * u, y + i * u - u / 2, (3 - Math.abs(i) + 0.5) * 2 * u, u);
-      g.fillStyle = "#05070d";
-      for (let i = -1; i <= 1; i++) g.fillRect(x - (1 - Math.abs(i) + 0.5) * u, y + i * u - u / 2, (1 - Math.abs(i) + 0.5) * 2 * u, u);
+      const unlock = SPECIAL_UNLOCKS[spot.id];
+      drawSpecialSilhouette(
+        g,
+        Math.round((at.cx - b.x0 + 0.5) * k),
+        Math.round((at.cy - b.y0 + 0.5) * k),
+        Math.max(1, Math.round(u * 0.8)),
+        unlock ? UPGRADE_BY_ID[unlock].icon : "question",
+        collected.includes(spot.id),
+      );
     }
   }
 
@@ -430,4 +432,35 @@ function drawSectorThumb(canvas: HTMLCanvasElement, def: LabWorldDef, sector: nu
     }
   }
   ctx.putImageData(img, 0, 0);
+}
+
+/**
+ * A special upgrade on the map: the silhouette of the upgrade's icon, solid
+ * gold with a dark rim while unfound, a dim husk once it has been collected.
+ */
+function drawSpecialSilhouette(g: CanvasRenderingContext2D, cx: number, cy: number, px: number, icon: SpriteName, taken: boolean): void {
+  const grid: readonly string[] = SPRITES[icon];
+  const h = grid.length;
+  const w = grid[0].length;
+  const x0 = Math.round(cx - (w * px) / 2);
+  const y0 = Math.round(cy - (h * px) / 2);
+  const filled = (x: number, y: number) => y >= 0 && y < h && x >= 0 && x < w && "#+-wk".includes(grid[y][x]);
+  // Dark rim: every empty texel touching a filled one (8 neighbours).
+  g.fillStyle = "#05070d";
+  for (let y = -1; y <= h; y++) {
+    for (let x = -1; x <= w; x++) {
+      if (filled(x, y)) continue;
+      let near = false;
+      for (let dy = -1; dy <= 1 && !near; dy++) for (let dx = -1; dx <= 1; dx++) if (filled(x + dx, y + dy)) { near = true; break; }
+      if (near) g.fillRect(x0 + x * px, y0 + y * px, px, px);
+    }
+  }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!filled(x, y)) continue;
+      // A lit top edge so the shape reads as a gold cutout.
+      g.fillStyle = taken ? "#3e3218" : !filled(x, y - 1) ? "#ffe58a" : "#e0ac2a";
+      g.fillRect(x0 + x * px, y0 + y * px, px, px);
+    }
+  }
 }

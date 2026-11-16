@@ -1,4 +1,4 @@
-import { unlockTabs } from "./helpers/progression";
+import { unlockTabs, findAllSpecials } from "./helpers/progression";
 import { describe, expect, it } from "vitest";
 import { SOLDIER, TERRAIN, zoneForDepth } from "../src/config";
 import { LootKind, LootSystem } from "../src/entities/LootSystem";
@@ -51,7 +51,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
   it("gates Multishot at 40 lifetime pixels and Additional Soldier at 100", () => {
     const save = new SaveManager(new MemStorage());
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     save.data.bank = 10_000; save.data.crystals = 10_000;
 
     expect(upg.isUnlocked("keycard_t1")).toBe(true);
@@ -77,7 +77,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     save.data.bank = 1_000_000; save.data.crystals = 1_000_000;
     save.data.lifetimePixels = 500;
 
@@ -144,7 +144,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
 
     // Shotgun tree starts locked until shotgun_unlock is purchased; blight upgrades modify blight stats.
     unlockTabs(s2);
-    const upg = new UpgradeManager(s2);
+    const upg = new UpgradeManager(s2); findAllSpecials(s2.data);
     s2.data.bank = 10000;
     s2.data.lifetimePixels = 100;
     expect(upg.isUnlocked("shotgun_unlock")).toBe(true);
@@ -175,7 +175,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     save.data.bank = 100_000; save.data.crystals = 100_000;
     save.data.lifetimePixels = 500;
 
@@ -287,7 +287,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
     save.data.bank = 500_000; save.data.crystals = 500_000;
     save.data.lifetimePixels = 1000;
 

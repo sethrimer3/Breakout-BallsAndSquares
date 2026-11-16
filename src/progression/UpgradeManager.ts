@@ -1,5 +1,6 @@
 import { baseSoldierStats, resolvePrimaryMutation, type PrimaryMutation, type SoldierStats, type WeaponType } from "../entities/Soldier";
 import type { SaveData, SaveManager } from "./SaveManager";
+import { needsSpecial } from "./specialUnlocks";
 import {
   SOLDIER_UPGRADE_BY_ID,
   soldierModsFor,
@@ -55,6 +56,8 @@ export class UpgradeManager {
   isUnlocked(id: UpgradeId): boolean {
     const def = UPGRADE_BY_ID[id];
     if (!def || def.placeholder || !this.isBranchUnlocked(def.branch)) return false;
+    // Hidden in a gold special-upgrade block until the squad finds it.
+    if (needsSpecial(this.save.data, id)) return false;
     if (def.branch === "core") {
       let parent = def.parent;
       while (parent && UPGRADE_BY_ID[parent].placeholder) parent = UPGRADE_BY_ID[parent].parent;
@@ -95,6 +98,11 @@ export class UpgradeManager {
     // Research-base upgrades build on each other: buy the parent first.
     if (def.branch === "facility" && def.parent && this.levelOf(def.parent) === 0) return false;
     return true;
+  }
+
+  /** True while `id` is still hidden in an unfound gold special-upgrade block. */
+  needsFinding(id: UpgradeId): boolean {
+    return needsSpecial(this.save.data, id);
   }
 
   isBranchUnlocked(branch: UpgradeBranch): boolean {
