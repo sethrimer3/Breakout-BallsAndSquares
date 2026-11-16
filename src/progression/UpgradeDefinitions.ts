@@ -1023,7 +1023,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     icon: "pellets",
   },
 
-  // SQUELCH Shotgun mutation: unlock plus the two lifetime-defining upgrades.
+  // SQUELCH base weapon: unlock plus the two lifetime-defining upgrades.
   {
     id: "goo_unlock", branch: "squelch", name: "Unlock SQUELCH",
     shortDesc: "Sticky mine launcher — sticks, sheds a mine, then rebounds",

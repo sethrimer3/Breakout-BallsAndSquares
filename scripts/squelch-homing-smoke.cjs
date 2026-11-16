@@ -22,8 +22,8 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
    await page.locator('.tree-node[aria-label="Unlock Shotgun"]:visible').click();
    await page.locator('.tree-node[aria-label="Black Market"]:visible').click();
    if(width<700)await page.locator('[data-market="shotgun"]').tap();else await page.locator('[data-market="shotgun"]').click();
-   assert.equal(await page.locator('.bm-tree [data-market-buy="goo_unlock"]').count(),0);
-   if(width<700)await page.locator('[data-market-buy="homing_shotgun_unlock"]').tap();else await page.locator('[data-market-buy="homing_shotgun_unlock"]').click();
+   assert.equal(await page.locator('.tree-node[data-id="goo_unlock"]:not(.hidden)').count(),0);
+   if(width<700){await page.locator('.tree-node[data-id="homing_shotgun_unlock"]:not(.hidden)').tap();await page.locator('.tree-node[data-id="homing_shotgun_unlock"]:not(.hidden)').tap();}else await page.locator('.tree-node[data-id="homing_shotgun_unlock"]:not(.hidden)').click();
    await page.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());
    await page.locator('[data-slot="0"][data-weapon="squelch"]').click();
    await page.locator('[data-slot="1"][data-weapon="shotgun"]').click();
@@ -43,7 +43,7 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
     g.combat.updateBullet(p,1/60);
     if(!p.homingLocked||Math.abs(Math.atan2(p.dy,p.dx)-before)<1e-5)throw Error('Pellet did not steer');
     const result={weapons:[a.weapon,b.weapon],mutations:[a.mutation,b.mutation],orbs:g.combat.goo.orbs.activeCount,pellets:pellets.length,steered:true,essence:g.save.data.essence};
-    g.openUpgrades();g.upgradeTree.switchTab('squelch');g.transition.update(10);g.save.save();return result;
+    g.openUpgrades();g.upgradeTree.switchTab('squelch');g.upgradeTree.activateBranch(false);g.transition.update(10);g.save.save();return result;
    });
    assert.deepEqual(live.weapons,['squelch','shotgun']);assert.deepEqual(live.mutations,[null,'homing_shotgun']);
    await page.screenshot({path:`/tmp/squelch-tree-${width}.png`});

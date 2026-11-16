@@ -2383,40 +2383,10 @@ button {
 .tree-market-tab span { white-space:normal; }
 .tree-market-tab.active { background:#421b38; border-color:#ff4b8b; color:#ffc6dc; }
 .tree-market-tab:disabled { opacity:.45; cursor:not-allowed; }
-.tree-stage.market-view > .tree-clip, .tree-stage.market-view > .tree-fit { display:none; }
-.bm-tree { position:absolute; inset:0; overflow:auto; padding:20px 14px; background:radial-gradient(ellipse at center,#1b1021,#080c14 75%); color:#bcb4c4; overscroll-behavior:contain; }
-.bm-heading { color:#f18bb8; font-family:var(--font-small); font-size:14px; text-align:center; line-height:1.6; }
-.bm-rule { text-align:center; font-size:11px; line-height:1.6; margin:8px 0 24px; }
-.bm-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(70px,160px) minmax(0,1fr); align-items:start; gap:16px; max-width:1000px; margin:auto; }
-.bm-path { display:flex; flex-direction:column; align-items:stretch; gap:12px; min-width:0; position:relative; }
-.bm-path::before { content:""; position:absolute; z-index:0; top:45px; bottom:20px; left:50%; width:2px; background:#572a49; }
-.bm-node { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; min-width:0; width:100%; padding:14px 10px; border:2px solid #713657; color:#d5abc2; background:#160e1c; text-align:center; }
-.bm-node strong { font-family:var(--font-small); font-size:11px; line-height:1.6; overflow-wrap:anywhere; }
-.bm-desc { font-size:11px; line-height:1.6; }
-.bm-node:disabled { cursor:default; }
-.bm-node:not(:disabled):hover, .bm-node:focus-visible { border-color:#ffc08e; background:#2a1525; outline:2px solid #b45b8d; outline-offset:2px; }
-.bm-path.selected .bm-node { border-color:#f29b6b; }
-.bm-path.inactive .bm-node:not(.bm-choice) { opacity:.4; }
-.bm-path.inactive .bm-choice { border-style:dashed; }
-.bm-action { font-family:var(--font-small); color:#f08eb4; font-size:9px; line-height:1.5; }
-.bm-price { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px; font-size:11px; color:#f9b583; }
-.bm-level { font-size:10px; color:#b1a1ba; }
-.bm-hub { display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; margin-top:15px; gap:10px; font-family:var(--font-small); color:#9c6b87; font-size:10px; text-align:center; }
-.bm-hub::before { content:""; position:absolute; top:72px; left:-16px; right:-16px; height:2px; background:#713657; }
-.bm-hub canvas.bm-weapon { position:relative; z-index:1; width:100%; max-width:144px; height:auto; image-rendering:pixelated; }
-.bm-upward { grid-column:1/-1; width:36%; min-width:140px; justify-self:center; padding-bottom:22px; position:relative; }
-.bm-upward::after { content:""; position:absolute; bottom:-12px; height:35px; width:2px; left:50%; background:#713657; }
-.bm-upward .bm-path { max-height:240px; overflow-y:auto; padding-right:5px; }
-.bm-intro { max-width:400px; margin:50px auto; line-height:1.8; text-align:center; }
 @media(max-width:700px) {
-  .bm-tree { padding:14px 7px; }
-  .bm-layout { gap:7px; grid-template-columns:minmax(0,1fr) 68px minmax(0,1fr); }
-  .bm-node { padding:9px 5px; gap:6px; }
-  .bm-node strong, .bm-desc, .bm-price { font-size:9px; }
-  .bm-heading { font-size:11px; }
-  .bm-rule { font-size:10px; }
-  .bm-hub { font-size:8px; }
-  .bm-hub::before { top:34px; left:-7px; right:-7px; }
   .tree-overlay .tree-weapon-tab .tree-tab, .tree-market-tab { min-height:48px; font-size:var(--f8); }
 }
-@media(prefers-reduced-motion:reduce) { .bm-node { transition:none; } }
+
+/* Black Market trees: the camera glides to the new shape when a path folds away. */
+.tree-view.view-glide { transition: transform 0.42s cubic-bezier(0.3, 0, 0.2, 1); }
+@media (prefers-reduced-motion: reduce) { .tree-view.view-glide { transition: none; } }
