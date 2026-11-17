@@ -58,4 +58,22 @@ describe("render scale governor", () => {
     feed(g, 40, windowAndSettle * 4);
     expect(densityFor(g.cap, 1)).toBeGreaterThanOrEqual(0.75);
   });
+
+  it.each([[1,0.75],[1.25,1],[0.8,0.75]])("skips native-density plateaus at DPR %s", (dpr,expected) => {
+    const g = new RenderScaleGovernor(0,dpr);
+    expect(feed(g,40,windowAndSettle)).toBe(1);
+    expect(densityFor(g.cap,dpr)).toBe(expected);
+    feed(g,20,GOVERNOR.settleFrames+GOVERNOR.windowFrames);
+    expect(densityFor(g.cap,dpr)).toBe(expected);
+  });
+
+  it.each([0,1,2])("restores the original plateau index %s after an unhelpful skipped step", index => {
+    const g = new RenderScaleGovernor(index,1);
+    feed(g,40,windowAndSettle);
+    expect(g.cap).toBe(0.75);
+    feed(g,40,GOVERNOR.settleFrames+GOVERNOR.windowFrames);
+    expect(g.step).toBe(index);
+    expect(g.cap).toBe(AUTO_STEPS[index]);
+  });
+
 });

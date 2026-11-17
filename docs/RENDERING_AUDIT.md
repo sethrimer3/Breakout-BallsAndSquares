@@ -1,5 +1,7 @@
 # Rendering audit and validated changes
 
+For the later surface-geometry and automatic-quality fixes, see [surface outline results](SURFACE_OUTLINE_CACHE.md).
+
 For the later real-replication profile and terrain fixes, see [active Blight growth results](FAST_GROWTH_RENDERING.md).
 
 This pass audits the complete render pipeline and its preparation work across all five worlds, implements the validated improvements below, and ranks the remaining major targets.
