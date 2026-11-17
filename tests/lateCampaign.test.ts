@@ -14,7 +14,7 @@ import {
   soldierModsFor,
 } from "../src/progression/SoldierUpgrades";
 import { upgradePrices } from "../src/progression/UpgradeDefinitions";
-import { sanitizeSaveData } from "../src/progression/SaveManager";
+import { defaultSaveData, markCampaignComplete, sanitizeSaveData } from "../src/progression/SaveManager";
 import { circleIsClear } from "../src/systems/PhysicsSystem";
 function setup(id = 3) {
   const w = new PixelWorld(WORLD);
@@ -566,5 +566,19 @@ describe("late campaign pacing and encounters", () => {
     expect(bossReward).toBeDefined();
     expect(bossReward!.kind).toBe(LootKind.Essence);
     expect(bossReward!.value).toBe(10000);
+  });
+
+  it("records campaign.complete once and survives a save round-trip", () => {
+    const save = defaultSaveData("ABCD");
+    expect(save.campaign.complete).toBe(false);
+    expect(markCampaignComplete(save, 1234.5)).toBe(true);
+    expect(save.campaign.complete).toBe(true);
+    expect(save.campaign.clearTime).toBe(1234.5);
+    // Second call does not overwrite clearTime
+    expect(markCampaignComplete(save, 9999)).toBe(false);
+    expect(save.campaign.clearTime).toBe(1234.5);
+
+    const roundTripped = sanitizeSaveData(JSON.parse(JSON.stringify(save)));
+    expect(roundTripped.campaign).toEqual({ complete: true, clearTime: 1234.5 });
   });
 });

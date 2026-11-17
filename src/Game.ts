@@ -13,7 +13,7 @@ import { CreatureSystem, type Creature } from "./entities/Creatures";
 import { LootKind, lootKindForZone, LootSystem } from "./entities/LootSystem";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, resolvePrimaryMutation, baseSoldierStats, type SecondaryWeaponType, type SoldierStats } from "./entities/Soldier";
-import { MUZZLE_FLASH_MULTIPLIER, SaveManager, type SoldierBehavior } from "./progression/SaveManager";
+import { markCampaignComplete, MUZZLE_FLASH_MULTIPLIER, SaveManager, type SoldierBehavior } from "./progression/SaveManager";
 import { UpgradeManager } from "./progression/UpgradeManager";
 import type { RenderQuality } from "./rendering/RenderScale";
 import { Renderer } from "./rendering/Renderer";
@@ -36,6 +36,7 @@ import { DualStick } from "./ui/DualStick";
 import { MainMenu } from "./ui/MainMenu";
 import { PauseMenu } from "./ui/PauseMenu";
 import { ResultsScreen } from "./ui/ResultsScreen";
+import { CampaignEndingScreen } from "./ui/CampaignEndingScreen";
 import { UpgradeTree } from "./ui/UpgradeTree";
 import { DoorSystem } from "./world/DoorSystem";
 import { GlassSystem } from "./world/GlassSystem";
@@ -108,6 +109,8 @@ export class Game {
   readonly mainMenu: MainMenu;
   readonly pauseMenu: PauseMenu;
   readonly resultsScreen: ResultsScreen;
+  readonly campaignEnding: CampaignEndingScreen;
+  private pendingEndingTimer = -1;
   readonly upgradeTree: UpgradeTree;
   readonly dualStick: DualStick;
   readonly input: Input;
@@ -334,6 +337,9 @@ export class Game {
         this.loot.spawnOne(a.x, a.y, 90, this.rng, cacheRewardKind, cacheRewardVal, true);
       }
       if (a.kind === "boss") {
+        markCampaignComplete(this.save.data, this.runStats.time);
+        this.save.save();
+        this.pendingEndingTimer = 1.4;
         this.addScreenShake(8);
         for (let i = 0; i < 48; i++) {
           const ang = this.rng.range(0, Math.PI * 2);
@@ -393,6 +399,7 @@ export class Game {
     this.mainMenu = new MainMenu(uiRoot, this);
     this.pauseMenu = new PauseMenu(uiRoot, this);
     this.resultsScreen = new ResultsScreen(uiRoot, this);
+    this.campaignEnding = new CampaignEndingScreen(uiRoot, this);
     this.upgradeTree = new UpgradeTree(uiRoot, this);
     this.labMap = new LabMap(uiRoot, this);
     this.refreshSectorThumbs();
@@ -539,6 +546,8 @@ export class Game {
     this.mainMenu.hide();
     this.pauseMenu.hide();
     this.resultsScreen.hide();
+    this.campaignEnding.hide();
+    this.pendingEndingTimer = -1;
     this.upgradeTree.hide();
     this.labMap?.hide();
     // The hand-made lab is rebuilt every run: the chosen spawn and conquered sectors may have changed.
@@ -669,6 +678,8 @@ export class Game {
     this.mainMenu.hide();
     this.pauseMenu.hide();
     this.resultsScreen.hide();
+    this.campaignEnding.hide();
+    this.pendingEndingTimer = -1;
     this.upgradeTree.hide();
     this.paused = true;
     this.labMap.show();
@@ -857,6 +868,8 @@ export class Game {
     this.aimState.isDragging = false;
     this.pauseMenu.hide();
     this.resultsScreen.hide();
+    this.campaignEnding.hide();
+    this.pendingEndingTimer = -1;
     this.mainMenu.hide();
     this.paused = true;
     this.upgradeTree.show();
@@ -885,6 +898,8 @@ export class Game {
     this.bankCurrentRun();
     this.pauseMenu.hide();
     this.resultsScreen.hide();
+    this.campaignEnding.hide();
+    this.pendingEndingTimer = -1;
     this.upgradeTree.hide();
     this.labMap?.hide();
     this.paused = true;
@@ -1949,6 +1964,15 @@ export class Game {
     this.combat.updateTurrets(dt);
     this.glass.update(dt, this.growth.overdrive);
     this.late.update(dt, this.soldiers);
+    if (this.pendingEndingTimer > 0) {
+      this.pendingEndingTimer -= dt;
+      if (this.pendingEndingTimer <= 0) {
+        this.pendingEndingTimer = -1;
+        const alive = this.soldiers.filter((s) => s.alive).length;
+        const soldiersLost = Math.max(0, this.runStats.soldiersDeployed - alive);
+        this.campaignEnding.show({ time: this.runStats.time, soldiersLost, essence: this.runStats.essence });
+      }
+    }
     this.creatures.update(dt, this.runStats.time, this.soldiers, this.growth);
     this.doors.update(dt);
     this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));

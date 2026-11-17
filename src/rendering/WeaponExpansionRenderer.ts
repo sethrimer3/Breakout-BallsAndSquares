@@ -1,6 +1,8 @@
-import { NAPALM, ORBIT, OVERCHARGE, PRISM, RAIL } from "../config";
+import { ART_PIXEL, NAPALM, ORBIT, OVERCHARGE, PRISM, RAIL } from "../config";
 import type { Game } from "../Game";
 import { circuitColorAt } from "../systems/CircuitRunnerSystem";
+import type { CameraSystem } from "../systems/CameraSystem";
+import { drawPixelSprite, fillArtPixel, forEachLinePixel, pixelDiscSprite } from "./pixelFx";
 
 /** Bounded Canvas-only effects; never alter weapon simulation. */
 export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, reduced: boolean): void {
@@ -237,21 +239,23 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     }
   }
 
-  // Overcharge Conductor: charging rounds, steady per-target glow, restrained arcs & small blasts.
+  // Overcharge Conductor, all on the art-pixel grid: charged rounds, per-target
+  // charge glows with spark ticks, chain-lightning arcs and small blast rings.
   for (const b of game.combat.bullets.items) {
     if (!b.active || !b.overcharge) continue;
     const x = cam.worldToScreenX(b.x);
     const y = cam.worldToScreenY(b.y);
     if (x < -16 || y < -16 || x > cam.viewW + 16 || y > cam.viewH + 16) continue;
-    ctx.globalAlpha = 0.9;
-    ctx.strokeStyle = "#5ad8ff";
-    ctx.lineWidth = Math.max(1.2, cam.zoom * 1.1);
-    ctx.beginPath();
-    ctx.moveTo(x - b.dx * 5 * cam.zoom, y - b.dy * 5 * cam.zoom);
-    ctx.lineTo(x, y);
-    ctx.stroke();
+    // Pixel trail: faint at the tail, bright behind a white head.
+    const tail = Math.min(5, b.traveled);
+    ctx.fillStyle = "#5ad8ff";
+    forEachLinePixel(b.x - b.dx * tail, b.y - b.dy * tail, b.x, b.y, (gx, gy, t) => {
+      ctx.globalAlpha = 0.25 + 0.7 * t;
+      fillArtPixel(ctx, cam, gx, gy);
+    });
+    ctx.globalAlpha = 1;
     ctx.fillStyle = "#e6fbff";
-    ctx.fillRect(x - 1, y - 1, Math.max(1.5, cam.zoom * 1.2), Math.max(1.5, cam.zoom * 1.2));
+    fillArtPixel(ctx, cam, Math.floor(b.x / ART_PIXEL), Math.floor(b.y / ART_PIXEL));
   }
 
   for (const e of game.combat.overcharge.entries) {
@@ -261,27 +265,22 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     if (x < -32 || y < -32 || x > cam.viewW + 32 || y > cam.viewH + 32) continue;
     const frac = Math.min(1, e.stacks / OVERCHARGE.maxChargeStacks);
     const armed = e.stacks >= OVERCHARGE.armThreshold;
-    const glowRad = Math.max(3, (4 + frac * 6) * cam.zoom);
+    const glowR = Math.max(2, 4 + frac * 6); // world units
     ctx.globalAlpha = 0.24 + frac * 0.44;
-    ctx.fillStyle = armed ? "#6ce5ff" : "#3fa8e8";
-    ctx.beginPath();
-    ctx.arc(x, y, glowRad, 0, Math.PI * 2);
-    ctx.fill();
+    drawPixelSprite(ctx, cam, pixelDiscSprite(glowR / ART_PIXEL, armed ? 0x6ce5ff : 0x3fa8e8, 0), e.x, e.y);
 
-    // Restrained electrical accents: more ticks with higher charge, static under reduced motion.
+    // Electrical ticks: more with higher charge, static under reduced motion.
     const accents = armed ? Math.min(6, 2 + Math.floor((e.stacks - OVERCHARGE.armThreshold) / 2)) : 1;
     const phase = reduced ? 0 : (OVERCHARGE.quietDelay - e.quietLeft) * 1.5;
-    ctx.globalAlpha = armed ? 0.8 : 0.45;
-    ctx.strokeStyle = armed ? "#d8f9ff" : "#7dd6ff";
-    ctx.lineWidth = Math.max(1, cam.zoom * 0.65);
+    ctx.globalAlpha = armed ? 0.85 : 0.5;
+    ctx.fillStyle = armed ? "#d8f9ff" : "#7dd6ff";
     for (let i = 0; i < accents; i++) {
       const a = phase + (i * Math.PI * 2) / accents;
-      const r0 = glowRad * 0.65;
-      const r1 = glowRad * (armed ? 1.25 : 0.95);
-      ctx.beginPath();
-      ctx.moveTo(x + Math.cos(a) * r0, y + Math.sin(a) * r0);
-      ctx.lineTo(x + Math.cos(a + 0.18) * r1, y + Math.sin(a + 0.18) * r1);
-      ctx.stroke();
+      const r0 = glowR * 0.65;
+      const r1 = glowR * (armed ? 1.25 : 0.95);
+      forEachLinePixel(e.x + Math.cos(a) * r0, e.y + Math.sin(a) * r0,
+        e.x + Math.cos(a + 0.18) * r1, e.y + Math.sin(a + 0.18) * r1,
+        (gx, gy) => fillArtPixel(ctx, cam, gx, gy));
     }
   }
 
@@ -291,46 +290,35 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     const y = cam.worldToScreenY(bl.y);
     if (x < -48 || y < -48 || x > cam.viewW + 48 || y > cam.viewH + 48) continue;
     const progress = 1 - Math.max(0, bl.life / Math.max(1e-4, bl.maxLife));
-    const rad = Math.max(2, bl.radius * cam.zoom * (reduced ? 0.85 : 0.55 + 0.45 * progress));
-    ctx.globalAlpha = reduced ? 0.65 : Math.max(0, (1 - progress) * 0.85);
-    ctx.strokeStyle = "#8af0ff";
-    ctx.lineWidth = Math.max(1.5, cam.zoom * 1.4);
-    ctx.beginPath();
-    ctx.arc(x, y, rad, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.fillStyle = "rgba(180, 248, 255, 0.35)";
-    ctx.fill();
+    const r = Math.max(1, bl.radius * (reduced ? 0.85 : 0.55 + 0.45 * progress));
+    const alpha = reduced ? 0.65 : Math.max(0, (1 - progress) * 0.85);
+    // Two-pixel ring (bright outer, dimmer inner) around a checkered fill.
+    const gcx = Math.floor(bl.x / ART_PIXEL);
+    const gcy = Math.floor(bl.y / ART_PIXEL);
+    const rg = r / ART_PIXEL;
+    const span = Math.ceil(rg) + 1;
+    for (let gy = -span; gy <= span; gy++) {
+      for (let gx = -span; gx <= span; gx++) {
+        const d = Math.hypot(gx, gy);
+        if (d > rg + 0.5) continue;
+        if (d > rg - 0.5) { ctx.fillStyle = "#8af0ff"; ctx.globalAlpha = alpha; }
+        else if (d > rg - 1.5) { ctx.fillStyle = "#4cc4e8"; ctx.globalAlpha = alpha * 0.8; }
+        else if (((gcx + gx + gcy + gy) & 1) === 0) { ctx.fillStyle = "#b4f8ff"; ctx.globalAlpha = alpha * 0.4; }
+        else continue;
+        fillArtPixel(ctx, cam, gcx + gx, gcy + gy);
+      }
+    }
   }
 
   for (const arc of game.combat.overcharge.arcs) {
     if (!arc.active) continue;
-    const x1 = cam.worldToScreenX(arc.x1);
-    const y1 = cam.worldToScreenY(arc.y1);
-    const x2 = cam.worldToScreenX(arc.x2);
-    const y2 = cam.worldToScreenY(arc.y2);
-    ctx.globalAlpha = reduced ? 0.85 : Math.max(0, arc.life / Math.max(1e-4, arc.maxLife));
-    ctx.strokeStyle = "#52d8ff";
-    ctx.lineWidth = Math.max(1.5, cam.zoom * (1.2 + Math.min(1.2, arc.stacks * 0.08)));
-    const mx = (x1 + x2) * 0.5;
-    const my = (y1 + y2) * 0.5;
-    const dx = x2 - x1;
-    const dy = y2 - y1;
-    const len = Math.hypot(dx, dy) || 1;
-    const kink = reduced ? 0 : Math.min(6 * cam.zoom, len * 0.14);
-    const kx = mx + (-dy / len) * kink;
-    const ky = my + (dx / len) * kink;
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(kx, ky);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
-    ctx.strokeStyle = "#f0fcff";
-    ctx.lineWidth = Math.max(0.7, cam.zoom * 0.45);
-    ctx.beginPath();
-    ctx.moveTo(x1, y1);
-    ctx.lineTo(kx, ky);
-    ctx.lineTo(x2, y2);
-    ctx.stroke();
+    const pad = 12;
+    const sx1 = cam.worldToScreenX(arc.x1), sy1 = cam.worldToScreenY(arc.y1);
+    const sx2 = cam.worldToScreenX(arc.x2), sy2 = cam.worldToScreenY(arc.y2);
+    if (Math.max(sx1, sx2) < -pad || Math.min(sx1, sx2) > cam.viewW + pad ||
+        Math.max(sy1, sy2) < -pad || Math.min(sy1, sy2) > cam.viewH + pad) continue;
+    const alpha = reduced ? 0.85 : Math.max(0, arc.life / Math.max(1e-4, arc.maxLife));
+    drawPixelBolt(ctx, cam, arc.x1, arc.y1, arc.x2, arc.y2, reduced ? 0 : Math.floor(arc.life * 40), alpha, arc.stacks >= 10);
   }
 
   // Circuit Runner: crisp right-angled Tron-like traces cooling orange -> light blue -> blue -> purple.
@@ -396,4 +384,59 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
   }
 
   ctx.restore();
+}
+
+/**
+ * Pixel-art lightning between two world points: a jagged path (a few
+ * perpendicular kinks that re-roll as `seed` changes) drawn as a white
+ * one-pixel core with a cyan halo. `heavy` widens the halo for big charges.
+ */
+function drawPixelBolt(
+  ctx: CanvasRenderingContext2D, cam: CameraSystem,
+  x1: number, y1: number, x2: number, y2: number,
+  seed: number, alpha: number, heavy: boolean,
+): void {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const kinks = Math.max(1, Math.min(4, Math.round(len / 7)));
+  const amp = Math.min(4, len * 0.18);
+  // Small deterministic hash so a bolt holds still within a frame bucket.
+  let h = (Math.floor(x1) * 73856093) ^ (Math.floor(y1) * 19349663) ^ (seed * 83492791);
+  const rand = (): number => { h = (h * 1103515245 + 12345) | 0; return ((h >>> 8) & 0xffff) / 0xffff; };
+  const core = new Set<number>();
+  const cells: number[] = [];
+  let px = x1, py = y1;
+  for (let k = 1; k <= kinks + 1; k++) {
+    const t = k / (kinks + 1);
+    const off = k <= kinks ? (rand() * 2 - 1) * amp : 0;
+    const qx = x1 + dx * t + nx * off;
+    const qy = y1 + dy * t + ny * off;
+    forEachLinePixel(px, py, qx, qy, (gx, gy) => {
+      const key = gx * 65536 + gy;
+      if (!core.has(key)) { core.add(key); cells.push(gx, gy); }
+    });
+    px = qx; py = qy;
+  }
+  const halo = new Set<number>();
+  ctx.fillStyle = "#52d8ff";
+  ctx.globalAlpha = alpha * 0.7;
+  const reach = heavy ? 2 : 1;
+  for (let i = 0; i < cells.length; i += 2) {
+    for (let oy = -reach; oy <= reach; oy++) {
+      for (let ox = -reach; ox <= reach; ox++) {
+        if (Math.abs(ox) + Math.abs(oy) > reach) continue;
+        const gx = cells[i] + ox, gy = cells[i + 1] + oy;
+        const key = gx * 65536 + gy;
+        if (core.has(key) || halo.has(key)) continue;
+        halo.add(key);
+        fillArtPixel(ctx, cam, gx, gy);
+      }
+    }
+  }
+  ctx.fillStyle = "#f0fcff";
+  ctx.globalAlpha = alpha;
+  for (let i = 0; i < cells.length; i += 2) fillArtPixel(ctx, cam, cells[i], cells[i + 1]);
 }

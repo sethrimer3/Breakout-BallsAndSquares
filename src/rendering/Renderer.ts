@@ -3,6 +3,7 @@ import { drawMapBoundary } from "./MapBoundaryRenderer";
 import { drawWeaponExpansion } from "./WeaponExpansionRenderer";
 import { drawGoo } from "./GooRenderer";
 import { LateAtmosphere } from "./LateAtmosphere";
+import { bayer, drawPixelSprite, fillArtPixel, pixelDiscSprite } from "./pixelFx";
 import { worldAtmosphere } from "../world/worldAtmosphere";
 import { LootKind } from "../entities/LootSystem";
 import { ESSENCE_FPS, ESSENCE_SIZE, essenceFrame, essencePixels, paintPixels } from "./blightEssence";
@@ -905,8 +906,10 @@ export class Renderer {
   }
 
   /**
-   * Katana slash: a luminous crescent cutting wave.
-   * Actual sword is not visible — only the razor-sharp energy slash.
+   * Katana slash: a pixel-art crescent cutting wave rasterized on the art-pixel
+   * grid. Layers, back to front: a sparse dithered aura, the crescent body
+   * (dimmer toward its inner curve), a white one-pixel cutting edge, then
+   * trailing air-cut streaks (and Gale Edge echoes). The sword itself is never drawn.
    */
   private drawSlash(b: Bullet): void {
     const { ctx, game } = this;
@@ -918,60 +921,86 @@ export class Renderer {
 
     const lifePct = b.maxLife > 0 ? Math.max(0, b.life / b.maxLife) : 1;
     const alpha = Math.min(1, lifePct * 1.5);
-    const w = (b.slashWidth || 16) * cam.zoom;
+    if (alpha <= 0.01) return;
+    // Local crescent frame in world units: +u is the cutting direction.
+    const w = b.slashWidth || 16;
     const bulge = w * (b.gale ? 0.65 : 0.42);
-    const dir = Math.atan2(b.dy, b.dx);
-    const tilt = b.slashAngle;
-
-    ctx.save();
-    ctx.translate(sx, sy);
-    ctx.rotate(dir + tilt);
-
+    const ang = Math.atan2(b.dy, b.dx) + b.slashAngle;
+    const cos = Math.cos(ang);
+    const sin = Math.sin(ang);
     const tipY = w * 0.5;
     const tipX = -bulge * 0.35;
+    const outerC = bulge * 1.15;
+    const innerC = bulge * 0.28;
+    const trail = Math.min(8, b.traveled * 0.5);
+    // Streak curves as [x0, control, halfHeight]: the air-cut trail, then Gale echoes.
+    const streaks: [number, number, number][] = [];
+    if (trail > 1) streaks.push([tipX - trail, (bulge - trail) * 0.8, tipY * 0.7]);
+    if (b.gale && !this.motion.matches) for (const off of [6, 12]) streaks.push([tipX - off, bulge - off, tipY * 0.8]);
+    const blade = b.gale ? "#aaffd7" : "#a8f5ff";
+    const bladeDim = b.gale ? "#4fc79a" : "#3fb6d8";
 
-    // 1. Faint outer cyan glow aura
-    ctx.beginPath();
-    ctx.moveTo(tipX - 2, -tipY);
-    ctx.quadraticCurveTo(bulge * 1.25, 0, tipX - 2, tipY);
-    ctx.quadraticCurveTo(bulge * 0.1, 0, tipX - 2, -tipY);
-    ctx.closePath();
-    ctx.fillStyle = `rgba(56, 214, 255, ${0.35 * alpha})`;
-    ctx.fill();
+    // A quadratic from (x0, -h) through control (c, 0) to (x0, h) is
+    // x(v) = x0 + 2t(1-t)(c - x0) with t = (v + h) / 2h. Returns NaN outside |v| <= h.
+    const curveX = (v: number, x0: number, c: number, h: number): number => {
+      const t = (v + h) / (2 * h);
+      return t < 0 || t > 1 ? NaN : x0 + 2 * t * (1 - t) * (c - x0);
+    };
+    // Half-thickness that keeps a steep curve one connected pixel line.
+    const lineHalf = (v: number, x0: number, c: number, h: number): number => {
+      const slope = ((1 - 2 * ((v + h) / (2 * h))) / h) * (c - x0);
+      return 0.5 * Math.sqrt(1 + slope * slope);
+    };
 
-    // 2. Main crescent slash blade
-    ctx.beginPath();
-    ctx.moveTo(tipX, -tipY);
-    ctx.quadraticCurveTo(bulge * 1.15, 0, tipX, tipY);
-    ctx.quadraticCurveTo(bulge * 0.28, 0, tipX, -tipY);
-    ctx.closePath();
-    ctx.fillStyle = b.gale ? `rgba(170, 255, 215, ${0.85 * alpha})` : `rgba(168, 245, 255, ${0.85 * alpha})`;
-    ctx.fill();
-
-    // 3. Razor-sharp white leading cutting edge
-    ctx.beginPath();
-    ctx.moveTo(tipX, -tipY);
-    ctx.quadraticCurveTo(bulge * 1.15, 0, tipX, tipY);
-    ctx.lineWidth = Math.max(1, 1.8 * cam.zoom);
-    ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-    ctx.stroke();
-
-    if(b.gale && !this.motion.matches){
-      ctx.strokeStyle=`rgba(150,255,220,${0.35*alpha})`;ctx.lineWidth=Math.max(1,cam.zoom);
-      for(const offset of [6,12]){ctx.beginPath();ctx.moveTo(tipX-offset*cam.zoom,-tipY*0.8);ctx.quadraticCurveTo(bulge-offset*cam.zoom,0,tipX-offset*cam.zoom,tipY*0.8);ctx.stroke();}
+    const reach = Math.max(tipY, bulge * 1.3) + trail + 14;
+    const gx0 = Math.floor((b.x - reach) / ART_PIXEL);
+    const gx1 = Math.floor((b.x + reach) / ART_PIXEL);
+    const gy0 = Math.floor((b.y - reach) / ART_PIXEL);
+    const gy1 = Math.floor((b.y + reach) / ART_PIXEL);
+    for (let gy = gy0; gy <= gy1; gy++) {
+      for (let gx = gx0; gx <= gx1; gx++) {
+        const dx = (gx + 0.5) * ART_PIXEL - b.x;
+        const dy = (gy + 0.5) * ART_PIXEL - b.y;
+        const u = dx * cos + dy * sin;
+        const v = -dx * sin + dy * cos;
+        if (Math.abs(v) > tipY + 1) continue;
+        const xo = curveX(v, tipX, outerC, tipY);
+        const xi = curveX(v, tipX, innerC, tipY);
+        if (u <= xo && u >= xi) {
+          if (u > xo - 0.9 * lineHalf(v, tipX, outerC, tipY) * 2) {
+            ctx.fillStyle = "#ffffff";
+            ctx.globalAlpha = alpha;
+          } else {
+            const depth = (u - xi) / Math.max(1e-4, xo - xi);
+            ctx.fillStyle = depth > 0.45 ? blade : bladeDim;
+            ctx.globalAlpha = alpha * 0.9;
+          }
+          fillArtPixel(ctx, cam, gx, gy);
+          continue;
+        }
+        // Trailing air-cut streaks behind the blade.
+        let streak = false;
+        for (const [x0, c, h] of streaks) {
+          const xs = curveX(v, x0, c, h);
+          if (xs === xs && Math.abs(u - xs) <= lineHalf(v, x0, c, h)) { streak = true; break; }
+        }
+        if (streak) {
+          ctx.fillStyle = b.gale ? "#96ffdc" : "#5adcff";
+          ctx.globalAlpha = alpha * 0.45;
+          fillArtPixel(ctx, cam, gx, gy);
+          continue;
+        }
+        // Sparse dithered aura just around the crescent.
+        const xa = curveX(v, tipX - 2, bulge * 1.25, tipY);
+        const xai = curveX(v, tipX - 2, bulge * 0.1, tipY);
+        if (u <= xa && u >= xai && bayer(gx, gy) < 0.5) {
+          ctx.fillStyle = "#38d6ff";
+          ctx.globalAlpha = alpha * 0.35;
+          fillArtPixel(ctx, cam, gx, gy);
+        }
+      }
     }
-    // 4. Subtle trailing motion streaks (air cut effect)
-    const trailOffset = Math.min(8 * cam.zoom, b.traveled * cam.zoom * 0.5);
-    if (trailOffset > 1) {
-      ctx.beginPath();
-      ctx.moveTo(tipX - trailOffset, -tipY * 0.7);
-      ctx.quadraticCurveTo((bulge - trailOffset) * 0.8, 0, tipX - trailOffset, tipY * 0.7);
-      ctx.lineWidth = Math.max(0.8, 1.0 * cam.zoom);
-      ctx.strokeStyle = `rgba(90, 220, 255, ${0.4 * alpha})`;
-      ctx.stroke();
-    }
-
-    ctx.restore();
+    ctx.globalAlpha = 1;
   }
 
   /**
@@ -1008,12 +1037,7 @@ export class Renderer {
 
   /** Fill `n` x `n` art pixels starting at grid cell (gx, gy), snapped to screen pixels. */
   private fillArtPixel(gx: number, gy: number, n: number): void {
-    const cam = this.game.camera;
-    const x0 = Math.round(cam.worldToScreenX(gx * ART_PIXEL));
-    const y0 = Math.round(cam.worldToScreenY(gy * ART_PIXEL));
-    const x1 = Math.round(cam.worldToScreenX((gx + n) * ART_PIXEL));
-    const y1 = Math.round(cam.worldToScreenY((gy + n) * ART_PIXEL));
-    this.ctx.fillRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
+    fillArtPixel(this.ctx, this.game.camera, gx, gy, n);
   }
 
   private drawOpaqueParticles(): void {
@@ -1051,23 +1075,36 @@ export class Renderer {
       const sx = cam.worldToScreenX(p.x[i]);
       const sy = cam.worldToScreenY(p.y[i]);
       if (k === PKind.Spark) {
-        const tx = cam.worldToScreenX(p.x[i] - p.vx[i] * 0.026);
-        const ty = cam.worldToScreenY(p.y[i] - p.vy[i] * 0.026);
-        const pad = Math.max(1, p.size[i] * 0.72 * cam.zoom) + 1;
+        // Pixel-art streak: a one-pixel line from the tail to a brighter head.
+        const tailX = p.x[i] - p.vx[i] * 0.026;
+        const tailY = p.y[i] - p.vy[i] * 0.026;
+        const tx = cam.worldToScreenX(tailX);
+        const ty = cam.worldToScreenY(tailY);
+        const pad = ART_PIXEL * cam.zoom + 1;
         if (Math.max(sx, tx) < -pad || Math.min(sx, tx) > cam.viewW + pad ||
             Math.max(sy, ty) < -pad || Math.min(sy, ty) > cam.viewH + pad) continue;
-        ctx.globalAlpha = a;
-        ctx.strokeStyle = hexColor(p.color[i]);
-        ctx.lineWidth = Math.max(1, p.size[i] * 0.72 * cam.zoom);
-        ctx.beginPath();
-        ctx.moveTo(tx, ty);
-        ctx.lineTo(sx, sy);
-        ctx.stroke();
+        ctx.fillStyle = hexColor(p.color[i]);
+        const ax = Math.floor(tailX / ART_PIXEL), ay = Math.floor(tailY / ART_PIXEL);
+        const bx = Math.floor(p.x[i] / ART_PIXEL), by = Math.floor(p.y[i] / ART_PIXEL);
+        const steps = Math.max(Math.abs(bx - ax), Math.abs(by - ay), 1);
+        for (let s = 0; s <= steps; s++) {
+          const t = s / steps;
+          ctx.globalAlpha = a * (0.35 + 0.65 * t);
+          fillArtPixel(ctx, cam, Math.round(ax + (bx - ax) * t), Math.round(ay + (by - ay) * t));
+        }
+        // Larger sparks get a hot head pixel.
+        if (p.size[i] >= 1.5) {
+          ctx.globalAlpha = a;
+          ctx.fillStyle = "#fff6d8";
+          fillArtPixel(ctx, cam, Math.floor(p.x[i] / ART_PIXEL), Math.floor(p.y[i] / ART_PIXEL));
+        }
       } else {
-        const r = Math.max(2, p.size[i] * cam.zoom);
+        // Burst: a dithered pixel disc that swells a little as it fades.
+        const rWorld = Math.max(1, p.size[i] * (0.75 + 0.35 * (1 - a)));
+        const r = rWorld * cam.zoom;
         if (sx + r + 1 < 0 || sy + r + 1 < 0 || sx - r - 1 > cam.viewW || sy - r - 1 > cam.viewH) continue;
-        ctx.globalAlpha = a;
-        ctx.drawImage(this.sprites.hotGlow, sx - r, sy - r, r * 2, r * 2);
+        ctx.globalAlpha = Math.min(1, a * 1.15);
+        drawPixelSprite(ctx, cam, pixelDiscSprite(rWorld / ART_PIXEL, p.color[i], a > 0.45 ? 1 : 0.5), p.x[i], p.y[i]);
       }
     }
     ctx.globalAlpha = 1;
