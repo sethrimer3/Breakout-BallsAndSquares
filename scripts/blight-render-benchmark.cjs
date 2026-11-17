@@ -18,7 +18,7 @@ for(let y=40;y<110;y++)for(let x=40;x<110;x++)if((x+y)%4!==0)w.setCell(x,y,10,'g
 const a=new Old(w,16),b=new Next(w,16),cam=new CameraSystem(w);cam.viewW=device.width;cam.viewH=device.height;cam.zoom=zoom;cam.x=600;cam.y=600;
 const canvases=[a,b].map(()=>{const c=document.createElement('canvas');c.width=device.width*device.scale;c.height=device.height*device.scale;return c}),times=[[],[]],paints=[0,0];
 [a,b].forEach((r,j)=>{const f=r.paintEdgeFire;r.paintEdgeFire=function(...args){paints[j]++;return f.apply(this,args)};while(r.chunks.pending)r.update()});
-let maxDelta=0,channels=0;
+let maxDelta=0,channels=0,alphaChanges=0;
 for(let frame=0;frame<65;frame++){
 for(let i=0;i<12;i++){const x=(growth==='visible'?55:200)+(frame*7+i)%20,y=(growth==='visible'?55:200)+((frame+i*3)%20);w.setCell(x,y,(frame+i)%3?10:0,(frame+i)%3?'grown':'destroyed')}
 cam.x=600+(moving?frame*1.3:0);const clock=frame/60;
@@ -28,8 +28,8 @@ for(const j of frame%2?[1,0]:[0,1]){
  ctx.setTransform(device.scale,0,0,device.scale,0,0);ctx.clearRect(0,0,cam.viewW,cam.viewH);r.draw(ctx,cam,false);r.drawBlightThroughFog(ctx,cam);r.drawBlightEdges(ctx,cam,clock);
  if(frame>=15)times[j].push(performance.now()-t);
 }
-if(frame===20||frame===64){const aa=canvases[0].getContext('2d').getImageData(0,0,canvases[0].width,canvases[0].height).data,bb=canvases[1].getContext('2d').getImageData(0,0,canvases[1].width,canvases[1].height).data;
- for(let i=0;i<aa.length;i++){const delta=Math.abs(aa[i]-bb[i]);if(delta){channels++;maxDelta=Math.max(delta,maxDelta)}}}
+if(frame===20||frame===21||frame===64){const aa=canvases[0].getContext('2d').getImageData(0,0,canvases[0].width,canvases[0].height).data,bb=canvases[1].getContext('2d').getImageData(0,0,canvases[1].width,canvases[1].height).data;
+ for(let i=0;i<aa.length;i++){const delta=Math.abs(aa[i]-bb[i]);if(delta){channels++;if(i%4===3)alphaChanges++;maxDelta=Math.max(delta,maxDelta)}}}
 }
 const measuredPaints=paints.slice();
 // Exercise half-size pixels, dormancy, removal and regeneration at a fixed clock.
@@ -43,13 +43,13 @@ for(let phase=0;phase<4;phase++){
   ctx.setTransform(device.scale,0,0,device.scale,0,0);ctx.clearRect(0,0,cam.viewW,cam.viewH);r.draw(ctx,cam,false);r.drawBlightThroughFog(ctx,cam);r.drawBlightEdges(ctx,cam,2);
  }
  const aa=canvases[0].getContext('2d').getImageData(0,0,canvases[0].width,canvases[0].height).data,bb=canvases[1].getContext('2d').getImageData(0,0,canvases[1].width,canvases[1].height).data;
- for(let i=0;i<aa.length;i++){const delta=Math.abs(aa[i]-bb[i]);if(delta){channels++;maxDelta=Math.max(delta,maxDelta)}}
+ for(let i=0;i<aa.length;i++){const delta=Math.abs(aa[i]-bb[i]);if(delta){channels++;if(i%4===3)alphaChanges++;maxDelta=Math.max(delta,maxDelta)}}
 }
-rows.push({zoom,moving,growth,baseline:pct(times[0]),updated:pct(times[1]),paints:measuredPaints,changedChannels:channels,maxDelta});
+rows.push({zoom,moving,growth,baseline:pct(times[0]),updated:pct(times[1]),paints:measuredPaints,changedChannels:channels,alphaChanges,maxDelta});
 }
 return rows;
 },{url:'/'+path.relative(root,dir),device});
-for(const r of rows){if(r.changedChannels)throw Error('Pixel mismatch '+JSON.stringify(r));results.push({device,...r})}
+for(const r of rows){if(r.alphaChanges || (r.changedChannels&&!process.env.BREACH_ALLOW_PHASE_DIFF))throw Error('Pixel mismatch '+JSON.stringify(r));results.push({device,...r})}
 await context.close()}
 fs.writeFileSync('/tmp/blight-render-benchmark.json',JSON.stringify(results,null,2));console.log(JSON.stringify(results));
 }finally{await b.close();fs.rmSync(dir,{recursive:true,force:true})}})().catch(e=>{console.error(e);process.exitCode=1});

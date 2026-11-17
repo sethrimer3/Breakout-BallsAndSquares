@@ -156,6 +156,8 @@ export class TerrainRenderer {
   private edgeImage: ImageData;
   /** Bumped whenever a chunk's mask changes, so the fire knows to repaint. */
   private edgeVersion = 0;
+  /** Unmasked noise changes on animation ticks, independently of growing contours. */
+  private edgeNoise = new WeakMap<HTMLCanvasElement, {canvas:HTMLCanvasElement;key:string}>();
   private edgeChunkVersion: Uint32Array;
   private dormantChunkVersion: Uint32Array;
   private edgeUnion = document.createElement("canvas");
@@ -1169,53 +1171,72 @@ export class TerrainRenderer {
         }
       }
     }
-    const f = fire.getContext("2d")!;
-    f.setTransform(1, 0, 0, 1, 0, 0);
-    f.globalCompositeOperation = "source-over";
-    f.clearRect(0, 0, fire.width, fire.height);
-    // Clip procedural painting to occupied chunks, not the empty space between
-    // distant Blight patches. Keep world coordinates so noise remains seamless.
-    const clipChunks = (target: CanvasRenderingContext2D, worldSpace: boolean): void => {
-      target.beginPath();
-      for (let ky = ky0; ky <= ky1; ky++) for (let kx = kx0; kx <= kx1; kx++) {
-        if (live[ky * cols + kx]) target.rect((kx - (worldSpace ? 0 : kx0)) * size, (ky - (worldSpace ? 0 : ky0)) * size, size, size);
-      }
-      target.clip();
-    };
-    f.save();
-    clipChunks(f, false);
-    // World-anchored: the fire stays put under the camera.
-    const ox = kx0 * size;
-    const oy = ky0 * size;
-    const box = { x: ox, y: oy, w, h };
-    if (shrink > 1) {
-      const low = this.edgeFireLow;
-      const lw = Math.ceil(w / shrink);
-      const lh = Math.ceil(h / shrink);
-      if (low.width < lw) low.width = lw;
-      if (low.height < lh) low.height = lh;
-      const l = low.getContext("2d")!;
-      l.setTransform(1 / shrink, 0, 0, 1 / shrink, -ox / shrink, -oy / shrink);
-      l.save();
-      clipChunks(l, true);
-      paintPortal(l, box, seconds, EDGE_FIRE_RATIO);
-      l.restore();
-      f.imageSmoothingEnabled = false;
-      f.drawImage(low, 0, 0, lw, lh, 0, 0, lw * shrink, lh * shrink);
-    } else {
-      f.setTransform(1, 0, 0, 1, -ox, -oy);
-      paintPortal(f, box, seconds, EDGE_FIRE_RATIO);
+    let cached = this.edgeNoise.get(fire);
+    if (!cached) {
+      cached = {canvas:document.createElement("canvas"),key:""};
+      this.edgeNoise.set(fire,cached);
+    }
+    let occupancy = "";
+    for (let ky=ky0;ky<=ky1;ky++) for(let kx=kx0;kx<=kx1;kx++) occupancy += live[ky*cols+kx] ? "1" : "0";
+    const noiseKey = `${Math.floor(seconds * EDGE_FIRE_FPS)}:${kx0}:${ky0}:${kx1}:${ky1}:${shrink}:${frozen}:${occupancy}`;
+    if (cached.key !== noiseKey || cached.canvas.width !== fire.width || cached.canvas.height !== fire.height) {
+      cached.key = noiseKey;
+      const noise = cached.canvas;
+      if (noise.width !== fire.width || noise.height !== fire.height) { noise.width=fire.width;noise.height=fire.height; }
+      const f = noise.getContext("2d")!;
       f.setTransform(1, 0, 0, 1, 0, 0);
+      f.globalCompositeOperation = "source-over";
+      f.clearRect(0, 0, noise.width, noise.height);
+      // Clip procedural painting to occupied chunks, not the empty space between
+      // distant Blight patches. Keep world coordinates so noise remains seamless.
+      const clipChunks = (target: CanvasRenderingContext2D, worldSpace: boolean): void => {
+        target.beginPath();
+        for (let ky = ky0; ky <= ky1; ky++) for (let kx = kx0; kx <= kx1; kx++) {
+          if (live[ky * cols + kx]) target.rect((kx - (worldSpace ? 0 : kx0)) * size, (ky - (worldSpace ? 0 : ky0)) * size, size, size);
+        }
+        target.clip();
+      };
+      f.save();
+      clipChunks(f, false);
+      // World-anchored: the fire stays put under the camera.
+      const ox = kx0 * size;
+      const oy = ky0 * size;
+      const box = { x: ox, y: oy, w, h };
+      if (shrink > 1) {
+        const low = this.edgeFireLow;
+        const lw = Math.ceil(w / shrink);
+        const lh = Math.ceil(h / shrink);
+        if (low.width < lw) low.width = lw;
+        if (low.height < lh) low.height = lh;
+        const l = low.getContext("2d")!;
+        l.setTransform(1 / shrink, 0, 0, 1 / shrink, -ox / shrink, -oy / shrink);
+        l.save();
+        clipChunks(l, true);
+        paintPortal(l, box, seconds, EDGE_FIRE_RATIO);
+        l.restore();
+        f.imageSmoothingEnabled = false;
+        f.drawImage(low, 0, 0, lw, lh, 0, 0, lw * shrink, lh * shrink);
+      } else {
+        f.setTransform(1, 0, 0, 1, -ox, -oy);
+        paintPortal(f, box, seconds, EDGE_FIRE_RATIO);
+        f.setTransform(1, 0, 0, 1, 0, 0);
+      }
+      if (frozen) {
+        // Cold and still: the fire's colors pulled toward a dull violet.
+        f.globalCompositeOperation = "source-atop";
+        f.fillStyle = "rgba(70, 52, 110, 0.62)";
+        f.fillRect(0, 0, w, h);
+      }
+      f.restore();
+      f.globalCompositeOperation = "source-over";
     }
-    if (frozen) {
-      // Cold and still: the fire's colors pulled toward a dull violet.
-      f.globalCompositeOperation = "source-atop";
-      f.fillStyle = "rgba(70, 52, 110, 0.62)";
-      f.fillRect(0, 0, w, h);
-    }
+    const f = fire.getContext("2d")!;
+    f.setTransform(1,0,0,1,0,0);
+    f.globalCompositeOperation = "source-over";
+    f.clearRect(0,0,fire.width,fire.height);
+    f.drawImage(cached.canvas,0,0);
     f.globalCompositeOperation = "destination-in";
-    f.drawImage(union, 0, 0);
-    f.restore();
+    f.drawImage(union,0,0);
     f.globalCompositeOperation = "source-over";
   }
 
