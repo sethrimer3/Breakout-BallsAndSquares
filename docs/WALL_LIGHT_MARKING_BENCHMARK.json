@@ -1,0 +1,2143 @@
+{
+  "baseline": "4a48853c4393c591cf387afbaee7faeea1d500cf",
+  "component": {
+    "baseline": "4a48853c4393c591cf387afbaee7faeea1d500cf",
+    "rows": [
+      {
+        "cpu": 1,
+        "dense": false,
+        "lightsPerBatch": 2,
+        "samples": 60,
+        "baseline": {
+          "p50": 0.10000000149011612,
+          "p95": 0.20000000298023224,
+          "p99": 0.30000000074505806
+        },
+        "updated": {
+          "p50": 0.10000000149011612,
+          "p95": 0.20000000298023224,
+          "p99": 0.6999999992549419
+        },
+        "listComparisons": 2,
+        "changedCells": 0
+      },
+      {
+        "cpu": 1,
+        "dense": true,
+        "lightsPerBatch": 40,
+        "samples": 60,
+        "baseline": {
+          "p50": 2.5,
+          "p95": 3,
+          "p99": 4
+        },
+        "updated": {
+          "p50": 1.6000000014901161,
+          "p95": 2.800000000745058,
+          "p99": 3.600000001490116
+        },
+        "listComparisons": 40,
+        "changedCells": 0
+      },
+      {
+        "cpu": 4,
+        "dense": false,
+        "lightsPerBatch": 2,
+        "samples": 60,
+        "baseline": {
+          "p50": 0.4000000022351742,
+          "p95": 1.2000000029802322,
+          "p99": 2.100000001490116
+        },
+        "updated": {
+          "p50": 0.10000000149011612,
+          "p95": 0.8999999985098839,
+          "p99": 2.7000000029802322
+        },
+        "listComparisons": 2,
+        "changedCells": 0
+      },
+      {
+        "cpu": 4,
+        "dense": true,
+        "lightsPerBatch": 40,
+        "samples": 60,
+        "baseline": {
+          "p50": 11.300000000745058,
+          "p95": 15.800000000745058,
+          "p99": 31.800000000745058
+        },
+        "updated": {
+          "p50": 7.600000001490116,
+          "p95": 11.599999997764826,
+          "p99": 14.5
+        },
+        "listComparisons": 40,
+        "changedCells": 0
+      }
+    ]
+  },
+  "preparationOnly": {
+    "baseline": "4a48853c4393c591cf387afbaee7faeea1d500cf",
+    "rows": [
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": true
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 0.8000000007450581,
+            "p95": 1.1000000014901161,
+            "p99": 1.1000000014901161
+          },
+          "preparation": {
+            "p50": 0.8000000007450581,
+            "p95": 1,
+            "p99": 1.1000000014901161
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 0.6999999992549419,
+            "p95": 1.0999999977648258,
+            "p99": 1.0999999977648258
+          },
+          "preparation": {
+            "p50": 0.6999999992549419,
+            "p95": 1.0999999977648258,
+            "p99": 1.0999999977648258
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": true
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 0.7000000029802322,
+            "p95": 0.9000000022351742,
+            "p99": 0.9000000022351742
+          },
+          "preparation": {
+            "p50": 0.7000000029802322,
+            "p95": 0.9000000022351742,
+            "p99": 0.9000000022351742
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 0.6000000014901161,
+            "p95": 0.8999999985098839,
+            "p99": 0.9000000022351742
+          },
+          "preparation": {
+            "p50": 0.6000000014901161,
+            "p95": 0.8999999985098839,
+            "p99": 0.9000000022351742
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": true
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 0.6999999992549419,
+            "p95": 0.9000000022351742,
+            "p99": 1
+          },
+          "preparation": {
+            "p50": 0.6999999992549419,
+            "p95": 0.9000000022351742,
+            "p99": 1
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 0.6000000014901161,
+            "p95": 0.9000000022351742,
+            "p99": 1.1000000014901161
+          },
+          "preparation": {
+            "p50": 0.6000000014901161,
+            "p95": 0.9000000022351742,
+            "p99": 1.1000000014901161
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": true
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 0.6999999992549419,
+            "p95": 0.8999999985098839,
+            "p99": 1
+          },
+          "preparation": {
+            "p50": 0.6999999992549419,
+            "p95": 0.8999999985098839,
+            "p99": 1
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 0.6999999992549419,
+            "p95": 1,
+            "p99": 1
+          },
+          "preparation": {
+            "p50": 0.6999999992549419,
+            "p95": 1,
+            "p99": 1
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": true
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 18.899999998509884,
+            "p95": 24,
+            "p99": 24.600000001490116
+          },
+          "preparation": {
+            "p50": 18.899999998509884,
+            "p95": 24,
+            "p99": 24.600000001490116
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 17.600000001490116,
+            "p95": 21.699999999254942,
+            "p99": 29.100000001490116
+          },
+          "preparation": {
+            "p50": 17.600000001490116,
+            "p95": 21.699999999254942,
+            "p99": 29.100000001490116
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": true
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 19.600000001490116,
+            "p95": 22,
+            "p99": 27.5
+          },
+          "preparation": {
+            "p50": 19.600000001490116,
+            "p95": 22,
+            "p99": 27.5
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 18.899999998509884,
+            "p95": 34.80000000074506,
+            "p99": 37.80000000074506
+          },
+          "preparation": {
+            "p50": 18.899999998509884,
+            "p95": 34.80000000074506,
+            "p99": 37.80000000074506
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": true
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 19,
+            "p95": 26.199999999254942,
+            "p99": 27.899999998509884
+          },
+          "preparation": {
+            "p50": 19,
+            "p95": 26.199999999254942,
+            "p99": 27.899999998509884
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 18.399999998509884,
+            "p95": 29,
+            "p99": 33.400000002235174
+          },
+          "preparation": {
+            "p50": 18.399999998509884,
+            "p95": 29,
+            "p99": 33.400000002235174
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": true
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 19.799999997019768,
+            "p95": 22.599999997764826,
+            "p99": 23.600000001490116
+          },
+          "preparation": {
+            "p50": 19.799999997019768,
+            "p95": 22.599999997764826,
+            "p99": 23.600000001490116
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 18.599999997764826,
+            "p95": 21.300000000745058,
+            "p99": 24.5
+          },
+          "preparation": {
+            "p50": 18.599999997764826,
+            "p95": 21.300000000745058,
+            "p99": 24.5
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": true
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 3,
+            "p95": 5.400000002235174,
+            "p99": 6.699999999254942
+          },
+          "preparation": {
+            "p50": 3,
+            "p95": 5.400000002235174,
+            "p99": 6.699999999254942
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 3.400000002235174,
+            "p95": 5.199999999254942,
+            "p99": 5.300000000745058
+          },
+          "preparation": {
+            "p50": 3.400000002235174,
+            "p95": 5.199999999254942,
+            "p99": 5.300000000745058
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": true
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 3.600000001490116,
+            "p95": 5.799999997019768,
+            "p99": 6
+          },
+          "preparation": {
+            "p50": 3.600000001490116,
+            "p95": 5.799999997019768,
+            "p99": 6
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 3,
+            "p95": 7.400000002235174,
+            "p99": 9.200000002980232
+          },
+          "preparation": {
+            "p50": 3,
+            "p95": 7.400000002235174,
+            "p99": 9.200000002980232
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": true
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 3.5,
+            "p95": 7.099999997764826,
+            "p99": 31
+          },
+          "preparation": {
+            "p50": 3.5,
+            "p95": 7.099999997764826,
+            "p99": 31
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 3.599999997764826,
+            "p95": 6.399999998509884,
+            "p99": 7.5
+          },
+          "preparation": {
+            "p50": 3.599999997764826,
+            "p95": 6.399999998509884,
+            "p99": 7.5
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": true
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 3.5,
+            "p95": 7.199999999254942,
+            "p99": 9.199999999254942
+          },
+          "preparation": {
+            "p50": 3.5,
+            "p95": 7.199999999254942,
+            "p99": 9.199999999254942
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 3.400000002235174,
+            "p95": 11.100000001490116,
+            "p99": 12.099999997764826
+          },
+          "preparation": {
+            "p50": 3.400000002235174,
+            "p95": 11.100000001490116,
+            "p99": 12.099999997764826
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": true
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 82.59999999776483,
+            "p95": 89.80000000074506,
+            "p99": 122.5
+          },
+          "preparation": {
+            "p50": 82.59999999776483,
+            "p95": 89.80000000074506,
+            "p99": 122.5
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 84,
+            "p95": 92.69999999925494,
+            "p99": 101.09999999776483
+          },
+          "preparation": {
+            "p50": 84,
+            "p95": 92.69999999925494,
+            "p99": 101.09999999776483
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": true
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 88.39999999850988,
+            "p95": 118.89999999850988,
+            "p99": 166.80000000074506
+          },
+          "preparation": {
+            "p50": 88.39999999850988,
+            "p95": 118.89999999850988,
+            "p99": 166.80000000074506
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 86.5,
+            "p95": 106,
+            "p99": 114.39999999850988
+          },
+          "preparation": {
+            "p50": 86.5,
+            "p95": 106,
+            "p99": 114.39999999850988
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": true
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 88.30000000074506,
+            "p95": 96.69999999925494,
+            "p99": 100.69999999925494
+          },
+          "preparation": {
+            "p50": 88.30000000074506,
+            "p95": 96.69999999925494,
+            "p99": 100.69999999925494
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 86.29999999701977,
+            "p95": 95.5,
+            "p99": 101.19999999925494
+          },
+          "preparation": {
+            "p50": 86.29999999701977,
+            "p95": 95.5,
+            "p99": 101.19999999925494
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": true
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 88.70000000298023,
+            "p95": 115.29999999701977,
+            "p99": 120
+          },
+          "preparation": {
+            "p50": 88.70000000298023,
+            "p95": 115.29999999701977,
+            "p99": 120
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 86.30000000074506,
+            "p95": 104.69999999925494,
+            "p99": 110.80000000074506
+          },
+          "preparation": {
+            "p50": 86.30000000074506,
+            "p95": 104.69999999925494,
+            "p99": 110.80000000074506
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 0
+      }
+    ],
+    "samples": 30,
+    "browser": "156.0.8078.79"
+  },
+  "softShadows": {
+    "baseline": "4a48853c4393c591cf387afbaee7faeea1d500cf",
+    "rows": [
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 20.800000000745058,
+            "p95": 34.19999999925494,
+            "p99": 34.69999999925494
+          },
+          "preparation": {
+            "p50": 0.8000000007450581,
+            "p95": 1.199999999254942,
+            "p99": 2
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 22.299999997019768,
+            "p95": 35.5,
+            "p99": 39
+          },
+          "preparation": {
+            "p50": 0.7999999970197678,
+            "p95": 1,
+            "p99": 1.5
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 20.100000001490116,
+            "p95": 26.100000001490116,
+            "p99": 31
+          },
+          "preparation": {
+            "p50": 0.7999999970197678,
+            "p95": 1,
+            "p99": 1.1000000014901161
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 19.699999999254942,
+            "p95": 30.199999999254942,
+            "p99": 37.099999997764826
+          },
+          "preparation": {
+            "p50": 0.6999999992549419,
+            "p95": 1.199999999254942,
+            "p99": 1.5
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 21,
+            "p95": 28.300000000745058,
+            "p99": 30.700000002980232
+          },
+          "preparation": {
+            "p50": 0.8000000007450581,
+            "p95": 1.5,
+            "p99": 1.9000000022351742
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 21,
+            "p95": 27.600000001490116,
+            "p99": 28.800000000745058
+          },
+          "preparation": {
+            "p50": 0.8000000007450581,
+            "p95": 1,
+            "p99": 1.199999999254942
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 18.700000002980232,
+            "p95": 23.300000000745058,
+            "p99": 24.300000000745058
+          },
+          "preparation": {
+            "p50": 0.7000000029802322,
+            "p95": 1.5,
+            "p99": 1.5
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 18.700000002980232,
+            "p95": 23.899999998509884,
+            "p99": 23.899999998509884
+          },
+          "preparation": {
+            "p50": 0.8000000007450581,
+            "p95": 1,
+            "p99": 1.3999999985098839
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 55.19999999925494,
+            "p95": 61.70000000298023,
+            "p99": 66.40000000223517
+          },
+          "preparation": {
+            "p50": 17.799999997019768,
+            "p95": 23.399999998509884,
+            "p99": 25.299999997019768
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 54.600000001490116,
+            "p95": 60.19999999925494,
+            "p99": 68.5
+          },
+          "preparation": {
+            "p50": 17.600000001490116,
+            "p95": 20.100000001490116,
+            "p99": 20.399999998509884
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 65.69999999925494,
+            "p95": 77.59999999776483,
+            "p99": 89
+          },
+          "preparation": {
+            "p50": 19.100000001490116,
+            "p95": 26.800000000745058,
+            "p99": 31.699999999254942
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 65,
+            "p95": 73.5,
+            "p99": 79.40000000223517
+          },
+          "preparation": {
+            "p50": 18.100000001490116,
+            "p95": 21,
+            "p99": 22.5
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 56,
+            "p95": 66.80000000074506,
+            "p99": 76.60000000149012
+          },
+          "preparation": {
+            "p50": 18.900000002235174,
+            "p95": 21.300000000745058,
+            "p99": 23.399999998509884
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 56.80000000074506,
+            "p95": 65.10000000149012,
+            "p99": 87.79999999701977
+          },
+          "preparation": {
+            "p50": 18.300000000745058,
+            "p95": 21.300000000745058,
+            "p99": 22.899999998509884
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 63.099999997764826,
+            "p95": 69.20000000298023,
+            "p99": 70.80000000074506
+          },
+          "preparation": {
+            "p50": 19,
+            "p95": 20.5,
+            "p99": 20.600000001490116
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 62.69999999925494,
+            "p95": 75.5,
+            "p99": 121.5
+          },
+          "preparation": {
+            "p50": 18.100000001490116,
+            "p95": 24,
+            "p99": 48.30000000074506
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 138.60000000149012,
+            "p95": 185.90000000223517,
+            "p99": 230.60000000149012
+          },
+          "preparation": {
+            "p50": 3.5,
+            "p95": 6.899999998509884,
+            "p99": 6.900000002235174
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 140.5,
+            "p95": 200.39999999850988,
+            "p99": 215.30000000074506
+          },
+          "preparation": {
+            "p50": 3.699999999254942,
+            "p95": 8.199999999254942,
+            "p99": 9.899999998509884
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 119.40000000223517,
+            "p95": 166.09999999776483,
+            "p99": 183.29999999701977
+          },
+          "preparation": {
+            "p50": 3.599999997764826,
+            "p95": 5.600000001490116,
+            "p99": 6.100000001490116
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 130.39999999850988,
+            "p95": 221.10000000149012,
+            "p99": 228.69999999925494
+          },
+          "preparation": {
+            "p50": 3.600000001490116,
+            "p95": 5.700000002980232,
+            "p99": 7.5
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 139.5,
+            "p95": 237,
+            "p99": 260.80000000074506
+          },
+          "preparation": {
+            "p50": 4,
+            "p95": 6.800000000745058,
+            "p99": 21.300000000745058
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 136.60000000149012,
+            "p95": 165.40000000223517,
+            "p99": 168.40000000223517
+          },
+          "preparation": {
+            "p50": 3.899999998509884,
+            "p95": 8,
+            "p99": 9.399999998509884
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 125.5,
+            "p95": 242.5,
+            "p99": 324.5
+          },
+          "preparation": {
+            "p50": 3.900000002235174,
+            "p95": 5.200000002980232,
+            "p99": 5.5
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 133.80000000074506,
+            "p95": 212.80000000074506,
+            "p99": 259.5
+          },
+          "preparation": {
+            "p50": 3.399999998509884,
+            "p95": 5.800000000745058,
+            "p99": 32.400000002235174
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 348.8999999985099,
+            "p95": 428.0999999977648,
+            "p99": 443.80000000074506
+          },
+          "preparation": {
+            "p50": 87.90000000223517,
+            "p95": 102.39999999850988,
+            "p99": 119.5
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 352.5,
+            "p95": 454.69999999925494,
+            "p99": 524.3000000007451
+          },
+          "preparation": {
+            "p50": 84.5,
+            "p95": 115.30000000074506,
+            "p99": 128.69999999925494
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 442.8999999985099,
+            "p95": 489.3999999985099,
+            "p99": 527.5999999977648
+          },
+          "preparation": {
+            "p50": 88,
+            "p95": 96.30000000074506,
+            "p99": 107.09999999776483
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 436.80000000074506,
+            "p95": 532.6999999992549,
+            "p99": 547.8000000007451
+          },
+          "preparation": {
+            "p50": 86.89999999850988,
+            "p95": 96.20000000298023,
+            "p99": 178.19999999925494
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 326.19999999925494,
+            "p95": 470.30000000074506,
+            "p99": 475.1000000014901
+          },
+          "preparation": {
+            "p50": 87.19999999925494,
+            "p95": 174,
+            "p99": 192.69999999925494
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 327.9000000022352,
+            "p95": 398.5,
+            "p99": 459.5
+          },
+          "preparation": {
+            "p50": 87.19999999925494,
+            "p95": 97.19999999925494,
+            "p99": 101.60000000149012
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 443.6000000014901,
+            "p95": 571,
+            "p99": 689.1999999992549
+          },
+          "preparation": {
+            "p50": 86.60000000149012,
+            "p95": 120,
+            "p99": 176.5
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 440.69999999925494,
+            "p95": 565.6999999992549,
+            "p99": 593.8999999985099
+          },
+          "preparation": {
+            "p50": 86.20000000298023,
+            "p95": 107.10000000149012,
+            "p99": 113.30000000074506
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      }
+    ],
+    "samples": 30,
+    "browser": "156.0.8078.79",
+    "settings": {
+      "softShadows": true,
+      "revealedFog": true,
+      "preparationOnly": false
+    }
+  },
+  "defaultShadows": {
+    "baseline": "4a48853c4393c591cf387afbaee7faeea1d500cf",
+    "rows": [
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 15.199999999254942,
+            "p95": 24.899999998509884,
+            "p99": 24.899999998509884
+          },
+          "preparation": {
+            "p50": 0.8999999985098839,
+            "p95": 1.300000000745058,
+            "p99": 1.300000000745058
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 15.800000000745058,
+            "p95": 26.599999997764826,
+            "p99": 26.599999997764826
+          },
+          "preparation": {
+            "p50": 0.8000000007450581,
+            "p95": 1.199999999254942,
+            "p99": 1.199999999254942
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 12.699999999254942,
+            "p95": 23.299999997019768,
+            "p99": 23.299999997019768
+          },
+          "preparation": {
+            "p50": 0.8000000007450581,
+            "p95": 1.5,
+            "p99": 1.5
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 12.5,
+            "p95": 22.099999997764826,
+            "p99": 22.099999997764826
+          },
+          "preparation": {
+            "p50": 0.7000000029802322,
+            "p95": 1.1000000014901161,
+            "p99": 1.1000000014901161
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 15.800000000745058,
+            "p95": 20.900000002235174,
+            "p99": 20.900000002235174
+          },
+          "preparation": {
+            "p50": 0.8000000007450581,
+            "p95": 1.199999999254942,
+            "p99": 1.199999999254942
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 15.600000001490116,
+            "p95": 23.299999997019768,
+            "p99": 23.299999997019768
+          },
+          "preparation": {
+            "p50": 0.6999999992549419,
+            "p95": 1,
+            "p99": 1
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 13.199999999254942,
+            "p95": 43.80000000074506,
+            "p99": 43.80000000074506
+          },
+          "preparation": {
+            "p50": 0.8000000007450581,
+            "p95": 1,
+            "p99": 1
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 13.399999998509884,
+            "p95": 21.099999997764826,
+            "p99": 21.099999997764826
+          },
+          "preparation": {
+            "p50": 0.7999999970197678,
+            "p95": 2.899999998509884,
+            "p99": 2.899999998509884
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 47.400000002235174,
+            "p95": 53.80000000074506,
+            "p99": 53.80000000074506
+          },
+          "preparation": {
+            "p50": 17.5,
+            "p95": 19.899999998509884,
+            "p99": 19.899999998509884
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 46.30000000074506,
+            "p95": 55,
+            "p99": 55
+          },
+          "preparation": {
+            "p50": 16.900000002235174,
+            "p95": 18.199999999254942,
+            "p99": 18.199999999254942
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 55,
+            "p95": 68.10000000149012,
+            "p99": 68.10000000149012
+          },
+          "preparation": {
+            "p50": 17.599999997764826,
+            "p95": 25,
+            "p99": 25
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 54.399999998509884,
+            "p95": 68,
+            "p99": 68
+          },
+          "preparation": {
+            "p50": 17.199999999254942,
+            "p95": 19.399999998509884,
+            "p99": 19.399999998509884
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 53.599999997764826,
+            "p95": 64.59999999776483,
+            "p99": 64.59999999776483
+          },
+          "preparation": {
+            "p50": 18.799999997019768,
+            "p95": 21.699999999254942,
+            "p99": 21.699999999254942
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 50.900000002235174,
+            "p95": 62.19999999925494,
+            "p99": 62.19999999925494
+          },
+          "preparation": {
+            "p50": 18.199999999254942,
+            "p95": 22.199999999254942,
+            "p99": 22.199999999254942
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "desktop",
+          "width": 1200,
+          "height": 800,
+          "scale": 1,
+          "cpu": 1,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 57.5,
+            "p95": 66.10000000149012,
+            "p99": 66.10000000149012
+          },
+          "preparation": {
+            "p50": 18.400000002235174,
+            "p95": 25.199999999254942,
+            "p99": 25.199999999254942
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 56.100000001490116,
+            "p95": 72.90000000223517,
+            "p99": 72.90000000223517
+          },
+          "preparation": {
+            "p50": 17.800000000745058,
+            "p95": 21.800000000745058,
+            "p99": 21.800000000745058
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 87.69999999925494,
+            "p95": 146.69999999925494,
+            "p99": 146.69999999925494
+          },
+          "preparation": {
+            "p50": 3.5,
+            "p95": 7.5,
+            "p99": 7.5
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 85,
+            "p95": 141.80000000074506,
+            "p99": 141.80000000074506
+          },
+          "preparation": {
+            "p50": 3.699999999254942,
+            "p95": 5.699999999254942,
+            "p99": 5.699999999254942
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": false,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 76.69999999925494,
+            "p95": 121.19999999925494,
+            "p99": 121.19999999925494
+          },
+          "preparation": {
+            "p50": 4.100000001490116,
+            "p95": 6.5,
+            "p99": 6.5
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 75.5,
+            "p95": 102.40000000223517,
+            "p99": 102.40000000223517
+          },
+          "preparation": {
+            "p50": 3.100000001490116,
+            "p95": 6.600000001490116,
+            "p99": 6.600000001490116
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 101.20000000298023,
+            "p95": 152,
+            "p99": 152
+          },
+          "preparation": {
+            "p50": 3.400000002235174,
+            "p95": 5.699999999254942,
+            "p99": 5.699999999254942
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 102.69999999925494,
+            "p95": 143,
+            "p99": 143
+          },
+          "preparation": {
+            "p50": 3.600000001490116,
+            "p95": 9.100000001490116,
+            "p99": 9.100000001490116
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": false,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 1,
+        "baseline": {
+          "frame": {
+            "p50": 78.79999999701977,
+            "p95": 156.69999999925494,
+            "p99": 156.69999999925494
+          },
+          "preparation": {
+            "p50": 3.399999998509884,
+            "p95": 13.800000000745058,
+            "p99": 13.800000000745058
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 69.5,
+            "p95": 91.89999999850988,
+            "p99": 91.89999999850988
+          },
+          "preparation": {
+            "p50": 3.600000001490116,
+            "p95": 5.199999999254942,
+            "p99": 5.199999999254942
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 289.19999999925494,
+            "p95": 381.5,
+            "p99": 381.5
+          },
+          "preparation": {
+            "p50": 84,
+            "p95": 96.70000000298023,
+            "p99": 96.70000000298023
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 282.8999999985099,
+            "p95": 346.19999999925494,
+            "p99": 346.19999999925494
+          },
+          "preparation": {
+            "p50": 78.10000000149012,
+            "p95": 87.69999999925494,
+            "p99": 87.69999999925494
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": true,
+        "moving": false,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 406.4000000022352,
+            "p95": 500.69999999925494,
+            "p99": 500.69999999925494
+          },
+          "preparation": {
+            "p50": 85.89999999850988,
+            "p95": 138.30000000074506,
+            "p99": 138.30000000074506
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 396.4000000022352,
+            "p95": 487.3999999985099,
+            "p99": 487.3999999985099
+          },
+          "preparation": {
+            "p50": 87.80000000074506,
+            "p95": 115.19999999925494,
+            "p99": 115.19999999925494
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 0.5,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 310.19999999925494,
+            "p95": 445,
+            "p99": 445
+          },
+          "preparation": {
+            "p50": 90.89999999850988,
+            "p95": 117.30000000074506,
+            "p99": 117.30000000074506
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 310.8999999985099,
+            "p95": 455.5999999977648,
+            "p99": 455.5999999977648
+          },
+          "preparation": {
+            "p50": 86.29999999701977,
+            "p95": 195.5,
+            "p99": 195.5
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      },
+      {
+        "device": {
+          "name": "mobile",
+          "width": 390,
+          "height": 844,
+          "scale": 2,
+          "cpu": 4,
+          "preparationOnly": false,
+          "softShadows": false
+        },
+        "dense": true,
+        "moving": true,
+        "zoom": 1.13,
+        "tracedFlashes": 20,
+        "baseline": {
+          "frame": {
+            "p50": 390.29999999701977,
+            "p95": 435.3999999985099,
+            "p99": 435.3999999985099
+          },
+          "preparation": {
+            "p50": 85.39999999850988,
+            "p95": 93.59999999776483,
+            "p99": 93.59999999776483
+          }
+        },
+        "updated": {
+          "frame": {
+            "p50": 385.8999999985099,
+            "p95": 498,
+            "p99": 498
+          },
+          "preparation": {
+            "p50": 82.60000000149012,
+            "p95": 160.79999999701977,
+            "p99": 160.79999999701977
+          }
+        },
+        "changedChannels": 0,
+        "maxDelta": 0,
+        "polygonComparisons": 2,
+        "imageComparisons": 2
+      }
+    ],
+    "samples": 20,
+    "browser": "156.0.8078.79",
+    "settings": {
+      "softShadows": false,
+      "revealedFog": true,
+      "preparationOnly": false
+    }
+  }
+}

@@ -548,7 +548,8 @@ export class LightingSystem {
    * Wall light is applied to whole cells, so it follows the grid, not the polygon.
    */
   private markLitCells(ox: number, oy: number, poly: Float32Array, n: number, out: LitCells): void {
-    const step = this.world.cellSize * 0.5;
+    const cs = this.world.cellSize;
+    const step = cs * 0.5;
     if (++this.litStamp === 0xffffffff) {
       this.litStamps.fill(0);
       this.litStamp = 1;
@@ -565,23 +566,26 @@ export class LightingSystem {
         const py = ay + (by - ay) * f;
         // At grazing angles the perimeter can sit on the face itself, so also look
         // slightly further from the light along each axis.
-        this.markCellAt(px, py, out);
-        this.markCellAt(px + (px > ox ? 1 : -1), py, out);
-        this.markCellAt(px, py + (py > oy ? 1 : -1), out);
+        const cx = Math.floor(px / cs), cy = Math.floor(py / cs);
+        this.markCell(cx, cy, out);
+        const adjacentX = Math.floor((px + (px > ox ? 1 : -1)) / cs);
+        const adjacentY = Math.floor((py + (py > oy ? 1 : -1)) / cs);
+        if (adjacentX !== cx) this.markCell(adjacentX, cy, out);
+        if (adjacentY !== cy) this.markCell(cx, adjacentY, out);
       }
       ax = bx;
       ay = by;
     }
   }
 
-  private markCellAt(x: number, y: number, out: LitCells): void {
+  private markCell(cx: number, cy: number, out: LitCells): void {
     const w = this.world;
-    const cx = Math.floor(x / w.cellSize);
-    const cy = Math.floor(y / w.cellSize);
     if (!w.inBounds(cx, cy)) return;
     const i = cy * w.width + cx;
-    if (this.litStamps[i] === this.litStamp || (w.health[i] === 0 && !w.anySolidInCell(cx, cy))) return;
+    if (this.litStamps[i] === this.litStamp) return;
+    // Empty cells are also stable for the duration of this synchronous trace.
     this.litStamps[i] = this.litStamp;
+    if (w.health[i] === 0 && !w.anySolidInCell(cx, cy)) return;
     if (out.count < out.cells.length) out.cells[out.count++] = i;
   }
 }

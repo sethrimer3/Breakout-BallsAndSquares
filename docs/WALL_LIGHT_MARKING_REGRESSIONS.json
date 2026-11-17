@@ -1,0 +1,520 @@
+{
+  "traceOracle": {
+    "baseline": "4a48853c4393c591cf387afbaee7faeea1d500cf",
+    "comparisons": 195,
+    "nonempty": 195,
+    "fallbackOccluders": 116,
+    "changedPolygonChannels": 0,
+    "changedLitCells": 0
+  },
+  "componentListComparisons": 84,
+  "frameImageComparisons": 64,
+  "lightingPipeline": {
+    "status": "passed",
+    "pixelComparisons": 258,
+    "boundedCases": 6,
+    "emptyReuseCases": 6
+  },
+  "activeRender": {
+    "baseline": "4a48853c4393c591cf387afbaee7faeea1d500cf",
+    "status": "passed",
+    "samples": 60,
+    "browser": "156.0.8078.79",
+    "pixels": [
+      {
+        "device": "desktop",
+        "label": "freeze-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "freeze-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "thaw-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-pending-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-compacted-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "smoke-edges-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "rail-crossing-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "freeze-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "freeze-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "thaw-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-pending-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-compacted-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "smoke-edges-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "rail-crossing-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "freeze-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "freeze-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "thaw-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-pending-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-compacted-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "smoke-edges-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "rail-crossing-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-glass",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-destruction",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-growth",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-pan",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-zoom",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-regeneration",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-resize",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "thaw-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-pending-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-compacted-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "smoke-edges-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "rail-crossing-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "thaw-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-pending-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-compacted-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "smoke-edges-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "rail-crossing-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "thaw-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-pending-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-compacted-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "smoke-edges-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "rail-crossing-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-glass",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-destruction",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-growth",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-pan",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-zoom",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-regeneration",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-resize",
+        "channels": 0,
+        "maxDelta": 0
+      }
+    ],
+    "invalidation": {
+      "ordinaryDamageRebuilds": 0,
+      "checks": [
+        "glass",
+        "destruction",
+        "growth",
+        "pan",
+        "zoom",
+        "regeneration",
+        "resize"
+      ],
+      "maskRebuilds": 8
+    },
+    "scenarios": []
+  }
+}
