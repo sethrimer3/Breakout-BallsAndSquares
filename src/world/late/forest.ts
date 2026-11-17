@@ -2,7 +2,9 @@
  * World 3: Canopy Forest (13 x 13 sectors, 91 x 91 chars).
  * Sectors A..M (cols 0..12) x 1..13 (rows 0..12).
  * Arrival: A7 (west gate). Exit: L13 (south gate).
- * Landmarks: D5-E5 Sunken Lake Bed, G8-H8 Fallen Giant Tree, K10-K11 Ruined Ranger Station.
+ * Landmarks: B4-C4 Sunlit Moss Amphitheatre, B9-C10 Whispering Creek Crossing,
+ *   D5-E5 Sunken Lake Bed, D8-E8 Twin Ancient Oaks, G8-H8 Fallen Giant Tree,
+ *   I3-J4 Blight-Cracked Ravine, K10-K11 Ruined Ranger Station.
  * Legend: . solid, R clearing, -|+ trails, # cover, s soldier, b brute, g grove, $ special.
  */
 export const FOREST_BLUEPRINT: readonly string[] = [
@@ -21,18 +23,18 @@ export const FOREST_BLUEPRINT: readonly string[] = [
   "..|.....RgR....RgR.....|......|.....RgR....RgR......|.....|.....gRR....gRR............|....",
   "..++......|......|.....|......|.............++......|.....|......|.......|............+....",
   "...|......|......|.....|......++............|.......|.....|......|......++............|....", // 3
-  "..gRRR..gRRR...gRRRg...|gRR...gRRR..sRRR...sRR....sRRs...sRR....sRRR...sRR....sRRR...sRR...",
-  "..gRRR..gRRg...RRgRR..RgRRR...gRRR.+R#sR...R#s..+-R#Rb...s#R..+-s#RR...R#s..+-R#sR...s#R...",
-  ".gRRRg+-RRRR---RgRRR-+gRRRg--gRRRg-+RRRRbRRRsRRR+.RRRg---RbRRg+.bRRR---RRRRR+.RRRR---RbRRR.",
-  ".RRgRR..gRRg...gRgRR..RRgR...RRgRR...RRRgRRbRRgR...RRg...RgRgR...gRR...bRRRbRRbRRR...gRRgR.",
-  ".gRR....RgRR.....|....RgRR...gRR.....RRgRRRgR......RgR....|......gRR....|RgRRRgRRR....|....",
-  "...|.....|.......|.......|....++.....RgRRRgRR.............|........|....+RgRRgRRRR....|....",
-  "...|.....|......++.......|....|.......|.....|.............+........|....|.......|.....|....", // 4
-  ".gRRR....|gRR..gRRR.....gRR..gRRR.....s$R..sRR......sRR..sRR......sRR..sRR......sRR..sRR...",
-  ".gRRg---RRRgR..RgRR---RgRRR..gRRg-----s#R..s#R------R#sRsR#R------s#R..s#R------s#R..s#R...",
-  ".RRRR...RRRRgRRgRRR...gRRRg--RRRR...sRRRb--RbRRg..RRRbRRRbRRRg..RbRRR--RbRRR..RRRbR--RbRRR.",
-  ".gRRg...RRRRgRRRgRR...RRgR...gRRg...RgR....RgRgR..gRRgRRRgRRgR..bRg....gRRgR..RgR....gRRgR.",
-  ".RgRR...RRRgRRRgRRg...RgRR...RgRR...ggR.....|.....gRR.|...|.....RgR.....|.....gRR.....|....",
+  "..gRRR..gRRR...gRRRg...|gRR...gRRR..sRRR...sRR....sRRs...sRRRRRRsRRR...sRR....sRRR...sRR...",
+  "..gRRR..gRRg...RRgRR..RgRRR...gRRR.+R#sR...R#s..+-R#Rb...s#RRRRRs#RR...R#s..+-R#sR...s#R...",
+  ".gRRRg+-RRRR---RgRRR-+gRRRg--gRRRg-+RRRRbRRRsRRR+.RRRg---RbRRgRRbRRR---RRRRR+.RRRR---RbRRR.",
+  ".RRgRR..gRRg...gRgRR..RRgR...RRgRR...RRRgRRbRRgR...RRg...RgRgRRRRgRR...bRRRbRRbRRR...gRRgR.",
+  ".gRR....RgRR.....|....RgRR...gRR.....RRgRRRgR......RgR....|...RRRgRR....|RgRRRgRRR....|....",
+  "...|.....|.......|.......|....++.....RgRRRgRR.............|...RRRRRR....+RgRRgRRRR....|....",
+  "...|.....|RRRRRRRR.......|....|.......|.....|.............+...RRRRRR....|.......|.....|....", // 4
+  ".gRRR...RRgRRRRgRRRR....gRR..gRRR.....s$R..sRR......sRR..sRR..RRRRsRR..sRR......sRR..sRR...",
+  ".gRRg---RRRgRRRRgRRR--RgRRR..gRRg-----s#R..s#R------R#sRsR#R--RRRRs#R..s#R------s#R..s#R...",
+  ".RRRR...RRRRgRRgRRRR..gRRRg--RRRR...sRRRb--RbRRg..RRRbRRRbRRRgRRRbRRR--RbRRR..RRRbR--RbRRR.",
+  ".gRRg...RRRRgRRRgRRR..RRgR...gRRg...RgR....RgRgR..gRRgRRRgRRgR..bRg....gRRgR..RgR....gRRgR.",
+  ".RgRR...RRRgRRRgRRgR..RgRR...RgRR...ggR.....|.....gRR.|...|.....RgR.....|.....gRR.....|....",
   "..|.....RgRRRRRRR+......|.....|......|......|.........|...+.............|.......|.....|....",
   "..++.......|.....|......|.....|......|......++........|...|.............|.......|.....+....", // 5
   ".gRRRg..gRRR....g$RR..gRRRRggRRRRg..sRRs.....sRR...sRRs..sRs....sRRR....+sRR...sRRs..sRR...",
@@ -56,24 +58,24 @@ export const FOREST_BLUEPRINT: readonly string[] = [
   ".RRRRR..RgRR...gRRR...RgRR...gRR.....RgR....|......RgR....|......RRRR...|......gRR....|....",
   "...|.......|...gRRR.....|......|.....|......|........|....+......gRRR...|......|......|....",
   "..++.......|...gRRR.....|......|.....|......+........|....|......sRRR...|......|......+....", // 8
-  ".gRRR.....gRR..gRRR.....gRR..gRRR....|sRR..sRRRsRsRRRsR..sRR.....R#sR..sRR.....|sRR..sRR...",
-  ".gRRg...RgRRR..RgRR...RgRRR..gRRg....|s#R..R#RbRRR#RRbR..s#R.....RRbR..s#R.....|s#R..s#R...",
-  ".RRRR...gRRRg-+RgRR...gRRRg-+RRRR...sRRRb-+RgRRRRRRgRRR-+RbRRg..RRRgR-+RbRRR..RbRRR-+RbRRR.",
-  ".gRRg---RRgR...RgRR---RRgR...gRRg---RgR....gRRgRRRgRRg...RgRgR--RRg....gRRgR--bRg....gRRgR.",
-  ".RgRR...RgRR...RgRR...RgRR...RgRR...ggR.....|.....RRR|....|.....RRR.....|.....RgR.....|....",
+  ".gRRR.....gRR..gRRR...RRgRRRRgRRRR...|sRR..sRRRsRsRRRsR..sRR.....R#sR..sRR.....|sRR..sRR...",
+  ".gRRg...RgRRR..RgRR...RgRRRRRgRRgR...|s#R..R#RbRRR#RRbR..s#R.....RRbR..s#R.....|s#R..s#R...",
+  ".RRRR...gRRRg-+RgRR...gRRRgRRRRRRR..sRRRb-+RgRRRRRRgRRR-+RbRRg..RRRgR-+RbRRR..RbRRR-+RbRRR.",
+  ".gRRg---RRgR...RgRR---RRgRRRRgRRgR--RgR....gRRgRRRgRRg...RgRgR--RRg....gRRgR--bRg....gRRgR.",
+  ".RgRR...RgRR...RgRR...RgRRRRRRgRRR..ggR.....|.....RRR|....|.....RRR.....|.....RgR.....|....",
   "..++......|.....|......|......|.............++.......|....|......|......|.............+....",
   "...|......|.....|......|......++.............|.......|....|......|......++............|....", // 9
-  ".gRRRg..gRRR....gRRR...|gRR..gRRRg..sRRs.....sRR...sRRs..sRs....sRRR.....sRR...sRRs..sRR...",
-  ".RRgRR..gRRg....gRRR..RgRRR..RRgRR.+R#Rb.....s#R...RR#b..R#R..+-s#RR.....s#R...RR#R..s#R...",
-  ".RgRRR+-RRRR---gRRRg-+gRRRg--RgRRR-+RRRg---RbRRR-+--RRR--sRRbR+.bRRR---RbRRR-+--RbR--RbRRR.",
-  ".gRgRR..gRRg...RRgRR..RRgR...gRgRR...RRg...gRg......gRg..gRggR...gRR...bRg......RgR..gRRgR.",
-  "...|....RgRR...gRR....RgRR.....|.....RgR...RgR......RgR...|......gRR...RgR......gRR...|....",
-  "...|.....|.......|.......|.....+......|......|............|........|.....+......|.....|....",
-  "...|.....|.......+.......|.....|......|......|............+........|.....|......|.....|....", // 10
-  "...gRR...|gRR....gRR....gRR....gRR....sRR....s$R..sRs....sRR......sRR....sRR..sRR....sRR...",
+  ".gRRRg..gRRRRRRRgRRR...|gRR..gRRRg..sRRs.....sRR...sRRs..sRs....sRRR.....sRR...sRRs..sRR...",
+  ".RRgRR..gRRgRRRRgRRR..RgRRR..RRgRR.+R#Rb.....s#R...RR#b..R#R..+-s#RR.....s#R...RR#R..s#R...",
+  ".RgRRR+-RRRRRRRgRRRg-+gRRRg--RgRRR-+RRRg---RbRRR-+--RRR--sRRbR+.bRRR---RbRRR-+--RbR--RbRRR.",
+  ".gRgRR..gRRgRRRRRgRR..RRgR...gRgRR...RRg...gRg......gRg..gRggR...gRR...bRg......RgR..gRRgR.",
+  "...|....RgRR...gRRRR..RgRR.....|.....RgR...RgR......RgR...|......gRR...RgR......gRR...|....",
+  "...|.....|.....RRRRR.....|.....+......|......|............|........|.....+......|.....|....",
+  "...|.....|.....RRRRR.....|.....|......|......|............+........|.....|......|.....|....", // 10
+  "...gRR...|gRR..RRgRR....gRR....gRR....sRR....s$R..sRs....sRR......sRR....sRR..sRR....sRR...",
   ".RgRRR--RgRRR..RgRRR--RgRRR..RgRRR----s#R....s#R--R#R....s#R------s#R..RRR#s--s#R....s#R...",
   ".gRRRg..gRRRg+-gRRRg..gRRRg+-gRRRg..RbRRR+-RbRRR..sRRbR--RbRRg..RbRRR+-RRRRR..RbRRR--RbRRR.",
-  ".RRgR...RRgR...RRgR...RRgR...RRgR...gRg....gRg....gRggR..RgRgR..bRg....bRRRR..gRRgR..gRRgR.",
+  ".RRgR...RRgR...RRgRR..RRgR...RRgR...gRg....gRg....gRggR..RgRgR..bRg....bRRRR..gRRgR..gRRgR.",
   ".RgRR...RgRR...RgRR...RgRR...RgRR...RgR....RgR.......|....|.....RgR....gRRRR...|......|....",
   "...|.......|.....+......|......|.....|.......|.......|....+............gRRRR...|......|....",
   "...+.......|.....|......|......|.....|......++.......|....|............sRRRR...|......+....", // 11
