@@ -24,6 +24,8 @@ export function markBlightEdges(
   solid: Uint8Array,
   /** Only Blight subcells passing this draw edges (e.g. only dormant ones). Omitted: all do. */
   include?: (sx: number, sy: number) => boolean,
+  /** Reuse `solid` from the immediately preceding call for the same unchanged grid/rectangle. */
+  reuseSnapshot = false,
 ): number {
   const pad = subs + 2;
   let any = false;
@@ -32,9 +34,9 @@ export function markBlightEdges(
     for (let x = 0; x < pad; x++) {
       const sx = sx0 + x - 1;
       const outside = sx < 0 || sy < 0 || sx >= grid.subWidth || sy >= grid.subHeight;
-      const here = outside || grid.isBlightSubAt(sx, sy);
-      solid[y * pad + x] = here ? 1 : 0;
-      if (here && !outside && x > 0 && y > 0 && x <= subs && y <= subs && (!include || include(sx, sy))) any = true;
+      const here = reuseSnapshot ? solid[y * pad + x] !== 0 : outside || grid.isBlightSubAt(sx, sy);
+      if (!reuseSnapshot) solid[y * pad + x] = here ? 1 : 0;
+      if (!any && here && !outside && x > 0 && y > 0 && x <= subs && y <= subs && (!include || include(sx, sy))) any = true;
     }
   }
   out.fill(0);

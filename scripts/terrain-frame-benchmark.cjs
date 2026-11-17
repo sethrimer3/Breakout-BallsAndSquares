@@ -24,7 +24,7 @@ const report={baseline:ref,rows:[]};
     for(let cy=y-20;cy<y+20;cy++)for(let cx=x-20;cx<x+20;cx++){
      w.setCell(cx,cy,0,'destroyed');for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++)w.setSubCell(cx*2+dx,cy*2+dy,10);
     }
-    const terrains=[new Old(w,32),new Next(w,32)];for(const t of terrains)t.rebuildAll();
+    const terrains=[new Old(w,32),new Next(w,32)];for(const t of terrains){t.dormantAt=g.terrain.dormantAt;t.rebuildAll();}
     g.save.data.settings.renderQuality='high';g.save.data.settings.softShadows=true;g.renderer.resize();
     const canvas=document.createElement('canvas'),old=new Renderer(canvas,g);old.resize();
     c.following=false;c.x=x*w.cellSize;c.y=y*w.cellSize;

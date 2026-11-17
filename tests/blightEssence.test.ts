@@ -120,3 +120,28 @@ describe("Blight edge mask", () => {
     expect(count).toBe(0);
   });
 });
+
+describe('shared Blight edge occupancy snapshot', () => {
+  it.each([[0,0,4],[-1,-1,4],[2,2,4],[0,0,1]])('matches independent live/dormant samples at (%i,%i), size %i', (sx0,sy0,subs) => {
+    const source=grid(['#..#','.#.#','..#.','####']);
+    const size=subs*EDGE_PIXELS_PER_SUB;
+    const solid=new Uint8Array((subs+2)**2),otherSolid=new Uint8Array(solid.length);
+    const live=new Uint8Array(size*size),dormant=new Uint8Array(size*size),reference=new Uint8Array(size*size);
+    const isDormant=(sx:number,sy:number)=>(sx+sy)%2===0;
+    markBlightEdges(source,sx0,sy0,subs,live,solid,(x,y)=>!isDormant(x,y));
+    const expected=markBlightEdges(source,sx0,sy0,subs,reference,otherSolid,isDormant);
+    // Reusing the snapshot must not call the world classification query again.
+    source.isBlightSubAt=()=>{throw Error('Repeated classification');};
+    const actual=markBlightEdges(source,sx0,sy0,subs,dormant,solid,isDormant,true);
+    expect(actual).toBe(expected);
+    expect(dormant).toEqual(reference);
+  });
+
+  it('clears the second mask when the reused snapshot has no included cells', () => {
+    const source=grid(['.#.','###','.#.']);
+    const out=new Uint8Array(36),solid=new Uint8Array(25);
+    expect(markBlightEdges(source,0,0,3,out,solid)).toBeGreaterThan(0);
+    expect(markBlightEdges(source,0,0,3,out,solid,()=>false,true)).toBe(0);
+    expect(out.some(Boolean)).toBe(false);
+  });
+});

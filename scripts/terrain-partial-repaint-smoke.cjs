@@ -50,6 +50,15 @@ let pw; try { pw = require('playwright'); } catch { pw = require('/opt/codex/cua
       }
       // Independent subcell artwork edits use explicit visual invalidation.
       w.setCell(20,20,0);w.setSubCell(40,40,10);
+      check('isolated Blight before HP damage');
+      let hpClassificationQueries = 0;
+      const classify = w.isBlightSubAt;
+      w.isBlightSubAt = function(...args) { hpClassificationQueries++; return classify.apply(this,args); };
+      w.damageSub(40,40,1);
+      while(a.chunks.pending) a.update();
+      w.isBlightSubAt = classify;
+      if(hpClassificationQueries) throw Error('HP-only damage reclassified Blight');
+      check('HP-only cached classification');
       const si=40*w.subWidth+40;
       for (const kind of [SUB.rubble,SUB.screen,SUB.core,SUB.metal,SUB.blight]) {
         w.subKind[si]=kind;w.subTint[si]=137;a.chunks.markCell(20,20);
@@ -57,6 +66,7 @@ let pw; try { pw = require('playwright'); } catch { pw = require('/opt/codex/cua
       }
       // No stale Blight remains when its final subcell disappears, then reappears.
       w.subHealth.fill(0);w.health.fill(0);w.blight.fill(0);a.chunks.markAll();check('empty');
+      if(a.blightCells.some(Boolean) || a.blightCellCounts.some(Boolean)) throw Error('Empty chunks retain Blight classification');
       w.setSubCell(63,63,10);check('reappear');
       const cam = new CameraSystem(w);cam.viewW=600;cam.viewH=450;cam.x=260.37;cam.y=268.71;
       const canvases=[a,b].map(()=>{const c=document.createElement('canvas');return c;});
@@ -69,7 +79,7 @@ let pw; try { pw = require('playwright'); } catch { pw = require('/opt/codex/cua
         }
         same(...canvases,'composite '+scale+' / '+zoom);
       }
-      return {comparisons,changedChannels:0};
+      return {comparisons,changedChannels:0,hpClassificationQueries,emptyClassificationReleased:true};
     });
     console.log(JSON.stringify(result));
     fs.writeFileSync(process.env.BREACH_REPORT||'/tmp/terrain-partial-repaint-regressions.json',JSON.stringify(result,null,2));

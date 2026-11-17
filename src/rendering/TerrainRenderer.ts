@@ -141,6 +141,9 @@ export class TerrainRenderer {
   readonly chunks: TerrainChunks;
   private canvases: HTMLCanvasElement[] = [];
   private blightCanvases: (HTMLCanvasElement | null)[] = [];
+  /** Four classification bits per terrain cell, allocated only in Blight chunks. */
+  private blightCells: (Uint8Array | null)[] = [];
+  private blightCellCounts: Uint32Array;
   private surfaceOutlines: (Path2D | null)[] = [];
   /** One pixel per world cell: what the lab's emergency power keeps lit. */
   private glowCanvas: HTMLCanvasElement;
@@ -205,6 +208,8 @@ export class TerrainRenderer {
       this.canvases.push(c);
     }
     this.blightCanvases = new Array<HTMLCanvasElement | null>(n).fill(null);
+    this.blightCells = new Array<Uint8Array | null>(n).fill(null);
+    this.blightCellCounts = new Uint32Array(n);
     this.image = new ImageData(chunkSize * TEX, chunkSize * TEX);
     const edgeSize = subChunk * EDGE_PIXELS_PER_SUB;
     this.edgeMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
@@ -834,20 +839,39 @@ export class TerrainRenderer {
     this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0, tx0, ty0, tw, th);
     // Reuse the albedo pixels, masking everything except living Blight.
     // This cache changes with its terrain chunk, never by scanning the view.
-    let hasBlight = false;
-    // Classify once per half-cell, rather than once for every albedo texel.
+    let cells = this.blightCells[k];
+    let count = this.blightCellCounts[k];
+    const geometry = this.chunks.geometryDirty[k];
     const halfTex = TEX / 2;
-    for (let ly = 0; ly < cs * 2; ly++) for (let lx = 0; lx < cs * 2; lx++) {
-      const sx = kx * cs * 2 + lx, sy = ky * cs * 2 + ly;
-      const blight = world.isBlightSubAt(sx, sy);
-      if (blight) { hasBlight = true; continue; }
-      if (lx < x0 * 2 || lx >= (x1 + 1) * 2 || ly < y0 * 2 || ly >= (y1 + 1) * 2) continue;
-      const tx = lx * halfTex, ty = ly * halfTex;
-      for (let oy = 0; oy < halfTex; oy++) for (let ox = 0; ox < halfTex; ox++) {
-        data[((ty + oy) * texCs + tx + ox) * 4 + 3] = 0;
+    for (let ly = y0; ly <= y1; ly++) for (let lx = x0; lx <= x1; lx++) {
+      const ci = ly * cs + lx;
+      const previous = cells?.[ci] ?? 0;
+      let mask = previous;
+      if (geometry) {
+        mask = 0;
+        for (let sub = 0; sub < 4; sub++) {
+          const sx = (kx * cs + lx) * 2 + (sub & 1);
+          const sy = (ky * cs + ly) * 2 + (sub >> 1);
+          if (world.isBlightSubAt(sx, sy)) mask |= 1 << sub;
+        }
+        if (mask !== previous) {
+          if (!cells) cells = new Uint8Array(cs * cs);
+          cells[ci] = mask;
+          count += (mask ? 1 : 0) - (previous ? 1 : 0);
+        }
+      }
+      for (let sub = 0; sub < 4; sub++) {
+        if (mask & (1 << sub)) continue;
+        const tx = lx * TEX + (sub & 1) * halfTex;
+        const ty = ly * TEX + (sub >> 1) * halfTex;
+        for (let oy = 0; oy < halfTex; oy++) for (let ox = 0; ox < halfTex; ox++) {
+          data[((ty + oy) * texCs + tx + ox) * 4 + 3] = 0;
+        }
       }
     }
-    if (hasBlight) {
+    this.blightCells[k] = count ? cells : null;
+    this.blightCellCounts[k] = count;
+    if (count) {
       const canvas = this.blightCanvases[k] ?? document.createElement("canvas");
       if (!this.blightCanvases[k]) canvas.width = canvas.height = texCs;
       canvas.getContext("2d")!.putImageData(this.image, 0, 0, tx0, ty0, tw, th);
@@ -1038,7 +1062,7 @@ export class TerrainRenderer {
       this.edgeChunkVersion[k] = ++this.edgeVersion;
     }
     const dCount = dormant
-      ? markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid, (sx, sy) => dormant(sy * sw + sx))
+      ? markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid, (sx, sy) => dormant(sy * sw + sx), true)
       : 0;
     if (dCount === 0) {
       if (this.dormantLive[k]) {

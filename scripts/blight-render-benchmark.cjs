@@ -6,6 +6,7 @@ const dir=fs.mkdtempSync(path.join(root,'node_modules/.cache/blight-bench-'));
 cp.execFileSync('tar',['-x','-C',dir],{input:cp.execFileSync('git',['archive',ref,'src'],{cwd:root,maxBuffer:32e6})});
 (async()=>{const b=await pw.chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});const results=[];
 try{for(const device of [{name:'desktop',width:1200,height:800,scale:1,cpu:1},{name:'mobile',width:390,height:844,scale:2,cpu:4}]){
+device.dormant=process.env.BREACH_DORMANT==='1';
 const context=await b.newContext({viewport:{width:device.width,height:device.height},deviceScaleFactor:device.scale}),p=await context.newPage();
 const cdp=await context.newCDPSession(p);await cdp.send('Emulation.setCPUThrottlingRate',{rate:device.cpu});
 await p.goto('http://localhost:5173');
@@ -15,7 +16,9 @@ const rows=[];const pct=a=>{a.sort((a,b)=>a-b);return{p50:a[Math.floor(a.length*
 for(const zoom of [.5,1.13])for(const moving of [false,true])for(const growth of ['visible','offscreen']){
 const w=new PixelWorld({width:256,height:256,cellSize:8,roomSize:10});
 for(let y=40;y<110;y++)for(let x=40;x<110;x++)if((x+y)%4!==0)w.setCell(x,y,10,'grown',true);
-const a=new Old(w,16),b=new Next(w,16),cam=new CameraSystem(w);cam.viewW=device.width;cam.viewH=device.height;cam.zoom=zoom;cam.x=600;cam.y=600;
+const a=new Old(w,16),b=new Next(w,16),cam=new CameraSystem(w);
+if(device.dormant)a.dormantAt=b.dormantAt=si=>si%7===0;
+cam.viewW=device.width;cam.viewH=device.height;cam.zoom=zoom;cam.x=600;cam.y=600;
 const canvases=[a,b].map(()=>{const c=document.createElement('canvas');c.width=device.width*device.scale;c.height=device.height*device.scale;return c}),times=[[],[]],paints=[0,0];
 [a,b].forEach((r,j)=>{const f=r.paintEdgeFire;r.paintEdgeFire=function(...args){paints[j]++;return f.apply(this,args)};while(r.chunks.pending)r.update()});
 let maxDelta=0,channels=0,alphaChanges=0;
@@ -51,5 +54,5 @@ return rows;
 },{url:'/'+path.relative(root,dir),device});
 for(const r of rows){if(r.alphaChanges || (r.changedChannels&&!process.env.BREACH_ALLOW_PHASE_DIFF))throw Error('Pixel mismatch '+JSON.stringify(r));results.push({device,...r})}
 await context.close()}
-fs.writeFileSync('/tmp/blight-render-benchmark.json',JSON.stringify(results,null,2));console.log(JSON.stringify(results));
+fs.writeFileSync(process.env.BREACH_REPORT||'/tmp/blight-render-benchmark.json',JSON.stringify(results,null,2));console.log(JSON.stringify(results));
 }finally{await b.close();fs.rmSync(dir,{recursive:true,force:true})}})().catch(e=>{console.error(e);process.exitCode=1});
