@@ -651,9 +651,11 @@ export class TerrainRenderer {
       data[p + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
       data[p + 3] = a;
     };
-    for (let ly = 0; ly < cs; ly++) {
+    const x0 = this.chunks.x0[k], y0 = this.chunks.y0[k];
+    const x1 = this.chunks.x1[k], y1 = this.chunks.y1[k];
+    for (let ly = y0; ly <= y1; ly++) {
       const cy = ky * cs + ly;
-      for (let lx = 0; lx < cs; lx++) {
+      for (let lx = x0; lx <= x1; lx++) {
         const cx = kx * cs + lx;
         const tx0 = lx * TEX;
         const ty0 = ly * TEX;
@@ -826,7 +828,10 @@ export class TerrainRenderer {
         }
       }
     }
-    this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0);
+    // The shared image contains valid pixels only inside this edit rectangle.
+    const tx0 = x0 * TEX, ty0 = y0 * TEX;
+    const tw = (x1 - x0 + 1) * TEX, th = (y1 - y0 + 1) * TEX;
+    this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0, tx0, ty0, tw, th);
     // Reuse the albedo pixels, masking everything except living Blight.
     // This cache changes with its terrain chunk, never by scanning the view.
     let hasBlight = false;
@@ -836,6 +841,7 @@ export class TerrainRenderer {
       const sx = kx * cs * 2 + lx, sy = ky * cs * 2 + ly;
       const blight = world.isBlightSubAt(sx, sy);
       if (blight) { hasBlight = true; continue; }
+      if (lx < x0 * 2 || lx >= (x1 + 1) * 2 || ly < y0 * 2 || ly >= (y1 + 1) * 2) continue;
       const tx = lx * halfTex, ty = ly * halfTex;
       for (let oy = 0; oy < halfTex; oy++) for (let ox = 0; ox < halfTex; ox++) {
         data[((ty + oy) * texCs + tx + ox) * 4 + 3] = 0;
@@ -844,7 +850,7 @@ export class TerrainRenderer {
     if (hasBlight) {
       const canvas = this.blightCanvases[k] ?? document.createElement("canvas");
       if (!this.blightCanvases[k]) canvas.width = canvas.height = texCs;
-      canvas.getContext("2d")!.putImageData(this.image, 0, 0);
+      canvas.getContext("2d")!.putImageData(this.image, 0, 0, tx0, ty0, tw, th);
       this.blightCanvases[k] = canvas;
     } else this.blightCanvases[k] = null;
 

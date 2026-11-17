@@ -13,6 +13,11 @@ export class TerrainChunks {
   readonly geometryDirty: Uint8Array;
   /** Alpha may change, including HP-only damage to translucent glass. */
   readonly opacityDirty: Uint8Array;
+  /** Inclusive local cell bounds of pending artwork edits, including neighboring relief. */
+  readonly x0: Uint32Array;
+  readonly y0: Uint32Array;
+  readonly x1: Uint32Array;
+  readonly y1: Uint32Array;
   /** Queue of dirty chunk indices (deduplicated via `dirty`). */
   private queue: number[] = [];
 
@@ -21,6 +26,10 @@ export class TerrainChunks {
     this.cols = Math.ceil(world.width / chunkSize);
     this.rows = Math.ceil(world.height / chunkSize);
     this.dirty = new Uint8Array(this.cols * this.rows);
+    this.x0 = new Uint32Array(this.dirty.length);
+    this.y0 = new Uint32Array(this.dirty.length);
+    this.x1 = new Uint32Array(this.dirty.length);
+    this.y1 = new Uint32Array(this.dirty.length);
     this.geometryDirty = new Uint8Array(this.dirty.length);
     this.opacityDirty = new Uint8Array(this.dirty.length);
     world.addListener((cx, cy, kind) => {
@@ -33,6 +42,8 @@ export class TerrainChunks {
     this.queue.length = 0;
     for (let i = 0; i < this.dirty.length; i++) {
       this.dirty[i] = this.geometryDirty[i] = this.opacityDirty[i] = 1;
+      this.x0[i] = this.y0[i] = 0;
+      this.x1[i] = this.y1[i] = this.chunkSize - 1;
       this.queue.push(i);
     }
   }
@@ -52,7 +63,15 @@ export class TerrainChunks {
     const k = ky * this.cols + kx;
     if (geometry) this.geometryDirty[k] = 1;
     if (opacity) this.opacityDirty[k] = 1;
-    if (!this.dirty[k]) {
+    const x = cx - kx * this.chunkSize, y = cy - ky * this.chunkSize;
+    if (this.dirty[k]) {
+      this.x0[k] = Math.min(this.x0[k], x);
+      this.y0[k] = Math.min(this.y0[k], y);
+      this.x1[k] = Math.max(this.x1[k], x);
+      this.y1[k] = Math.max(this.y1[k], y);
+    } else {
+      this.x0[k] = this.x1[k] = x;
+      this.y0[k] = this.y1[k] = y;
       this.dirty[k] = 1;
       this.queue.push(k);
     }

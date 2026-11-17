@@ -1,0 +1,405 @@
+{
+  "baseline": "2dfee83ea8de3ee1a5a585981877271796dcb42b",
+  "rows": [
+    {
+      "device": {
+        "name": "desktop",
+        "width": 1200,
+        "height": 800,
+        "scale": 1,
+        "cpu": 1
+      },
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "editsPerFrame": 1,
+      "baseline": {
+        "p50": 28.399999998509884,
+        "p95": 35.100000001490116,
+        "p99": 40.099999997764826
+      },
+      "updated": {
+        "p50": 25.800000000745058,
+        "p95": 32.30000000074506,
+        "p99": 34.399999998509884
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "desktop",
+        "width": 1200,
+        "height": 800,
+        "scale": 1,
+        "cpu": 1
+      },
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "editsPerFrame": 1,
+      "baseline": {
+        "p50": 20.899999998509884,
+        "p95": 29.399999998509884,
+        "p99": 34.30000000074506
+      },
+      "updated": {
+        "p50": 19.699999999254942,
+        "p95": 27.100000001490116,
+        "p99": 33.80000000074506
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "desktop",
+        "width": 1200,
+        "height": 800,
+        "scale": 1,
+        "cpu": 1
+      },
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "editsPerFrame": 1,
+      "baseline": {
+        "p50": 26.699999999254942,
+        "p95": 33.80000000074506,
+        "p99": 38.600000001490116
+      },
+      "updated": {
+        "p50": 26.199999999254942,
+        "p95": 31.799999997019768,
+        "p99": 35.400000002235174
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "desktop",
+        "width": 1200,
+        "height": 800,
+        "scale": 1,
+        "cpu": 1
+      },
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "editsPerFrame": 1,
+      "baseline": {
+        "p50": 21.900000002235174,
+        "p95": 27,
+        "p99": 45.399999998509884
+      },
+      "updated": {
+        "p50": 20.600000001490116,
+        "p95": 27,
+        "p99": 42.600000001490116
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "desktop",
+        "width": 1200,
+        "height": 800,
+        "scale": 1,
+        "cpu": 1
+      },
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "editsPerFrame": 32,
+      "baseline": {
+        "p50": 31.899999998509884,
+        "p95": 34.600000001490116,
+        "p99": 36.70000000298023
+      },
+      "updated": {
+        "p50": 28.600000001490116,
+        "p95": 39.5,
+        "p99": 68.09999999776483
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "desktop",
+        "width": 1200,
+        "height": 800,
+        "scale": 1,
+        "cpu": 1
+      },
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "editsPerFrame": 32,
+      "baseline": {
+        "p50": 28.699999999254942,
+        "p95": 35,
+        "p99": 35.100000001490116
+      },
+      "updated": {
+        "p50": 25.099999997764826,
+        "p95": 32.399999998509884,
+        "p99": 33.5
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "desktop",
+        "width": 1200,
+        "height": 800,
+        "scale": 1,
+        "cpu": 1
+      },
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "editsPerFrame": 32,
+      "baseline": {
+        "p50": 31.699999999254942,
+        "p95": 39.19999999925494,
+        "p99": 42.80000000074506
+      },
+      "updated": {
+        "p50": 29.400000002235174,
+        "p95": 51.29999999701977,
+        "p99": 64.5
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "desktop",
+        "width": 1200,
+        "height": 800,
+        "scale": 1,
+        "cpu": 1
+      },
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "editsPerFrame": 32,
+      "baseline": {
+        "p50": 28.5,
+        "p95": 32.100000001490116,
+        "p99": 42.100000001490116
+      },
+      "updated": {
+        "p50": 25.699999999254942,
+        "p95": 27.699999999254942,
+        "p99": 27.899999998509884
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844,
+        "scale": 2,
+        "cpu": 4
+      },
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "editsPerFrame": 1,
+      "baseline": {
+        "p50": 146.19999999925494,
+        "p95": 173,
+        "p99": 207.39999999850988
+      },
+      "updated": {
+        "p50": 134.5,
+        "p95": 181.60000000149012,
+        "p99": 221
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844,
+        "scale": 2,
+        "cpu": 4
+      },
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "editsPerFrame": 1,
+      "baseline": {
+        "p50": 111.39999999850988,
+        "p95": 129.19999999925494,
+        "p99": 165.10000000149012
+      },
+      "updated": {
+        "p50": 103.90000000223517,
+        "p95": 114.30000000074506,
+        "p99": 130.39999999850988
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844,
+        "scale": 2,
+        "cpu": 4
+      },
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "editsPerFrame": 1,
+      "baseline": {
+        "p50": 143.69999999925494,
+        "p95": 237.29999999701977,
+        "p99": 238.5
+      },
+      "updated": {
+        "p50": 134.30000000074506,
+        "p95": 169.90000000223517,
+        "p99": 225.89999999850988
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844,
+        "scale": 2,
+        "cpu": 4
+      },
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "editsPerFrame": 1,
+      "baseline": {
+        "p50": 127.29999999701977,
+        "p95": 155,
+        "p99": 170.90000000223517
+      },
+      "updated": {
+        "p50": 116.10000000149012,
+        "p95": 150.60000000149012,
+        "p99": 176.60000000149012
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844,
+        "scale": 2,
+        "cpu": 4
+      },
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "editsPerFrame": 32,
+      "baseline": {
+        "p50": 179.20000000298023,
+        "p95": 256.29999999701977,
+        "p99": 290.0999999977648
+      },
+      "updated": {
+        "p50": 164.79999999701977,
+        "p95": 256.8999999985099,
+        "p99": 341
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844,
+        "scale": 2,
+        "cpu": 4
+      },
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "editsPerFrame": 32,
+      "baseline": {
+        "p50": 179,
+        "p95": 212.89999999850988,
+        "p99": 251.5
+      },
+      "updated": {
+        "p50": 166,
+        "p95": 216.30000000074506,
+        "p99": 305.30000000074506
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844,
+        "scale": 2,
+        "cpu": 4
+      },
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "editsPerFrame": 32,
+      "baseline": {
+        "p50": 184.60000000149012,
+        "p95": 250.30000000074506,
+        "p99": 305
+      },
+      "updated": {
+        "p50": 171.10000000149012,
+        "p95": 212.89999999850988,
+        "p99": 215.20000000298023
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": {
+        "name": "mobile",
+        "width": 390,
+        "height": 844,
+        "scale": 2,
+        "cpu": 4
+      },
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "editsPerFrame": 32,
+      "baseline": {
+        "p50": 167.5,
+        "p95": 212.90000000223517,
+        "p99": 231.5
+      },
+      "updated": {
+        "p50": 147.80000000074506,
+        "p95": 182.69999999925494,
+        "p99": 210.80000000074506
+      },
+      "changedChannels": 0,
+      "maxDelta": 0
+    }
+  ]
+}

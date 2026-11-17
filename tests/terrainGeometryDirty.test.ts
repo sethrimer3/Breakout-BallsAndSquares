@@ -45,3 +45,46 @@ describe('terrain artwork versus geometry invalidation',()=>{
     expect(chunks.geometryDirty.every(v=>v===1)).toBe(true);
   });
 });
+
+describe('terrain artwork edit bounds', () => {
+  const bounds = (c: TerrainChunks, k: number) => [c.x0[k], c.y0[k], c.x1[k], c.y1[k]];
+
+  it('includes diagonal relief neighbors across all four chunks at a corner', () => {
+    const { chunks } = fixture();
+    chunks.markCell(3, 3);
+    expect(bounds(chunks, 0)).toEqual([2, 2, 3, 3]);
+    expect(bounds(chunks, 1)).toEqual([0, 2, 0, 3]);
+    expect(bounds(chunks, 4)).toEqual([2, 0, 3, 0]);
+    expect(bounds(chunks, 5)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('unions queued edits and retains their bounds across budgeted updates', () => {
+    const { chunks } = fixture();
+    chunks.markCell(1, 1);
+    chunks.markCell(3, 3);
+    const batch: number[] = [];
+    chunks.take(1, batch);
+    expect(batch).toEqual([0]);
+    expect(bounds(chunks, 0)).toEqual([0, 0, 3, 3]);
+    chunks.markCell(6, 2);
+    expect(bounds(chunks, 1)).toEqual([0, 1, 3, 3]);
+    // A new edit to the consumed chunk starts a fresh rectangle.
+    chunks.markCell(1, 1);
+    expect(bounds(chunks, 0)).toEqual([0, 0, 2, 2]);
+  });
+
+  it('keeps a full repaint when edits join initial generation or regeneration', () => {
+    const { chunks } = fixture();
+    chunks.markAll();
+    chunks.markCell(1, 1);
+    for (let k = 0; k < chunks.dirty.length; k++) expect(bounds(chunks, k)).toEqual([0, 0, 3, 3]);
+  });
+
+  it('clips at world edges and expands the bounds for HP-only damage', () => {
+    const { chunks, w } = fixture();
+    w.health[0] = 100;
+    w.damage(0, 0, 1);
+    expect(bounds(chunks, 0)).toEqual([0, 0, 1, 1]);
+    expect(chunks.pending).toBe(1);
+  });
+});
