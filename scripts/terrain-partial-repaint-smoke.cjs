@@ -13,6 +13,7 @@ let pw; try { pw = require('playwright'); } catch { pw = require('/opt/codex/cua
       // Non-multiple dimensions also exercise padded pixels in the final chunks.
       const w = new PixelWorld({width:65,height:67,cellSize:8,roomSize:4});
       const a = new TerrainRenderer(w,32), b = new TerrainRenderer(w,32);
+      w.decor.fill(1);
       a.rebuildAll(); b.rebuildAll();
       let comparisons = 0;
       const same = (ca, cb, label) => {
@@ -26,9 +27,13 @@ let pw; try { pw = require('playwright'); } catch { pw = require('/opt/codex/cua
         while(a.chunks.pending) a.update();
         // Unlike the incremental renderer, the oracle paints every cell each time.
         b.rebuildAll();
+        a.flushFloor();
+        same(a.floorCanvas,b.floorCanvas,label+' floor');
         for (let k=0;k<a.canvases.length;k++) {
           same(a.canvases[k],b.canvases[k],label+' albedo '+k);
           same(a.blightCanvases[k],b.blightCanvases[k],label+' blight '+k);
+          same(a.edgeMasks[k],b.edgeMasks[k],label+' live mask '+k);
+          same(a.dormantMasks[k],b.dormantMasks[k],label+' dormant mask '+k);
         }
       };
       for (let frame=0;frame<48;frame++) {
@@ -65,7 +70,7 @@ let pw; try { pw = require('playwright'); } catch { pw = require('/opt/codex/cua
         check('subkind '+kind);
       }
       // No stale Blight remains when its final subcell disappears, then reappears.
-      w.subHealth.fill(0);w.health.fill(0);w.blight.fill(0);a.chunks.markAll();check('empty');
+      w.subHealth.fill(0);w.health.fill(0);w.blight.fill(0);a.chunks.markAll();a.buildFloor();check('empty');
       if(a.blightCells.some(Boolean) || a.blightCellCounts.some(Boolean)) throw Error('Empty chunks retain Blight classification');
       w.setSubCell(63,63,10);check('reappear');
       const cam = new CameraSystem(w);cam.viewW=600;cam.viewH=450;cam.x=260.37;cam.y=268.71;

@@ -55,8 +55,17 @@ export class BlightColonies {
     this.edgePos = new Int32Array(n).fill(-1);
     this.stamp = new Uint32Array(n);
     this.queue = new Int32Array(n);
-    world.addListener((cx, cy) => {
-      if (this.bulk) return;
+    world.addListener((cx, cy, kind, sx, sy) => {
+      if (this.bulk || kind === "damaged") return;
+      if (sx !== undefined && sy !== undefined) {
+        // Match the old row-major refresh order, visiting only affected cells.
+        this.refresh(sx, sy - 1);
+        this.refresh(sx - 1, sy);
+        this.refresh(sx, sy);
+        this.refresh(sx + 1, sy);
+        this.refresh(sx, sy + 1);
+        return;
+      }
       const sx0 = cx * 2 - 1;
       const sy0 = cy * 2 - 1;
       for (let sy = sy0; sy <= sy0 + 3; sy++) {

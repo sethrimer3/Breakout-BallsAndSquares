@@ -1,6 +1,9 @@
 /** Mask pixels per world subcell: a Blight edge is one mask pixel thick, half a subcell. */
 export const EDGE_PIXELS_PER_SUB = 2;
 
+/** Inclusive chunk-local subcell bounds to recompute. */
+export interface SubcellRegion { x0: number; y0: number; x1: number; y1: number }
+
 export interface BlightGrid {
   readonly subWidth: number;
   readonly subHeight: number;
@@ -13,7 +16,7 @@ export interface BlightGrid {
  * that is not Blight, including corner pixels touching a non-Blight diagonal.
  * The world's border counts as Blight, so it draws no edge.
  * `out` has `subs * EDGE_PIXELS_PER_SUB` pixels a side, 1 for edge, and `solid`
- * is a reusable `(subs + 2)²` scratch. Returns how many mask pixels were set.
+ * is a reusable `(subs + 2)²` scratch. Returns the count inside the updated region.
  */
 export function markBlightEdges(
   grid: BlightGrid,
@@ -26,22 +29,29 @@ export function markBlightEdges(
   include?: (sx: number, sy: number) => boolean,
   /** Reuse `solid` from the immediately preceding call for the same unchanged grid/rectangle. */
   reuseSnapshot = false,
+  /** Only this region of `out` is written; `solid` samples a one-subcell border too. Reuse requires the same region. */
+  region?: SubcellRegion,
 ): number {
   const pad = subs + 2;
+  const x0 = region?.x0 ?? 0, y0 = region?.y0 ?? 0;
+  const x1 = region?.x1 ?? subs - 1, y1 = region?.y1 ?? subs - 1;
   let any = false;
-  for (let y = 0; y < pad; y++) {
+  for (let y = y0; y <= y1 + 2; y++) {
     const sy = sy0 + y - 1;
-    for (let x = 0; x < pad; x++) {
+    for (let x = x0; x <= x1 + 2; x++) {
       const sx = sx0 + x - 1;
       const outside = sx < 0 || sy < 0 || sx >= grid.subWidth || sy >= grid.subHeight;
       const here = reuseSnapshot ? solid[y * pad + x] !== 0 : outside || grid.isBlightSubAt(sx, sy);
       if (!reuseSnapshot) solid[y * pad + x] = here ? 1 : 0;
-      if (!any && here && !outside && x > 0 && y > 0 && x <= subs && y <= subs && (!include || include(sx, sy))) any = true;
+      if (!any && here && !outside && x > x0 && y > y0 && x <= x1 + 1 && y <= y1 + 1 && (!include || include(sx, sy))) any = true;
     }
   }
-  out.fill(0);
-  if (!any) return 0;
   const size = subs * EDGE_PIXELS_PER_SUB;
+  if (!region) out.fill(0);
+  else for (let y = y0 * EDGE_PIXELS_PER_SUB; y < (y1 + 1) * EDGE_PIXELS_PER_SUB; y++) {
+    out.fill(0, y * size + x0 * EDGE_PIXELS_PER_SUB, y * size + (x1 + 1) * EDGE_PIXELS_PER_SUB);
+  }
+  if (!any) return 0;
   let count = 0;
   const mark = (x: number, y: number): void => {
     const i = y * size + x;
@@ -50,8 +60,8 @@ export function markBlightEdges(
       count++;
     }
   };
-  for (let y = 0; y < subs; y++) {
-    for (let x = 0; x < subs; x++) {
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
       const i = (y + 1) * pad + x + 1;
       if (solid[i] === 0) continue;
       if (include && !include(sx0 + x, sy0 + y)) continue;

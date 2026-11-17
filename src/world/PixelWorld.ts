@@ -135,7 +135,8 @@ export interface SpecimenSpot {
 
 export type CellChangeKind = "damaged" | "destroyed" | "grown" | "set";
 
-export type CellListener = (cx: number, cy: number, kind: CellChangeKind) => void;
+/** Optional fine-grid coordinates identify a change confined to one subcell. */
+export type CellListener = (cx: number, cy: number, kind: CellChangeKind, sx?: number, sy?: number) => void;
 export type DestroyListener = (cx: number, cy: number, isSub: boolean, sx: number, sy: number) => void;
 
 export interface WorldDims {
@@ -547,7 +548,7 @@ export class PixelWorld implements SolidQuery {
     const si = sy * this.subWidth + sx;
     this.subHealth[si] = hp;
     if (kind === "grown") this.subKind[si] = SUB.blight;
-    if (!silent) this.emit(sx >> 1, sy >> 1, kind);
+    if (!silent) this.emit(sx >> 1, sy >> 1, kind, sx, sy);
   }
 
   /**
@@ -665,7 +666,7 @@ export class PixelWorld implements SolidQuery {
     if (next === 0) {
       const spreads = this.subKind[si] !== SUB.blight;
       const debrisDamage = this.maxSubHealthAt(sx, sy);
-      this.emit(cx, cy, "destroyed");
+      this.emit(cx, cy, "destroyed", sx, sy);
       this.emitDestroy(cx, cy, true, sx, sy);
       if (spreads) this.spreadDebrisDamage(sx, sy, debrisDamage, byPlayer);
       return 2;
@@ -673,7 +674,7 @@ export class PixelWorld implements SolidQuery {
     if (byPlayer && this.subHealth[si] > 0 && this.subHealth[si] < hp) {
       this.emitDamage((sx + 0.5) * this.subCellSize, (sy + 0.5) * this.subCellSize, hp - this.subHealth[si], true, attackDx, attackDy);
     }
-    this.emit(cx, cy, "damaged");
+    this.emit(cx, cy, "damaged", sx, sy);
     return 1;
   }
 
@@ -728,8 +729,11 @@ export class PixelWorld implements SolidQuery {
     return core;
   }
 
-  private emit(cx: number, cy: number, kind: CellChangeKind): void {
-    for (let k = 0; k < this.listeners.length; k++) this.listeners[k](cx, cy, kind);
+  private emit(cx: number, cy: number, kind: CellChangeKind, sx?: number, sy?: number): void {
+    for (let k = 0; k < this.listeners.length; k++) {
+      if (sx === undefined) this.listeners[k](cx, cy, kind);
+      else this.listeners[k](cx, cy, kind, sx, sy);
+    }
   }
 }
 

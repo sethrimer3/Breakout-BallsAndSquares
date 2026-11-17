@@ -1,5 +1,7 @@
 # Rendering audit and validated changes
 
+For the later real-replication profile and terrain fixes, see [active Blight growth results](FAST_GROWTH_RENDERING.md).
+
 This pass audits the complete render pipeline and its preparation work across all five worlds, implements the validated improvements below, and ranks the remaining major targets.
 
 Baseline: `a56afb14e409df923b807bb30665faa27f5d7d21`, the latest incoming phone-rendering implementation. The optimized source is committed with this report; its SHA-256 is `66f937e173d61cfd6a3c0570a8aa55daf71542c43b8e9d7fc4b167cfc9978bc3`. Complete measurements, pixel records, and validation results are in [RENDERING_AUDIT_DATA.json](RENDERING_AUDIT_DATA.json).

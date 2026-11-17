@@ -1,3 +1,4 @@
+import { BinaryMask } from "./BinaryMask";
 import { FloorRegions } from "./FloorRegions";
 import { visibleRoomLightIndices } from "./RoomLightIndex";
 import { fogRegionVisible } from "./fogRegionVisible";
@@ -6,7 +7,7 @@ import { SortedGridIndex } from "./SortedGridIndex";
 import { boundaryColor } from "../world/MapBoundary";
 import { traceSurfaceOutline } from "./surfaceOutline";
 import { COLORS, FACILITY, TERRAIN, TERRAIN as T, zoneForDepth } from "../config";
-import { EDGE_PIXELS_PER_SUB, markBlightEdges } from "./blightEdges";
+import { EDGE_PIXELS_PER_SUB, markBlightEdges, type SubcellRegion } from "./blightEdges";
 import { paintPortal } from "./portalNoise";
 import type { CameraSystem } from "../systems/CameraSystem";
 import { hash2 } from "../core/math";
@@ -153,6 +154,8 @@ export class TerrainRenderer {
   rebuiltLastFrame = 0;
   /** Per chunk: a mask of its Blight edges, made the first time it has any. */
   private edgeMasks: (HTMLCanvasElement | null)[] = [];
+  private edgeValues: (BinaryMask | null)[] = [];
+  private dormantValues: (BinaryMask | null)[] = [];
   private edgeLive: Uint8Array;
   private edgeVisibility: Uint8Array;
   private edgeBits: Uint8Array;
@@ -213,6 +216,8 @@ export class TerrainRenderer {
     this.image = new ImageData(chunkSize * TEX, chunkSize * TEX);
     const edgeSize = subChunk * EDGE_PIXELS_PER_SUB;
     this.edgeMasks = new Array<HTMLCanvasElement | null>(n).fill(null);
+    this.edgeValues = new Array<BinaryMask | null>(n).fill(null);
+    this.dormantValues = new Array<BinaryMask | null>(n).fill(null);
     this.edgeLive = new Uint8Array(n);
     this.edgeChunkVersion = new Uint32Array(n);
     this.dormantChunkVersion = new Uint32Array(n);
@@ -233,12 +238,13 @@ export class TerrainRenderer {
     this.panelGlow = radialSprite([255, 255, 255]);
     this.blightGlow = radialSprite([255, 70, 160]);
     // Broken or overgrown machinery goes dark.
-    world.addListener((cx, cy, kind) => {
+    world.addListener((cx, cy, kind, sx) => {
       if (kind === "destroyed" || kind === "grown") {
         this.glowCanvas.getContext("2d")!.clearRect(cx, cy, 1, 1);
       }
       // Walls coming down (or Blight filling in) move the floor's contact shadows.
-      if (kind !== "damaged") this.floorRegions.mark(cx - 1, cy - 1, cx + 1, cy + 1);
+      // Floor contact shadows depend on full-size health, not subcell occupancy.
+      if (kind !== "damaged" && sx === undefined) this.floorRegions.mark(cx - 1, cy - 1, cx + 1, cy + 1);
     });
   }
 
@@ -1046,46 +1052,65 @@ export class TerrainRenderer {
   }
 
   private buildEdgeMask(k: number, kx: number, ky: number): void {
-    const subs = this.chunks.chunkSize * 2;
-    const dormant = this.dormantAt;
-    const sw = this.world.subWidth;
+    const cs = this.chunks.chunkSize, subs = cs * 2;
+    // Partial world-edge chunks retain the full scan's border conventions.
+    const partial = (kx + 1) * cs > this.world.width || (ky + 1) * cs > this.world.height;
+    const region: SubcellRegion = partial ? { x0: 0, y0: 0, x1: subs - 1, y1: subs - 1 } : {
+      x0: this.chunks.x0[k] * 2, y0: this.chunks.y0[k] * 2,
+      x1: (this.chunks.x1[k] + 1) * 2 - 1, y1: (this.chunks.y1[k] + 1) * 2 - 1,
+    };
+    const dormant = this.dormantAt, sw = this.world.subWidth;
     const live = dormant ? (sx: number, sy: number) => !dormant(sy * sw + sx) : undefined;
-    const count = markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid, live);
-    if (count === 0) {
-      if (this.edgeLive[k]) {
-        this.edgeLive[k] = 0;
-        this.edgeChunkVersion[k] = ++this.edgeVersion;
-      }
+    const count = markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid, live, false, region);
+    this.publishEdgeMask(k, region, count, false);
+    if (dormant) {
+      const count = markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid,
+        (sx, sy) => dormant(sy * sw + sx), true, region);
+      this.publishEdgeMask(k, region, count, true);
     } else {
-      this.edgeMasks[k] = this.writeMask(this.edgeMasks[k]);
-      this.edgeLive[k] = 1;
-      this.edgeChunkVersion[k] = ++this.edgeVersion;
-    }
-    const dCount = dormant
-      ? markBlightEdges(this.world, kx * subs, ky * subs, subs, this.edgeBits, this.edgeSolid, (sx, sy) => dormant(sy * sw + sx), true)
-      : 0;
-    if (dCount === 0) {
-      if (this.dormantLive[k]) {
-        this.dormantLive[k] = 0;
-        this.dormantChunkVersion[k] = ++this.dormantVersion;
+      // A removed dormancy predicate may move all old dormant edges to live.
+      // Its callers invalidate all chunks, so the full dirty region clears them.
+      const size = this.edgeImage.width, scale = EDGE_PIXELS_PER_SUB;
+      for (let y = region.y0 * scale; y < (region.y1 + 1) * scale; y++) {
+        this.edgeBits.fill(0, y * size + region.x0 * scale, y * size + (region.x1 + 1) * scale);
       }
-    } else {
-      this.dormantMasks[k] = this.writeMask(this.dormantMasks[k]);
-      this.dormantLive[k] = 1;
-      this.dormantChunkVersion[k] = ++this.dormantVersion;
+      this.publishEdgeMask(k, region, 0, true);
     }
   }
 
-  /** Copy `edgeBits` into a chunk mask canvas (made on first use). */
-  private writeMask(mask: HTMLCanvasElement | null): HTMLCanvasElement {
+  private publishEdgeMask(k: number, region: SubcellRegion, regionalCount: number, frozen: boolean): void {
+    const values = frozen ? this.dormantValues : this.edgeValues;
+    const masks = frozen ? this.dormantMasks : this.edgeMasks;
+    const live = frozen ? this.dormantLive : this.edgeLive;
+    const revisions = frozen ? this.dormantChunkVersion : this.edgeChunkVersion;
+    if (!regionalCount && !values[k]) return;
+    const value = values[k] ?? (values[k] = new BinaryMask(this.edgeImage.width));
+    const scale = EDGE_PIXELS_PER_SUB;
+    const x = region.x0 * scale, y = region.y0 * scale;
+    const width = (region.x1 - region.x0 + 1) * scale, height = (region.y1 - region.y0 + 1) * scale;
+    if (!value.update(this.edgeBits, x, y, x + width - 1, y + height - 1)) return;
+    revisions[k] = frozen ? ++this.dormantVersion : ++this.edgeVersion;
+    live[k] = value.count ? 1 : 0;
+    if (!value.count) {
+      values[k] = null;
+      masks[k] = null;
+      return;
+    }
+    masks[k] = this.writeMask(masks[k], x, y, width, height);
+  }
+
+  /** Upload only scratch pixels belonging to this edit; the canvas keeps the rest. */
+  private writeMask(mask: HTMLCanvasElement | null, x: number, y: number, width: number, height: number): HTMLCanvasElement {
     if (!mask) {
       mask = document.createElement("canvas");
       mask.width = mask.height = this.edgeImage.width;
     }
-    const data = this.edgeImage.data;
-    const bits = this.edgeBits;
-    for (let i = 0; i < bits.length; i++) data[i * 4 + 3] = bits[i] * 255;
-    mask.getContext("2d")!.putImageData(this.edgeImage, 0, 0);
+    const size = this.edgeImage.width, data = this.edgeImage.data, bits = this.edgeBits;
+    for (let row = y; row < y + height; row++) for (let col = x; col < x + width; col++) {
+      const i = row * size + col;
+      data[i * 4 + 3] = bits[i] * 255;
+    }
+    mask.getContext("2d")!.putImageData(this.edgeImage, 0, 0, x, y, width, height);
     return mask;
   }
 
