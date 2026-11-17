@@ -2,7 +2,7 @@ import { accessId, WEAPON_MARKETS } from "./BlackMarket";
 import { RENDER_QUALITIES, type RenderQuality } from "../rendering/RenderScale";
 import { parseProfileSeed, randomProfileSeed } from "../core/ProfileSeed";
 import type { SpeedrunData } from "../core/SpeedrunTimer";
-import { sectorCount, sectorTier } from "../world/labMap";
+import { parseLateMarkers, sectorCount, sectorTier } from "../world/labMap";
 import { clamp } from "../core/math";
 import { LAB_WORLD_COUNT, LAB_WORLDS } from "../world/labMap";
 import { CAMPAIGN, campaignTier } from "../world/campaignBalance";
@@ -150,8 +150,16 @@ export interface SaveData {
     world: number;
     /** Highest world the squad has reached through a gate. */
     unlocked: number;
+    /** Late-world blueprint layout version (0 = legacy formula, 1 = authored blueprints). */
+    lateLayout: number;
     /** Per world (keyed "1", "2", ...), by sector index. */
     worlds: Record<string, LabWorldProgress>;
+  };
+  campaign: {
+    /** True once the Leviathan Core boss in World 5 has been defeated. */
+    complete: boolean;
+    /** Run time (seconds) recorded on first campaign completion. */
+    clearTime?: number;
   };
   lastSaved?: number;
 }
@@ -178,7 +186,7 @@ export function freshLabWorld(id: number): LabWorldProgress {
 function defaultLab(): SaveData["lab"] {
   const worlds: Record<string, LabWorldProgress> = {};
   for (let id = 1; id <= LAB_WORLD_COUNT; id++) worlds[id] = freshLabWorld(id);
-  return { world: 1, unlocked: 1, worlds };
+  return { world: 1, unlocked: 1, lateLayout: 1, worlds };
 }
 
 export function defaultSaveData(seed = randomProfileSeed()): SaveData {
@@ -219,7 +227,16 @@ export function defaultSaveData(seed = randomProfileSeed()): SaveData {
       alwaysShootWhenAutoMoveOff: false,
     },
     lab: defaultLab(),
+    campaign: { complete: false },
   };
+}
+
+/** Records campaign completion once without overwriting the original clear time. */
+export function markCampaignComplete(data: SaveData, runTimeSeconds: number): boolean {
+  if (data.campaign.complete) return false;
+  data.campaign.complete = true;
+  data.campaign.clearTime = Math.max(0, runTimeSeconds);
+  return true;
 }
 
 function sectorList(v: unknown, id: number): number[] {
@@ -244,6 +261,75 @@ function sanitizeLabWorld(v: unknown, id: number): LabWorldProgress {
 function finiteNonNeg(v: unknown, fallback = 0, max = 1e12): number {
   if (typeof v !== "number" || !Number.isFinite(v)) return fallback;
   return clamp(v, 0, max);
+}
+
+/**
+ * Migrates legacy formula-layout encounter ids (Worlds 3–5) to authored blueprint ids.
+ * Sectors whose entire legacy encounter or grove set was completed are marked complete in
+ * the new layout; partial sector ids are dropped. Never pays rewards during migration.
+ */
+function migrateLateWorldProgress(worlds: Record<string, LabWorldProgress>): void {
+  for (let id = 3; id <= LAB_WORLD_COUNT; id++) {
+    const worldDef = LAB_WORLDS[id];
+    const wProg = worlds[id];
+    if (!worldDef || !wProg) continue;
+    if (wProg.cleared.length === 0 && wProg.gathered.length === 0) continue;
+
+    const newCombatBySector = new Map<number, string[]>();
+    const newGrovesBySector = new Map<number, string[]>();
+    for (const m of parseLateMarkers(worldDef.blueprint)) {
+      if (m.kind === "teleporter" || m.kind === "special") continue;
+      const eid = `${m.sector}:${m.kind}:${m.ordinal}`;
+      const bucket = m.kind === "grove" ? newGrovesBySector : newCombatBySector;
+      let list = bucket.get(m.sector);
+      if (!list) {
+        list = [];
+        bucket.set(m.sector, list);
+      }
+      list.push(eid);
+    }
+
+    const oldCleared = new Set(wProg.cleared);
+    const oldGathered = new Set(wProg.gathered);
+    const nextCleared: string[] = [];
+    const nextGathered: string[] = [];
+
+    for (let s = 0; s < sectorCount(worldDef); s++) {
+      const tier = sectorTier(worldDef, s);
+      const isBoss = id === 5 && s === 4;
+      const oldKinds =
+        s === worldDef.start || tier === 7
+          ? []
+          : isBoss
+            ? ["turret", "turret", "boss"]
+            : tier < 10
+              ? ["soldier", "soldier", "brute"]
+              : ["turret", "turret", "trap", "soldier", "brute"];
+      if (oldKinds.length > 0 && oldKinds.every((k, j) => oldCleared.has(`${s}:${k}:${j}`))) {
+        const ids = newCombatBySector.get(s);
+        if (ids) nextCleared.push(...ids);
+      }
+      if (id === 3) {
+        const nodes = CAMPAIGN[campaignTier(tier)].nodes;
+        if (nodes > 0) {
+          let allGroves = true;
+          for (let j = 0; j < nodes; j++) {
+            if (!oldGathered.has(`${s}:grove:${j}`)) {
+              allGroves = false;
+              break;
+            }
+          }
+          if (allGroves) {
+            const ids = newGrovesBySector.get(s);
+            if (ids) nextGathered.push(...ids);
+          }
+        }
+      }
+    }
+
+    wProg.cleared = nextCleared;
+    wProg.gathered = nextGathered;
+  }
 }
 
 /**
@@ -520,6 +606,20 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     const targetEssence = Math.max(0, minEssence - spentEssence);
     if (def.biomass < targetBiomass) def.biomass = targetBiomass;
     if (def.essence < targetEssence) def.essence = targetEssence;
+
+    const lateLayout = clamp(int(lab.lateLayout, 0), 0, 1);
+    if (lateLayout < 1) {
+      migrateLateWorldProgress(def.lab.worlds);
+    }
+    def.lab.lateLayout = 1;
+  }
+
+  if (obj.campaign && typeof obj.campaign === "object") {
+    const camp = obj.campaign as Record<string, unknown>;
+    def.campaign.complete = camp.complete === true;
+    if (typeof camp.clearTime === "number" && Number.isFinite(camp.clearTime) && camp.clearTime >= 0) {
+      def.campaign.clearTime = camp.clearTime;
+    }
   }
 
   if (typeof obj.lastSaved === "number" && Number.isFinite(obj.lastSaved)) {
@@ -568,6 +668,7 @@ export interface SlotSummary {
   upgradesCount: number;
   bestDepth: number;
   bestTime: number;
+  campaignComplete: boolean;
   lastSaved?: number;
 }
 
@@ -741,6 +842,7 @@ export class SaveManager {
         upgradesCount: 0,
         bestDepth: 0,
         bestTime: 0,
+        campaignComplete: false,
         lastSaved: undefined,
       };
     }
@@ -767,6 +869,7 @@ export class SaveManager {
       upgradesCount,
       bestDepth: data.bests?.depth ?? 0,
       bestTime: data.bests?.time ?? 0,
+      campaignComplete: !!data.campaign?.complete,
       lastSaved: data.lastSaved,
     };
   }

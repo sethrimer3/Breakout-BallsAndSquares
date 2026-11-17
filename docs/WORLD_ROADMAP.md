@@ -2,7 +2,7 @@
 
 ## Scope of this change
 
-Worlds 3–5 now have functional encounter spaces and an initial economy pass. Forest clearings and trails lead through peaceful gathering, rifle patrols and heavy melee enemies. City street crossfire and proximity mines defend armored facility checkpoints. Ship halls have 65,000-HP bulkheads. Shapes and colors are functional placeholders for the later art pass. See [CAMPAIGN_PACING.md](CAMPAIGN_PACING.md) for measurable budgets and tuning targets.
+Worlds 3–5 now use hand-authored, blueprint-driven maps (`src/world/late/forest.ts`, `city.ts`, `mothership.ts`) with matte pixel-art terrain, biome lighting/atmosphere, animated pixel-art encounters, special-upgrade gold blocks, and the Leviathan Core campaign ending. See [CAMPAIGN_PACING.md](CAMPAIGN_PACING.md) for measurable budgets and tuning targets.
 
 World and zone are different concepts: worlds 1/2 each contain three terrain zones; worlds 3/4/5 contain zones 7–9/10/11 respectively. The HUD displays both.
 
@@ -62,6 +62,6 @@ World and zone are different concepts: worlds 1/2 each contain three terrain zon
 
 - `labMap.ts` owns footprints, start sectors, zones, region reservations and destinations. `sectors` is the column count; `worldRows()` supplies row count for rectangular maps.
 - World 2's Tier 6 gate uses the new Tier 6 core keycard (150 green crystals + 100 essence). The Tier 9 card follows it along the core snake.
-- `worldAtmosphere.ts` owns the design profiles and continuous forest blending. Background/ambient preview lighting is active. Finished trees, canopy geometry, sunlight shadow casters/volumetric shafts, city scenery and mothership art are future work.
+- `worldAtmosphere.ts` owns the design profiles and continuous forest blending; `LateAtmosphere.ts`, `materials.ts`, and `LateEncounterRenderer.ts` implement canopy shadow patches, sun shafts, orange city haze/embers, ship conduit & bulkhead lights, matte biome materials, and animated pixel-art encounters.
 - Later generation suppresses old lab machinery and cellular Blight growth. Tier 7 remains completely peaceful. Tiers 8–11 use persistent authored encounter populations; killed enemies and gathered groves do not respawn when the map is reopened.
 - The south gate and teleporter use the existing squad-transfer machinery: health, loadouts, energy, reserves, run time and earnings survive travel. New worlds are unlocked/persisted when reached.

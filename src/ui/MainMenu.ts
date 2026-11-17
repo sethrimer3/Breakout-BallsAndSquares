@@ -99,6 +99,7 @@ export class MainMenu {
               <span class="profile-stat"><span class="stat-lbl">UPGRADES</span><span class="stat-val">${s.upgradesCount}</span></span>
             </span>
             <span class="profile-meta"><span class="slot-seed">SEED ${s.seed}</span>
+              ${s.campaignComplete ? `<span class="slot-complete" title="Campaign Complete">★ CLEARED</span>` : ""}
               ${s.speedrun.enabled || s.speedrun.elapsedMs > 0 ? `<span class="slot-speedrun">${formatSpeedrunTime(s.speedrun.elapsedMs)}${s.speedrun.enabled ? "" : " · OFF"}</span>` : ""}</span>
             <span class="profile-cta">CONTINUE <span aria-hidden="true">→</span></span>
           ` : `

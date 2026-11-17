@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CRACK_PATTERNS, MATERIAL_BASE, TIER_PAINT, crackTexelAt, materialShade } from "../src/rendering/materials";
+import { CRACK_PATTERNS, MATERIAL_BASE, TIER_PAINT, crackTexelAt, lateMaterial, materialShade } from "../src/rendering/materials";
 
 describe("matte tier materials", () => {
   it("gives every tier its own base color and paint", () => {
@@ -84,5 +84,40 @@ describe("pixel-art cracked block overlay", () => {
     expect(cracksStage1).toBeGreaterThan(0);
     expect(cracksStage2).toBeGreaterThan(cracksStage1);
     expect(cracksStage3).toBeGreaterThan(cracksStage2);
+  });
+
+  it("returns distinct colors per late environment and tier, and blends forest tiers smoothly", () => {
+    const avg = (env: "forest" | "city" | "mothership", tier: number, feature: "solid" | "floor" | "cover" | "bulkhead" = "solid") => {
+      let r = 0, g = 0, b = 0;
+      const out: [number, number, number] = [0, 0, 0];
+      for (let y = 0; y < 8; y++) {
+        for (let x = 0; x < 8; x++) {
+          lateMaterial(env, tier, x + 20, y + 20, feature, out);
+          r += out[0]; g += out[1]; b += out[2];
+        }
+      }
+      return [Math.round(r / 64), Math.round(g / 64), Math.round(b / 64)].join(",");
+    };
+
+    const samples = new Set([
+      avg("forest", 7),
+      avg("forest", 8),
+      avg("forest", 9),
+      avg("city", 10),
+      avg("mothership", 11),
+      avg("forest", 7, "floor"),
+      avg("city", 10, "floor"),
+      avg("mothership", 11, "floor"),
+    ]);
+    expect(samples.size).toBe(8);
+
+    const a: [number, number, number] = [0, 0, 0];
+    const b: [number, number, number] = [0, 0, 0];
+    const mid: [number, number, number] = [0, 0, 0];
+    lateMaterial("forest", 7, 10, 10, "solid", a);
+    lateMaterial("forest", 8, 10, 10, "solid", b);
+    lateMaterial("forest", 7.5, 10, 10, "solid", mid);
+    expect(mid[0]).toBeCloseTo((a[0] + b[0]) / 2, 1);
+    expect(mid[1]).toBeCloseTo((a[1] + b[1]) / 2, 1);
   });
 });

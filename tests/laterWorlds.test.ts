@@ -11,12 +11,14 @@ describe("later-world framework", () => {
   it.each([[3,13,13,169],[4,7,7,49],[5,3,7,21]])("builds world %i as %ix%i with %i encounter rooms", (id,columns,rows,count) => {
     const def = LAB_WORLDS[id];
     expect(def.sectors).toBe(columns); expect(worldRows(def)).toBe(rows); expect(sectorCount(def)).toBe(count);
-    expect(worldBlueprint(def).rooms).toHaveLength(count);
+    expect(new Set(worldBlueprint(def).rooms.map((r) => r.group)).size).toBe(count);
     const world = new PixelWorld(WORLD); generateWorld(world, 8, { labWorld: def });
     const frame = world.labLayout!.frame!;
-    expect(frame.def).toBe(def); expect(world.labLayout!.rooms).toHaveLength(count);
+    expect(frame.def).toBe(def); expect(new Set(world.labLayout!.rooms.map((r) => r.group)).size).toBe(count);
     expect(world.blightCores).toHaveLength(0); expect(world.sentrySpots).toHaveLength(0);
-    expect(world.specimenSpots).toHaveLength(0); expect(world.roomLights).toHaveLength(0);
+    expect(world.specimenSpots).toHaveLength(0);
+    if (id === 3) expect(world.roomLights).toHaveLength(0);
+    else expect(world.roomLights.length).toBeGreaterThan(0);
     expect(world.blight.some((v) => v > 0)).toBe(false);
     expect(world.subHealth.some((v) => v > 0)).toBe(false);
     // Every sector's placeholder room is reachable from the arrival, not merely carved.

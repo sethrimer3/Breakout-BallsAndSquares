@@ -12,12 +12,46 @@ import { paintPortal } from "./portalNoise";
 import type { CameraSystem } from "../systems/CameraSystem";
 import { hash2 } from "../core/math";
 import { DECOR } from "../world/LabDetails";
-import { materialColor, TEX, TIER_PAINT, crackTexelAt, materialShade } from "./materials";
+import { lateMaterial, materialColor, TEX, TIER_PAINT, crackTexelAt, materialShade, type LateFeature } from "./materials";
+import { CHAR_CELLS, SECTOR_CELLS, type LabFrame } from "../world/labMap";
 import { roomLightPosition, LIGHT_KIND, MAT, SUB, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
 
 type RGB = readonly [number, number, number];
 type Ramp4 = readonly [RGB, RGB, RGB, RGB];
+
+function lateBlendedTier(frame: LabFrame, cx: number, cy: number): number {
+  if (frame.def.id !== 3) return frame.def.tierBase + 1;
+  const col = (cx - frame.x0) / SECTOR_CELLS - 0.5;
+  const row = (cy - frame.y0) / SECTOR_CELLS - 0.5;
+  const sc = frame.def.start % frame.def.sectors;
+  const sr = (frame.def.start - sc) / frame.def.sectors;
+  const dist = Math.max(Math.abs(col - sc), Math.abs(row - sr));
+  const [b0, b1] = frame.def.bands;
+  if (dist < b0 - 0.75) return 7;
+  if (dist < b0 + 0.75) {
+    const t = (dist - b0 + 0.75) / 1.5;
+    return 7 + t * t * (3 - 2 * t);
+  }
+  if (dist < b1 - 0.75) return 8;
+  if (dist < b1 + 0.75) {
+    const t = (dist - b1 + 0.75) / 1.5;
+    return 8 + t * t * (3 - 2 * t);
+  }
+  return 9;
+}
+
+function lateCellFeature(frame: LabFrame, cx: number, cy: number): LateFeature {
+  const col = Math.floor((cx - frame.x0) / CHAR_CELLS);
+  const row = Math.floor((cy - frame.y0) / CHAR_CELLS);
+  const lines = frame.def.blueprint;
+  if (row >= 0 && row < lines.length && col >= 0 && col < lines[row].length) {
+    const ch = lines[row][col];
+    if (ch === "#") return "cover";
+    if (ch === "=") return "bulkhead";
+  }
+  return "solid";
+}
 
 /** How large the burning dimension's noise reads through a Blight edge. */
 const EDGE_FIRE_RATIO = 0.7;
@@ -150,7 +184,7 @@ export class TerrainRenderer {
   private glowCanvas: HTMLCanvasElement;
   private image: ImageData;
   private scratch: number[] = [];
-  private col = [0, 0, 0];
+  private col: [number, number, number] = [0, 0, 0];
   rebuiltLastFrame = 0;
   /** Per chunk: a mask of its Blight edges, made the first time it has any. */
   private edgeMasks: (HTMLCanvasElement | null)[] = [];
@@ -285,13 +319,17 @@ export class TerrainRenderer {
     const data = image.data;
     const pal = COLORS.labDecor;
     const W = w.width;
+    const frame = w.labLayout?.frame;
+    const lateEnv = frame?.def.environment;
+    const floorRgb: [number, number, number] = [0, 0, 0];
     const solid = (x: number, y: number): boolean => x >= 0 && y >= 0 && x < W && y < w.height && w.health[y * W + x] > 0;
     for (let cy = y0; cy <= y1; cy++) {
       for (let cx = x0; cx <= x1; cx++) {
         const d = w.decor[cy * W + cx];
         if (d === 0) continue;
-        const tiled = d === DECOR.cleanSeam || d === DECOR.floorLine;
+        const tiled = !lateEnv && (d === DECOR.cleanSeam || d === DECOR.floorLine);
         const tileTone = 0.93 + hash2(cx >> 2, cy >> 2, 303) * 0.14;
+        const lateTier = lateEnv && frame ? lateBlendedTier(frame, cx, cy) : 0;
         // Walls standing next to this cell, for the contact shadow.
         const nU = solid(cx, cy - 1);
         const nD = solid(cx, cy + 1);
@@ -308,7 +346,9 @@ export class TerrainRenderer {
           const gy = cy * TEX + ty;
           let c: RGB = pal[d];
           let v = 1;
-          if (tiled) {
+          if (lateEnv) {
+            c = lateMaterial(lateEnv, lateTier, gx, gy, "floor", floorRgb);
+          } else if (tiled) {
             // One-texel grout along the top and left edge of each 4-cell tile.
             const seam = (cx % 4 === 0 && tx === 0) || (cy % 4 === 0 && ty === 0);
             if (!seam) {
@@ -764,7 +804,11 @@ export class TerrainRenderer {
         }
         const t = tint[i] / 255;
         const tier = this.materialTier(cx, cy);
-        const base = materialColor(tier, !!world.labLayout?.frame?.def.framework);
+        const frame = world.labLayout?.frame;
+        const lateEnv = frame?.def.environment;
+        const lateTier = lateEnv && frame ? lateBlendedTier(frame, cx, cy) : tier;
+        const lateFeature = lateEnv && frame ? lateCellFeature(frame, cx, cy) : "solid";
+        const base = lateEnv ? [0, 0, 0] : materialColor(tier, !!frame?.def.framework);
         const tone = 0.88 + t * 0.24;
         const detail = world.decor[i];
         const dc = COLORS.labDecor[detail];
@@ -783,10 +827,17 @@ export class TerrainRenderer {
           for (let ox = 0; ox < TEX; ox++) {
             const gx = cx * TEX + ox;
             const gy = cy * TEX + oy;
-            const s = materialShade(tier, gx, gy) * tone;
-            col[0] = base[0] * s;
-            col[1] = base[1] * s;
-            col[2] = base[2] * s;
+            if (lateEnv) {
+              lateMaterial(lateEnv, lateTier, gx, gy, lateFeature, col);
+              col[0] *= tone;
+              col[1] *= tone;
+              col[2] *= tone;
+            } else {
+              const s = materialShade(tier, gx, gy) * tone;
+              col[0] = base[0] * s;
+              col[1] = base[1] * s;
+              col[2] = base[2] * s;
+            }
             if (dm > 0) {
               const g = dGrain * (0.95 + hash2(gx, gy, 9) * 0.1);
               col[0] += (dc[0] * g - col[0]) * dm;

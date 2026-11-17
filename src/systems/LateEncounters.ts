@@ -1,12 +1,13 @@
 import { FREEZE } from "../config";
 import type { PixelWorld } from "../world/PixelWorld";
-import { sectorBounds, sectorCount, sectorTier } from "../world/labMap";
+import { CHAR_CELLS, parseLateMarkers, sectorTier } from "../world/labMap";
 import { CAMPAIGN, campaignTier } from "../world/campaignBalance";
 import { LootKind } from "../entities/LootSystem";
 import type { Soldier } from "../entities/Soldier";
 import type { CameraSystem } from "./CameraSystem";
 import type { BulletTargets } from "./CombatSystem";
 import { circleIsClear } from "./PhysicsSystem";
+import { LateEncounterRenderer } from "../rendering/LateEncounterRenderer";
 export interface Encounter {
   id: string;
   sector: number;
@@ -39,6 +40,7 @@ export class LateEncounters implements BulletTargets {
   actors: Encounter[] = [];
   shots: Shot[] = [];
   private selected: Encounter | null = null;
+  private renderer = new LateEncounterRenderer();
   constructor(
     private world: PixelWorld,
     private reward: (a: Encounter, kind: LootKind, value: number) => void,
@@ -54,71 +56,38 @@ export class LateEncounters implements BulletTargets {
     const f = this.world.labLayout?.frame;
     if (!f?.def.framework) return;
     const done = new Set([...cleared, ...gathered]);
-    for (let s = 0; s < sectorCount(f.def); s++) {
-      const tier = sectorTier(f.def, s),
-        p = CAMPAIGN[campaignTier(tier)],
-        b = sectorBounds(f, s),
-        cx = ((b.x0 + b.x1 + 1) / 2) * this.world.cellSize,
-        cy = ((b.y0 + b.y1 + 1) / 2) * this.world.cellSize;
-      const isMothershipBossSector = f.def.id === 5 && s === 4;
-      const kinds: Encounter["kind"][] =
-        tier === 7
-          ? []
-          : isMothershipBossSector
-            ? ["turret", "turret", "boss"]
-            : tier < 10
-              ? ["soldier", "soldier", "brute"]
-              : ["turret", "turret", "trap", "soldier", "brute"];
-      if (s === f.def.start) kinds.length = 0;
-      const add = (
-        kind: Encounter["kind"],
-        j: number,
-        x: number,
-        y: number,
-      ) => {
-        const id = `${s}:${kind}:${j}`;
-        const hp =
-          kind === "grove"
-            ? 1
-            : kind === "boss"
-              ? 50000
-              : p.enemyHp * (kind === "brute" ? 2 : kind === "trap" ? 0.3 : 1);
-        this.actors.push({
-          id,
-          sector: s,
-          x,
-          y,
-          homeX: x,
-          homeY: y,
-          hp,
-          maxHp: hp,
-          alive: !done.has(id),
-          kind,
-          tier,
-          cooldown: 1 + j * 0.3,
-          charge: 0,
-          phase: j + s,
-          aimAngle: 0,
-          windup: 0,
-        });
-      };
-      kinds.forEach((k, j) => {
-        let ex = cx + (j < 2 ? (j % 2 ? 1 : -1) * 10 : 0) * this.world.cellSize;
-        let ey = cy + (j < 2 ? 0 : (j - 1) * 5 * this.world.cellSize);
-        if (k === "boss") {
-          ex = cx;
-          ey = cy;
-        }
-        add(k, j, ex, ey);
+    const mid = (CHAR_CELLS - 1) / 2;
+    for (const m of parseLateMarkers(f.def.blueprint)) {
+      if (m.kind === "teleporter" || m.kind === "special") continue;
+      const tier = sectorTier(f.def, m.sector);
+      const p = CAMPAIGN[campaignTier(tier)];
+      const x = (f.x0 + m.col * CHAR_CELLS + mid + 0.5) * this.world.cellSize;
+      const y = (f.y0 + m.row * CHAR_CELLS + mid + 0.5) * this.world.cellSize;
+      const id = `${m.sector}:${m.kind}:${m.ordinal}`;
+      const hp =
+        m.kind === "grove"
+          ? 1
+          : m.kind === "boss"
+            ? 50000
+            : p.enemyHp * (m.kind === "brute" ? 2 : m.kind === "trap" ? 0.3 : 1);
+      this.actors.push({
+        id,
+        sector: m.sector,
+        x,
+        y,
+        homeX: x,
+        homeY: y,
+        hp,
+        maxHp: hp,
+        alive: !done.has(id),
+        kind: m.kind,
+        tier,
+        cooldown: 1 + m.ordinal * 0.3,
+        charge: 0,
+        phase: m.ordinal + m.sector,
+        aimAngle: 0,
+        windup: 0,
       });
-      if (f.def.id === 3)
-        for (let j = 0; j < p.nodes; j++)
-          add(
-            "grove",
-            j,
-            cx + Math.cos(j * 2.4) * 9 * this.world.cellSize,
-            cy + Math.sin(j * 2.4) * 9 * this.world.cellSize,
-          );
     }
   }
   private los(x: number, y: number, tx: number, ty: number): boolean {
@@ -137,6 +106,7 @@ export class LateEncounters implements BulletTargets {
     return true;
   }
   update(dt: number, soldiers: readonly Soldier[]): void {
+    this.renderer.update(dt);
     const cs = this.world.cellSize;
     for (const a of this.actors) {
       if (!a.alive) continue;
@@ -340,6 +310,7 @@ export class LateEncounters implements BulletTargets {
   private kill(a: Encounter): void {
     if (!a.alive) return;
     a.alive = false;
+    if (a.kind === "boss") this.renderer.startBossCollapse(a.x, a.y);
     const p = CAMPAIGN[campaignTier(a.tier)];
     const rewardValue =
       a.kind === "grove"
@@ -354,140 +325,11 @@ export class LateEncounters implements BulletTargets {
     );
   }
   draw(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
-    for (const a of this.actors) {
-      if (!a.alive) continue;
-      const x = cam.worldToScreenX(a.x),
-        y = cam.worldToScreenY(a.y),
-        r = this.world.cellSize * cam.zoom;
-      if (
-        x < -r * 6 ||
-        y < -r * 6 ||
-        x > cam.viewW + r * 6 ||
-        y > cam.viewH + r * 6
-      )
-        continue;
-      if (a.kind === "boss") {
-        const br = r * 2.8;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(a.aimAngle);
-        // Outer dark carapace
-        ctx.fillStyle = a.hp / a.maxHp <= 0.3 ? "#ff1a53" : "#800e3b";
-        ctx.fillRect(-br, -br, br * 2, br * 2);
-        // Inner core
-        ctx.fillStyle = "#ff66a3";
-        ctx.fillRect(-br * 0.6, -br * 0.6, br * 1.2, br * 1.2);
-        // Central matrix eye
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(-br * 0.25, -br * 0.25, br * 0.5, br * 0.5);
-        // Front cannons
-        ctx.fillStyle = "#ffd84d";
-        ctx.fillRect(br * 0.5, -br * 0.3, br * 0.7, br * 0.2);
-        ctx.fillRect(br * 0.5, br * 0.1, br * 0.7, br * 0.2);
-        ctx.restore();
-
-        // Big Boss Health Bar above boss
-        const barW = br * 2.5;
-        const barH = Math.max(4, 5 * cam.zoom);
-        const barY = y - br - 12 * cam.zoom;
-        ctx.fillStyle = "#15151d";
-        ctx.fillRect(x - barW / 2, barY, barW, barH);
-        ctx.fillStyle = a.hp / a.maxHp <= 0.3 ? "#ff0055" : "#ff3377";
-        ctx.fillRect(x - barW / 2, barY, (barW * Math.max(0, a.hp)) / a.maxHp, barH);
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = Math.max(1, cam.zoom);
-        ctx.strokeRect(x - barW / 2, barY, barW, barH);
-        continue;
-      }
-      ctx.fillStyle =
-        a.kind === "grove"
-          ? "#7fe39a"
-          : a.kind === "trap"
-            ? "#ffb347"
-            : "#e85a98";
-      ctx.fillRect(x - r, y - r, r * 2, r * 2);
-      if (a.kind === "soldier" || a.kind === "turret") {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(a.aimAngle);
-        ctx.fillStyle = "#ffddaa";
-        ctx.fillRect(0, -r * 0.3, r * 1.8, r * 0.6);
-        ctx.restore();
-      } else if (a.kind === "brute") {
-        // Brute windup telegraph: flashes yellow-white when preparing melee strike
-        if (a.windup > 0) {
-          const t = a.windup / 0.45;
-          ctx.strokeStyle = t > 0.7 ? "#ffffff" : "#ffd84d";
-          ctx.lineWidth = Math.max(1, 2 * cam.zoom);
-          ctx.strokeRect(x - r - 2, y - r - 2, (r + 2) * 2, (r + 2) * 2);
-        }
-      }
-      if (a.kind === "trap" && a.charge > 0) {
-        ctx.strokeStyle = "#ffb347";
-        ctx.lineWidth = Math.max(1.5, 2 * cam.zoom);
-        ctx.beginPath();
-        ctx.arc(x, y, (r * 6 * a.charge) / 0.9, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-      if (a.hp < a.maxHp) {
-        ctx.fillStyle = "#15151d";
-        ctx.fillRect(x - r, y - r * 1.8, r * 2, 2);
-        ctx.fillStyle = "#fa6a9a";
-        ctx.fillRect(x - r, y - r * 1.8, (r * 2 * a.hp) / a.maxHp, 2);
-      }
-    }
-    ctx.fillStyle = "#ff889e";
-    for (const p of this.shots)
-      ctx.fillRect(
-        cam.worldToScreenX(p.x) - 2,
-        cam.worldToScreenY(p.y) - 2,
-        4,
-        4,
-      );
+    this.renderer.draw(ctx, cam, this.actors, this.shots, this.world.cellSize, performance.now() / 1000);
   }
 
   /** Post-fog overlay rendering so critical warnings (mine warning rings, brute windup) remain readable. */
   drawOverlay(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
-    for (const a of this.actors) {
-      if (!a.alive) continue;
-      const x = cam.worldToScreenX(a.x),
-        y = cam.worldToScreenY(a.y),
-        r = this.world.cellSize * cam.zoom;
-      if (
-        x < -r * 6 ||
-        y < -r * 6 ||
-        x > cam.viewW + r * 6 ||
-        y > cam.viewH + r * 6
-      )
-        continue;
-      if (a.kind === "boss") {
-        const br = r * 2.8;
-        ctx.save();
-        ctx.strokeStyle = a.hp / a.maxHp <= 0.3 ? "#ff0055" : "#ff4081";
-        ctx.lineWidth = Math.max(2, 2.5 * cam.zoom);
-        ctx.strokeRect(x - br - 2, y - br - 2, (br + 2) * 2, (br + 2) * 2);
-        ctx.restore();
-        continue;
-      }
-      if (a.kind === "trap" && a.charge > 0) {
-        const pulse = 0.8 + 0.2 * Math.sin(performance.now() * 0.02);
-        ctx.save();
-        ctx.strokeStyle = a.charge > 0.6 ? "#ff4040" : "#ffb347";
-        ctx.lineWidth = Math.max(2, 2.5 * cam.zoom);
-        ctx.beginPath();
-        ctx.arc(x, y, (r * 6 * a.charge) / 0.9, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fillStyle = a.charge > 0.6 ? `rgba(255, 64, 64, ${0.15 * pulse})` : `rgba(255, 179, 71, ${0.12 * pulse})`;
-        ctx.fill();
-        ctx.restore();
-      } else if (a.kind === "brute" && a.windup > 0) {
-        const t = a.windup / 0.45;
-        ctx.save();
-        ctx.strokeStyle = t > 0.7 ? "#ff3366" : "#ffcc00";
-        ctx.lineWidth = Math.max(1.5, 2 * cam.zoom);
-        ctx.strokeRect(x - r - 3, y - r - 3, (r + 3) * 2, (r + 3) * 2);
-        ctx.restore();
-      }
-    }
+    this.renderer.drawOverlay(ctx, cam, this.actors, this.world.cellSize);
   }
 }
