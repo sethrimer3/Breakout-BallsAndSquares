@@ -1,0 +1,5450 @@
+{
+  "comparisons": 576,
+  "changedChannels": 0,
+  "cacheHits": [
+    {
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "passes": [
+        1,
+        1
+      ]
+    },
+    {
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "passes": [
+        1,
+        0
+      ]
+    },
+    {
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "passes": [
+        1,
+        0
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "label": "initial",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.25,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.25,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.5,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 1.5,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 2,
+      "soft": false,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 2,
+      "soft": false,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 2,
+      "soft": true,
+      "zoom": 0.5,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": false,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "initial-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-history",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-new-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "visible-fading",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "pulse-expired",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "expired-after-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "active-offscreen-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "wrapped-visible",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-pulse",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "destroyed-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "fractional-pan",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "history-reset-repeat",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "terrain-regeneration",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    },
+    {
+      "label": "resize",
+      "scale": 2,
+      "soft": true,
+      "zoom": 1.13,
+      "smoothing": true,
+      "changedChannels": 0
+    }
+  ],
+  "baseline": "664ef8712e6d66b7f640a79ba1ee47908461fbf4",
+  "activeRender": {
+    "baseline": "664ef8712e6d66b7f640a79ba1ee47908461fbf4",
+    "status": "passed",
+    "samples": 60,
+    "browser": "156.0.8078.79",
+    "pixels": [
+      {
+        "device": "desktop",
+        "label": "freeze-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "freeze-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "thaw-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-pending-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-compacted-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "smoke-edges-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "rail-crossing-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "freeze-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "freeze-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "thaw-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-pending-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-compacted-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "smoke-edges-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "rail-crossing-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "freeze-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "freeze-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "thaw-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-pending-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "destroy-compacted-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "smoke-edges-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "rail-crossing-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "offscreen-rail-frost-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "prism-crossing-marker-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-glass",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-destruction",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-growth",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-pan",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-zoom",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-regeneration",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "desktop",
+        "label": "mask-alpha-resize",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "thaw-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-pending-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-compacted-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "smoke-edges-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "rail-crossing-0.5",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-0.5-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-0.5-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "thaw-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-pending-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-compacted-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "smoke-edges-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "rail-crossing-1.13",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-1.13-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-1.13-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "freeze-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "thaw-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-pending-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "destroy-compacted-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "smoke-edges-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "rail-crossing-2.75",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "offscreen-rail-frost-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-2.75-false",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "prism-crossing-marker-2.75-true",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-glass",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-destruction",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-growth",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-pan",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-zoom",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-regeneration",
+        "channels": 0,
+        "maxDelta": 0
+      },
+      {
+        "device": "mobile",
+        "label": "mask-alpha-resize",
+        "channels": 0,
+        "maxDelta": 0
+      }
+    ],
+    "invalidation": {
+      "ordinaryDamageRebuilds": 0,
+      "checks": [
+        "glass",
+        "destruction",
+        "growth",
+        "pan",
+        "zoom",
+        "regeneration",
+        "resize"
+      ],
+      "maskRebuilds": 8
+    },
+    "scenarios": []
+  },
+  "lightingPipeline": {
+    "status": "passed",
+    "pixelComparisons": 258,
+    "boundedCases": 6,
+    "emptyReuseCases": 6
+  },
+  "frameComparisons": {
+    "scenarios": 80,
+    "pixelComparisons": 160,
+    "changedChannels": 0
+  }
+}

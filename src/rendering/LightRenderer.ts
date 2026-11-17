@@ -1,3 +1,4 @@
+import { hasVisibleGrowthGlows } from "./GrowthGlowVisibility";
 import { LightRegion, type ScreenRect } from "./LightRegion";
 import { visibleRoomLightIndices } from "./RoomLightIndex";
 import { ChunkRegions } from "./ChunkRegions";
@@ -216,13 +217,17 @@ export class LightRenderer {
     // Empty views need only the ambient/terrain result. Reuse that exact
     // upstream composite, including its blurred screen edges, instead of
     // repeating the full-screen primary pass. Any possible light disables it.
-    let empty = game.world.roomLights.length === 0 && game.flashes.length === 0 && game.growth.glowCount === 0;
+    // Partially covered backing pixels can retain color from earlier fills.
+    // Preserve the full-render history path there instead of freezing that fringe.
+    const growthCacheSafe = game.growth.glowCount === 0 || (devW <= viewW * dpr && devH <= viewH * dpr);
+    let empty = growthCacheSafe && game.world.roomLights.length === 0 && game.flashes.length === 0;
     for (let i = 0; empty && i < game.lighting.softCount; i++) {
       const light = game.lighting.softLights[i];
       const x = cam.worldToScreenX(light.x), y = cam.worldToScreenY(light.y), r = light.radius * cam.zoom;
       if (light.lit.count > 0 || (x + r >= -2 && y + r >= -2 && x - r <= viewW + 2 && y - r <= viewH + 2)) empty = false;
     }
-    if (empty && this.emptyLightmap?.mask === this.maskState && this.emptyLightmap.soft === this.softShadows) {
+    if (empty && this.emptyLightmap?.mask === this.maskState && this.emptyLightmap.soft === this.softShadows &&
+        !hasVisibleGrowthGlows(game.world, game.growth, cam, game.runStats.time)) {
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalCompositeOperation = "multiply";
@@ -317,6 +322,7 @@ export class LightRenderer {
 
     // 3) Dim crimson light from recently replicated hostile terrain cells.
     const gr = game.growth;
+    let growthVisible = false;
     if (gr.glowCount > 0) {
       const w = game.world;
       const cs = w.cellSize;
@@ -333,6 +339,7 @@ export class LightRenderer {
         const sx = cam.worldToScreenX((cx + 0.5) * cs);
         const sy = cam.worldToScreenY((cy + 0.5) * cs);
         if (sx < -60 || sy < -60 || sx > viewW + 60 || sy > viewH + 60) continue;
+        growthVisible = true;
         const a = 1 - age / dur;
         const cr = cs * 2.6 * cam.zoom;
         g.globalAlpha = a * 0.42;
@@ -389,7 +396,7 @@ export class LightRenderer {
       game.terrain.drawCellOverlay(ctx, cam, this.wallCanvas, this.wallChunks);
       ctx.restore();
     }
-    if (empty && this.maskState) this.emptyLightmap = { mask: this.maskState, soft: this.softShadows };
+    if (empty && !growthVisible && this.maskState) this.emptyLightmap = { mask: this.maskState, soft: this.softShadows };
   }
 
   /** Clear the shared light layer for additive drawing in CSS-pixel coordinates. */
