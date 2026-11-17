@@ -157,7 +157,7 @@ describe("hand-made lab", () => {
     const w = new PixelWorld(WORLD);
     generateWorld(w, 7, { labWorld: Z3 });
     expect(w.labLayout!.frame!.def).toBe(Z3);
-    expect(w.labLayout!.rooms.length).toBe(169);
+    expect(new Set(w.labLayout!.rooms.map((r) => r.group)).size).toBe(169);
     expect(w.blightCores.length).toBe(0);
     expect(sectorAtCell(w.labLayout!.frame!, w.roomX0 + 5, w.roomY0 + 5)).toBe(Z3.start);
   });

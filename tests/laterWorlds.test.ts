@@ -16,7 +16,9 @@ describe("later-world framework", () => {
     const frame = world.labLayout!.frame!;
     expect(frame.def).toBe(def); expect(new Set(world.labLayout!.rooms.map((r) => r.group)).size).toBe(count);
     expect(world.blightCores).toHaveLength(0); expect(world.sentrySpots).toHaveLength(0);
-    expect(world.specimenSpots).toHaveLength(0); expect(world.roomLights).toHaveLength(0);
+    expect(world.specimenSpots).toHaveLength(0);
+    if (id === 3) expect(world.roomLights).toHaveLength(0);
+    else expect(world.roomLights.length).toBeGreaterThan(0);
     expect(world.blight.some((v) => v > 0)).toBe(false);
     expect(world.subHealth.some((v) => v > 0)).toBe(false);
     // Every sector's placeholder room is reachable from the arrival, not merely carved.

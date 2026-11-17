@@ -1,8 +1,9 @@
-import type { PixelWorld } from "./PixelWorld";
+import { LIGHT_KIND, type PixelWorld, type RoomLight } from "./PixelWorld";
 import { DECOR } from "./LabDetails";
 import { CHAR_CELLS, type LabFrame } from "./labMap";
 import type { LabLayout } from "./WorldGenerator";
 import { lateBlockHealth } from "./campaignBalance";
+import { hash2 } from "../core/math";
 
 /**
  * Carves a late world (Worlds 3–5) directly from its authored blueprint:
@@ -82,6 +83,95 @@ export function carveLateBlueprint(w: PixelWorld, f: LabFrame, layout: LabLayout
           }
         }
       }
+    }
+  }
+}
+
+/**
+ * Installs destructible `LightingSystem` fixtures for City (burning windows &
+ * streetlights) and Mothership (organic conduit lights & bulkhead warning lamps).
+ * Forest (World 3) uses ambient/canopy/sun-beam lighting without artificial fixtures.
+ */
+export function installLateLights(w: PixelWorld, f: LabFrame, layout: LabLayout): void {
+  if (f.def.id < 4) return;
+  const seed = f.def.seed;
+  const tryPlace = (
+    wx: number,
+    wy: number,
+    face: RoomLight["wallFace"],
+    kind: RoomLight["kind"],
+    clip: { cx0: number; cy0: number; cx1: number; cy1: number },
+    phase: number,
+  ): void => {
+    if (!w.inBounds(wx, wy) || !w.solidAt(wx, wy)) return;
+    const dx = face === "east" ? 1 : face === "west" ? -1 : 0;
+    const dy = face === "south" ? 1 : face === "north" ? -1 : 0;
+    if (!w.inBounds(wx + dx, wy + dy) || w.solidAt(wx + dx, wy + dy)) return;
+    w.roomLights.push({
+      kind,
+      x0: wx,
+      y0: wy,
+      x1: wx,
+      y1: wy,
+      cx0: Math.max(0, clip.cx0 - 1),
+      cy0: Math.max(0, clip.cy0 - 1),
+      cx1: Math.min(w.width - 1, clip.cx1 + 1),
+      cy1: Math.min(w.height - 1, clip.cy1 + 1),
+      wallFace: face,
+      phase,
+    });
+  };
+
+  if (f.def.id === 4) {
+    // City: burning-window & streetlight fixtures along building perimeters facing open streets
+    for (const room of layout.rooms) {
+      const clip = { cx0: room.x, cy0: room.y, cx1: room.x + room.size - 1, cy1: room.y + room.size - 1 };
+      const step = 11;
+      for (let x = room.x + 3; x <= room.x + room.size - 4; x += step) {
+        const roll = hash2(x, room.y, seed + 17);
+        if (roll < 0.7) tryPlace(x, room.y - 1, "south", roll < 0.35 ? LIGHT_KIND.dim : LIGHT_KIND.flicker, clip, roll);
+        const roll2 = hash2(x, room.y + room.size, seed + 19);
+        if (roll2 < 0.7) tryPlace(x, room.y + room.size, "north", roll2 < 0.35 ? LIGHT_KIND.dim : LIGHT_KIND.flicker, clip, roll2);
+      }
+      for (let y = room.y + 3; y <= room.y + room.size - 4; y += step) {
+        const roll = hash2(room.x, y, seed + 23);
+        if (roll < 0.7) tryPlace(room.x - 1, y, "east", roll < 0.35 ? LIGHT_KIND.dim : LIGHT_KIND.flicker, clip, roll);
+        const roll2 = hash2(room.x + room.size, y, seed + 29);
+        if (roll2 < 0.7) tryPlace(room.x + room.size, y, "west", roll2 < 0.35 ? LIGHT_KIND.dim : LIGHT_KIND.flicker, clip, roll2);
+      }
+    }
+    return;
+  }
+
+  // Mothership: pulsing organic conduit lights along corridors + bulkhead warning lamps
+  for (const seg of layout.corridors) {
+    const clip = { cx0: seg.x0 - 4, cy0: seg.y0 - 4, cx1: seg.x1 + 4, cy1: seg.y1 + 4 };
+    if (seg.axis === "h") {
+      for (let x = seg.x0 + 4; x <= seg.x1 - 4; x += 10) {
+        const roll = hash2(x, seg.y0, seed + 31);
+        tryPlace(x, seg.y0 - 1, "south", LIGHT_KIND.flicker, clip, roll);
+        tryPlace(x, seg.y1 + 1, "north", LIGHT_KIND.flicker, clip, (roll + 0.5) % 1);
+      }
+    } else {
+      for (let y = seg.y0 + 4; y <= seg.y1 - 4; y += 10) {
+        const roll = hash2(seg.x0, y, seed + 37);
+        tryPlace(seg.x0 - 1, y, "east", LIGHT_KIND.flicker, clip, roll);
+        tryPlace(seg.x1 + 1, y, "west", LIGHT_KIND.flicker, clip, (roll + 0.5) % 1);
+      }
+    }
+  }
+  const lines = f.def.blueprint;
+  const mid = (CHAR_CELLS - 1) >> 1;
+  for (let row = 0; row < lines.length; row++) {
+    for (let col = 0; col < lines[row].length; col++) {
+      if (lines[row][col] !== "=") continue;
+      const cx = f.x0 + col * CHAR_CELLS + mid;
+      const cy = f.y0 + row * CHAR_CELLS + mid;
+      const clip = { cx0: cx - 10, cy0: cy - 10, cx1: cx + 10, cy1: cy + 10 };
+      tryPlace(cx - 4, cy, "east", LIGHT_KIND.dim, clip, 0.2);
+      tryPlace(cx + 4, cy, "west", LIGHT_KIND.dim, clip, 0.7);
+      tryPlace(cx, cy - 4, "south", LIGHT_KIND.dim, clip, 0.4);
+      tryPlace(cx, cy + 4, "north", LIGHT_KIND.dim, clip, 0.9);
     }
   }
 }

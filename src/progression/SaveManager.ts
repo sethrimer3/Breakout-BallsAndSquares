@@ -155,6 +155,12 @@ export interface SaveData {
     /** Per world (keyed "1", "2", ...), by sector index. */
     worlds: Record<string, LabWorldProgress>;
   };
+  campaign: {
+    /** True once the Leviathan Core boss in World 5 has been defeated. */
+    complete: boolean;
+    /** Run time (seconds) recorded on first campaign completion. */
+    clearTime?: number;
+  };
   lastSaved?: number;
 }
 
@@ -221,7 +227,16 @@ export function defaultSaveData(seed = randomProfileSeed()): SaveData {
       alwaysShootWhenAutoMoveOff: false,
     },
     lab: defaultLab(),
+    campaign: { complete: false },
   };
+}
+
+/** Records campaign completion once without overwriting the original clear time. */
+export function markCampaignComplete(data: SaveData, runTimeSeconds: number): boolean {
+  if (data.campaign.complete) return false;
+  data.campaign.complete = true;
+  data.campaign.clearTime = Math.max(0, runTimeSeconds);
+  return true;
 }
 
 function sectorList(v: unknown, id: number): number[] {
@@ -599,6 +614,14 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     def.lab.lateLayout = 1;
   }
 
+  if (obj.campaign && typeof obj.campaign === "object") {
+    const camp = obj.campaign as Record<string, unknown>;
+    def.campaign.complete = camp.complete === true;
+    if (typeof camp.clearTime === "number" && Number.isFinite(camp.clearTime) && camp.clearTime >= 0) {
+      def.campaign.clearTime = camp.clearTime;
+    }
+  }
+
   if (typeof obj.lastSaved === "number" && Number.isFinite(obj.lastSaved)) {
     def.lastSaved = obj.lastSaved;
   }
@@ -645,6 +668,7 @@ export interface SlotSummary {
   upgradesCount: number;
   bestDepth: number;
   bestTime: number;
+  campaignComplete: boolean;
   lastSaved?: number;
 }
 
@@ -818,6 +842,7 @@ export class SaveManager {
         upgradesCount: 0,
         bestDepth: 0,
         bestTime: 0,
+        campaignComplete: false,
         lastSaved: undefined,
       };
     }
@@ -844,6 +869,7 @@ export class SaveManager {
       upgradesCount,
       bestDepth: data.bests?.depth ?? 0,
       bestTime: data.bests?.time ?? 0,
+      campaignComplete: !!data.campaign?.complete,
       lastSaved: data.lastSaved,
     };
   }

@@ -118,6 +118,22 @@ describe("late world blueprints", () => {
     }
   });
 
+  it.each([
+    [3, 4],
+    [4, 3],
+    [5, 2],
+  ])("places %i special-upgrade gold blocks in open cells for world %i", (id, expectedCount) => {
+    const def = LAB_WORLDS[id];
+    const world = new PixelWorld(WORLD);
+    generateWorld(world, 8, { labWorld: def });
+    expect(world.upgradeSpots).toHaveLength(expectedCount);
+    for (let i = 0; i < expectedCount; i++) {
+      const spot = world.upgradeSpots[i];
+      expect(spot.id).toBe(`z${id}-special-${i + 1}`);
+      expect(world.solidAt(spot.cx, spot.cy)).toBe(false);
+    }
+  });
+
   it.each([3, 4, 5])("validates marker placement rules in world %i", (id) => {
     const def = LAB_WORLDS[id];
     const world = new PixelWorld(WORLD);

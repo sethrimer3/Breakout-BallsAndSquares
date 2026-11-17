@@ -179,6 +179,227 @@ export function materialShade(tier: number, gx: number, gy: number): number {
   }
 }
 
+export type LateEnv = "forest" | "city" | "mothership";
+export type LateFeature = "solid" | "cover" | "bulkhead" | "floor";
+
+const _tmpRgb: [number, number, number] = [0, 0, 0];
+
+function forestSolidTexel(tier: number, gx: number, gy: number, out: [number, number, number]): void {
+  const grain = 0.92 + hash2(gx, gy, 211) * 0.16;
+  if (tier <= 7) {
+    // Tier 7: moss and loam with grass tufts
+    const tuft = hash2(gx >> 1, gy >> 1, 709) < 0.28 && (gy & 1) === 0;
+    if (tuft) {
+      out[0] = 74 * grain;
+      out[1] = 124 * grain;
+      out[2] = 48 * grain;
+    } else {
+      out[0] = 50 * grain;
+      out[1] = 86 * grain;
+      out[2] = 38 * grain;
+    }
+  } else if (tier === 8) {
+    // Tier 8: drier brown earth with leaf litter
+    const leaf = hash2(gx, gy, 811) < 0.14;
+    if (leaf) {
+      out[0] = 104 * grain;
+      out[1] = 70 * grain;
+      out[2] = 36 * grain;
+    } else {
+      out[0] = 76 * grain;
+      out[1] = 58 * grain;
+      out[2] = 35 * grain;
+    }
+  } else {
+    // Tier 9: dark Blight-stained soil with faint vein lines
+    const vein = Math.abs(valueNoise(gx, gy, 10, 907) - 0.5) < 0.04;
+    if (vein) {
+      out[0] = 62 * grain;
+      out[1] = 34 * grain;
+      out[2] = 52 * grain;
+    } else {
+      out[0] = 24 * grain;
+      out[1] = 36 * grain;
+      out[2] = 26 * grain;
+    }
+  }
+}
+
+function forestFloorTexel(tier: number, gx: number, gy: number, out: [number, number, number]): void {
+  const grain = 0.94 + hash2(gx, gy, 77) * 0.12;
+  const blade = hash2(gx, gy, 313) < 0.22;
+  if (tier <= 7) {
+    out[0] = (blade ? 78 : 62) * grain;
+    out[1] = (blade ? 122 : 102) * grain;
+    out[2] = (blade ? 48 : 44) * grain;
+  } else if (tier === 8) {
+    out[0] = (blade ? 88 : 74) * grain;
+    out[1] = (blade ? 72 : 62) * grain;
+    out[2] = (blade ? 42 : 40) * grain;
+  } else {
+    out[0] = (blade ? 40 : 30) * grain;
+    out[1] = (blade ? 48 : 40) * grain;
+    out[2] = (blade ? 38 : 32) * grain;
+  }
+}
+
+/**
+ * Environment-specific matte pixel-art material for Worlds 3–5.
+ * Supports continuous tier blending (e.g. `tier = 7.4` in Forest).
+ * Pass `out` to avoid allocations inside tight texel loops.
+ */
+export function lateMaterial(
+  env: LateEnv,
+  tier: number,
+  gx: number,
+  gy: number,
+  feature: LateFeature = "solid",
+  out: [number, number, number] = _tmpRgb,
+): RGB {
+  const grain = 0.92 + hash2(gx, gy, 211) * 0.16;
+
+  if (env === "forest") {
+    if (feature === "cover") {
+      // Tree trunks (ring/bark texture) or boulders, picked per 7x7 char block
+      const isTree = hash2(Math.floor(gx / 28), Math.floor(gy / 28), 353) < 0.6;
+      if (isTree) {
+        const ring = Math.sin(Math.hypot((gx % 28) - 13.5, (gy % 28) - 13.5) * 0.85) > 0.2 ? 1.15 : 0.82;
+        out[0] = 68 * ring * grain;
+        out[1] = 48 * ring * grain;
+        out[2] = 30 * ring * grain;
+      } else {
+        const ridge = valueNoise(gx, gy, 6, 359) > 0.52 ? 1.14 : 0.84;
+        out[0] = 64 * ridge * grain;
+        out[1] = 66 * ridge * grain;
+        out[2] = 62 * ridge * grain;
+      }
+      return out;
+    }
+
+    const t0 = Math.floor(tier);
+    const frac = tier - t0;
+    if (feature === "floor") {
+      if (frac <= 0.001) {
+        forestFloorTexel(t0, gx, gy, out);
+      } else {
+        const a: [number, number, number] = [0, 0, 0];
+        const b: [number, number, number] = [0, 0, 0];
+        forestFloorTexel(t0, gx, gy, a);
+        forestFloorTexel(t0 + 1, gx, gy, b);
+        out[0] = a[0] + (b[0] - a[0]) * frac;
+        out[1] = a[1] + (b[1] - a[1]) * frac;
+        out[2] = a[2] + (b[2] - a[2]) * frac;
+      }
+      return out;
+    }
+
+    if (frac <= 0.001) {
+      forestSolidTexel(t0, gx, gy, out);
+    } else {
+      const a: [number, number, number] = [0, 0, 0];
+      const b: [number, number, number] = [0, 0, 0];
+      forestSolidTexel(t0, gx, gy, a);
+      forestSolidTexel(t0 + 1, gx, gy, b);
+      out[0] = a[0] + (b[0] - a[0]) * frac;
+      out[1] = a[1] + (b[1] - a[1]) * frac;
+      out[2] = a[2] + (b[2] - a[2]) * frac;
+    }
+    return out;
+  }
+
+  if (env === "city") {
+    if (feature === "bulkhead") {
+      const stripe = ((gx + gy) & 4) === 0;
+      out[0] = (stripe ? 142 : 44) * grain;
+      out[1] = (stripe ? 104 : 40) * grain;
+      out[2] = (stripe ? 30 : 42) * grain;
+      return out;
+    }
+    if (feature === "cover") {
+      // Car wrecks / concrete barricades
+      const px = gx & 7;
+      const py = gy & 7;
+      const seam = px === 0 || py === 0 ? 0.65 : px === 1 ? 1.15 : 1;
+      const rust = hash2(gx >> 1, gy >> 1, 419) < 0.2;
+      out[0] = (rust ? 96 : 62) * seam * grain;
+      out[1] = (rust ? 58 : 66) * seam * grain;
+      out[2] = (rust ? 40 : 72) * seam * grain;
+      return out;
+    }
+    if (feature === "floor") {
+      // Asphalt with faded lane paint
+      const lane = ((gx & 15) === 0 && (gy & 7) < 4) || ((gy & 15) === 0 && (gx & 7) < 4);
+      if (lane) {
+        out[0] = 88 * grain;
+        out[1] = 80 * grain;
+        out[2] = 56 * grain;
+      } else {
+        out[0] = 40 * grain;
+        out[1] = 38 * grain;
+        out[2] = 42 * grain;
+      }
+      return out;
+    }
+    // Fractured concrete and brick with rebar
+    const course = Math.floor(gy / 6);
+    const off = (course & 1) * 6;
+    const mortar = gy % 6 === 0 || (gx + off) % 12 === 0;
+    const rebar = !mortar && hash2(gx >> 2, gy >> 2, 431) < 0.08 && (gy & 3) === 2;
+    if (mortar) {
+      out[0] = 46 * grain;
+      out[1] = 36 * grain;
+      out[2] = 34 * grain;
+    } else if (rebar) {
+      out[0] = 104 * grain;
+      out[1] = 52 * grain;
+      out[2] = 36 * grain;
+    } else {
+      const brick = 0.9 + hash2(Math.floor((gx + off) / 12), course, 433) * 0.2;
+      out[0] = 84 * brick * grain;
+      out[1] = 54 * brick * grain;
+      out[2] = 44 * brick * grain;
+    }
+    return out;
+  }
+
+  // Mothership
+  if (feature === "bulkhead") {
+    const stripe = ((gx - gy) & 4) === 0;
+    out[0] = (stripe ? 132 : 34) * grain;
+    out[1] = (stripe ? 76 : 24) * grain;
+    out[2] = (stripe ? 148 : 48) * grain;
+    return out;
+  }
+  if (feature === "cover") {
+    // Reinforced blast pillars
+    const px = gx & 7;
+    const py = gy & 7;
+    const bevel = px === 0 || py === 0 ? 0.62 : px === 1 || py === 1 ? 1.18 : 1;
+    out[0] = 54 * bevel * grain;
+    out[1] = 40 * bevel * grain;
+    out[2] = 72 * bevel * grain;
+    return out;
+  }
+  if (feature === "floor") {
+    // Ribbed deck panels
+    const panel = (gx & 15) === 0 || (gy & 15) === 0 ? 0.65 : 1;
+    const rib = (gy & 3) === 0 ? 1.12 : 0.95;
+    out[0] = 30 * panel * rib * grain;
+    out[1] = 24 * panel * rib * grain;
+    out[2] = 42 * panel * rib * grain;
+    return out;
+  }
+  // Organic-metal hull plates with seams
+  const px = gx & 7;
+  const py = gy & 7;
+  const seam = px === 0 || py === 0 ? 0.58 : px === 1 || py === 1 ? 1.16 : 1;
+  const rib = valueNoise(gx, gy, 10, 521) > 0.58 ? 1.1 : 0.92;
+  out[0] = 44 * seam * rib * grain;
+  out[1] = 28 * seam * rib * grain;
+  out[2] = 62 * seam * rib * grain;
+  return out;
+}
+
 /** Preview albedos only; later-world biome art/materials are still placeholders. */
 const FRAMEWORK_BASE: Readonly<Record<number, RGB>> = {
   7: [55, 94, 43], 8: [80, 62, 37], 9: [24, 39, 28], 10: [86, 48, 29], 11: [44, 29, 61],

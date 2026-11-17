@@ -28,14 +28,14 @@ export const FOREST_BLUEPRINT: readonly string[] = [
   ".RRRRR..gRRRg..RRRRg..RRRRR..gRRRg..#RRRg..gRRs#..sRRg#..#RRRg..#RRR#...#RR...#sRR#..#RRR#.",
   "...|......|......|......|......|......|......|......|......|......|......|......|......|...",
   "...|......|......|......|......|......|......|......|......|......|......|......|......|...", // 4
-  ".RRRRR..gRRRg..gRRRR..RRRRR..gRRRg..sRRg#..#sRRg..gR#Rs..sRRg#..#sRR#...sRR#..#gRs#..#sRR#.",
+  ".RRRRR..gRRRg..gRRRR..RRRRR..gRRRg..s$Rg#..#sRRg..gR#Rs..sRRg#..#sRR#...sRR#..#gRs#..#sRR#.",
   ".gRRRg..RRRRR..RRRRg..gRRRg..RRRRR..RR#RR..RRRR#..RRRRR..RR#RR..gRRRb..#RRRg..#RRR#..gRRRb.",
   ".gRRRg--gRRRg--gRRRg--gRRRg--gRRRg--RRsRb--gRRbR--bRRRg--RRsRb--RRRRR--gRRRb--bRRRg--RRRRR.",
   ".gRRRg..RRRRR..gRRRR..gRRRg..RRRRR..gR#RR..#RRRR..#RRRR..gR#RR..sRRRg..#RRRs..#RRR#..sRRRg.",
   ".RRRRR..gRRRg..RRRRg..RRRRR..gRRRg..#RRRg..gRRs#..sRRg#..#RRRg..#RRR#...#RR...#sRR#..#RRR#.",
   "...|......|......|......|......|......|......|......|......|......|......|......|......|...",
   "...|......|......|......|......|......|......|......|......|......|......|......|......|...", // 5
-  ".RRRRR..gRRRg..gRRRR.gRRRRRg.gRRRg..sRRg#..#sRRg..gR#Rs..sRRg#..#sRR#...sRR#..#gRs#..#sRR#.",
+  ".RRRRR..gRRRg..g$RRR.gRRRRRg.gRRRg..sRRg#..#sRRg..gR#Rs..sRRg#..#sRR#...sRR#..#gRs#..#sRR#.",
   ".gRRRg..RRRRR..RRRRg.RRRRRRR.RRRRR..RR#RR..RRRR#..RRRRR..RR#RR..gRRRb..#RRRg..#RRR#..gRRRb.",
   ".gRRRg--gRRRg--gRRRg--gRRRg--gRRRg--RRsRb--gRRbR--bRRRg--RRsRb--RRRRR--gRRRb--bRRRg--RRRRR.",
   ".gRRRg..RRRRR..gRRRR.RRRRRRR.RRRRR..gR#RR..#RRRR..#RRRR..gR#RR..sRRRg..#RRRs..#RRR#..sRRRg.",
@@ -70,7 +70,7 @@ export const FOREST_BLUEPRINT: readonly string[] = [
   ".RRRRR..gRRRg..RRRRg..RRRRR..gRRRg..#RRRg..gRRs#..sRRg#..#RRRg..#RRR#...#RR...#sRR#..#RRR#.",
   "...|......|......|......|......|......|......|......|......|......|......|......|......|...",
   "...|......|......|......|......|......|......|......|......|......|......|......|......|...", // 10
-  ".RRRRR..gRRRg..gRRRR..RRRRR..gRRRg..sRRg#..#sRRg..gR#Rs..sRRg#..#sRR#..#sRR#..#gRs#..#sRR#.",
+  ".RRRRR..gRRRg..gRRRR..RRRRR..gRRRg..sRRg#..#s$Rg..gR#Rs..sRRg#..#sRR#..#sRR#..#gRs#..#sRR#.",
   ".gRRRg..RRRRR..RRRRg..gRRRg..RRRRR..RR#RR..RRRR#..RRRRR..RR#RR..gRRRb..gRRRb..#RRR#..gRRRb.",
   ".gRRRg--gRRRg--gRRRg--gRRRg--gRRRg--RRsRb--gRRbR--bRRRg--RRsRb--RRRRR--RRRRR--bRRRg--RRRRR.",
   ".gRRRg..RRRRR..gRRRR..gRRRg..RRRRR..gR#RR..#RRRR..#RRRR..gR#RR..sRRRg..sRRRg..#RRR#..sRRRg.",
@@ -84,7 +84,7 @@ export const FOREST_BLUEPRINT: readonly string[] = [
   ".RRRRR..gRRRg..RRRRg..RRRRR..gRRRg..#RRRg..gRRs#..sRRg#..#RRRg..#RRR#...#RR...#sRR#..#RRR#.",
   "...|......|......|......|......|......|......|......|......|......|......|......|......|...",
   "...|......|......|......|......|......|......|......|......|......|......|......|......|...", // 12
-  ".#sRRg..gR#Rs..sRRg#..#sRRg..gR#Rs..sRRg#..#sRRg..gR#Rs..sRRg#..#sRR#...sRR#..#gRs#..#sRR#.",
+  ".#sRRg..gR#Rs..sRRg#..#sRRg..gR#Rs..sRRg#..#sRRg..gR#Rs..sRRg#..#sRR#...sRR#..#gRs#..#s$R#.",
   ".RRRR#..RRRRR..RR#RR..RRRR#..RRRRR..RR#RR..RRRR#..RRRRR..RR#RR..gRRRb..#RRRg..#RRR#..gRRRb.",
   ".gRRbR--bRRRg--RRsRb--gRRbR--bRRRg--RRsRb--gRRbR--bRRRg--RRsRb--RRRRR--gRRRb--bRRRg--RRRRR.",
   ".#RRRR..#RRRR..gR#RR..#RRRR..#RRRR..gR#RR..#RRRR..#RRRR..gR#RR..sRRRg..#RRRs..#RRR#..sRRRg.",

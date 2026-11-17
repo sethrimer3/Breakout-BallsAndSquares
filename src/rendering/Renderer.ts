@@ -2,8 +2,8 @@ import { DamageNumberRenderer } from "./DamageNumberRenderer";
 import { drawMapBoundary } from "./MapBoundaryRenderer";
 import { drawWeaponExpansion } from "./WeaponExpansionRenderer";
 import { drawGoo } from "./GooRenderer";
+import { LateAtmosphere } from "./LateAtmosphere";
 import { worldAtmosphere } from "../world/worldAtmosphere";
-import { sectorSpawnCell } from "../world/labMap";
 import { LootKind } from "../entities/LootSystem";
 import { ESSENCE_FPS, ESSENCE_SIZE, essenceFrame, essencePixels, paintPixels } from "./blightEssence";
 import { ART_PIXEL, BULLET, COLORS, GROWTH, SOLDIER } from "../config";
@@ -58,6 +58,7 @@ export class Renderer {
   private fieryFlash: FieryFlashRenderer;
   private damageNumberRenderer = new DamageNumberRenderer();
   private fireRenderer = new FireRenderer();
+  private lateAtmosphere = new LateAtmosphere();
   private fogRenderer: FogRenderer;
 
   constructor(
@@ -162,15 +163,7 @@ export class Renderer {
     game.terrain.draw(ctx, cam, game.showChunkBorders);
     this.drawDoors();
     drawSpecialPlinths(ctx, cam, game.world);
-    const portal = game.labDef.teleporter, frame = game.world.labLayout?.frame;
-    if (portal && frame) {
-      const at = sectorSpawnCell(frame, portal.sector);
-      const x = cam.worldToScreenX(at.cx * game.world.cellSize), y = cam.worldToScreenY(at.cy * game.world.cellSize);
-      const r = game.world.cellSize * 2 * cam.zoom;
-      ctx.strokeStyle = "#65fff0"; ctx.lineWidth = Math.max(1, cam.zoom * 2);
-      ctx.strokeRect(x - r, y - r, 2 * r, 2 * r);
-      ctx.fillStyle = "rgba(60,255,225,0.25)"; ctx.fillRect(x - r, y - r, 2*r, 2*r);
-    }
+    this.lateAtmosphere.drawFloorProps(ctx, cam, game.world, this.motion.matches ? 0 : performance.now() / 1000);
 
     // Subtle starting-room frame so the spawn zone stays recognizable.
     const cs = game.world.cellSize;
@@ -187,6 +180,7 @@ export class Renderer {
     // 2) Dynamic lighting pass: multiply shadow-clipped lightmap over the albedo
     //    scene + additive air-scatter cone so shadows behind walls & soldiers pop.
     this.lightRenderer.renderLighting(ctx, game, this.dpr);
+    this.lateAtmosphere.drawAtmosphere(ctx, cam, game.world, atmosphere, this.motion.matches ? 0 : performance.now() / 1000);
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
     game.terrain.drawPanels(ctx, cam, performance.now() / 1000);
     game.terrain.drawLabLights(ctx, cam, performance.now() / 1000, this.motion.matches);

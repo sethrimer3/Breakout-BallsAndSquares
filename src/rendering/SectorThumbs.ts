@@ -3,7 +3,8 @@ import { COLORS } from "../config";
 import { SECTOR_CELLS, sectorBounds, sectorTier, type LabFrame, type LabWorldDef } from "../world/labMap";
 import { LIGHT_KIND, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { hash2, valueNoise } from "../core/math";
-import { materialColor, TEX } from "./materials";
+import { lateMaterial, materialColor, TEX } from "./materials";
+import { atmosphereAt } from "../world/worldAtmosphere";
 import type { TerrainRenderer } from "./TerrainRenderer";
 
 /** Edge of a sector picture in pixels: the terrain's own texels, one per quarter cell. */
@@ -44,7 +45,12 @@ export function renderSectorThumbs(world: PixelWorld, terrain: TerrainRenderer, 
 
     // Lightmap for this sector.
     lg.globalCompositeOperation = "source-over";
-    lg.fillStyle = AMBIENT;
+    const col = s % frame.def.sectors;
+    const row = (s - col) / frame.def.sectors;
+    const atmo = frame.def.framework ? atmosphereAt(frame.def, col, row) : null;
+    lg.fillStyle = atmo
+      ? `rgb(${Math.round(atmo.ambient[0] * 0.5)}, ${Math.round(atmo.ambient[1] * 0.5)}, ${Math.round(atmo.ambient[2] * 0.5)})`
+      : AMBIENT;
     lg.fillRect(0, 0, THUMB_SIZE, THUMB_SIZE);
     lg.globalCompositeOperation = "lighter";
     const lights = world.roomLights.filter((l) => l.cx1 >= b.x0 && l.cy1 >= b.y0 && l.cx0 <= b.x1 && l.cy0 <= b.y1);
@@ -127,9 +133,11 @@ export function renderUncharted(def: LabWorldDef, sector: number): HTMLCanvasEle
   const g = canvas.getContext("2d")!;
   const img = g.createImageData(THUMB_SIZE, THUMB_SIZE);
   const tier = sectorTier(def, sector);
+  const env = def.environment;
   const base = materialColor(tier, def.framework);
   const col = sector % def.sectors;
   const row = (sector - col) / def.sectors;
+  const rgb: [number, number, number] = [0, 0, 0];
   for (let y = 0; y < THUMB_SIZE; y++) {
     for (let x = 0; x < THUMB_SIZE; x++) {
       const gx = col * THUMB_SIZE + x;
@@ -137,10 +145,11 @@ export function renderUncharted(def: LabWorldDef, sector: number): HTMLCanvasEle
       // Plain, very dark rock in the tier's hue: no block joints, so the
       // unexplored lab reads as one mass rather than a grid.
       const m = 0.3 + valueNoise(gx, gy, 24, 7) * 0.12 + hash2(gx, gy, 9) * 0.04;
+      const sample = env ? lateMaterial(env, tier, gx, gy, "solid", rgb) : base;
       const i = (y * THUMB_SIZE + x) * 4;
-      img.data[i] = base[0] * m;
-      img.data[i + 1] = base[1] * m;
-      img.data[i + 2] = base[2] * m;
+      img.data[i] = sample[0] * m;
+      img.data[i + 1] = sample[1] * m;
+      img.data[i + 2] = sample[2] * m;
       img.data[i + 3] = 255;
     }
   }

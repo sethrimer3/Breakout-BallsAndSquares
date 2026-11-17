@@ -13,14 +13,14 @@ export const CITY_BLUEPRINT: readonly string[] = [
   ".#tRR#..#tRR#..#tRR#..RRRRR..#tRR#..#tRR#..#tRR#.",
   "...|......|......|......|......|......|......|...",
   "...|......|......|......|......|......|......|...", // 2
-  ".#tRRs..#tRRs..#tRRs..#tRRs..#tRRs..#tRRs..#tRRs.",
+  ".#t$Rs..#tRRs..#tRRs..#tRRs..#tRRs..#tRRs..#tRRs.",
   ".RRR#R..RRR#R..RRR#R..RRR#R..RRR#R..RRR#R..RRR#R.",
   ".mRRRt--mRRRt--mRRRt--mRRRt--mRRRt--mRRRt--mRRRt.",
   ".R#RRR..R#RRR..R#RRR..R#RRR..R#RRR..R#RRR..R#RRR.",
   ".bRRR#..bRRR#..bRRR#..bRRR#..bRRR#..bRRR#..bRRR#.",
   "...|......|.............|.............|......|...",
   "...|......|.............=.............|......|...", // 3
-  ".tRRm#..tRRm#..#tRs#..#tRs#..#tRs#..tRRm#..tRRm#.",
+  ".tRRm#..tRRm#..#t$s#..#tRs#..#tRs#..tRRm#..tRRm#.",
   ".R#RRt..R#RRt..RRRRR..RRRRR..RRRRR..R#RRt..R#RRt.",
   ".sRRRb--sRRRb..mRRRb--mRRRb--mRRRb..sRRRb--sRRRb.",
   ".RR#RR..RR#RR..RRRRR..RRRRR..RRRRR..RR#RR..RR#RR.",
@@ -41,7 +41,7 @@ export const CITY_BLUEPRINT: readonly string[] = [
   ".bRRR#..bRRR#..#tRR#..#tRR#..#tRR#..bRRR#..bRRR#.",
   "...|......|.............=.............|......|...",
   "...|......|.............|.............|......|...", // 6
-  ".tRRm#..tRRm#..tRRm#..tRRm#..tRRm#..tRRm#..tRRm#.",
+  ".tRRm#..tRRm#..tRRm#..tRRm#..tRRm#..tRRm#..t$Rm#.",
   ".R#RRt..R#RRt..R#RRt..R#RRt..R#RRt..R#RRt..R#RRt.",
   ".sRRRb--sRRRb--sRRRb--sRRRb--sRRRb--sRRRb--sRRRb.",
   ".RR#RR..RR#RR..RR#RR..RR#RR..RR#RR..RR#RR..RR#RR.",

@@ -1,12 +1,12 @@
 import { buildStartingTube } from "./StartingTube";
 import { installMapBoundary } from "./MapBoundary";
-import { carveLateBlueprint } from "./LateWorldLayouts";
+import { carveLateBlueprint, installLateLights } from "./LateWorldLayouts";
 import { FACILITY, TERRAIN, zoneForDepth } from "../config";
 import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
 import { placeLabEquipment } from "./LabEquipment";
 import { decorateLab, ensureRoomFixtures } from "./LabDetails";
-import { buildAuthoredLayout, gateGeometry, sectorCount, labFrame, LAB_WORLDS, sectorAtCell, sectorBounds, sectorSpawnCell, sectorZone, upgradeSpotCell, upgradeSpotSector, type LabFrame, type LabWorldDef, type RoomKind } from "./labMap";
+import { buildAuthoredLayout, CHAR_CELLS, gateGeometry, sectorCount, labFrame, LAB_WORLDS, parseLateMarkers, sectorAtCell, sectorBounds, sectorSpawnCell, sectorZone, upgradeSpotCell, upgradeSpotSector, type LabFrame, type LabWorldDef, type RoomKind } from "./labMap";
 import { MAT, SUB, type PixelWorld } from "./PixelWorld";
 import { DECOR } from "./LabDetails";
 import { corridorCaveIns, placeCaveIns, roomCaveIns, type CaveIn } from "./CaveIns";
@@ -168,6 +168,19 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
       }
     }
     forRect(world, world.roomX0, world.roomY0, world.roomX1, world.roomY1, clear);
+    let specialIdx = 0;
+    const mid = (CHAR_CELLS - 1) >> 1;
+    for (const m of parseLateMarkers(def.blueprint)) {
+      if (m.kind !== "special") continue;
+      specialIdx++;
+      world.upgradeSpots.push({
+        id: `z${def.id}-special-${specialIdx}`,
+        cx: frame.x0 + m.col * CHAR_CELLS + mid,
+        cy: frame.y0 + m.row * CHAR_CELLS + mid,
+        sector: m.sector,
+      });
+    }
+    installLateLights(world, frame, layout);
     installMapBoundary(world);
     return;
   }
