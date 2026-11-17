@@ -39,17 +39,20 @@ export function renderSectorThumbs(world: PixelWorld, terrain: TerrainRenderer, 
     const canvas = makeCanvas();
     const g = canvas.getContext("2d")!;
     const b = sectorBounds(frame, s);
-    g.fillStyle = COLORS.background;
+    const col = s % frame.def.sectors;
+    const row = (s - col) / frame.def.sectors;
+    const atmo = frame.def.framework ? atmosphereAt(frame.def, col, row) : null;
+    g.fillStyle = atmo
+      ? `rgb(${Math.round(atmo.background[0] * 0.65)}, ${Math.round(atmo.background[1] * 0.65)}, ${Math.round(atmo.background[2] * 0.65)})`
+      : COLORS.background;
     g.fillRect(0, 0, THUMB_SIZE, THUMB_SIZE);
     terrain.drawRegion(g, b.x0, b.y0, SECTOR_CELLS, SECTOR_CELLS);
 
     // Lightmap for this sector.
     lg.globalCompositeOperation = "source-over";
-    const col = s % frame.def.sectors;
-    const row = (s - col) / frame.def.sectors;
-    const atmo = frame.def.framework ? atmosphereAt(frame.def, col, row) : null;
+    const ambScale = frame.def.id === 5 ? 0.85 : 0.55;
     lg.fillStyle = atmo
-      ? `rgb(${Math.round(atmo.ambient[0] * 0.5)}, ${Math.round(atmo.ambient[1] * 0.5)}, ${Math.round(atmo.ambient[2] * 0.5)})`
+      ? `rgb(${Math.round(atmo.ambient[0] * ambScale)}, ${Math.round(atmo.ambient[1] * ambScale)}, ${Math.round(atmo.ambient[2] * ambScale)})`
       : AMBIENT;
     lg.fillRect(0, 0, THUMB_SIZE, THUMB_SIZE);
     lg.globalCompositeOperation = "lighter";
@@ -137,15 +140,29 @@ export function renderUncharted(def: LabWorldDef, sector: number): HTMLCanvasEle
   const base = materialColor(tier, def.framework);
   const col = sector % def.sectors;
   const row = (sector - col) / def.sectors;
+  const sc = def.start % def.sectors;
+  const sr = (def.start - sc) / def.sectors;
+  const [b0, b1] = def.bands;
   const rgb: [number, number, number] = [0, 0, 0];
   for (let y = 0; y < THUMB_SIZE; y++) {
     for (let x = 0; x < THUMB_SIZE; x++) {
       const gx = col * THUMB_SIZE + x;
       const gy = row * THUMB_SIZE + y;
+      let t = tier;
+      if (def.id === 3) {
+        const fx = col + (x + 0.5) / THUMB_SIZE - 0.5;
+        const fy = row + (y + 0.5) / THUMB_SIZE - 0.5;
+        const d = Math.max(Math.abs(fx - sc), Math.abs(fy - sr));
+        if (d < b0 - 0.75) t = 7;
+        else if (d < b0 + 0.75) { const u = (d - b0 + 0.75) / 1.5; t = 7 + u * u * (3 - 2 * u); }
+        else if (d < b1 - 0.75) t = 8;
+        else if (d < b1 + 0.75) { const u = (d - b1 + 0.75) / 1.5; t = 8 + u * u * (3 - 2 * u); }
+        else t = 9;
+      }
       // Plain, very dark rock in the tier's hue: no block joints, so the
       // unexplored lab reads as one mass rather than a grid.
       const m = 0.3 + valueNoise(gx, gy, 24, 7) * 0.12 + hash2(gx, gy, 9) * 0.04;
-      const sample = env ? lateMaterial(env, tier, gx, gy, "solid", rgb) : base;
+      const sample = env ? lateMaterial(env, t, gx, gy, "solid", rgb) : base;
       const i = (y * THUMB_SIZE + x) * 4;
       img.data[i] = sample[0] * m;
       img.data[i + 1] = sample[1] * m;

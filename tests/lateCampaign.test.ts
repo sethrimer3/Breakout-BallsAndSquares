@@ -204,14 +204,13 @@ describe("late campaign pacing and encounters", () => {
     expect(grenade.terrainDamageBonus).toBe(12000);
   });
   it("migrates old saves and recovers uncredited finite rewards atomically", () => {
-    // If a player had cleared enemies/groves but had 0 biomass and 0 essence due to pickup loss
+    // If a player had cleared enemies/groves in a pre-lateLayout save but had 0 biomass and 0 essence
     const s = sanitizeSaveData({
       biomass: 0,
       essence: 0,
       lab: {
         world: 3,
         unlocked: 3,
-        lateLayout: 1,
         worlds: {
           3: {
             cleared: ["1:soldier:0", "1:soldier:0", 7],
@@ -220,12 +219,14 @@ describe("late campaign pacing and encounters", () => {
         },
       },
     });
-    // Sector 1 in World 3: tier is determined by sectorTier(LAB_WORLDS[3], 1).
-    // Grove gathered in sector 2: awards tier's biomass.
+    // Sector 1 in World 3: tier 8 -> 200 essence; Grove in sector 2: tier 7 -> 25 biomass.
     expect(s.biomass).toBeGreaterThanOrEqual(25);
     expect(s.essence).toBeGreaterThanOrEqual(200);
-    expect(s.lab.worlds[3].cleared).toEqual(["1:soldier:0"]);
-    expect(s.lab.worlds[3].gathered).toEqual(["2:grove:1"]);
+    // Partial legacy sector clears are dropped by lateLayout migration, and reloading never tops up again.
+    expect(s.lab.lateLayout).toBe(1);
+    const reloaded = sanitizeSaveData({ ...s, essence: 0, biomass: 0 });
+    expect(reloaded.essence).toBe(0);
+    expect(reloaded.biomass).toBe(0);
     expect(sanitizeSaveData({}).biomass).toBe(0);
   });
   it("migrates legacy lateLayout < 1 saves by completing full sectors and dropping partial ids without paying rewards", () => {

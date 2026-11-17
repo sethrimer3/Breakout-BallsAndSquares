@@ -181,6 +181,7 @@ export class LabMap {
     this.tiles = [];
     this.canvases = [];
     this.root.style.setProperty("--sectors", String(n));
+    this.root.style.setProperty("--rows", String(worldRows(this.def)));
     const label = (text: string): HTMLDivElement => {
       const el = document.createElement("div");
       el.className = "labmap-label";

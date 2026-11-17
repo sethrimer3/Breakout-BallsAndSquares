@@ -538,11 +538,12 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     def.lab.unlocked = clamp(int(lab.unlocked, 1), 1, LAB_WORLD_COUNT);
     def.lab.world = clamp(int(lab.world, 1), 1, def.lab.unlocked);
 
-    // Migration recovery for finite rewards lost due to previous drop expiration/refresh bugs:
-    // If a save already cleared encounters or gathered groves, ensure wallet biomass and essence
-    // are at least the sum of their fixed entitlements (less any spent on soldier upgrades).
-    let minBiomass = 0;
-    let minEssence = 0;
+    const lateLayout = clamp(int(lab.lateLayout, 0), 0, 1);
+    if (lateLayout < 1) {
+      // Migration recovery for finite rewards lost due to previous drop expiration/refresh bugs:
+      // Run only on pre-lateLayout saves using the original pre-migration ids, never on migrated ids.
+      let minBiomass = 0;
+      let minEssence = 0;
     for (let id = 3; id <= LAB_WORLD_COUNT; id++) {
       const wProg = def.lab.worlds[id];
       const worldDef = LAB_WORLDS[id];
@@ -604,11 +605,8 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     }
     const targetBiomass = Math.max(0, minBiomass - spentBiomass);
     const targetEssence = Math.max(0, minEssence - spentEssence);
-    if (def.biomass < targetBiomass) def.biomass = targetBiomass;
-    if (def.essence < targetEssence) def.essence = targetEssence;
-
-    const lateLayout = clamp(int(lab.lateLayout, 0), 0, 1);
-    if (lateLayout < 1) {
+      if (def.biomass < targetBiomass) def.biomass = targetBiomass;
+      if (def.essence < targetEssence) def.essence = targetEssence;
       migrateLateWorldProgress(def.lab.worlds);
     }
     def.lab.lateLayout = 1;

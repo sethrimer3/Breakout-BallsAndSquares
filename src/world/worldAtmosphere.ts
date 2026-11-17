@@ -14,7 +14,7 @@ export const ZONE_ATMOSPHERES: Readonly<Record<number, Atmosphere>> = {
   8: { zone: 8, name: "DUSK FOREST", background: [87, 65, 38], ambient: [160, 127, 94], sunlight: 0.5, canopy: 0.6, beams: 0.3, haze: 0.2, encounters: "Difficult Blight enemies; transition toward dusk." },
   9: { zone: 9, name: "DARK BLIGHT FOREST", background: [15, 29, 23], ambient: [65, 84, 66], sunlight: 0.15, canopy: 0.95, beams: 0.8, haze: 0.35, encounters: "Dark Blight forest; sunlight shafts through an overhead canopy." },
   10: { zone: 10, name: "FALLEN CITY", background: [110, 49, 18], ambient: [190, 126, 70], sunlight: 0.35, canopy: 0, beams: 0.1, haze: 0.75, encounters: "Penultimate zone; apocalyptic orange haze, Blight-hacked facility defenses." },
-  11: { zone: 11, name: "BLIGHT MOTHERSHIP", background: [12, 10, 27], ambient: [95, 76, 125], sunlight: 0, canopy: 0, beams: 0, haze: 0.1, encounters: "Final zone: the Blight mother ship in space." },
+  11: { zone: 11, name: "BLIGHT MOTHERSHIP", background: [14, 12, 30], ambient: [125, 102, 160], sunlight: 0, canopy: 0, beams: 0, haze: 0.1, encounters: "Final zone: the Blight mother ship in space." },
 };
 
 export function atmosphereAt(def: LabWorldDef, col: number, row: number): Atmosphere | null {

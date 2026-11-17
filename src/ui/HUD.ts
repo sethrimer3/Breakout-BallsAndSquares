@@ -259,6 +259,9 @@ export class HUD {
     this.fields.depth.textContent = `${s.maxDepth}`;
     this.fields.soldiers.textContent = `${alive} / +${game.reserves}`;
 
+    this.growthMeterEl.style.display = game.labDef.framework ? "none" : "";
+    if (game.labDef.framework) return;
+
     // Dramatic Growth Rate meter update. It fills toward OVERDRIVE, then empties
     // and refills with the walls' own replication rate under a surge effect.
     const rate = game.growthRate;

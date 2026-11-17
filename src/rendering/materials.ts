@@ -381,22 +381,22 @@ export function lateMaterial(
     return out;
   }
   if (feature === "floor") {
-    // Ribbed deck panels
+    // Ribbed deck panels: noticeably darker than hull walls for clear figure-ground contrast
     const panel = (gx & 15) === 0 || (gy & 15) === 0 ? 0.65 : 1;
-    const rib = (gy & 3) === 0 ? 1.12 : 0.95;
-    out[0] = 30 * panel * rib * grain;
-    out[1] = 24 * panel * rib * grain;
-    out[2] = 42 * panel * rib * grain;
+    const rib = (gy & 3) === 0 ? 1.15 : 0.94;
+    out[0] = 20 * panel * rib * grain;
+    out[1] = 16 * panel * rib * grain;
+    out[2] = 30 * panel * rib * grain;
     return out;
   }
   // Organic-metal hull plates with seams
   const px = gx & 7;
   const py = gy & 7;
-  const seam = px === 0 || py === 0 ? 0.58 : px === 1 || py === 1 ? 1.16 : 1;
+  const seam = px === 0 || py === 0 ? 0.58 : px === 1 || py === 1 ? 1.18 : 1;
   const rib = valueNoise(gx, gy, 10, 521) > 0.58 ? 1.1 : 0.92;
-  out[0] = 44 * seam * rib * grain;
-  out[1] = 28 * seam * rib * grain;
-  out[2] = 62 * seam * rib * grain;
+  out[0] = 56 * seam * rib * grain;
+  out[1] = 36 * seam * rib * grain;
+  out[2] = 78 * seam * rib * grain;
   return out;
 }
 

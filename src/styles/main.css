@@ -2200,7 +2200,7 @@ button {
 
 /* ---------------------------------------------------------------- lab map */
 .labmap-panel {
-  --tile: max(14px, min(calc((100vw - 96px) / (var(--sectors, 9) + 0.6)), calc((100vh - 220px) / (var(--sectors, 9) + 0.6)), 64px));
+  --tile: max(14px, min(calc((100vw - 96px) / (var(--sectors, 9) + 0.6)), calc((100vh - 220px) / (var(--rows, var(--sectors, 9)) + 0.6)), 64px));
   min-width: 0;
   max-width: none;
   padding: 14px 16px;
@@ -2209,7 +2209,7 @@ button {
 .labmap-grid {
   display: grid;
   grid-template-columns: 16px repeat(var(--sectors, 9), var(--tile)) 16px;
-  grid-template-rows: 14px repeat(var(--sectors, 9), var(--tile)) 14px;
+  grid-template-rows: 14px repeat(var(--rows, var(--sectors, 9)), var(--tile)) 14px;
   gap: 0;
   justify-content: center;
   margin: 10px 0 8px;
