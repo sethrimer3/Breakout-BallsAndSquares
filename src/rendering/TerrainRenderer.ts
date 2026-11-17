@@ -5,7 +5,7 @@ import { fogRegionVisible } from "./fogRegionVisible";
 import type { FogOfWar } from "../world/FogOfWar";
 import { SortedGridIndex } from "./SortedGridIndex";
 import { boundaryColor } from "../world/MapBoundary";
-import { traceSurfaceOutline } from "./surfaceOutline";
+import { SurfaceOutlineCache } from "./SurfaceOutlineCache";
 import { COLORS, FACILITY, TERRAIN, TERRAIN as T, zoneForDepth } from "../config";
 import { EDGE_PIXELS_PER_SUB, markBlightEdges, type SubcellRegion } from "./blightEdges";
 import { paintPortal } from "./portalNoise";
@@ -180,6 +180,7 @@ export class TerrainRenderer {
   private blightCells: (Uint8Array | null)[] = [];
   private blightCellCounts: Uint32Array;
   private surfaceOutlines: (Path2D | null)[] = [];
+  private surfaceGeometry: (SurfaceOutlineCache | null)[];
   /** One pixel per world cell: what the lab's emergency power keeps lit. */
   private glowCanvas: HTMLCanvasElement;
   private image: ImageData;
@@ -238,6 +239,7 @@ export class TerrainRenderer {
     this.opacityChunkRevisions = new Uint32Array(n);
     const subChunk = chunkSize * 2;
     this.surfaceOutlines = new Array<Path2D | null>(n).fill(null);
+    this.surfaceGeometry = new Array<SurfaceOutlineCache | null>(n).fill(null);
     for (let i = 0; i < n; i++) {
       const c = document.createElement("canvas");
       c.width = chunkSize * TEX;
@@ -936,11 +938,18 @@ export class TerrainRenderer {
     } else this.blightCanvases[k] = null;
 
     if (this.chunks.geometryDirty[k]) {
-      const outline = new Path2D();
       const subs = cs * 2;
-      const edges = traceSurfaceOutline(world, kx * subs, ky * subs, subs, this.edgeSolid,
-        (x, y, width, height) => outline.rect(x, y, width, height));
-      this.surfaceOutlines[k] = edges ? outline : null;
+      const geometry = this.surfaceGeometry[k] ?? new SurfaceOutlineCache(subs);
+      const changed = geometry.update(world, kx * subs, ky * subs, this.edgeSolid, {
+        x0: x0 * 2, y0: y0 * 2, x1: (x1 + 1) * 2 - 1, y1: (y1 + 1) * 2 - 1,
+      });
+      this.surfaceGeometry[k] = geometry.empty ? null : geometry;
+      if (geometry.empty) this.surfaceOutlines[k] = null;
+      else if (changed) {
+        const path = new Path2D();
+        geometry.trace((x, y, width, height) => path.rect(x, y, width, height));
+        this.surfaceOutlines[k] = path;
+      }
       this.buildEdgeMask(k, kx, ky);
       this.chunks.geometryDirty[k] = 0;
     }

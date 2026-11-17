@@ -71,6 +71,7 @@ export class RenderScaleGovernor {
   private slowStreak = 0;
   /** Typical interval of the last window before the most recent step down, or 0. */
   private beforeStep = 0;
+  private beforeStepIndex = 0;
   private failedSteps = 0;
 
   constructor(startIndex: number, private devicePixelRatio: number) {
@@ -112,7 +113,7 @@ export class RenderScaleGovernor {
       const helped = typical <= this.beforeStep * (1 - GOVERNOR.minGain);
       this.beforeStep = 0;
       if (!helped) {
-        this.step--;
+        this.step = this.beforeStepIndex;
         this.locked = ++this.failedSteps >= GOVERNOR.maxFailedSteps;
         this.settle = GOVERNOR.retryFrames;
         return true;
@@ -125,13 +126,16 @@ export class RenderScaleGovernor {
     }
     if (++this.slowStreak < GOVERNOR.slowWindows) return false;
     this.slowStreak = 0;
-    // Further steps can't lower the density on this screen: nothing left to try.
-    const next = this.step + 1;
-    if (next >= AUTO_STEPS.length ||
-        densityFor(AUTO_STEPS[next], this.devicePixelRatio) >= densityFor(this.cap, this.devicePixelRatio)) {
+    // Several caps can map to the same native density. Skip that plateau
+    // rather than stopping before a lower effective density is reached.
+    let next = this.step + 1;
+    const density = densityFor(this.cap, this.devicePixelRatio);
+    while (next < AUTO_STEPS.length && densityFor(AUTO_STEPS[next], this.devicePixelRatio) >= density) next++;
+    if (next >= AUTO_STEPS.length) {
       this.locked = true;
       return false;
     }
+    this.beforeStepIndex = this.step;
     this.step = next;
     this.beforeStep = typical;
     this.settle = GOVERNOR.settleFrames;
