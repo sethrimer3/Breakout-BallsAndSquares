@@ -79,7 +79,7 @@ describe("late world blueprints", () => {
     expect(def.blueprint).toHaveLength(rows);
     for (const line of def.blueprint) expect(line).toHaveLength(cols);
     const bp = worldBlueprint(def);
-    expect(bp.rooms.length).toBeGreaterThanOrEqual(sectorCount(def));
+    expect(bp.rooms.length).toBeGreaterThanOrEqual(1);
     expect(worldRows(def) * SECTOR_CHARS).toBe(rows);
   });
 

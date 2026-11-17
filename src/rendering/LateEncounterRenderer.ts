@@ -223,23 +223,23 @@ export class LateEncounterRenderer {
     const walk = Math.sin(time * 8 + a.phase);
     // Boots/legs alternating along facing axis
     for (const side of [-1, 1]) {
-      const step = side * walk * 2.2;
-      this.batch.disc(a.x + px * side * 2.5 + ca * step, a.y + py * side * 2.5 + sa * step, 1.8, () => pal[0]);
+      const step = side * walk * 2.8;
+      this.batch.disc(a.x + px * side * 3.2 + ca * step, a.y + py * side * 3.2 + sa * step, 2.2, () => pal[0]);
     }
     // Armored torso & shoulder pads
-    this.batch.disc(a.x, a.y, 4.8, (dx, dy, edge) => {
+    this.batch.disc(a.x, a.y, 6.2, (dx, dy, edge) => {
       if (edge) return pal[0];
-      const lit = dx * ca + dy * sa > 1;
+      const lit = dx * ca + dy * sa > 1.2;
       return frozen ? "#88e8ff" : lit ? pal[3] : pal[2];
     });
     // Visor slit
-    this.batch.line(a.x + ca * 2 - px * 2, a.y + sa * 2 - py * 2, a.x + ca * 2 + px * 2, a.y + sa * 2 + py * 2, frozen ? "#ffffff" : pal[4]);
+    this.batch.line(a.x + ca * 2.8 - px * 2.5, a.y + sa * 2.8 - py * 2.5, a.x + ca * 2.8 + px * 2.5, a.y + sa * 2.8 + py * 2.5, frozen ? "#ffffff" : pal[4]);
     // Rifle barrel
-    this.batch.line(a.x + ca * 3 + px * 1.5, a.y + sa * 3 + py * 1.5, a.x + ca * 9 + px * 1.5, a.y + sa * 9 + py * 1.5, "#3a3846");
-    this.batch.put(a.x + ca * 9 + px * 1.5, a.y + sa * 9 + py * 1.5, "#ffddaa");
+    this.batch.line(a.x + ca * 4 + px * 2, a.y + sa * 4 + py * 2, a.x + ca * 11.5 + px * 2, a.y + sa * 11.5 + py * 2, "#3a3846");
+    this.batch.put(a.x + ca * 11.5 + px * 2, a.y + sa * 11.5 + py * 2, "#ffddaa");
     // Muzzle flash
     if (a.cooldown > 1.05) {
-      this.batch.disc(a.x + ca * 10.5 + px * 1.5, a.y + sa * 10.5 + py * 1.5, 2.2, (_dx, _dy, edge) => (edge ? "#ffb84d" : "#fff8cc"));
+      this.batch.disc(a.x + ca * 13 + px * 2, a.y + sa * 13 + py * 2, 2.6, (_dx, _dy, edge) => (edge ? "#ffb84d" : "#fff8cc"));
     }
   }
 
@@ -254,28 +254,28 @@ export class LateEncounterRenderer {
     const winding = a.windup > 0;
     // Heavy legs
     for (const side of [-1, 1]) {
-      const step = side * lumber * 2.5;
-      this.batch.disc(a.x + px * side * 4 + ca * step, a.y + py * side * 4 + sa * step, 2.5, () => pal[0]);
+      const step = side * lumber * 3.2;
+      this.batch.disc(a.x + px * side * 5 + ca * step, a.y + py * side * 5 + sa * step, 3.0, () => pal[0]);
     }
     // Shoulder armor horns
     for (const side of [-1, 1]) {
-      this.batch.disc(a.x + px * side * 5.2, a.y + py * side * 5.2, 3.2, (_dx, _dy, edge) => (edge ? pal[0] : pal[3]));
+      this.batch.disc(a.x + px * side * 6.5, a.y + py * side * 6.5, 4.0, (_dx, _dy, edge) => (edge ? pal[0] : pal[3]));
     }
     // Hulking carapace body
-    this.batch.disc(a.x, a.y, 6.5, (dx, dy, edge) => {
+    this.batch.disc(a.x, a.y, 8.2, (dx, dy, edge) => {
       if (edge) return pal[0];
-      const core = dx * dx + dy * dy < 6;
+      const core = dx * dx + dy * dy < 9;
       if (core) return winding ? "#ffe066" : frozen ? "#88e8ff" : pal[4];
       return dx * ca + dy * sa > 0 ? pal[2] : pal[1];
     });
     // Battering claws
-    const reach = winding ? 3 : 0;
+    const reach = winding ? 4 : 0;
     for (const side of [-1, 1]) {
       this.batch.line(
-        a.x + ca * 4 + px * side * 4.5,
-        a.y + sa * 4 + py * side * 4.5,
-        a.x + ca * (8 + reach) + px * side * 3.5,
-        a.y + sa * (8 + reach) + py * side * 3.5,
+        a.x + ca * 5 + px * side * 5.5,
+        a.y + sa * 5 + py * side * 5.5,
+        a.x + ca * (10 + reach) + px * side * 4.5,
+        a.y + sa * (10 + reach) + py * side * 4.5,
         winding ? "#fff0a0" : "#d8c0c8",
       );
     }
@@ -290,17 +290,17 @@ export class LateEncounterRenderer {
     // Tripod legs
     for (let k = 0; k < 4; k++) {
       const ang = (k * Math.PI) / 2 + Math.PI / 4;
-      this.batch.line(a.x, a.y, a.x + Math.cos(ang) * 7, a.y + Math.sin(ang) * 7, "#2a2836");
+      this.batch.line(a.x, a.y, a.x + Math.cos(ang) * 9, a.y + Math.sin(ang) * 9, "#2a2836");
     }
     // Armored rotating dome
-    this.batch.disc(a.x, a.y, 5.2, (dx, dy, edge) => {
+    this.batch.disc(a.x, a.y, 6.6, (dx, dy, edge) => {
       if (edge) return pal[0];
-      if (dx * dx + dy * dy < 4) return pulse ? "#fff2a0" : pal[4];
+      if (dx * dx + dy * dy < 6) return pulse ? "#fff2a0" : pal[4];
       return dx + dy < 0 ? pal[3] : pal[1];
     });
     // Twin gun barrel
-    this.batch.line(a.x + ca * 3, a.y + sa * 3, a.x + ca * 9.5, a.y + sa * 9.5, "#3e3c4c");
-    this.batch.put(a.x + ca * 9.5, a.y + sa * 9.5, pulse ? "#ffe066" : "#ffddaa");
+    this.batch.line(a.x + ca * 4, a.y + sa * 4, a.x + ca * 12, a.y + sa * 12, "#3e3c4c");
+    this.batch.put(a.x + ca * 12, a.y + sa * 12, pulse ? "#ffe066" : "#ffddaa");
   }
 
   private mine(a: Encounter, time: number): void {
@@ -309,25 +309,25 @@ export class LateEncounterRenderer {
     // Contact prongs
     for (let k = 0; k < 4; k++) {
       const ang = (k * Math.PI) / 2;
-      this.batch.line(a.x, a.y, a.x + Math.cos(ang) * 6, a.y + Math.sin(ang) * 6, MINE_PAL[0]);
+      this.batch.line(a.x, a.y, a.x + Math.cos(ang) * 7.5, a.y + Math.sin(ang) * 7.5, MINE_PAL[0]);
     }
-    this.batch.disc(a.x, a.y, 4.4, (dx, dy, edge) => {
+    this.batch.disc(a.x, a.y, 5.4, (dx, dy, edge) => {
       if (edge) return MINE_PAL[0];
-      if (dx * dx + dy * dy < 3.5) return armed ? (blink ? MINE_PAL[4] : MINE_PAL[3]) : blink ? MINE_PAL[3] : MINE_PAL[1];
+      if (dx * dx + dy * dy < 4.5) return armed ? (blink ? MINE_PAL[4] : MINE_PAL[3]) : blink ? MINE_PAL[3] : MINE_PAL[1];
       return dx + dy < 0 ? MINE_PAL[2] : MINE_PAL[1];
     });
   }
 
   private grove(a: Encounter, time: number): void {
-    const sway = Math.sin(time * 2.2 + a.phase) * 1.1;
+    const sway = Math.sin(time * 2.2 + a.phase) * 1.3;
     // 3 overlapping leafy frond clusters + glowing biomass pods
     for (let k = 0; k < 3; k++) {
       const ang = (k * Math.PI * 2) / 3 + a.phase * 0.5;
-      const fx = a.x + Math.cos(ang) * 3 + sway * 0.5;
-      const fy = a.y + Math.sin(ang) * 3;
-      this.batch.disc(fx, fy, 3.6, (dx, dy, edge) => (edge ? GROVE_PAL[0] : dx + dy < 0 ? GROVE_PAL[3] : GROVE_PAL[2]));
+      const fx = a.x + Math.cos(ang) * 3.8 + sway * 0.5;
+      const fy = a.y + Math.sin(ang) * 3.8;
+      this.batch.disc(fx, fy, 4.5, (dx, dy, edge) => (edge ? GROVE_PAL[0] : dx + dy < 0 ? GROVE_PAL[3] : GROVE_PAL[2]));
     }
-    this.batch.disc(a.x + sway, a.y, 2.8, (_dx, _dy, edge) => (edge ? GROVE_PAL[1] : GROVE_PAL[4]));
+    this.batch.disc(a.x + sway, a.y, 3.4, (_dx, _dy, edge) => (edge ? GROVE_PAL[1] : GROVE_PAL[4]));
   }
 
   private boss(a: Encounter, time: number): void {
@@ -393,15 +393,7 @@ export class LateEncounterRenderer {
       const y = cam.worldToScreenY(a.y);
       const r = cellSize * cam.zoom;
       if (x < -r * 6 || y < -r * 6 || x > cam.viewW + r * 6 || y > cam.viewH + r * 6) continue;
-      if (a.kind === "boss") {
-        const br = r * 2.8;
-        ctx.save();
-        ctx.strokeStyle = a.hp / a.maxHp <= 0.3 ? "#ff0055" : "#ff4081";
-        ctx.lineWidth = Math.max(2, 2.5 * cam.zoom);
-        ctx.strokeRect(x - br - 2, y - br - 2, (br + 2) * 2, (br + 2) * 2);
-        ctx.restore();
-        continue;
-      }
+      if (a.kind === "boss") continue;
       if (a.kind === "trap" && a.charge > 0) {
         const pulse = 0.8 + 0.2 * Math.sin(performance.now() * 0.02);
         ctx.save();

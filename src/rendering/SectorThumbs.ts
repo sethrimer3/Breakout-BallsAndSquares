@@ -42,19 +42,66 @@ export function renderSectorThumbs(world: PixelWorld, terrain: TerrainRenderer, 
     const col = s % frame.def.sectors;
     const row = (s - col) / frame.def.sectors;
     const atmo = frame.def.framework ? atmosphereAt(frame.def, col, row) : null;
-    g.fillStyle = atmo
-      ? `rgb(${Math.round(atmo.background[0] * 0.65)}, ${Math.round(atmo.background[1] * 0.65)}, ${Math.round(atmo.background[2] * 0.65)})`
-      : COLORS.background;
-    g.fillRect(0, 0, THUMB_SIZE, THUMB_SIZE);
+    if (frame.def.id === 3) {
+      // Smoothly blend forest open-floor background across tier bands (no hard sector seams)
+      const bgImg = g.createImageData(THUMB_SIZE, THUMB_SIZE);
+      const step = 4;
+      for (let ty = 0; ty < THUMB_SIZE; ty += step) {
+        for (let tx = 0; tx < THUMB_SIZE; tx += step) {
+          const a = atmosphereAt(frame.def, col + (tx + step * 0.5) / THUMB_SIZE - 0.5, row + (ty + step * 0.5) / THUMB_SIZE - 0.5)!;
+          const r = Math.round(a.background[0] * 0.65);
+          const gr = Math.round(a.background[1] * 0.65);
+          const bl = Math.round(a.background[2] * 0.65);
+          for (let dy = 0; dy < step; dy++) {
+            for (let dx = 0; dx < step; dx++) {
+              const idx = ((ty + dy) * THUMB_SIZE + (tx + dx)) * 4;
+              bgImg.data[idx] = r;
+              bgImg.data[idx + 1] = gr;
+              bgImg.data[idx + 2] = bl;
+              bgImg.data[idx + 3] = 255;
+            }
+          }
+        }
+      }
+      g.putImageData(bgImg, 0, 0);
+    } else {
+      g.fillStyle = atmo
+        ? `rgb(${Math.round(atmo.background[0] * 0.65)}, ${Math.round(atmo.background[1] * 0.65)}, ${Math.round(atmo.background[2] * 0.65)})`
+        : COLORS.background;
+      g.fillRect(0, 0, THUMB_SIZE, THUMB_SIZE);
+    }
     terrain.drawRegion(g, b.x0, b.y0, SECTOR_CELLS, SECTOR_CELLS);
 
     // Lightmap for this sector.
     lg.globalCompositeOperation = "source-over";
     const ambScale = frame.def.id === 5 ? 0.85 : 0.55;
-    lg.fillStyle = atmo
-      ? `rgb(${Math.round(atmo.ambient[0] * ambScale)}, ${Math.round(atmo.ambient[1] * ambScale)}, ${Math.round(atmo.ambient[2] * ambScale)})`
-      : AMBIENT;
-    lg.fillRect(0, 0, THUMB_SIZE, THUMB_SIZE);
+    if (frame.def.id === 3) {
+      const ambImg = lg.createImageData(THUMB_SIZE, THUMB_SIZE);
+      const step = 4;
+      for (let ty = 0; ty < THUMB_SIZE; ty += step) {
+        for (let tx = 0; tx < THUMB_SIZE; tx += step) {
+          const a = atmosphereAt(frame.def, col + (tx + step * 0.5) / THUMB_SIZE - 0.5, row + (ty + step * 0.5) / THUMB_SIZE - 0.5)!;
+          const r = Math.round(a.ambient[0] * ambScale);
+          const gr = Math.round(a.ambient[1] * ambScale);
+          const bl = Math.round(a.ambient[2] * ambScale);
+          for (let dy = 0; dy < step; dy++) {
+            for (let dx = 0; dx < step; dx++) {
+              const idx = ((ty + dy) * THUMB_SIZE + (tx + dx)) * 4;
+              ambImg.data[idx] = r;
+              ambImg.data[idx + 1] = gr;
+              ambImg.data[idx + 2] = bl;
+              ambImg.data[idx + 3] = 255;
+            }
+          }
+        }
+      }
+      lg.putImageData(ambImg, 0, 0);
+    } else {
+      lg.fillStyle = atmo
+        ? `rgb(${Math.round(atmo.ambient[0] * ambScale)}, ${Math.round(atmo.ambient[1] * ambScale)}, ${Math.round(atmo.ambient[2] * ambScale)})`
+        : AMBIENT;
+      lg.fillRect(0, 0, THUMB_SIZE, THUMB_SIZE);
+    }
     lg.globalCompositeOperation = "lighter";
     const lights = world.roomLights.filter((l) => l.cx1 >= b.x0 && l.cy1 >= b.y0 && l.cx0 <= b.x1 && l.cy0 <= b.y1);
     for (const l of lights) addLight(lg, world, l, b.x0, b.y0);

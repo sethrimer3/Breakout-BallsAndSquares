@@ -753,7 +753,10 @@ export function sectorSpawnCell(frame: LabFrame, index: number): { cx: number; c
   const c0 = col * SECTOR_CHARS;
   const r0 = row * SECTOR_CHARS;
   const inSector = (c: number, r: number): boolean => c >= c0 && c < c0 + SECTOR_CHARS && r >= r0 && r < r0 + SECTOR_CHARS;
-  const rooms = worldBlueprint(def).rooms.filter((b) => inSector(b.col + ((b.span - 1) >> 1), b.row + ((b.span - 1) >> 1)));
+  const overlapsSector = (b: { col: number; row: number; span: number }): boolean =>
+    b.col + b.span > c0 && b.col < c0 + SECTOR_CHARS && b.row + b.span > r0 && b.row < r0 + SECTOR_CHARS;
+  const allRooms = worldBlueprint(def).rooms;
+  const rooms = allRooms.filter((b) => inSector(b.col + ((b.span - 1) >> 1), b.row + ((b.span - 1) >> 1)));
   const rank: Record<RoomKind, number> = { room: 0, tanks: 1, blighted: 2, overrun: 3 };
   rooms.sort((a, b) => rank[a.kind] - rank[b.kind] || b.span - a.span);
   if (rooms.length > 0) {
@@ -765,8 +768,8 @@ export function sectorSpawnCell(frame: LabFrame, index: number): { cx: number; c
     const br = Math.floor((cy - frame.y0) / CHAR_CELLS);
     if (!def.framework || lines[br]?.[bc] !== "#") return { cx, cy };
     let bestC = bc, bestR = br, bestD = Infinity;
-    for (let r = b.row; r < b.row + b.span; r++) {
-      for (let c = b.col; c < b.col + b.span; c++) {
+    for (let r = Math.max(r0, b.row); r < Math.min(r0 + SECTOR_CHARS, b.row + b.span); r++) {
+      for (let c = Math.max(c0, b.col); c < Math.min(c0 + SECTOR_CHARS, b.col + b.span); c++) {
         const ch = lines[r]?.[c];
         if (!ch || ch === "." || ch === "#") continue;
         const d = Math.abs(c - bc) + Math.abs(r - br);
@@ -775,6 +778,26 @@ export function sectorSpawnCell(frame: LabFrame, index: number): { cx: number; c
     }
     const half = (CHAR_CELLS - 1) >> 1;
     return { cx: frame.x0 + bestC * CHAR_CELLS + half, cy: frame.y0 + bestR * CHAR_CELLS + half };
+  }
+  // If a cross-border room overlaps this sector without its center inside, pick an open cell in that overlap
+  if (def.framework) {
+    const overlap = allRooms.filter(overlapsSector).sort((a, b) => b.span - a.span);
+    if (overlap.length > 0) {
+      const mid = (SECTOR_CHARS - 1) / 2;
+      let bestC = -1, bestR = -1, bestD = Infinity;
+      for (let r = r0; r < r0 + SECTOR_CHARS; r++) {
+        for (let c = c0; c < c0 + SECTOR_CHARS; c++) {
+          const ch = lines[r]?.[c];
+          if (!ch || ch === "." || ch === "#" || "-|=".includes(ch)) continue;
+          const d = Math.abs(c - c0 - mid) + Math.abs(r - r0 - mid);
+          if (d < bestD) { bestD = d; bestC = c; bestR = r; }
+        }
+      }
+      if (bestC >= 0) {
+        const half = (CHAR_CELLS - 1) >> 1;
+        return { cx: frame.x0 + bestC * CHAR_CELLS + half, cy: frame.y0 + bestR * CHAR_CELLS + half };
+      }
+    }
   }
   const mid = (SECTOR_CHARS - 1) / 2;
   let best = { c: c0 + mid, r: r0 + mid };
