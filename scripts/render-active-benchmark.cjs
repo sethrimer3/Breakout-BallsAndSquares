@@ -92,7 +92,7 @@ const destination = process.env.BREACH_REPORT || '/tmp/breach-active-render-repo
     t.draw=function(context,...args){if(context===lr.maskCtx)masks++;return draw.call(this,context,...args)};
     const render=()=>lr.renderLighting(ctx,g,devicePixelRatio);
     const flush=()=>{while(t.chunks.pending)t.update()};flush();lr.maskState=null;render();render();if(masks!==1)throw Error('Unchanged mask rebuilt');
-    const target=solid.find(i=>w.health[i]>=6&&w.mat[i]===MAT.none&&!w.doorId[i]);
+    const target=solid.find(i=>w.health[i]>=6&&w.mat[i]===MAT.none&&!w.doorId[i]&&Math.abs((i%w.width+.5)*w.cellSize-c.x)<c.viewW/(2*c.zoom)-w.cellSize&&Math.abs((Math.floor(i/w.width)+.5)*w.cellSize-c.y)<c.viewH/(2*c.zoom)-w.cellSize);
     if(target===undefined)throw Error('No damage target');const tx=target%w.width,ty=Math.floor(target/w.width);
     w.health[target]=Math.max(2,w.maxHealthAt(tx,ty));w.damage(tx,ty,1);flush();render();if(masks!==1)throw Error('Ordinary damage rebuilt mask');
     const checks=[['glass',()=>{w.mat[target]=MAT.glass;w.health[target]=Math.max(3,w.maxHealthAt(tx,ty));w.damage(tx,ty,1)}],['destruction',()=>w.damage(tx,ty,1000)],['growth',()=>w.setCell(tx,ty,10,'grown')],['pan',()=>c.x+=.1],['zoom',()=>c.zoom+=.01],['regeneration',()=>t.rebuildAll()],['resize',()=>c.viewW-=1]];

@@ -132,7 +132,7 @@ export class LightRenderer {
   private layerCanvas: HTMLCanvasElement;
   private layerCtx: CanvasRenderingContext2D;
   private maskState: {
-    terrain: Game["terrain"]; revision: number; x: number; y: number; zoom: number;
+    terrain: Game["terrain"]; revision: string; x: number; y: number; zoom: number;
     viewW: number; viewH: number; width: number; height: number; dpr: number; ambient: string;
   } | null = null;
   private maskCanvas: HTMLCanvasElement;
@@ -193,7 +193,8 @@ export class LightRenderer {
     // Reuse the ambient-colored silhouette while camera, size and terrain opacity
     // are unchanged. Pending chunk work invalidates it as each chunk is built.
     const m = this.maskState, terrain = game.terrain;
-    if (!m || m.terrain !== terrain || m.revision !== terrain.opacityRevision ||
+    const revision = terrain.visibleOpacityRevision(cam);
+    if (!m || m.terrain !== terrain || m.revision !== revision ||
         m.x !== cam.x || m.y !== cam.y || m.zoom !== cam.zoom ||
         m.viewW !== cam.viewW || m.viewH !== cam.viewH || m.dpr !== dpr ||
         m.width !== devW || m.height !== devH || m.ambient !== ambient) {
@@ -208,7 +209,7 @@ export class LightRenderer {
       mask.fillStyle = ambient;
       mask.fillRect(0, 0, devW, devH);
       mask.globalCompositeOperation = "source-over";
-      this.maskState = { terrain, revision: terrain.opacityRevision, x: cam.x, y: cam.y,
+      this.maskState = { terrain, revision, x: cam.x, y: cam.y,
         zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: devW, height: devH, dpr, ambient };
     }
 

@@ -137,6 +137,7 @@ export class TerrainRenderer {
   renderRevision = 0;
   /** Changes as chunks with potentially different alpha are published. */
   opacityRevision = 0;
+  private opacityChunkRevisions: Uint32Array;
   readonly chunks: TerrainChunks;
   private canvases: HTMLCanvasElement[] = [];
   private blightCanvases: (HTMLCanvasElement | null)[] = [];
@@ -194,6 +195,7 @@ export class TerrainRenderer {
     this.chunks = new TerrainChunks(world, chunkSize);
     this.floorRegions = new FloorRegions(world.width, world.height);
     const n = this.chunks.cols * this.chunks.rows;
+    this.opacityChunkRevisions = new Uint32Array(n);
     const subChunk = chunkSize * 2;
     this.surfaceOutlines = new Array<Path2D | null>(n).fill(null);
     for (let i = 0; i < n; i++) {
@@ -615,10 +617,20 @@ export class TerrainRenderer {
     ctx.restore();
   }
 
+  /** Only chunks drawn into the current terrain mask contribute to its revision. */
+  visibleOpacityRevision(cam: CameraSystem): string {
+    let revision = "";
+    this.forEachVisibleChunk(cam, (kx, ky) => {
+      const k = ky * this.chunks.cols + kx;
+      revision += k + ":" + this.opacityChunkRevisions[k] + ",";
+    });
+    return revision;
+  }
+
   private buildChunk(k: number): void {
     this.renderRevision++;
     if (this.chunks.opacityDirty[k]) {
-      this.opacityRevision++;
+      this.opacityChunkRevisions[k] = ++this.opacityRevision;
       this.chunks.opacityDirty[k] = 0;
     }
     const { world } = this;
