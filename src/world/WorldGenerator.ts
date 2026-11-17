@@ -1,6 +1,6 @@
 import { buildStartingTube } from "./StartingTube";
 import { installMapBoundary } from "./MapBoundary";
-import { designLateSpaces, fortifyLateSpaces } from "./LateWorldLayouts";
+import { carveLateBlueprint } from "./LateWorldLayouts";
 import { FACILITY, TERRAIN, zoneForDepth } from "../config";
 import { hash2, valueNoise } from "../core/math";
 import { Rng } from "../core/Rng";
@@ -154,11 +154,10 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     // Later campaign uses outdoor clearings, city defenses and ship checkpoints.
     world.roomLights = []; world.blightCores = []; world.sentrySpots = []; world.specimenSpots = [];
     health.fill(500); tint.fill(96);
-    designLateSpaces(world, frame);
+    carveLateBlueprint(world, frame, layout);
     // Outdoor/ship geometry is authored; profile-specific surface grain is stable.
     for (let i = 0; i < tint.length; i++) tint[i] = 64 + Math.floor(hash2(i % width, Math.floor(i / width), seed) * 64);
     const clear = (i: number): void => { health[i] = 0; wall[i] = 0; world.decor[i] = DECOR.cleanFloor; };
-    fortifyLateSpaces(world, frame);
     buildGates(world, frame);
     for (const door of world.doors) {
       // Onward gates require their corresponding core keycard.

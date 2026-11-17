@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { WORLD, tierHealth } from "../src/config";
 import { PixelWorld } from "../src/world/PixelWorld";
 import { generateWorld } from "../src/world/WorldGenerator";
-import { LAB_WORLDS, sectorBounds, sectorCount, sectorTier, worldRows } from "../src/world/labMap";
+import { CHAR_CELLS, LAB_WORLDS, sectorCount, sectorTier, worldRows } from "../src/world/labMap";
 import { LateEncounters, type Encounter } from "../src/systems/LateEncounters";
 import { LootKind, LootSystem } from "../src/entities/LootSystem";
 import { Rng } from "../src/core/Rng";
@@ -211,6 +211,7 @@ describe("late campaign pacing and encounters", () => {
       lab: {
         world: 3,
         unlocked: 3,
+        lateLayout: 1,
         worlds: {
           3: {
             cleared: ["1:soldier:0", "1:soldier:0", 7],
@@ -227,80 +228,70 @@ describe("late campaign pacing and encounters", () => {
     expect(s.lab.worlds[3].gathered).toEqual(["2:grove:1"]);
     expect(sanitizeSaveData({}).biomass).toBe(0);
   });
+  it("migrates legacy lateLayout < 1 saves by completing full sectors and dropping partial ids without paying rewards", () => {
+    const s = sanitizeSaveData({
+      biomass: 500,
+      essence: 5000,
+      lab: {
+        world: 3,
+        unlocked: 5,
+        worlds: {
+          3: {
+            // Sector 0 is tier 9 (2 soldiers + 1 brute, 2 groves); sector 1 is tier 8 (partial clear, full groves)
+            cleared: ["0:soldier:0", "0:soldier:1", "0:brute:2", "1:soldier:0"],
+            gathered: ["1:grove:0", "1:grove:1", "1:grove:2", "0:grove:0"],
+          },
+          5: {
+            // Sector 4 is boss sector (2 turrets + boss)
+            cleared: ["4:turret:0", "4:turret:1", "4:boss:2"],
+          },
+        },
+      },
+    });
+    expect(s.lab.lateLayout).toBe(1);
+    expect(s.biomass).toBe(500);
+    expect(s.essence).toBe(5000);
+    expect(s.lab.worlds[3].cleared.sort()).toEqual(["0:brute:0", "0:soldier:0", "0:soldier:1"]);
+    expect(s.lab.worlds[3].gathered).toEqual(["1:grove:0", "1:grove:1", "1:grove:2"]);
+    expect(s.lab.worlds[5].cleared.sort()).toEqual(["4:boss:0", "4:turret:0", "4:turret:1"]);
+  });
   it("generates distinct spatial archetypes with tactical cover across late worlds", () => {
+    const coverCenter = (w: PixelWorld, s: number): { cx: number; cy: number } | null => {
+      const f = w.labLayout!.frame!;
+      const n = f.def.sectors;
+      const sc = s % n;
+      const sr = (s - sc) / n;
+      for (let r = sr * 7; r < (sr + 1) * 7; r++) {
+        for (let c = sc * 7; c < (sc + 1) * 7; c++) {
+          if (f.def.blueprint[r][c] === "#") {
+            return { cx: f.x0 + c * CHAR_CELLS + 3, cy: f.y0 + r * CHAR_CELLS + 3 };
+          }
+        }
+      }
+      return null;
+    };
+
     const forest = setup(3);
-    // Archetype 0 has corner mounds for cover in tier 8
-    const sTier8_0 = forest.e.actors.find(
-      (a) => a.tier === 8 && a.sector % 3 === 0,
-    )?.sector;
-    expect(sTier8_0).toBeDefined();
-    // Verify forest mound cell has non-zero health (archetype 0)
-    const fFrame = forest.w.labLayout!.frame!;
-    const fb = sectorBounds(fFrame, sTier8_0!);
-    const fcx = Math.round((fb.x0 + fb.x1) / 2);
-    const fcy = Math.round((fb.y0 + fb.y1) / 2);
-    expect(forest.w.health[(fcy + 7) * forest.w.width + (fcx + 7)]).toBeGreaterThan(0);
+    const sTier8 = forest.e.actors.find((a) => a.tier === 8)?.sector;
+    expect(sTier8).toBeDefined();
+    const fCover = coverCenter(forest.w, sTier8!);
+    expect(fCover).not.toBeNull();
+    expect(forest.w.health[fCover!.cy * forest.w.width + fCover!.cx]).toBeGreaterThan(0);
 
-    // Verify forest central bluff (archetype 1): diagonal offset dx=3, dy=3 (dx^2+dy^2 = 18)
-    const sTier8_1 = forest.e.actors.find(
-      (a) => a.tier === 8 && a.sector % 3 === 1,
-    )?.sector;
-    expect(sTier8_1).toBeDefined();
-    const fb1 = sectorBounds(fFrame, sTier8_1!);
-    const fcx1 = Math.round((fb1.x0 + fb1.x1) / 2);
-    const fcy1 = Math.round((fb1.y0 + fb1.y1) / 2);
-    expect(forest.w.health[(fcy1 + 3) * forest.w.width + (fcx1 + 3)]).toBeGreaterThan(0);
-
-    // Verify that world 4 (city) has barricade cover elements across archetypes
     const city = setup(4);
-    expect(city.w.solidAt).toBeDefined();
-    const cFrame = city.w.labLayout!.frame!;
-    // Archetype 0: Corner barricades (Sector 0)
-    const cb0 = sectorBounds(cFrame, 0);
-    const ccx0 = Math.round((cb0.x0 + cb0.x1) / 2);
-    const ccy0 = Math.round((cb0.y0 + cb0.y1) / 2);
-    expect(city.w.health[(ccy0 + 5) * city.w.width + (ccx0 + 5)]).toBeGreaterThan(0);
+    for (const s of [0, 1, 2, 24]) {
+      const cCover = coverCenter(city.w, s);
+      expect(cCover, `city sector ${s} cover`).not.toBeNull();
+      expect(city.w.health[cCover!.cy * city.w.width + cCover!.cx]).toBeGreaterThan(0);
+    }
 
-    // Archetype 1: Commercial Avenue planters (Sector 1)
-    const cb1 = sectorBounds(cFrame, 1);
-    const ccx1 = Math.round((cb1.x0 + cb1.x1) / 2);
-    const ccy1 = Math.round((cb1.y0 + cb1.y1) / 2);
-    expect(city.w.health[(ccy1 + 6) * city.w.width + (ccx1 + 6)]).toBeGreaterThan(0);
-
-    // Archetype 2: Logistics freight crate barriers (Sector 2)
-    const cb2 = sectorBounds(cFrame, 2);
-    const ccx2 = Math.round((cb2.x0 + cb2.x1) / 2);
-    const ccy2 = Math.round((cb2.y0 + cb2.y1) / 2);
-    expect(city.w.health[(ccy2 + 5) * city.w.width + (ccx2 + 5)]).toBeGreaterThan(0);
-
-    // Aerospace Teleporter Launchpad (Sector 24)
-    const cb24 = sectorBounds(cFrame, 24);
-    const ccx24 = Math.round((cb24.x0 + cb24.x1) / 2);
-    const ccy24 = Math.round((cb24.y0 + cb24.y1) / 2);
-    expect(city.w.health[(ccy24 + 6) * city.w.width + (ccx24 + 6)]).toBeGreaterThan(0);
-
-    // Verify world 5 (ship) has varied archetypes and solid pillar/alcove cover
     const ship = setup(5);
     expect(ship.e.actors.length).toBeGreaterThan(0);
-    const sFrame = ship.w.labLayout!.frame!;
-    // Sector 2 is archetype 2 (hangar bay with dual pillars at cx +- 5, cy)
-    const sb = sectorBounds(sFrame, 2);
-    const scx = Math.round((sb.x0 + sb.x1) / 2);
-    const scy = Math.round((sb.y0 + sb.y1) / 2);
-    expect(ship.w.health[scy * ship.w.width + (scx + 5)]).toBeGreaterThan(0);
-    expect(ship.w.health[scy * ship.w.width + (scx - 5)]).toBeGreaterThan(0);
-
-    // Sector 1 is Apex Observation Dome with conduit pylons
-    const sb1 = sectorBounds(sFrame, 1);
-    const scx1 = Math.round((sb1.x0 + sb1.x1) / 2);
-    const scy1 = Math.round((sb1.y0 + sb1.y1) / 2);
-    expect(ship.w.health[(scy1 + 5) * ship.w.width + (scx1 + 5)]).toBeGreaterThan(0);
-
-    // Sector 4 is Boss Sanctum with 4 blast pillars at (+-7, +-7)
-    const sb4 = sectorBounds(sFrame, 4);
-    const scx4 = Math.round((sb4.x0 + sb4.x1) / 2);
-    const scy4 = Math.round((sb4.y0 + sb4.y1) / 2);
-    expect(ship.w.health[(scy4 + 7) * ship.w.width + (scx4 + 7)]).toBeGreaterThan(0);
+    for (const s of [1, 2, 4]) {
+      const sCover = coverCenter(ship.w, s);
+      expect(sCover, `ship sector ${s} cover`).not.toBeNull();
+      expect(ship.w.health[sCover!.cy * ship.w.width + sCover!.cx]).toBeGreaterThan(0);
+    }
   });
   it("secures encounter drops immediately to prevent softlocks upon squad wipe", () => {
     // Verified via Game late encounter reward callback and loot collection
@@ -543,15 +534,20 @@ describe("late campaign pacing and encounters", () => {
     expect(boss!.maxHp).toBe(50000);
     expect(boss!.tier).toBe(11);
 
-    // Check sector 4 tactical arena cover (4 blast pillars at +-7, +-7)
+    // Check sector 4 tactical arena cover (4 blast pillars from blueprint `#` markers)
     const f = ship.w.labLayout!.frame!;
-    const sb = sectorBounds(f, 4);
-    const scx = Math.round((sb.x0 + sb.x1) / 2);
-    const scy = Math.round((sb.y0 + sb.y1) / 2);
-    expect(ship.w.health[(scy + 7) * ship.w.width + (scx + 7)]).toBeGreaterThan(0);
-    expect(ship.w.health[(scy + 7) * ship.w.width + (scx - 7)]).toBeGreaterThan(0);
-    expect(ship.w.health[(scy - 7) * ship.w.width + (scx + 7)]).toBeGreaterThan(0);
-    expect(ship.w.health[(scy - 7) * ship.w.width + (scx - 7)]).toBeGreaterThan(0);
+    const pillars: { cx: number; cy: number }[] = [];
+    for (let r = 7; r < 14; r++) {
+      for (let c = 7; c < 14; c++) {
+        if (f.def.blueprint[r][c] === "#") {
+          pillars.push({ cx: f.x0 + c * CHAR_CELLS + 3, cy: f.y0 + r * CHAR_CELLS + 3 });
+        }
+      }
+    }
+    expect(pillars).toHaveLength(4);
+    for (const p of pillars) {
+      expect(ship.w.health[p.cy * ship.w.width + p.cx]).toBeGreaterThan(0);
+    }
 
     // Verify boss combat: multi-projectile spread and 10,000 essence reward
     const s = new Soldier(boss!.x, boss!.y + 8 * ship.w.cellSize, 1, 0, 100);

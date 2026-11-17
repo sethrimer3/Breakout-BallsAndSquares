@@ -1,6 +1,9 @@
 import { FACILITY } from "../config";
 import { hash2 } from "../core/math";
 import type { LabCorridorSegment, LabLayout, LabRoom } from "./WorldGenerator";
+import { FOREST_BLUEPRINT } from "./late/forest";
+import { CITY_BLUEPRINT } from "./late/city";
+import { MOTHERSHIP_BLUEPRINT } from "./late/mothership";
 
 /**
  * The hand-made research lab: fixed blueprints shared by every run, one per
@@ -183,7 +186,7 @@ export const ZONE2_BLUEPRINT: readonly string[] = [
 /**
  * World 3: 13 × 13 forest clearing lattice, entered from A7 on the west.
  */
-export const ZONE3_BLUEPRINT: readonly string[] = frameworkBlueprint(13, 13);
+export const ZONE3_BLUEPRINT: readonly string[] = FOREST_BLUEPRINT;
 
 /** Empty, linked placeholder rooms: one room per sector, no encounter content. */
 export function frameworkBlueprint(columns: number, rows: number): string[] {
@@ -300,15 +303,15 @@ export const LAB_WORLDS: Readonly<Record<number, LabWorldDef>> = {
     ],
   },
   3: {
-    id: 3, name: "CANOPY FOREST", blueprint: ZONE3_BLUEPRINT,
-    sectors: 13, start: 78, tierBase: 6, bands: [5, 9], freeform: false, alien: false,
+    id: 3, name: "CANOPY FOREST", blueprint: FOREST_BLUEPRINT,
+    sectors: 13, start: 78, tierBase: 6, bands: [5, 9], freeform: true, alien: false,
     framework: true, environment: "forest", seed: 0x3c0de3,
     gates: [{ side: "west", row: 6, tier: 6, to: 0 }, { side: "south", row: 12, col: 11, tier: 9, to: 4 }],
     upgrades: [],
   },
   4: {
-    id: 4, name: "FALLEN CITY", blueprint: frameworkBlueprint(7, 7),
-    sectors: 7, start: 3, tierBase: 9, bands: [99, 99], freeform: false, alien: false,
+    id: 4, name: "FALLEN CITY", blueprint: CITY_BLUEPRINT,
+    sectors: 7, start: 3, tierBase: 9, bands: [99, 99], freeform: true, alien: false,
     framework: true, environment: "city", seed: 0x4c1710,
     gates: [{ side: "north", row: 0, col: 3, tier: 9, to: 0 }], upgrades: [],
     facility: { name: "AEROSPACE FACILITY", col0: 2, row0: 2, col1: 4, row1: 4,
@@ -316,8 +319,8 @@ export const LAB_WORLDS: Readonly<Record<number, LabWorldDef>> = {
     teleporter: { sector: 24, to: 5 },
   },
   5: {
-    id: 5, name: "BLIGHT MOTHERSHIP", blueprint: frameworkBlueprint(3, 7),
-    sectors: 3, rows: 7, start: 19, tierBase: 10, bands: [99, 99], freeform: false, alien: false,
+    id: 5, name: "BLIGHT MOTHERSHIP", blueprint: MOTHERSHIP_BLUEPRINT,
+    sectors: 3, rows: 7, start: 19, tierBase: 10, bands: [99, 99], freeform: true, alien: false,
     framework: true, environment: "mothership", seed: 0x5b1197, gates: [], upgrades: [],
     facility: {
       name: "MOTHERSHIP COMMAND SANCTUM",
@@ -373,14 +376,57 @@ export interface Blueprint {
 }
 
 const ROOM_CHARS = "RGT";
+const LATE_ROOM_CHARS = "RGT#sbtmgXP$";
 
-function isRoomChar(ch: string): boolean {
-  return ROOM_CHARS.includes(ch);
+export type LateMarkerKind = "soldier" | "brute" | "turret" | "trap" | "grove" | "boss" | "teleporter" | "special";
+
+export interface LateMarker {
+  kind: LateMarkerKind;
+  col: number;
+  row: number;
+  sector: number;
+  ordinal: number;
+}
+
+const LATE_MARKER_KINDS: Readonly<Record<string, LateMarkerKind>> = {
+  s: "soldier",
+  b: "brute",
+  t: "turret",
+  m: "trap",
+  g: "grove",
+  X: "boss",
+  P: "teleporter",
+  $: "special",
+};
+
+/** Parse encounter, teleporter and special-upgrade markers from a late blueprint in reading order. */
+export function parseLateMarkers(lines: readonly string[]): LateMarker[] {
+  const cols = lines[0]?.length ?? 0;
+  const sectorCols = Math.floor(cols / SECTOR_CHARS);
+  const counts = new Map<string, number>();
+  const markers: LateMarker[] = [];
+  for (let row = 0; row < lines.length; row++) {
+    const line = lines[row];
+    for (let col = 0; col < line.length; col++) {
+      const kind = LATE_MARKER_KINDS[line[col]];
+      if (!kind) continue;
+      const sector = Math.floor(row / SECTOR_CHARS) * sectorCols + Math.floor(col / SECTOR_CHARS);
+      const key = `${sector}:${kind}`;
+      const ordinal = counts.get(key) ?? 0;
+      counts.set(key, ordinal + 1);
+      markers.push({ kind, col, row, sector, ordinal });
+    }
+  }
+  return markers;
+}
+
+function isRoomChar(ch: string, late = false): boolean {
+  return (late ? LATE_ROOM_CHARS : ROOM_CHARS).includes(ch);
 }
 
 /** Can `ch` join its east/west (`h`) or north/south (`v`) neighbor? */
-function joins(ch: string, axis: "h" | "v"): boolean {
-  if (ch === "+" || isRoomChar(ch)) return true;
+function joins(ch: string, axis: "h" | "v", late = false): boolean {
+  if (ch === "+" || (late && ch === "=") || isRoomChar(ch, late)) return true;
   return axis === "h" ? ch === "-" : ch === "|";
 }
 
@@ -391,7 +437,7 @@ function joins(ch: string, axis: "h" | "v"): boolean {
  * lies in a 2×2 block of the room; it becomes the overlapping squares that
  * cover it, and only the biggest square carries the room's core or tanks.
  */
-export function parseBlueprint(lines: readonly string[] = LAB_BLUEPRINT, freeform = false): Blueprint {
+export function parseBlueprint(lines: readonly string[] = LAB_BLUEPRINT, freeform = false, late = false): Blueprint {
   const n = lines[0]?.length ?? 0;
   const rows = lines.length;
   const at = (c: number, r: number): string => (r >= 0 && r < rows && c >= 0 && c < lines[r].length ? lines[r][c] : ".");
@@ -402,7 +448,7 @@ export function parseBlueprint(lines: readonly string[] = LAB_BLUEPRINT, freefor
   let group = 0;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < n; c++) {
-      if (!isRoomChar(at(c, r)) || seen[r * n + c]) continue;
+      if (!isRoomChar(at(c, r), late) || seen[r * n + c]) continue;
       // Flood the room so a non-square block is caught.
       const stack = [[c, r]];
       const cells: number[][] = [];
@@ -418,7 +464,7 @@ export function parseBlueprint(lines: readonly string[] = LAB_BLUEPRINT, freefor
         else if (ch === "T" && kind === "room") kind = "tanks";
         for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
           const nx = x + dx, ny = y + dy;
-          if (isRoomChar(at(nx, ny)) && !seen[ny * n + nx]) {
+          if (isRoomChar(at(nx, ny), late) && !seen[ny * n + nx]) {
             seen[ny * n + nx] = 1;
             stack.push([nx, ny]);
           }
@@ -431,13 +477,13 @@ export function parseBlueprint(lines: readonly string[] = LAB_BLUEPRINT, freefor
         continue;
       }
       if (!freeform) throw new Error(`Blueprint room at column ${c0}, row ${r0} must be a filled square of at least 2×2`);
-      rooms.push(...coverWithSquares(cells, at, kind, group++));
+      rooms.push(...coverWithSquares(cells, at, kind, group++, late));
     }
   }
 
   const halls: BlueprintHall[] = [];
   const link = (a: string, b: string, axis: "h" | "v"): boolean =>
-    joins(a, axis) && joins(b, axis) && !(isRoomChar(a) && isRoomChar(b));
+    joins(a, axis, late) && joins(b, axis, late) && !(isRoomChar(a, late) && isRoomChar(b, late));
   for (let r = 0; r < rows; r++) {
     let start = -1;
     for (let c = 0; c < n; c++) {
@@ -468,8 +514,8 @@ export function parseBlueprint(lines: readonly string[] = LAB_BLUEPRINT, freefor
  * cover every character of it. The biggest square keeps the room's kind; the
  * rest of an overrun room is "blighted" (Blight floor, no second core).
  */
-function coverWithSquares(cells: number[][], at: (c: number, r: number) => string, kind: RoomKind, group: number): BlueprintRoom[] {
-  const inRoom = (c: number, r: number): boolean => isRoomChar(at(c, r));
+function coverWithSquares(cells: number[][], at: (c: number, r: number) => string, kind: RoomKind, group: number, late = false): BlueprintRoom[] {
+  const inRoom = (c: number, r: number): boolean => isRoomChar(at(c, r), late);
   const fits = (c: number, r: number, s: number): boolean => {
     for (let y = r; y < r + s; y++) for (let x = c; x < c + s; x++) if (!inRoom(x, y)) return false;
     return true;
@@ -587,7 +633,7 @@ export function sectorBounds(frame: LabFrame, index: number): { x0: number; y0: 
 const parsed = new Map<LabWorldDef, Blueprint>();
 export function worldBlueprint(def: LabWorldDef): Blueprint {
   let bp = parsed.get(def);
-  if (!bp) parsed.set(def, (bp = parseBlueprint(def.blueprint, def.freeform)));
+  if (!bp) parsed.set(def, (bp = parseBlueprint(def.blueprint, def.freeform, !!def.framework)));
   return bp;
 }
 

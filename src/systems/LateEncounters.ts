@@ -1,6 +1,6 @@
 import { FREEZE } from "../config";
 import type { PixelWorld } from "../world/PixelWorld";
-import { sectorBounds, sectorCount, sectorTier } from "../world/labMap";
+import { CHAR_CELLS, parseLateMarkers, sectorTier } from "../world/labMap";
 import { CAMPAIGN, campaignTier } from "../world/campaignBalance";
 import { LootKind } from "../entities/LootSystem";
 import type { Soldier } from "../entities/Soldier";
@@ -54,71 +54,38 @@ export class LateEncounters implements BulletTargets {
     const f = this.world.labLayout?.frame;
     if (!f?.def.framework) return;
     const done = new Set([...cleared, ...gathered]);
-    for (let s = 0; s < sectorCount(f.def); s++) {
-      const tier = sectorTier(f.def, s),
-        p = CAMPAIGN[campaignTier(tier)],
-        b = sectorBounds(f, s),
-        cx = ((b.x0 + b.x1 + 1) / 2) * this.world.cellSize,
-        cy = ((b.y0 + b.y1 + 1) / 2) * this.world.cellSize;
-      const isMothershipBossSector = f.def.id === 5 && s === 4;
-      const kinds: Encounter["kind"][] =
-        tier === 7
-          ? []
-          : isMothershipBossSector
-            ? ["turret", "turret", "boss"]
-            : tier < 10
-              ? ["soldier", "soldier", "brute"]
-              : ["turret", "turret", "trap", "soldier", "brute"];
-      if (s === f.def.start) kinds.length = 0;
-      const add = (
-        kind: Encounter["kind"],
-        j: number,
-        x: number,
-        y: number,
-      ) => {
-        const id = `${s}:${kind}:${j}`;
-        const hp =
-          kind === "grove"
-            ? 1
-            : kind === "boss"
-              ? 50000
-              : p.enemyHp * (kind === "brute" ? 2 : kind === "trap" ? 0.3 : 1);
-        this.actors.push({
-          id,
-          sector: s,
-          x,
-          y,
-          homeX: x,
-          homeY: y,
-          hp,
-          maxHp: hp,
-          alive: !done.has(id),
-          kind,
-          tier,
-          cooldown: 1 + j * 0.3,
-          charge: 0,
-          phase: j + s,
-          aimAngle: 0,
-          windup: 0,
-        });
-      };
-      kinds.forEach((k, j) => {
-        let ex = cx + (j < 2 ? (j % 2 ? 1 : -1) * 10 : 0) * this.world.cellSize;
-        let ey = cy + (j < 2 ? 0 : (j - 1) * 5 * this.world.cellSize);
-        if (k === "boss") {
-          ex = cx;
-          ey = cy;
-        }
-        add(k, j, ex, ey);
+    const mid = (CHAR_CELLS - 1) / 2;
+    for (const m of parseLateMarkers(f.def.blueprint)) {
+      if (m.kind === "teleporter" || m.kind === "special") continue;
+      const tier = sectorTier(f.def, m.sector);
+      const p = CAMPAIGN[campaignTier(tier)];
+      const x = (f.x0 + m.col * CHAR_CELLS + mid + 0.5) * this.world.cellSize;
+      const y = (f.y0 + m.row * CHAR_CELLS + mid + 0.5) * this.world.cellSize;
+      const id = `${m.sector}:${m.kind}:${m.ordinal}`;
+      const hp =
+        m.kind === "grove"
+          ? 1
+          : m.kind === "boss"
+            ? 50000
+            : p.enemyHp * (m.kind === "brute" ? 2 : m.kind === "trap" ? 0.3 : 1);
+      this.actors.push({
+        id,
+        sector: m.sector,
+        x,
+        y,
+        homeX: x,
+        homeY: y,
+        hp,
+        maxHp: hp,
+        alive: !done.has(id),
+        kind: m.kind,
+        tier,
+        cooldown: 1 + m.ordinal * 0.3,
+        charge: 0,
+        phase: m.ordinal + m.sector,
+        aimAngle: 0,
+        windup: 0,
       });
-      if (f.def.id === 3)
-        for (let j = 0; j < p.nodes; j++)
-          add(
-            "grove",
-            j,
-            cx + Math.cos(j * 2.4) * 9 * this.world.cellSize,
-            cy + Math.sin(j * 2.4) * 9 * this.world.cellSize,
-          );
     }
   }
   private los(x: number, y: number, tx: number, ty: number): boolean {
