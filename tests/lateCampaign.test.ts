@@ -252,7 +252,7 @@ describe("late campaign pacing and encounters", () => {
     expect(s.lab.lateLayout).toBe(1);
     expect(s.biomass).toBe(500);
     expect(s.essence).toBe(5000);
-    expect(s.lab.worlds[3].cleared.sort()).toEqual(["0:brute:0", "0:soldier:0", "0:soldier:1"]);
+    expect(s.lab.worlds[3].cleared.sort()).toEqual(["0:brute:0", "0:soldier:0", "0:soldier:1", "0:soldier:2"]);
     expect(s.lab.worlds[3].gathered).toEqual(["1:grove:0", "1:grove:1", "1:grove:2"]);
     expect(s.lab.worlds[5].cleared.sort()).toEqual(["4:boss:0", "4:turret:0", "4:turret:1"]);
   });

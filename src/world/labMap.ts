@@ -759,7 +759,22 @@ export function sectorSpawnCell(frame: LabFrame, index: number): { cx: number; c
   if (rooms.length > 0) {
     const b = rooms[0];
     const size = b.span * CHAR_CELLS - 4;
-    return { cx: frame.x0 + b.col * CHAR_CELLS + 2 + (size >> 1), cy: frame.y0 + b.row * CHAR_CELLS + 2 + (size >> 1) };
+    const cx = frame.x0 + b.col * CHAR_CELLS + 2 + (size >> 1);
+    const cy = frame.y0 + b.row * CHAR_CELLS + 2 + (size >> 1);
+    const bc = Math.floor((cx - frame.x0) / CHAR_CELLS);
+    const br = Math.floor((cy - frame.y0) / CHAR_CELLS);
+    if (!def.framework || lines[br]?.[bc] !== "#") return { cx, cy };
+    let bestC = bc, bestR = br, bestD = Infinity;
+    for (let r = b.row; r < b.row + b.span; r++) {
+      for (let c = b.col; c < b.col + b.span; c++) {
+        const ch = lines[r]?.[c];
+        if (!ch || ch === "." || ch === "#") continue;
+        const d = Math.abs(c - bc) + Math.abs(r - br);
+        if (d < bestD) { bestD = d; bestC = c; bestR = r; }
+      }
+    }
+    const half = (CHAR_CELLS - 1) >> 1;
+    return { cx: frame.x0 + bestC * CHAR_CELLS + half, cy: frame.y0 + bestR * CHAR_CELLS + half };
   }
   const mid = (SECTOR_CHARS - 1) / 2;
   let best = { c: c0 + mid, r: r0 + mid };

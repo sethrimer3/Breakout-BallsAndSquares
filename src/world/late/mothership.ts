@@ -6,10 +6,10 @@
  */
 export const MOTHERSHIP_BLUEPRINT: readonly string[] = [
   ".....................", // 1
-  "..tRR...t$RtR...tRR..",
-  ".tRRRm..R#R#m..tRRRm.",
-  ".R#RR#--RRRsR--R#RR#.",
-  ".sRbRR...bRR...sRbRR.",
+  ".#tRR#..t$RtR..#tRR#.",
+  ".RtRRR..R#R#m..RtRRR.",
+  ".mRRRs--RRRsR--mRRRs.",
+  ".RRbRR...bRR...RRbRR.",
   "..........|..........",
   "..........|..........",
   "..........|..........", // 2
@@ -27,11 +27,11 @@ export const MOTHERSHIP_BLUEPRINT: readonly string[] = [
   "...|......|......|...",
   "...|......|......|...",
   "...|......|......|...", // 4
-  ".t$.RR..tR.RR..tR.RR.",
-  ".t#.#R..t#.#R..t#.#R.",
+  ".t$RRt..tRRRt..tRRRt.",
+  ".R#R#R..R#R#R..R#R#R.",
   ".RmRRR--RmRRR--RmRRR.",
-  ".s#.#R..s#.#R..s#.#R.",
-  ".Rb.RR..Rb.RR..Rb.RR.",
+  ".R#s#R..R#s#R..R#s#R.",
+  ".RbRRR..RbRRR..RbRRR.",
   "...=......=......=...",
   "...=......=......=...", // 5
   ".tRRRt..tRRRt..tRRRt.",
@@ -48,8 +48,8 @@ export const MOTHERSHIP_BLUEPRINT: readonly string[] = [
   "...bRR....bRR....bRR.",
   "...|......|......|...",
   "...|......=......|...", // 7
-  ".tRRRt..RRRRR..tRRRt.",
-  ".R#RR#..RRRRR..R#RR#.",
+  ".#tRR#..RRRRR..#tRR#.",
+  ".RtRRR..RRRRR..RtRRR.",
   ".RmRRR==RRRRR==RmRRR.",
   ".RsRRb..RRRRR..RsRRb.",
   "..RRR...RRRRR...RRR..",
