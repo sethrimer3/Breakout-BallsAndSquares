@@ -165,7 +165,7 @@ export class LightingSystem {
   private angles = new Float64Array(LIGHT.maxRays);
   private corners: CornerCand[] = [];
   /** Soldier occluders gathered for the current trace. */
-  private occluders: { x: number; y: number; n: number; poly: Float32Array }[] = [];
+  private occluders: { x: number; y: number; n: number; poly: Float32Array; minAngle: number; maxAngle: number }[] = [];
   /** Per-cell stamp so `markLitCells` lists each cell once per light. */
   private litStamps: Uint32Array;
   private litStamp = 0;
@@ -464,11 +464,15 @@ export class LightingSystem {
       const dy = s.y - oy;
       const dist = Math.hypot(dx, dy);
       if (dist <= occR + 0.2 || dist > radius + occR * 1.5) continue;
-      const o = occ[occN] ?? (occ[occN] = { x: 0, y: 0, n: 0, poly: new Float32Array(16) });
+      const o = occ[occN] ?? (occ[occN] = { x: 0, y: 0, n: 0, poly: new Float32Array(16), minAngle: -Math.PI, maxAngle: Math.PI });
       occN++;
       o.x = s.x;
       o.y = s.y;
       o.n = shapeOccluder(SOLDIER_SHAPES[soldierShapeIndex(s.slotIndex)], s.x, s.y, s.facingAngle, occScale, o.poly);
+      // Keep exact intersection tests as the fallback if the ray budget leaves
+      // no room to calculate this occluder's silhouette rays.
+      o.minAngle = -Math.PI;
+      o.maxAngle = Math.PI;
       if (n + 4 > maxVerts) continue;
       const centerAng = Math.atan2(dy, dx);
       let lo: number;
@@ -487,6 +491,10 @@ export class LightingSystem {
         }
         lo += centerAng;
         hi += centerAng;
+      }
+      if (hi - lo < Math.PI) {
+        o.minAngle = normalizeAngle(lo - eps);
+        o.maxAngle = normalizeAngle(hi + eps);
       }
       angles[n++] = normalizeAngle(lo - eps);
       angles[n++] = normalizeAngle(lo + eps);
@@ -513,6 +521,7 @@ export class LightingSystem {
       // Check soldier occluders (circles or rotated outlines).
       for (let j = 0; j < occN; j++) {
         const o = occ[j];
+        if (!angleInShadowSpan(ang, o.minAngle, o.maxAngle)) continue;
         const ct = o.n === 0
           ? rayCircleDistance(ox, oy, rdx, rdy, o.x, o.y, occR)
           : rayPolygonDistance(ox, oy, rdx, rdy, o.poly, o.n);
@@ -581,4 +590,9 @@ function normalizeAngle(a: number): number {
   while (a <= -Math.PI) a += Math.PI * 2;
   while (a > Math.PI) a -= Math.PI * 2;
   return a;
+}
+
+/** Conservative angular broad phase; normalized bounds may cross the ±π seam. */
+export function angleInShadowSpan(angle: number, lo: number, hi: number): boolean {
+  return lo <= hi ? angle >= lo && angle <= hi : angle >= lo || angle <= hi;
 }
