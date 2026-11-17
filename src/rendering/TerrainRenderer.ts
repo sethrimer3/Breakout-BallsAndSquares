@@ -1,3 +1,4 @@
+import { LightRegion, type ScreenRect } from "./LightRegion";
 import { BinaryMask } from "./BinaryMask";
 import { FloorRegions } from "./FloorRegions";
 import { visibleRoomLightIndices } from "./RoomLightIndex";
@@ -173,6 +174,11 @@ export class TerrainRenderer {
   /** Changes as chunks with potentially different alpha are published. */
   opacityRevision = 0;
   private opacityChunkRevisions: Uint32Array;
+  /** Eight-cell opacity tiles retain revisions across frames and mask consumers. */
+  private readonly opacityTileSize = 8;
+  private readonly opacityTileCols: number;
+  private readonly opacityTiles: Uint32Array;
+  private readonly opacityRegion = new LightRegion();
   readonly chunks: TerrainChunks;
   private canvases: HTMLCanvasElement[] = [];
   private blightCanvases: (HTMLCanvasElement | null)[] = [];
@@ -237,6 +243,8 @@ export class TerrainRenderer {
     this.floorRegions = new FloorRegions(world.width, world.height);
     const n = this.chunks.cols * this.chunks.rows;
     this.opacityChunkRevisions = new Uint32Array(n);
+    this.opacityTileCols = Math.ceil(chunkSize / this.opacityTileSize);
+    this.opacityTiles = new Uint32Array(n * this.opacityTileCols ** 2);
     const subChunk = chunkSize * 2;
     this.surfaceOutlines = new Array<Path2D | null>(n).fill(null);
     this.surfaceGeometry = new Array<SurfaceOutlineCache | null>(n).fill(null);
@@ -680,10 +688,36 @@ export class TerrainRenderer {
     return revision;
   }
 
+  /** Device-pixel union of opacity tiles changed since this mask's last build.
+   * Revisions are persistent, so skipped frames and independent views are safe. */
+  opacityUpdateBounds(cam: CameraSystem, since: number, width: number, height: number, dpr: number): ScreenRect | null {
+    if (this.opacityRevision > 0xffffffff || since > this.opacityRevision) return { x: 0, y: 0, width, height };
+    const region = this.opacityRegion, cols = this.opacityTileCols, cs = this.chunks.chunkSize;
+    region.reset();
+    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      const k = ky * this.chunks.cols + kx;
+      if (this.opacityChunkRevisions[k] <= since) return;
+      for (let y = 0; y < cols; y++) for (let x = 0; x < cols; x++) {
+        if (this.opacityTiles[k * cols * cols + y * cols + x] <= since) continue;
+        const x0 = x * this.opacityTileSize, y0 = y * this.opacityTileSize;
+        const x1 = Math.min(cs, x0 + this.opacityTileSize), y1 = Math.min(cs, y0 + this.opacityTileSize);
+        region.include(sx + x0 / cs * sw, sy + y0 / cs * sh, 0);
+        region.include(sx + x1 / cs * sw, sy + y1 / cs * sh, 0);
+      }
+    });
+    return region.resolve(width, height, dpr, 2);
+  }
+
   private buildChunk(k: number): void {
     this.renderRevision++;
     if (this.chunks.opacityDirty[k]) {
       this.opacityChunkRevisions[k] = ++this.opacityRevision;
+      const cols = this.opacityTileCols, size = this.opacityTileSize;
+      for (let y = Math.floor(this.chunks.y0[k] / size); y <= Math.floor(this.chunks.y1[k] / size); y++) {
+        for (let x = Math.floor(this.chunks.x0[k] / size); x <= Math.floor(this.chunks.x1[k] / size); x++) {
+          this.opacityTiles[k * cols * cols + y * cols + x] = this.opacityRevision;
+        }
+      }
       this.chunks.opacityDirty[k] = 0;
     }
     const { world } = this;
@@ -1412,9 +1446,10 @@ export class TerrainRenderer {
     for (const k of this.scratch) this.buildChunk(k);
   }
 
-  draw(ctx: CanvasRenderingContext2D, cam: CameraSystem, showBorders = false): void {
+  draw(ctx: CanvasRenderingContext2D, cam: CameraSystem, showBorders = false, region?: ScreenRect): void {
     ctx.imageSmoothingEnabled = false;
     this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      if (region && (sx + sw < region.x || sy + sh < region.y || sx > region.x + region.width || sy > region.y + region.height)) return;
       ctx.drawImage(this.canvases[ky * this.chunks.cols + kx], sx, sy, sw, sh);
       if (showBorders) {
         ctx.strokeStyle = "rgba(80, 210, 255, 0.25)";

@@ -1,0 +1,1255 @@
+{
+  "baseline": "28064e409b87f78f0a246f3f371f42e236beaea5",
+  "status": "passed",
+  "samples": 20,
+  "browser": "156.0.8078.79",
+  "pixels": [
+    {
+      "device": "desktop",
+      "label": "freeze-0.5-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-0.5-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "thaw-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-pending-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-compacted-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "smoke-edges-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "rail-crossing-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-0.5-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-0.5-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "prism-crossing-marker-0.5-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "prism-crossing-marker-0.5-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-1.13-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-1.13-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "thaw-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-pending-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-compacted-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "smoke-edges-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "rail-crossing-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-1.13-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-1.13-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "prism-crossing-marker-1.13-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "prism-crossing-marker-1.13-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-2.75-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "freeze-2.75-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "thaw-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-pending-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "destroy-compacted-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "smoke-edges-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "rail-crossing-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-2.75-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "offscreen-rail-frost-2.75-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "prism-crossing-marker-2.75-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "prism-crossing-marker-2.75-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-glass",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-destruction",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-growth",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-pan",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-zoom",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-regeneration",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "mask-alpha-resize",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-false-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-false-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-false-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-false-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-true-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-true-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-true-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "desktop",
+      "label": "frame-combined-true-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-0.5-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-0.5-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "thaw-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-pending-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-compacted-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "smoke-edges-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "rail-crossing-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-0.5-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-0.5-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "prism-crossing-marker-0.5-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "prism-crossing-marker-0.5-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-1.13-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-1.13-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "thaw-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-pending-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-compacted-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "smoke-edges-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "rail-crossing-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-1.13-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-1.13-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "prism-crossing-marker-1.13-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "prism-crossing-marker-1.13-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-2.75-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "freeze-2.75-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "thaw-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-pending-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "destroy-compacted-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "smoke-edges-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "rail-crossing-2.75",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-2.75-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "offscreen-rail-frost-2.75-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "prism-crossing-marker-2.75-false",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "prism-crossing-marker-2.75-true",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-glass",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-destruction",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-growth",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-pan",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-zoom",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-regeneration",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "mask-alpha-resize",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-false-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-false-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-false-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-false-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-true-false-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-true-false-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-true-true-0.5",
+      "channels": 0,
+      "maxDelta": 0
+    },
+    {
+      "device": "mobile",
+      "label": "frame-combined-true-true-1.13",
+      "channels": 0,
+      "maxDelta": 0
+    }
+  ],
+  "invalidation": {
+    "ordinaryDamageRebuilds": 0,
+    "checks": [
+      "glass",
+      "destruction",
+      "growth",
+      "pan",
+      "zoom",
+      "regeneration",
+      "resize"
+    ],
+    "maskRebuilds": 8
+  },
+  "scenarios": [
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 15.400000005960464,
+          "p95": 19.299999997019768,
+          "p99": 19.900000005960464
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.399999999999636,
+          "p99": 33.399999999999636
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 16.600000008940697,
+          "p95": 20.200000002980232,
+          "p99": 20.599999994039536
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.30000000000018,
+          "p95": 33.399999999999636,
+          "p99": 33.400000000000546
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 14.599999994039536,
+          "p95": 16.200000002980232,
+          "p99": 17.5
+        },
+        "interval": {
+          "n": 21,
+          "p50": 16.700000000000728,
+          "p95": 33.399999999999636,
+          "p99": 33.399999999999636
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 14.600000008940697,
+          "p95": 17.299999997019768,
+          "p99": 17.799999997019768
+        },
+        "interval": {
+          "n": 21,
+          "p50": 16.700000000000728,
+          "p95": 33.399999999999636,
+          "p99": 33.399999999999636
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 21.80000001192093,
+          "p95": 24.5,
+          "p99": 24.900000005960464
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.30000000000109,
+          "p95": 33.5,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 22.600000008940697,
+          "p95": 27.200000002980232,
+          "p99": 28.799999997019768
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.30000000000109,
+          "p95": 49.899999999999636,
+          "p99": 50.100000000000364
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 18.700000002980232,
+          "p95": 23.5,
+          "p99": 23.700000002980232
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.399999999999636,
+          "p99": 33.399999999999636
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 18.400000005960464,
+          "p95": 21.5,
+          "p99": 27.900000005960464
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.399999999999636,
+          "p99": 50
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155244,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 35.1000000089407,
+          "p95": 38.70000000298023,
+          "p99": 50.8999999910593
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.30000000000109,
+          "p95": 50,
+          "p99": 50.100000000000364
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 34.5,
+          "p95": 38.1000000089407,
+          "p99": 39.400000005960464
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.30000000000109,
+          "p95": 50,
+          "p99": 50
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155244,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 16.899999991059303,
+          "p95": 20.5,
+          "p99": 24.69999998807907
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.39999999999782,
+          "p99": 33.400000000001455
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 16.5,
+          "p95": 18.099999994039536,
+          "p99": 41.20000000298023
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50.099999999998545
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155244,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 40.5,
+          "p95": 45.79999999701977,
+          "p99": 48
+        },
+        "interval": {
+          "n": 21,
+          "p50": 50,
+          "p95": 50.099999999998545,
+          "p99": 50.10000000000218
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 40.3999999910593,
+          "p95": 43.29999999701977,
+          "p99": 46.099999994039536
+        },
+        "interval": {
+          "n": 21,
+          "p50": 50,
+          "p95": 50.099999999998545,
+          "p99": 50.10000000000218
+        }
+      }
+    },
+    {
+      "device": "desktop",
+      "scale": 1,
+      "workload": "combined",
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155244,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 22.299999997019768,
+          "p95": 24.900000005960464,
+          "p99": 25.599999994039536
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50.10000000000218
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 22.099999994039536,
+          "p95": 22.799999997019768,
+          "p99": 23.19999998807907
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": false,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 12.900000005960464,
+          "p95": 14.799999997019768,
+          "p99": 15.5
+        },
+        "interval": {
+          "n": 21,
+          "p50": 16.700000000000728,
+          "p95": 33.30000000000018,
+          "p99": 33.399999999999636
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 13.200000002980232,
+          "p95": 16,
+          "p99": 19.399999991059303
+        },
+        "interval": {
+          "n": 21,
+          "p50": 16.700000000000728,
+          "p95": 33.400000000000546,
+          "p99": 66.59999999999945
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": false,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 13.099999994039536,
+          "p95": 15.299999997019768,
+          "p99": 20.299999997019768
+        },
+        "interval": {
+          "n": 21,
+          "p50": 16.699999999999818,
+          "p95": 33.399999999999636,
+          "p99": 33.399999999999636
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 13.200000002980232,
+          "p95": 15.400000005960464,
+          "p99": 16.899999991059303
+        },
+        "interval": {
+          "n": 21,
+          "p50": 16.699999999999818,
+          "p95": 33.400000000000546,
+          "p99": 33.5
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": false,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 18.700000002980232,
+          "p95": 21,
+          "p99": 22.200000002980232
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.5,
+          "p99": 66.69999999999891
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 19.30000001192093,
+          "p95": 22.100000008940697,
+          "p99": 39.099999994039536
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 49.900000000001455,
+          "p99": 50.099999999998545
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": false,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 1,
+      "softLights": 2,
+      "activeFrozen": 17,
+      "smoke": 32,
+      "beams": 4,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 19,
+          "p95": 27.700000002980232,
+          "p99": 29.799999997019768
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 66.70000000000073
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 20,
+          "p95": 30,
+          "p99": 60.79999999701977
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 50,
+          "p99": 66.70000000000073
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": true,
+      "moving": false,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155244,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 15.799999997019768,
+          "p95": 21.099999994039536,
+          "p99": 38.70000000298023
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.399999999999636,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 15.5,
+          "p95": 19,
+          "p99": 31.200000002980232
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.399999999999636,
+          "p99": 33.400000000001455
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": true,
+      "moving": false,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155244,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 21.700000002980232,
+          "p95": 24.599999994039536,
+          "p99": 26.700000002980232
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 49.899999999999636,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 21,
+          "p95": 28.700000002980232,
+          "p99": 30.299999997019768
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 33.400000000001455,
+          "p99": 50
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": true,
+      "moving": true,
+      "zoom": 0.5,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155244,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 22,
+          "p95": 26.400000005960464,
+          "p99": 27
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.29999999999927,
+          "p95": 50,
+          "p99": 50
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 23.299999997019768,
+          "p95": 27.80000001192093,
+          "p99": 28
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.39999999999782,
+          "p95": 50.099999999998545,
+          "p99": 66.60000000000218
+        }
+      }
+    },
+    {
+      "device": "mobile",
+      "scale": 2,
+      "workload": "combined",
+      "dense": true,
+      "moving": true,
+      "zoom": 1.13,
+      "damageTargets": 16,
+      "softLights": 21,
+      "activeFrozen": 155244,
+      "smoke": 1400,
+      "beams": 32,
+      "baseline": {
+        "cpu": {
+          "n": 21,
+          "p50": 26.80000001192093,
+          "p95": 28.799999997019768,
+          "p99": 28.900000005960464
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.39999999999782,
+          "p95": 50,
+          "p99": 50.099999999998545
+        }
+      },
+      "changed": {
+        "cpu": {
+          "n": 21,
+          "p50": 26.200000002980232,
+          "p95": 32.099999994039536,
+          "p99": 55
+        },
+        "interval": {
+          "n": 21,
+          "p50": 33.39999999999782,
+          "p95": 50,
+          "p99": 66.69999999999709
+        }
+      }
+    }
+  ]
+}
