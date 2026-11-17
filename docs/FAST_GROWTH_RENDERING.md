@@ -1,6 +1,51 @@
 # Reduce terrain work during active Blight replication
 
-Baseline: `915161c`. This pass targets real generator growth, including the simulation and terrain preparation before the draw call. It does not reduce growth rates, cap replication, defer terrain visibility, or change collision rules.
+Initial baseline: `915161c`. This pass targets real generator growth, including the simulation and terrain preparation before the draw call. It does not reduce growth rates, cap replication, defer terrain visibility, or change collision rules.
+
+## Integration with main
+
+Main advanced to `545bda3` during validation. Its later-world materials, campaign changes and pixel-art effects were merged without conflicts. The floor optimization remains valid for the new material path: floor colors depend on environment, coordinates, decor and full-size wall health, rather than subcell occupancy. The initial 24-case measurements below precede that integration; a separate fast-growth comparison checks the final merged source against `545bda3`.
+
+The final comparison against `545bda3` covers 16 fast-growth scenarios (multipliers 1/4, both cameras, both zooms and both device profiles), with 40 samples each. All **48 full-frame pixel checks** and **48 world-state checks** match. Replication event counts and chunk backlogs match in every case. [Final merged measurements](FAST_GROWTH_INTEGRATED.json) include the complete stage timings.
+
+| Device | Growth multiplier | Pipeline p50 | Pipeline p95 | Pipeline p99 | Terrain p50 |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| desktop | 1 | -19.6% | -14.1% | -15.7% | -41.1% |
+| desktop | 4 | -18.8% | -4.7% | -27.3% | -35.2% |
+| mobile | 1 | -21.9% | -17.6% | -6.8% | -41.6% |
+| mobile | 4 | -21.0% | +10.9% | -4.5% | -35.7% |
+
+Percentage changes are medians of the paired changes across camera/zoom cases. Every fast-growth scenario improves pipeline p50; individual tail regressions remain in the raw data.
+
+| Device | Growth | Camera | Zoom | Baseline p50 / p95 / p99, ms | Updated p50 / p95 / p99, ms |
+| --- | ---: | --- | ---: | --- | --- |
+| desktop | 1 | Stationary | 0.5 | 23.2 / 32.8 / 33.7 | 17.3 / 24.8 / 28.6 |
+| desktop | 1 | Stationary | 1.13 | 20.1 / 27.0 / 63.7 | 14.9 / 30.7 / 53.3 |
+| desktop | 1 | Moving | 0.5 | 23.6 / 31.1 / 38.6 | 20.5 / 29.9 / 66.3 |
+| desktop | 1 | Moving | 1.13 | 20.2 / 33.7 / 34.4 | 17.4 / 23.3 / 28.6 |
+| desktop | 4 | Stationary | 0.5 | 25.5 / 41.1 / 53.6 | 20.5 / 35.1 / 38.0 |
+| desktop | 4 | Stationary | 1.13 | 23.8 / 32.7 / 73.2 | 19.5 / 39.1 / 52.4 |
+| desktop | 4 | Moving | 0.5 | 25.5 / 29.3 / 31.6 | 21.0 / 30.8 / 45.2 |
+| desktop | 4 | Moving | 1.13 | 24.1 / 30.5 / 39.4 | 19.1 / 26.1 / 29.1 |
+| mobile | 1 | Stationary | 0.5 | 118.0 / 147.8 / 212.6 | 87.3 / 117.7 / 120.6 |
+| mobile | 1 | Stationary | 1.13 | 112.5 / 166.4 / 176.7 | 83.4 / 141.7 / 197.8 |
+| mobile | 1 | Moving | 0.5 | 121.5 / 187.2 / 224.2 | 104.6 / 164.6 / 188.9 |
+| mobile | 1 | Moving | 1.13 | 126.4 / 161.6 / 167.1 | 103.8 / 128.0 / 170.6 |
+| mobile | 4 | Stationary | 0.5 | 144.2 / 169.0 / 287.9 | 112.4 / 192.0 / 208.7 |
+| mobile | 4 | Stationary | 1.13 | 139.8 / 180.4 / 190.9 | 108.2 / 177.8 / 219.9 |
+| mobile | 4 | Moving | 0.5 | 157.9 / 225.5 / 335.4 | 132.9 / 249.3 / 254.2 |
+| mobile | 4 | Moving | 1.13 | 147.6 / 244.7 / 262.3 | 118.3 / 272.4 / 316.9 |
+
+### Longer mobile stress repeat
+
+The 40-frame mobile stress tails varied between runs, so the final merged source was checked again against `545bda3` with **100 measured frames per view**, after the same 12 warmup frames. Across the four stationary/moving and zoom combinations, median paired pipeline changes are **-18.4% p50, -17.6% p95 and -19.6% p99**. All 12 full-frame and 12 world-state comparisons match. [Complete repeat data](FAST_GROWTH_MOBILE_REPEAT.json) retain each stage and event count. This longer run evolves farther into replication than the original 40-frame fixture; compare each variant within its own run.
+
+| Camera | Zoom | Baseline p50 / p95 / p99, ms | Updated p50 / p95 / p99, ms |
+| --- | ---: | --- | --- |
+| Stationary | 0.5 | 146.5 / 188.0 / 245.0 | 114.5 / 155.3 / 241.8 |
+| Stationary | 1.13 | 133.9 / 191.9 / 311.6 | 102.3 / 137.1 / 180.4 |
+| Moving | 0.5 | 144.6 / 217.2 / 339.0 | 125.1 / 178.4 / 229.7 |
+| Moving | 1.13 | 141.1 / 204.7 / 296.4 | 120.1 / 195.7 / 275.8 |
 
 ## Changes
 
@@ -68,10 +113,10 @@ This does not make the high-resolution throttled mobile profile smooth. Full-fra
 
 ## Validation
 
-- 619 tests across 87 files and production type check/build passed before integration.
+- Final merged build: **638 tests across 88 files** and production type check/build passed (619 tests before integration).
 - 2,118 incremental/full-rebuild terrain, floor, mask and composite comparisons matched exactly.
-- All 16 live/dormant baseline comparison scenarios passed with zero changed channels.
-- 258 lighting/floor comparisons across all five worlds and 80 existing active-render checks passed.
+- Before integration, all 16 live/dormant baseline comparison scenarios passed with zero changed channels.
+- Final merged build: **260 lighting/floor comparisons** across all five worlds and **80 existing active-render checks** passed (258 lighting checks before integration).
 - 12 targeted HP-only geometry/cache pixel checks passed.
 
 [Raw regression records](FAST_GROWTH_REGRESSIONS.json) retain the per-case results.
@@ -87,9 +132,11 @@ npm test
 npm run build
 node scripts/terrain-partial-repaint-smoke.cjs
 BREACH_BASELINE_REF=915161c node scripts/fast-growth-benchmark.cjs
-BREACH_BASELINE_REF=915161c BREACH_DORMANT=1 node scripts/blight-render-benchmark.cjs
-BREACH_BASELINE_REF=915161c node scripts/lighting-pipeline-smoke.cjs
-BREACH_BASELINE_REF=915161c BREACH_CHECK_ONLY=1 node scripts/render-active-benchmark.cjs
+BREACH_BASELINE_REF=545bda3 BREACH_RATES=1,4 node scripts/fast-growth-benchmark.cjs
+BREACH_BASELINE_REF=545bda3 BREACH_DEVICES=mobile BREACH_RATES=4 BREACH_SAMPLES=100 node scripts/fast-growth-benchmark.cjs
+BREACH_BASELINE_REF=545bda3 BREACH_DORMANT=1 node scripts/blight-render-benchmark.cjs
+BREACH_BASELINE_REF=545bda3 node scripts/lighting-pipeline-smoke.cjs
+BREACH_BASELINE_REF=545bda3 BREACH_CHECK_ONLY=1 node scripts/render-active-benchmark.cjs
 ```
 
 The active-growth benchmark accepts `BREACH_REPORT`, `BREACH_SAMPLES`, `BREACH_DEVICES` and `BREACH_RATES`. Temporary baseline archives are removed after each run. `scripts/fast-growth-profile.cjs` additionally captures a growth-only CPU profile for diagnosis.
