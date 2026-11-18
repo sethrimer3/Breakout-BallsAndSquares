@@ -29,14 +29,14 @@ const DY = [0, 0, 1, -1];
  */
 export class FreezeSystem {
   readonly cellTimer: Float32Array;
-  readonly cellHalfHp: Uint16Array;
+  readonly cellHalfHp: Uint32Array;
   readonly cellOwner: Int32Array;
   readonly cellWave: Uint32Array;
   private activeCells: number[] = [];
   private readonly cellListed: Uint8Array;
 
   readonly subTimer: Float32Array;
-  readonly subHalfHp: Uint16Array;
+  readonly subHalfHp: Uint32Array;
   readonly subOwner: Int32Array;
   readonly subWave: Uint32Array;
   private activeSubs: number[] = [];
@@ -52,13 +52,13 @@ export class FreezeSystem {
     const n = world.width * world.height;
     this.cellListed = new Uint8Array(n);
     this.cellTimer = new Float32Array(n);
-    this.cellHalfHp = new Uint16Array(n);
+    this.cellHalfHp = new Uint32Array(n);
     this.cellOwner = new Int32Array(n);
     this.cellWave = new Uint32Array(n);
 
     const sn = world.subWidth * world.subHeight;
     this.subTimer = new Float32Array(sn);
-    this.subHalfHp = new Uint16Array(sn);
+    this.subHalfHp = new Uint32Array(sn);
     this.subOwner = new Int32Array(sn);
     this.subWave = new Uint32Array(sn);
   }

@@ -1,6 +1,6 @@
 import { formatSpeedrunTime } from "../core/SpeedrunTimer";
 import { essenceIcon } from "./essenceIcon";
-import { GROWTH, TERRAIN } from "../config";
+import { damageRange, GROWTH, TERRAIN } from "../config";
 import type { Game } from "../Game";
 import { sprite, UI_COLORS, type SpriteName } from "./pixelArt";
 
@@ -328,7 +328,7 @@ export class HUD {
     let statsHtml =
       `<div><b>SPD</b> ${st.speed.toFixed(0)}</div>` +
       `<div><b>ROF</b> ${st.fireRate.toFixed(2)}/s</div>` +
-      `<div><b>DMG</b> ${st.damage}</div>` +
+      `<div><b>DMG</b> ${damageRange(st.damage)}</div>` +
       `<div><b>DROP</b> ${(st.dropChance * 100).toFixed(0)}%</div>` +
       `<div><b>MAG</b> ${st.magnetRange.toFixed(0)}</div>` +
       `<div><b>MAX</b> ${st.maxSoldiers}</div>`;

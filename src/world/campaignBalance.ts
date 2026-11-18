@@ -8,7 +8,7 @@ import { LootKind, type LootKind as Kind } from "../entities/LootSystem";
  */
 export const CAMPAIGN = {
   7: {
-    block: [16000, 32000],
+    block: [72000, 72000],
     kind: LootKind.GreenCrystal,
     stack: 10,
     enemyHp: 0,
@@ -18,7 +18,7 @@ export const CAMPAIGN = {
     biomass: 25,
   },
   8: {
-    block: [22000, 40000],
+    block: [93000, 93000],
     kind: LootKind.GreenCrystal,
     stack: 25,
     enemyHp: 220,
@@ -28,7 +28,7 @@ export const CAMPAIGN = {
     biomass: 40,
   },
   9: {
-    block: [30000, 50000],
+    block: [120000, 120000],
     kind: LootKind.GreenCrystal,
     stack: 60,
     enemyHp: 900,
@@ -38,7 +38,7 @@ export const CAMPAIGN = {
     biomass: 60,
   },
   10: {
-    block: [40000, 58000],
+    block: [147000, 147000],
     kind: LootKind.Essence,
     stack: 30,
     enemyHp: 1800,
@@ -48,7 +48,7 @@ export const CAMPAIGN = {
     biomass: 0,
   },
   11: {
-    block: [48000, 65000],
+    block: [170000, 170000],
     kind: LootKind.Essence,
     stack: 75,
     enemyHp: 3600,

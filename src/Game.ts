@@ -1,7 +1,7 @@
 import { DamageNumbers } from "./entities/DamageNumbers";
 import { LateEncounters } from "./systems/LateEncounters";
 import { GROVE_CACHE_STACKS, LATE_DROP_CHANCE, lateBlockReward } from "./world/campaignBalance";
-import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
+import { BULLET, CAMERA, DAMAGE_ROLL, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
 import { fireAmbienceMix } from "./audio/fireAmbience";
 import { labWorldSeed } from "./core/WorldSeed";
@@ -507,6 +507,8 @@ export class Game {
     this.applyFacilityStats();
     this.combat.stats = this.stats;
     this.world.playerDamageMult = this.stats.terrainDamageMult;
+    this.world.damageRollMin = DAMAGE_ROLL.min;
+    this.world.damageRollMax = DAMAGE_ROLL.max;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
     this.growth.startRate = this.stats.blightStartRate;
     this.growth.expBase = this.stats.blightExpBase;
@@ -566,6 +568,8 @@ export class Game {
     this.resetFacility();
     this.combat.stats = this.stats;
     this.world.playerDamageMult = this.stats.terrainDamageMult;
+    this.world.damageRollMin = DAMAGE_ROLL.min;
+    this.world.damageRollMax = DAMAGE_ROLL.max;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
     this.growth.startRate = this.stats.blightStartRate;
     this.growth.expBase = this.stats.blightExpBase;

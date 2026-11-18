@@ -44,7 +44,7 @@ describe("late campaign pacing and encounters", () => {
         expect(tierHealth(t, p)).toBe(lateBlockHealth(t, p));
       }
     }
-    expect(tierHealth(11, 1)).toBe(65000);
+    expect(tierHealth(11, 1)).toBe(170000);
     expect(lateBlockReward(7)).toEqual({ kind: LootKind.GreenCrystal, value: 10 });
     expect(lateBlockReward(10).kind).toBe(LootKind.Essence);
   });
@@ -148,9 +148,8 @@ describe("late campaign pacing and encounters", () => {
     const mods = soldierModsFor({ s_siege: 6 });
     expect(mods.terrainDamageBonus).toBe(12000);
     expect(mods.damageBonus).toBe(0);
-    expect(Math.ceil(tierHealth(11, 1) / (mods.terrainDamageBonus + 1))).toBe(
-      6,
-    );
+    // A ship bulkhead cell (65,000 HP, armored) takes six maxed-drill hits.
+    expect(Math.ceil(65000 / (mods.terrainDamageBonus + 1))).toBe(6);
     const costs = Array.from(
       { length: 6 },
       (_, l) =>

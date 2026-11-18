@@ -97,33 +97,33 @@ export function wallHealthForZone(zone: 0 | 1 | 2, distance: number): number {
 
 /**
  * Ordinary block health of each terrain tier in the hand-made lab worlds
- * (index = tier): [first sector of the tier band, last]. World 1 holds tiers
- * 1-3, world 2 tiers 4-6, the forest 7-9, the city 10 and the ship 11. Every
- * tier is harder than the one before; Arsenal Calibration keeps pace (see
- * docs/BALANCE.md). Health is a Uint16, so nothing may pass 65535.
+ * (index = tier). Every block of a tier has exactly this health (Seth,
+ * 2026-11-18): the variety comes from weapon damage rolls instead (see
+ * `DAMAGE_ROLL`). World 1 holds tiers 1-3, world 2 tiers 4-6, the forest 7-9,
+ * the city 10 and the ship 11. Values are the old band midpoints x3, because a
+ * roll averages 3x the listed weapon damage. Health is a Uint32.
  */
-export const TIER_HEALTH: readonly (readonly [number, number])[] = [
-  [1, 1],
-  [1, 5],
-  [10, 50],
-  [100, 500],
-  [800, 2400],
-  [3000, 9000],
-  [12000, 30000],
-  [16000, 32000],
-  [22000, 40000],
-  [30000, 50000],
-  [40000, 58000],
-  [48000, 65000],
-];
+export const TIER_HEALTH: readonly number[] = [1, 5, 75, 900, 4800, 18000, 63000, 72000, 93000, 120000, 147000, 170000];
+
+/**
+ * Every squad hit against terrain and the Blight rolls between `min` and `max`
+ * times its listed damage: a 1-damage tier 1 weapon hits for 1-5.
+ */
+export const DAMAGE_ROLL = { min: 1, max: 5 } as const;
+
+/** A weapon's listed damage as the range it rolls, e.g. "1-5". */
+export function damageRange(damage: number): string {
+  const lo = Math.max(1, Math.round(damage * DAMAGE_ROLL.min));
+  const hi = Math.max(lo, Math.round(damage * DAMAGE_ROLL.max));
+  return lo === hi ? `${lo}` : `${lo}-${hi}`;
+}
 
 /** Highest terrain tier with stats. */
 export const MAX_TIER = TIER_HEALTH.length - 1;
 
-/** Health of an ordinary block of `tier`, `t` (0..1) of the way through its band. */
-export function tierHealth(tier: number, t: number): number {
-  const [lo, hi] = TIER_HEALTH[Math.max(1, Math.min(MAX_TIER, tier))];
-  return Math.round(lo + (hi - lo) * Math.max(0, Math.min(1, t)));
+/** Health of an ordinary block of `tier`. Every block of a tier is the same; `_t` is kept for callers. */
+export function tierHealth(tier: number, _t = 0): number {
+  return TIER_HEALTH[Math.max(1, Math.min(MAX_TIER, tier))];
 }
 
 /**
@@ -135,7 +135,7 @@ export function tierWallHealth(tier: number, t: number): number {
   if (tier <= 1) return FACILITY.zone1WallHealth;
   if (tier === 2) return Math.max(100, hp * 2);
   if (tier === 3) return Math.min(TERRAIN.maxHealthCap, Math.max(300, hp + 50));
-  return Math.min(65000, Math.round(hp * 2.5));
+  return Math.round(hp * 2.5);
 }
 
 /** Research-base structures: doors, glass containment tanks, rubble and sentries. */
