@@ -570,7 +570,7 @@ describe("late campaign pacing and encounters", () => {
   });
 
   it("records campaign.complete once and survives a save round-trip", () => {
-    const save = defaultSaveData("ABCD");
+    const save = defaultSaveData();
     expect(save.campaign.complete).toBe(false);
     expect(markCampaignComplete(save, 1234.5)).toBe(true);
     expect(save.campaign.complete).toBe(true);

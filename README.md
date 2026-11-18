@@ -164,9 +164,9 @@ Destroyed non-Blight half-size pixels deal their maximum HP as damage to all eig
 
 The empty-room framework now covers the 13×13 forest (zones 7–9), 7×7 fallen city (zone 10) and 5×3 Blight mother ship (zone 11). See [the world roadmap](docs/WORLD_ROADMAP.md) for exact exits, the central city facility/teleporter, atmosphere profiles, and the scenery/encounters reserved for later work.
 
-## Profile seeds and speedrun timing
+## Fixed maps and speedrun timing
 
-Open **Main Menu → Settings → Gameplay**. **New Save Seed** accepts 1–8 letters or numbers (case-insensitive); press **Apply** to use it for any newly initialized save. Blank restores random eight-character seeds. Existing profiles keep their code, shown on their save card. Each profile/world seed reproduces terrain dressing, rubble and crystal placement; authored routes and gates remain fixed. Conquered-sector progress still applies, and combat randomness is separate. Older profiles receive a seed once on loading.
+Every profile plays the same fixed, hand-drawn maps; there is no per-profile seed. The small amount of seeded dressing (wall tint and grain, cave-ins, crystal veins, alien warping) uses one constant seed per world (`src/core/WorldSeed.ts`), so each world looks the same on every save. Older saves that still carry a `seed` field load normally and drop it on their next save.
 
 **Speedrun Timer — Slot N** enables a cumulative `HH:MM:SS.mmm` HUD clock for the selected save. It adds real elapsed time across active runs, independently of simulation speed. Pause, upgrades, map selection, main menu, results, hidden tabs and offline time do not count. Disabling it hides the clock and retains the total; a fresh save starts at zero. Time is saved at transitions and every five seconds during play.
 
@@ -176,7 +176,7 @@ Run `npm run test:profile-browser` against the Vite dev server for settings, rep
 
 The menu runs a separate miniature lab with six randomly arranged, connected rooms, two ordinary pistol soldiers in a safe room, and two exposed Blight generators. It uses the game's physics, combat, growth, terrain textures and soldier sprites. All terrain is tier 1. A new skirmish starts automatically after the last generator or soldier is lost, or after 90 seconds.
 
-The backdrop adapts to landscape/portrait screens, uses steady soldier lighting, pauses while hidden, and stops when leaving the menu. Its combat and gold pickups never affect save slots, profile seeds, player resources, or speedrun timing. Run `npm run test:menu-browser` against the Vite server to verify gameplay, long-session save isolation, regeneration, stop/resume, and phone layout. The release check passed 466 unit tests, the production build, and Chromium menu validation with no page errors; screenshots are generated under `/tmp/breach-menu-validation`.
+The backdrop adapts to landscape/portrait screens, uses steady soldier lighting, pauses while hidden, and stops when leaving the menu. Its combat and gold pickups never affect save slots, player resources, or speedrun timing. Run `npm run test:menu-browser` against the Vite server to verify gameplay, long-session save isolation, regeneration, stop/resume, and phone layout. The release check passed 466 unit tests, the production build, and Chromium menu validation with no page errors; screenshots are generated under `/tmp/breach-menu-validation`.
 
 ## Choosing a profile
 

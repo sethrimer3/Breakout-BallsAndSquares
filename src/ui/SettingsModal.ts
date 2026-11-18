@@ -99,16 +99,6 @@ export class SettingsModal {
         ${this.showProfileSettings ? `
         <div class="set-row"><label class="set-label" for="menu-settings-profile">PROFILE SETTINGS</label>
           <select id="menu-settings-profile" class="set-profile-select" aria-label="Profile to configure">${Array.from({length:SAVE_SLOTS_COUNT},(_,i)=>`<option value="${i+1}" ${i+1===this.game.save.activeSlot?"selected":""}>Profile ${String(i+1).padStart(2,"0")}${this.game.save.slotExists(i+1)?"":" · New"}</option>`).join("")}</select></div>
-        <div class="set-group profile-settings">
-          <div class="set-label">NEW SAVE SEED</div>
-          <div class="set-desc">Use 1–8 letters or numbers for any new save. Leave blank for a random seed. Existing saves keep their seed.</div>
-          <div class="seed-controls">
-            <input class="set-seed-input" aria-label="Seed for new saves" maxlength="8" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="RANDOM" />
-            <button class="btn" data-set="apply-seed">APPLY</button>
-          </div>
-          <div class="set-desc current-seed">SLOT ${this.game.save.activeSlot} SEED: ${this.game.save.data.seed}</div>
-          <div class="set-desc seed-status" role="status" aria-live="polite"></div>
-        </div>
         <div class="set-row">
           <div class="set-info"><div class="set-label">SPEEDRUN TIMER — SLOT ${this.game.save.activeSlot}</div>
           <div class="set-desc">Total active run time for this save. Pauses in menus, upgrades, map, results and hidden tabs. Turning off keeps the recorded time.</div>
@@ -153,18 +143,6 @@ export class SettingsModal {
           this.render();
           this.bodyEl.querySelector<HTMLSelectElement>(".set-profile-select")!.focus();
         });
-        const input = body.querySelector<HTMLInputElement>(".set-seed-input")!;
-        input.value = this.game.save.newProfileSeed;
-        const applySeed = () => {
-          const ok = this.game.save.setNewProfileSeed(input.value);
-          body.querySelector(".seed-status")!.textContent = ok
-            ? (this.game.save.newProfileSeed ? `New saves will use ${this.game.save.newProfileSeed}.` : "New saves will receive random seeds.")
-            : "Use 1–8 letters or numbers. The seed could not be saved.";
-          if (ok) input.value = this.game.save.newProfileSeed;
-          body.querySelector(".current-seed")!.textContent = `SLOT ${this.game.save.activeSlot} SEED: ${this.game.save.data.seed}`;
-        };
-        body.querySelector('[data-set="apply-seed"]')!.addEventListener("click", applySeed);
-        input.addEventListener("keydown", e => { if (e.key === "Enter") { e.preventDefault(); applySeed(); } });
         body.querySelector('[data-set="speedrun"]')!.addEventListener("click", () => {
           this.game.setSpeedrunEnabled(!this.game.save.data.speedrun.enabled);
           this.render();

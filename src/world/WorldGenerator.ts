@@ -127,7 +127,7 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
   world.doorId.fill(0);
 
   // The hand-made lab when the world can hold it; otherwise a procedural maze.
-  // The profile seed varies the dressing without moving authored routes or gates.
+  // The seed only varies dressing (see core/WorldSeed); routes and gates are authored.
   world.doors = [];
   world.upgradeSpots = [];
   const def = options.labWorld ?? LAB_WORLDS[1];
@@ -309,7 +309,7 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
 }
 
 /**
- * Seams of crystal in the lab's walls, stable for the profile/world seed: orange crystal
+ * Seams of crystal in the lab's walls, stable for the fixed per-world seed: orange crystal
  * in tier 2 sectors, green in tier 3. A vein is a short random walk through
  * wall cells starting from a face that touches open floor, so it can be seen
  * and dug out. Crystal breaks like an ordinary block of its tier, a soft spot

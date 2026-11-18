@@ -67,7 +67,7 @@ spec and keep them true (update them if you change a number):
 
 1. **Deterministic maps.** Every player gets the same map. Geometry and
    encounter placement come only from the blueprint and `def.seed`. Never use
-   `Math.random` in generation. The profile seed may vary surface grain only.
+   `Math.random` in generation. The fixed per-world seed may vary surface grain only.
 2. **Don't touch Worlds 1–2.** Their blueprints, parsing rules
    (`freeform`, `alien`) and tests stay as they are. Shared code changes must
    be gated on `def.framework` or `def.environment`.
