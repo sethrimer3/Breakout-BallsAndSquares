@@ -133,7 +133,7 @@ export class LightRenderer {
   private layerCanvas: HTMLCanvasElement;
   private layerCtx: CanvasRenderingContext2D;
   private maskState: {
-    terrain: Game["terrain"]; revision: string; x: number; y: number; zoom: number;
+    terrain: Game["terrain"]; revision: string; opacityVersion: number; x: number; y: number; zoom: number;
     viewW: number; viewH: number; width: number; height: number; dpr: number; ambient: string;
   } | null = null;
   private maskCanvas: HTMLCanvasElement;
@@ -195,22 +195,36 @@ export class LightRenderer {
     // are unchanged. Pending chunk work invalidates it as each chunk is built.
     const m = this.maskState, terrain = game.terrain;
     const revision = terrain.visibleOpacityRevision(cam);
-    if (!m || m.terrain !== terrain || m.revision !== revision ||
-        m.x !== cam.x || m.y !== cam.y || m.zoom !== cam.zoom ||
-        m.viewW !== cam.viewW || m.viewH !== cam.viewH || m.dpr !== dpr ||
-        m.width !== devW || m.height !== devH || m.ambient !== ambient) {
-      const mask = this.maskCtx;
-      mask.setTransform(1, 0, 0, 1, 0, 0);
-      mask.globalCompositeOperation = "source-over";
-      mask.clearRect(0, 0, devW, devH);
-      mask.setTransform(dpr, 0, 0, dpr, 0, 0);
-      terrain.draw(mask, cam);
-      mask.setTransform(1, 0, 0, 1, 0, 0);
-      mask.globalCompositeOperation = "source-in";
-      mask.fillStyle = ambient;
-      mask.fillRect(0, 0, devW, devH);
-      mask.globalCompositeOperation = "source-over";
-      this.maskState = { terrain, revision, x: cam.x, y: cam.y,
+    const sameView = m && m.terrain === terrain && m.x === cam.x && m.y === cam.y && m.zoom === cam.zoom &&
+      m.viewW === cam.viewW && m.viewH === cam.viewH && m.dpr === dpr &&
+      m.width === devW && m.height === devH && m.ambient === ambient;
+    if (!sameView || m.revision !== revision) {
+      const bounds = sameView ? terrain.opacityUpdateBounds(cam, m.opacityVersion, devW, devH, dpr)
+        : { x: 0, y: 0, width: devW, height: devH };
+      if (bounds) {
+        const mask = this.maskCtx;
+        const partial = bounds.x !== 0 || bounds.y !== 0 || bounds.width !== devW || bounds.height !== devH;
+        mask.setTransform(1, 0, 0, 1, 0, 0);
+        if (partial) {
+          // Clip in integer device pixels; source-in must not clear retained pixels.
+          mask.save();
+          mask.beginPath();
+          mask.rect(bounds.x, bounds.y, bounds.width, bounds.height);
+          mask.clip();
+        }
+        mask.globalCompositeOperation = "source-over";
+        mask.clearRect(bounds.x, bounds.y, bounds.width, bounds.height);
+        mask.setTransform(dpr, 0, 0, dpr, 0, 0);
+        terrain.draw(mask, cam, false, partial ? { x: bounds.x / dpr, y: bounds.y / dpr,
+          width: bounds.width / dpr, height: bounds.height / dpr } : undefined);
+        mask.setTransform(1, 0, 0, 1, 0, 0);
+        mask.globalCompositeOperation = "source-in";
+        mask.fillStyle = ambient;
+        mask.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
+        mask.globalCompositeOperation = "source-over";
+        if (partial) mask.restore();
+      }
+      this.maskState = { terrain, revision, opacityVersion: terrain.opacityRevision, x: cam.x, y: cam.y,
         zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: devW, height: devH, dpr, ambient };
     }
 

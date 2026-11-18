@@ -1,5 +1,7 @@
 # Rendering audit and validated changes
 
+For regional lighting-mask updates during active growth, see [opacity region results](OPACITY_REGION_CACHE.md).
+
 For the later surface-geometry and automatic-quality fixes, see [surface outline results](SURFACE_OUTLINE_CACHE.md).
 
 For the later real-replication profile and terrain fixes, see [active Blight growth results](FAST_GROWTH_RENDERING.md).
