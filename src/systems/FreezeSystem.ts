@@ -118,7 +118,7 @@ export class FreezeSystem {
   }
 
   /** Freeze a half-size subcell (or its parent normal cell if solid) without dealing damage. */
-  freezeSubCell(sx: number, sy: number, ownerId: number, duration = FREEZE.duration): boolean {
+  freezeSubCell(sx: number, sy: number, ownerId: number, duration: number = FREEZE.duration): boolean {
     if (!this.world.subInBounds(sx, sy)) return false;
     const cx = sx >> 1;
     const cy = sy >> 1;
@@ -141,7 +141,7 @@ export class FreezeSystem {
   }
 
   /** Freeze a creature or late-world enemy without dealing damage. Refreshes duration without compounding multipliers. */
-  freezeCreature(c: Creature | Encounter, duration = FREEZE.duration): void {
+  freezeCreature(c: Creature | Encounter, duration: number = FREEZE.duration): void {
     if (c.kind === "grove") return;
     const cur = c.freezeTimer ?? 0;
     if (duration > cur) c.freezeTimer = duration;
@@ -154,7 +154,7 @@ export class FreezeSystem {
     radiusWorld: number,
     ownerId: number,
     creatures?: readonly (Creature | Encounter)[],
-    duration = FREEZE.duration,
+    duration: number = FREEZE.duration,
   ): void {
     const cs = this.world.cellSize;
     const ss = this.world.subCellSize;

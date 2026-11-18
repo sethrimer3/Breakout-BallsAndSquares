@@ -200,7 +200,7 @@ export class HUD {
         <div class="help-touch"><b>TWO-FINGER PINCH/DRAG</b> Pan camera around &amp; zoom in/out</div>
         <div class="help-touch"><b>${sprite("follow", { color: UI_COLORS.soldier, scale: 1 })} BUTTON</b> Follow soldier #1, tap again to cycle in order</div>
         <div class="help-touch"><b>${sprite("pause", { color: UI_COLORS.white, scale: 1 })} BUTTON</b> Pause, restart, upgrades &amp; settings</div>
-        <div><b>CURRENCIES</b> Zone 1 drops gold squares ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}, Zone 2 orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}, Zone 3 green crystals ${sprite("crystal", { color: UI_COLORS.greenCrystal, scale: 1 })}, and Blight Cores leave Blight Essence ${essenceIcon(1)}. Forest groves provide outdoor-only biomass ◆. Later terrain drops larger resource stacks; enemy essence rewards are fixed. Soldiers must touch pickups to collect!</div>
+        <div><b>CURRENCIES</b> Each world's terrain drops its own currency: the Lab gold ${sprite("gold", { color: UI_COLORS.gold, scale: 1 })}, the Blighted Wards orange crystals ${sprite("crystal", { color: UI_COLORS.crystal, scale: 1 })}, the forest green crystals ${sprite("crystal", { color: UI_COLORS.greenCrystal, scale: 1 })}, the city and the ship Blight Essence ${essenceIcon(1)}. Deeper tiers drop bigger stacks. Blight Cores leave essence everywhere and forest groves give biomass ◆; enemy essence rewards are fixed. Soldiers must touch pickups to collect!</div>
         <div class="help-keys"><b>1 / 2</b> Toggle Line / Triangle formation</div>
         <div class="help-keys"><b>F / TAB</b> Follow / Cycle soldiers in order (#1, #2, ...)</div>
         <div class="help-keys"><b>U</b> Open Upgrade Matrix</div>

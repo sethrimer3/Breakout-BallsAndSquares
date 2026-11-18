@@ -1,6 +1,7 @@
 import type { PrimaryMutation, WeaponType } from "../entities/Soldier";
 import type { SpriteName } from "../ui/pixelArt";
 import type { UpgradeDef, UpgradeId } from "./UpgradeDefinitions";
+import { MARKET_RESEARCH_DEFS } from "./MarketResearch";
 
 export type BlackMarketAccessId = `black_market_${WeaponType}`;
 export interface MarketPath {
@@ -15,7 +16,8 @@ export interface WeaponMarket {
   unlock: UpgradeId | null;
   paths: readonly MarketPath[];
 }
-const path = (root: UpgradeId, mutation: PrimaryMutation | null, nodes: UpgradeId[] = []): MarketPath => ({root, mutation, nodes: [root, ...nodes]});
+/** A path's nodes: its root, its hand-listed research, then every MarketResearch node that deepens it. */
+const path = (root: UpgradeId, mutation: PrimaryMutation | null, nodes: UpgradeId[] = []): MarketPath => ({root, mutation, nodes: [root, ...nodes, ...MARKET_RESEARCH_DEFS.filter(d => d.parent === root).map(d => d.id)]});
 /** The Pistol's third path rises above the weapon silhouette. */
 export const DRONE_PATH: MarketPath = path("drone_unlock","drone_shepherd",["drone_capacity","drone_cycle","drone_damage","drone_speed","drone_aim","drone_health","drone_recall"]);
 export const WEAPON_MARKETS: readonly WeaponMarket[] = [

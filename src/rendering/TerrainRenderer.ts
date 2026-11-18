@@ -67,6 +67,7 @@ const EDGE_CANVAS_STEP = 256;
 /** Matte albedo of crystal veins: tier 2 orange, tier 3 green. */
 const CRYSTAL_ORANGE = [212, 120, 48] as const;
 const CRYSTAL_GREEN = [70, 182, 118] as const;
+const CRYSTAL_GOLD = [214, 170, 52] as const;
 
 /** A soft round light falloff in one color, for drawing scaled into the lightmap. */
 function radialSprite(c: RGB): HTMLCanvasElement {
@@ -1064,8 +1065,9 @@ export class TerrainRenderer {
     put: (x: number, y: number, r: number, g: number, b: number, a: number) => void,
   ): void {
     const w = this.world;
-    const green = w.wall[i] >= 3;
-    const base = green ? CRYSTAL_GREEN : CRYSTAL_ORANGE;
+    // A vein shows the currency it pays: gold in the Lab, orange crystal in the
+    // Blighted Wards (procedural test worlds keep orange / green by wall tier).
+    const base = w.labLayout?.frame ? (w.tierBase < 3 ? CRYSTAL_GOLD : CRYSTAL_ORANGE) : w.wall[i] >= 3 ? CRYSTAL_GREEN : CRYSTAL_ORANGE;
     const maxHp = w.maxHealthAt(cx, cy);
     const dmg = hp < maxHp ? (1 - hp / maxHp) * 0.45 : 0;
     for (let oy = 0; oy < TEX; oy++) {

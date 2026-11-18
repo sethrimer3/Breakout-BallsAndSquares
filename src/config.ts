@@ -97,8 +97,10 @@ export function wallHealthForZone(zone: 0 | 1 | 2, distance: number): number {
 
 /**
  * Ordinary block health of each terrain tier in the hand-made lab worlds
- * (index = tier): [first sector of the tier band, last]. Zone 1 holds tiers
- * 1-3, zone 2 tiers 4-6. Health is a Uint16, so nothing may pass 65535.
+ * (index = tier): [first sector of the tier band, last]. World 1 holds tiers
+ * 1-3, world 2 tiers 4-6, the forest 7-9, the city 10 and the ship 11. Every
+ * tier is harder than the one before; Arsenal Calibration keeps pace (see
+ * docs/BALANCE.md). Health is a Uint16, so nothing may pass 65535.
  */
 export const TIER_HEALTH: readonly (readonly [number, number])[] = [
   [1, 1],
@@ -108,11 +110,11 @@ export const TIER_HEALTH: readonly (readonly [number, number])[] = [
   [800, 2400],
   [3000, 9000],
   [12000, 30000],
-  [800, 2400],
-  [3000, 9000],
-  [12000, 30000],
-  [24000, 45000],
-  [50000, 65000],
+  [16000, 32000],
+  [22000, 40000],
+  [30000, 50000],
+  [40000, 58000],
+  [48000, 65000],
 ];
 
 /** Highest terrain tier with stats. */

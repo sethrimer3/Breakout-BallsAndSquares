@@ -1,5 +1,7 @@
 # Campaign pacing: first playable pass
 
+> Superseded in part by docs/BALANCE.md: late terrain health, late drop currencies and the Siege Drill (now bulkheads only) changed. The encounter tables below still hold.
+
 These are starting budgets, not a claim of final balance. Visual polish, unique biome props, more enemy archetypes and the final boss are separate work. `campaignBalance.ts` owns encounter health, damage, yields and forest resource density; `config.ts` owns the ordinary terrain health contract. Tests keep the forest's two health tables consistent.
 
 | Tier | Mining HP | Encounter pressure | Fixed rewards |

@@ -8,6 +8,8 @@ export class ReverseShot {
   readonly cells = new Set<number>();
   readonly targets = new Set<object>();
   count = 0; cursor = 0; x = 0; y = 0; age = 0; pause = 0;
+  /** Seconds this shot hangs before rewinding (Black Market research shortens it). */
+  rewindPause: number = REVERSE.pause;
   ownerId = 0; speed = 0; damage = 0; terrainDamageBonus = 0; blightMultiplier = 1;
   hits = 0; coreDamageBonus = 0;
 }
@@ -19,11 +21,11 @@ export class ReverseRevolver {
   constructor(private damageSegment: (shot: ReverseShot, x: number, y: number, tx: number, ty: number) => void,
     private onReturn: (shot: ReverseShot) => void = () => {}) {}
 
-  begin(x: number, y: number, speed: number, damage: number, bonus: number, multiplier: number, ownerId: number): ReverseShot | null {
+  begin(x: number, y: number, speed: number, damage: number, bonus: number, multiplier: number, ownerId: number, pause: number = REVERSE.pause): ReverseShot | null {
     const shot = this.pool.acquire();
     if (!shot) { this.dropped++; return null; }
     shot.phase="recording";shot.count=1;shot.cursor=0;shot.points[0]=shot.x=x;shot.points[1]=shot.y=y;
-    shot.speed=speed;shot.damage=damage;shot.terrainDamageBonus=bonus;shot.blightMultiplier=multiplier;shot.ownerId=ownerId;
+    shot.rewindPause=pause;shot.speed=speed;shot.damage=damage;shot.terrainDamageBonus=bonus;shot.blightMultiplier=multiplier;shot.ownerId=ownerId;
     shot.age=shot.pause=shot.hits=shot.coreDamageBonus=0;shot.cells.clear();shot.targets.clear();
     return shot;
   }
@@ -47,7 +49,7 @@ export class ReverseRevolver {
   finish(shot: ReverseShot): void {
     if(!shot.active || shot.phase!=="recording")return;
     if(shot.count<2){this.pool.release(shot);return;}
-    shot.phase="waiting";shot.pause=REVERSE.pause;shot.cursor=shot.count-2;
+    shot.phase="waiting";shot.pause=shot.rewindPause;shot.cursor=shot.count-2;
     shot.x=shot.points[(shot.count-1)*2];shot.y=shot.points[(shot.count-1)*2+1];
   }
 

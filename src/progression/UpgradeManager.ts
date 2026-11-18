@@ -103,6 +103,8 @@ export class UpgradeManager {
     }
     // Research-base upgrades build on each other: buy the parent first.
     if (def.branch === "facility" && def.parent && this.levelOf(def.parent) === 0) return false;
+    // Each Calibration stage follows the one before it.
+    if (def.branch === "arsenal" && def.parent && this.levelOf(def.parent) === 0) return false;
     return true;
   }
 
@@ -226,17 +228,7 @@ export class UpgradeManager {
     if (inRun) return { ok: false, reason: "lab_only" };
     const mutationNodeIds: UpgradeId[] = [
       ...WEAPON_MARKETS.map(m => accessId(m.weapon)),
-      "katana_dash", "katana_impulse", "katana_glide", "katana_kinetic", "katana_wide", "katana_recovery", "katana_perfect",
-      "reverse_unlock", "orbit_unlock",
-      "drone_unlock", "drone_capacity", "drone_cycle", "drone_damage", "drone_speed", "drone_aim", "drone_health", "drone_recall",
-      "homing_shotgun_unlock",
-      "vacuum_unlock",
-      "overcharge_unlock", "overcharge_accuracy", "circuit_unlock",
-      "burrower_unlock", "freeze_rockets_unlock",
-      "prism_unlock", "prism_spectrum", "prism_bounces", "prism_gain", "prism_shear", "prism_distance", "prism_overload",
-      "rail_lance_unlock",
-      "gale_unlock", "gale_range",
-      "napalm_unlock", "cryospray_unlock",
+      ...WEAPON_MARKETS.flatMap(m => m.paths.flatMap(p => p.nodes)),
     ];
     const refunded: Partial<Record<Currency, number>> = {};
     const spentMap = this.save.data.upgradeSpent ?? {};

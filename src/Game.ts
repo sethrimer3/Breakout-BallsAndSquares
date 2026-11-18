@@ -1,6 +1,6 @@
 import { DamageNumbers } from "./entities/DamageNumbers";
 import { LateEncounters } from "./systems/LateEncounters";
-import { lateBlockReward } from "./world/campaignBalance";
+import { GROVE_CACHE_STACKS, LATE_DROP_CHANCE, lateBlockReward } from "./world/campaignBalance";
 import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
 import { fireAmbienceMix } from "./audio/fireAmbience";
@@ -11,6 +11,7 @@ import { CasingSystem } from "./entities/CasingSystem";
 import { SentrySystem } from "./entities/Sentry";
 import { CreatureSystem, type Creature } from "./entities/Creatures";
 import { LootKind, lootKindForZone, LootSystem } from "./entities/LootSystem";
+import { tierLootValue, VEIN_DROPS, worldLootKind } from "./world/tierEconomy";
 import { PKind, ParticleSystem } from "./entities/ParticleSystem";
 import { Soldier, resolvePrimaryMutation, baseSoldierStats, type SecondaryWeaponType, type SoldierStats } from "./entities/Soldier";
 import { markCampaignComplete, MUZZLE_FLASH_MULTIPLIER, SaveManager, type SoldierBehavior } from "./progression/SaveManager";
@@ -322,9 +323,10 @@ export class Game {
       if (a.kind === "grove") {
         const reward = lateBlockReward(a.tier);
         cacheRewardKind = reward.kind;
-        cacheRewardVal = reward.value * 10;
+        cacheRewardVal = reward.value * GROVE_CACHE_STACKS;
         if (cacheRewardKind === LootKind.Crystal) this.save.data.crystals += cacheRewardVal;
         else if (cacheRewardKind === LootKind.GreenCrystal) this.save.data.greenCrystals += cacheRewardVal;
+        else if (cacheRewardKind === LootKind.Essence) this.save.data.essence += cacheRewardVal;
         else this.save.data.bank += cacheRewardVal;
       }
       this.save.save();
@@ -504,6 +506,7 @@ export class Game {
     this.fog.connectedAir = this.stats.connectedAirMapping;
     this.applyFacilityStats();
     this.combat.stats = this.stats;
+    this.world.playerDamageMult = this.stats.terrainDamageMult;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
     this.growth.startRate = this.stats.blightStartRate;
     this.growth.expBase = this.stats.blightExpBase;
@@ -562,6 +565,7 @@ export class Game {
     this.resetFog();
     this.resetFacility();
     this.combat.stats = this.stats;
+    this.world.playerDamageMult = this.stats.terrainDamageMult;
     this.growth.graceSeconds = this.stats.blightGraceSeconds;
     this.growth.startRate = this.stats.blightStartRate;
     this.growth.expBase = this.stats.blightExpBase;
@@ -1349,7 +1353,8 @@ export class Game {
           this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, sk === SUB.pipe ? 0xac7646 : sk === SUB.wreck ? 0x3a3640 : sk === SUB.core ? 0x9a6ae0 : sk >= SUB.metal ? 0x60708a : rubble ? 0x6a625a : 0xd8267a, 4);
         }
         const subZone = this.world.zoneAt(cx, cy);
-        this.loot.spawnDropsForBlock(x, y, this.dropChanceAt(this.blockLootZone(subZone), ownerId) * 0.25, this.stats.pickupLifetime, this.rng, lootKindForZone(this.blockLootZone(subZone)));
+        const subLoot = this.terrainLoot(cx, cy, subZone);
+        this.loot.spawnDropsForBlock(x, y, this.dropChanceFor(subLoot.kind, ownerId) * 0.25, this.stats.pickupLifetime, this.rng, subLoot.kind, subLoot.value);
         this.checkSecondaryCharge(ownerId);
       }
       return;
@@ -1372,31 +1377,35 @@ export class Game {
       const depth = this.world.depthOf(cx, cy);
       if (depth > this.runStats.maxDepth) this.runStats.maxDepth = depth;
       const zone = this.world.zoneAt(cx, cy);
-      const lootKind = lootKindForZone(this.blockLootZone(zone));
+      const blockLoot = this.terrainLoot(cx, cy, zone);
+      const lootKind = blockLoot.kind;
       const ci = cy * this.world.width + cx;
       if (this.labDef.framework) {
         const reward = lateBlockReward(this.world.fillTierAt(cx, cy));
-        this.loot.spawnDropsForBlock(ccx, ccy, 0.12, this.stats.pickupLifetime, this.rng, reward.kind, reward.value);
+        this.loot.spawnDropsForBlock(ccx, ccy, LATE_DROP_CHANCE * (1 + this.kindBonus(reward.kind)), this.stats.pickupLifetime, this.rng, reward.kind, reward.value);
       } else if (this.world.mat[ci] === MAT.crystal) {
-        // A crystal vein: the lab's only source of crystals.
+        // A rich vein: several pickups of this world's currency at the vein's tier value.
         this.world.mat[ci] = MAT.none;
-        const veinZone = Math.max(1, Math.min(2, this.world.wall[ci] - 1));
+        const veinTier = this.world.tierBase + Math.max(1, this.world.wall[ci]);
+        const veinKind = this.world.labLayout?.frame ? worldLootKind(this.labDef.id) : lootKindForZone(Math.max(1, Math.min(2, this.world.wall[ci] - 1)));
         this.loot.spawnDropsForBlock(
           ccx,
           ccy,
-          FACILITY.crystalVeinDrops * (this.dropChanceAt(veinZone, ownerId) / Math.max(1e-6, this.stats.dropChance)),
+          VEIN_DROPS * (this.dropChanceFor(veinKind, ownerId) / Math.max(1e-6, this.stats.dropChance)),
           this.stats.pickupLifetime,
           this.rng,
-          lootKindForZone(veinZone),
+          veinKind,
+          this.world.labLayout?.frame ? tierLootValue(veinTier) : 1,
         );
       } else {
         this.loot.spawnDropsForBlock(
           ccx,
           ccy,
-          this.dropChanceAt(this.blockLootZone(zone), ownerId),
+          this.dropChanceFor(lootKind, ownerId),
           this.stats.pickupLifetime,
           this.rng,
           lootKind,
+          blockLoot.value,
         );
       }
       const destroyedCore = this.world.checkCoreDestroyedAt(cx, cy);
@@ -1412,7 +1421,7 @@ export class Game {
         const coreWy = (destroyedCore.cy + destroyedCore.size / 2) * cs;
         const burst = small ? Math.ceil(this.stats.coreLootBurst / 2) : this.stats.coreLootBurst;
         for (let i = 0; i < burst; i++) {
-          this.loot.spawnOne(coreWx, coreWy, this.stats.pickupLifetime, this.rng, lootKind);
+          this.loot.spawnOne(coreWx, coreWy, this.stats.pickupLifetime, this.rng, lootKind, blockLoot.value);
         }
         const essenceLife = this.stats.pickupLifetime * LOOT.essenceLifetimeMult;
         const essence = small ? Math.ceil(LOOT.coreEssence[destroyedCore.zone] / 3) : LOOT.coreEssence[destroyedCore.zone];
@@ -1485,18 +1494,27 @@ export class Game {
   }
 
   /**
-   * Zone whose loot an ordinary block at `zone` drops. In the hand-made lab
-   * crystals come only from veins, so every ordinary block drops gold.
+   * What an ordinary block at cell `(cx, cy)` drops. A hand-made world's
+   * terrain drops only that world's currency, in bigger stacks at deeper
+   * tiers (see world/tierEconomy.ts). Procedural test worlds keep the old
+   * gold / orange / green by zone.
    */
-  private blockLootZone(zone: number): number {
-    return this.world.labLayout?.frame ? 0 : zone;
+  private terrainLoot(cx: number, cy: number, zone: number): { kind: LootKind; value: number } {
+    if (this.labDef.framework && this.world.labLayout?.frame) return lateBlockReward(this.world.fillTierAt(cx, cy));
+    if (!this.world.labLayout?.frame) return { kind: lootKindForZone(zone), value: 1 };
+    return { kind: worldLootKind(this.labDef.id), value: tierLootValue(this.world.fillTierAt(cx, cy)) };
   }
 
-  /** A destroyed block's drop chance: its zone's, then the soldier who broke it. */
-  private dropChanceAt(zone: number, ownerId: number): number {
-    let chance = this.stats.dropChance;
-    if (zone === 1) chance *= 1 + this.stats.crystalDropBonus;
-    else if (zone >= 2) chance *= 1 + this.stats.tier3ResourceBonus;
+  /** Resource-tree yield bonus for one currency. */
+  private kindBonus(kind: LootKind): number {
+    if (kind === LootKind.Crystal) return this.stats.crystalDropBonus;
+    if (kind === LootKind.GreenCrystal) return this.stats.tier3ResourceBonus;
+    return 0;
+  }
+
+  /** A destroyed block's drop chance for a currency, then the soldier who broke it. */
+  private dropChanceFor(kind: LootKind, ownerId: number): number {
+    let chance = this.stats.dropChance * (1 + this.kindBonus(kind));
     if (ownerId > 0) {
       const owner = this.soldiers.find((s) => s.id === ownerId);
       if (owner) chance *= owner.mods.dropMult;
@@ -1688,9 +1706,11 @@ export class Game {
       const sp = this.rng.range(20, 110);
       this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.7), 1, col, 4);
     }
-    const zone = this.world.zoneAt(Math.floor(x / this.world.cellSize), Math.floor(y / this.world.cellSize));
+    const cx = Math.floor(x / this.world.cellSize);
+    const cy = Math.floor(y / this.world.cellSize);
+    const loot = this.terrainLoot(cx, cy, this.world.zoneAt(cx, cy));
     const chance = c.kind === "flower" ? 0.6 : c.kind === "worm" ? 1 : 2;
-    this.loot.spawnDropsForBlock(x, y, chance, this.stats.pickupLifetime, this.rng, lootKindForZone(this.blockLootZone(zone)));
+    this.loot.spawnDropsForBlock(x, y, chance, this.stats.pickupLifetime, this.rng, loot.kind, loot.value);
   }
 
   /** A dormant pixel crumbled to Necrosis Protocol: a puff of dark dust. */

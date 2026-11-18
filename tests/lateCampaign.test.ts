@@ -8,7 +8,7 @@ import { LateEncounters, type Encounter } from "../src/systems/LateEncounters";
 import { LootKind, LootSystem } from "../src/entities/LootSystem";
 import { Rng } from "../src/core/Rng";
 import { Soldier, baseSoldierStats } from "../src/entities/Soldier";
-import { CAMPAIGN, lateBlockReward } from "../src/world/campaignBalance";
+import { CAMPAIGN, lateBlockHealth, lateBlockReward } from "../src/world/campaignBalance";
 import {
   SOLDIER_UPGRADE_BY_ID,
   soldierModsFor,
@@ -37,13 +37,16 @@ function setup(id = 3) {
   };
 }
 describe("late campaign pacing and encounters", () => {
-  it("keeps forest mining equal to tiers 4–6, with a sharp city/ship jump", () => {
-    for (let t = 7; t <= 9; t++)
-      for (const p of [0, 0.5, 1])
-        expect(tierHealth(t, p)).toBe(tierHealth(t - 3, p));
-    expect(tierHealth(10, 0)).toBe(24000);
+  it("keeps every late tier harder than the one before, in step with the campaign table", () => {
+    for (let t = 7; t <= 11; t++) {
+      for (const p of [0, 0.5, 1]) {
+        expect(tierHealth(t, p)).toBeGreaterThan(tierHealth(t - 1, p));
+        expect(tierHealth(t, p)).toBe(lateBlockHealth(t, p));
+      }
+    }
     expect(tierHealth(11, 1)).toBe(65000);
-    expect(lateBlockReward(7).value).toBe(10);
+    expect(lateBlockReward(7)).toEqual({ kind: LootKind.GreenCrystal, value: 10 });
+    expect(lateBlockReward(10).kind).toBe(LootKind.Essence);
   });
   it.each([3, 4, 5])(
     "places world %i encounters in navigable spaces and leaves arrival safe",
@@ -183,10 +186,20 @@ describe("late campaign pacing and encounters", () => {
     const s = new Soldier(80, 128, 1, 0, 0);
     s.mods = soldierModsFor({ s_siege: 6 });
     world.health.fill(0);
+    // An armored bulkhead takes the drill's full bonus...
     world.health[16 * world.width + 20] = 13000;
+    world.armored[16 * world.width + 20] = 1;
     combat.fire(s, 1, 0);
     combat.updateBullets(0.5);
     expect(world.health[16 * world.width + 20]).toBeLessThan(1100);
+    combat.bullets.clear();
+    // ...ordinary terrain takes only the weapon's damage (Calibration covers that).
+    world.health.fill(0);
+    world.armored.fill(0);
+    world.health[16 * world.width + 20] = 13000;
+    combat.fire(s, 1, 0);
+    combat.updateBullets(0.5);
+    expect(world.health[16 * world.width + 20]).toBe(13000 - stats.damage);
     combat.bullets.clear();
     world.health.fill(0);
     let dealt = 0;
