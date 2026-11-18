@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { LIGHT, LOOT, SIM, SOLDIER, WORLD, zoneForDepth } from "../src/config";
+import { DAMAGE_ROLL, LIGHT, LOOT, SIM, SOLDIER, WORLD, zoneForDepth } from "../src/config";
 import { Rng } from "../src/core/Rng";
 import { CasingSystem } from "../src/entities/CasingSystem";
 import { LootSystem, lootKindForZone } from "../src/entities/LootSystem";
@@ -41,6 +41,9 @@ function simulateRun(
 } {
   const w = new PixelWorld(WORLD);
   generateWorld(w, seed);
+  // The game rolls every squad hit (see DAMAGE_ROLL).
+  w.damageRollMin = DAMAGE_ROLL.min;
+  w.damageRollMax = DAMAGE_ROLL.max;
   const rng = new Rng(seed);
   const phys = new PhysicsSystem(w, rng);
   const stats = upg.getSoldierStats();

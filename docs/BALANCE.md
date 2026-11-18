@@ -47,22 +47,35 @@ now only applies to armored bulkheads).
 | IV | essence | 3 | 1.08 | 2,000 → 12,500 | ×726 |
 | V | essence | 3 | 1.05 | 4,000 → 25,000 | ×840 |
 
-Hits per mid-band block for a Lab-upgraded pistol shot (14 damage):
+## Fixed block health, rolled damage
 
-| Tier | HP (mid) | Arriving | Fully calibrated for the world |
+Every ordinary block of a tier has the same health (no more bands), and every
+squad hit against terrain or the Blight rolls between 1x and 5x the weapon's
+listed damage (`DAMAGE_ROLL` in config.ts): a fresh 1-damage pistol hits for
+1-5, and the upgrade screen and HUD show weapon damage as that range. Rolls and
+Calibration don't apply to armored bulkheads or to enemies. Health is now a
+Uint32, so tiers no longer flatten near 65,535.
+
+| Tier | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Block HP | 5 | 75 | 900 | 4,800 | 18,000 | 63,000 | 72,000 | 93,000 | 120,000 | 147,000 | 170,000 |
+
+From tier 3 up these are the old band midpoints x3, since a roll averages 3x.
+
+Average hits per block for a Lab-upgraded pistol (14 listed damage, rolls 14-70):
+
+| Tier | HP | Arriving | Fully calibrated for the world |
 |---|---:|---:|---:|
-| 3 | 300 | 21 | 5.8 |
-| 4 | 1,600 | 31 | 0.4 |
-| 6 | 21,000 | 404 | 5.0 |
-| 7 | 24,000 | 5.8 | 3.0 |
-| 9 | 40,000 | 9.6 | 5.0 |
-| 10 | 49,000 | 6.1 | 4.8 |
-| 11 | 56,500 | 5.6 | 4.8 |
+| 3 | 900 | 21 | 5.8 |
+| 4 | 4,800 | 31 | 0.4 |
+| 6 | 63,000 | 404 | 5.0 |
+| 7 | 72,000 | 5.8 | 3.0 |
+| 9 | 120,000 | 9.6 | 5.0 |
+| 10 | 147,000 | 6.1 | 4.8 |
+| 11 | 170,000 | 5.6 | 4.8 |
 
-The Blighted Wards is the steep climb (HP grows ×70 from T3 to T6), so stage II
-carries most of the curve. Late terrain was raised so every tier is harder than
-the last (T7 used to drop back to T4's health); block health is a Uint16, so the
-late curve is flat and stages III–V are small steps.
+The Blighted Wards is the steep climb (HP x70 from T3 to T6), so stage II
+carries most of the curve.
 
 ## Black Market path research
 

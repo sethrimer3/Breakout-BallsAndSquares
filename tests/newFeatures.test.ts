@@ -176,8 +176,8 @@ describe("New Features & Upgrades", () => {
 
     // Check PixelWorld uses Uint16Array capable of holding 500+ HP
     const world = new PixelWorld(WORLD);
-    expect(world.health instanceof Uint16Array).toBe(true);
-    expect(world.subHealth instanceof Uint16Array).toBe(true);
+    expect(world.health instanceof Uint32Array).toBe(true);
+    expect(world.subHealth instanceof Uint32Array).toBe(true);
     world.setCell(10, 10, 500);
     expect(world.health[10 * world.width + 10]).toBe(500);
   });

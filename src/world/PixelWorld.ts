@@ -180,7 +180,7 @@ export class PixelWorld implements SolidQuery {
   roomX1: number;
   roomY1: number;
 
-  readonly health: Uint16Array;
+  readonly health: Uint32Array;
   /** Per-cell color variation seed (0..255). */
   readonly tint: Uint8Array;
   /**
@@ -211,6 +211,10 @@ export class PixelWorld implements SolidQuery {
   readonly armored: Uint8Array;
   /** Arsenal Calibration: multiplier on squad (`byPlayer`) damage against unarmored terrain. */
   playerDamageMult = 1;
+  /** Squad hits roll between these multiples of their damage (1..1 = no roll; the game sets DAMAGE_ROLL). */
+  damageRollMin = 1;
+  damageRollMax = 1;
+  private rollSeed = 0x9e3779b9;
   /** Glass weakened by sustained overdrive contact; independent of HP. */
   readonly glassCracked: Uint8Array;
   /** Per-cell door id (`0` = none, `id >= 1` = `doors[id - 1]`). */
@@ -222,7 +226,7 @@ export class PixelWorld implements SolidQuery {
    * 50%-smaller sub-pixel grid (4 subcells fit inside 1 normal cell).
    * `subHealth[sy * subWidth + sx]` > 0 when a small pink blight pixel occupies `(sx, sy)`.
    */
-  readonly subHealth: Uint16Array;
+  readonly subHealth: Uint32Array;
   readonly subTint: Uint8Array;
 
   /** Active/destroyed Blight Cores (each 2×2 normal cells) located inside blight-overrun rooms. */
@@ -298,7 +302,7 @@ export class PixelWorld implements SolidQuery {
     this.roomY0 = this.centerY - half;
     this.roomX1 = this.roomX0 + dims.roomSize - 1;
     this.roomY1 = this.roomY0 + dims.roomSize - 1;
-    this.health = new Uint16Array(dims.width * dims.height);
+    this.health = new Uint32Array(dims.width * dims.height);
     this.tint = new Uint8Array(dims.width * dims.height);
     this.wall = new Uint8Array(dims.width * dims.height);
     this.decor = new Uint8Array(dims.width * dims.height);
@@ -310,7 +314,7 @@ export class PixelWorld implements SolidQuery {
     this.armored = new Uint8Array(dims.width * dims.height);
     this.doorId = new Uint16Array(dims.width * dims.height);
     this.subKind = new Uint8Array(dims.width * 2 * dims.height * 2);
-    this.subHealth = new Uint16Array(this.subWidth * this.subHeight);
+    this.subHealth = new Uint32Array(this.subWidth * this.subHeight);
     this.subTint = new Uint8Array(this.subWidth * this.subHeight);
     this.subSolidQuery = {
       solidAt: (sx: number, sy: number) => this.subSolidAt(sx, sy),
@@ -498,7 +502,7 @@ export class PixelWorld implements SolidQuery {
       const w = this.wall[i];
       if (w > 0) return this.labLayout?.frame?.def.id === 1
         ? tierHealth(fill, t) : tierWallHealth(this.tierBase + w, t);
-      if (this.coreId[i] > 0) return Math.min(65000, tierHealth(fill, t) + GROWTH.coreHealthBonus);
+      if (this.coreId[i] > 0) return tierHealth(fill, t) + GROWTH.coreHealthBonus;
     }
     return tierHealth(fill, t);
   }
@@ -612,8 +616,20 @@ export class PixelWorld implements SolidQuery {
    */
   /** Squad damage after Arsenal Calibration; armored cells and non-squad damage are unscaled. */
   private scaled(i: number, amount: number, byPlayer: boolean): number {
-    if (!byPlayer || this.playerDamageMult === 1 || this.armored[i]) return amount;
-    return Math.round(amount * this.playerDamageMult);
+    if (!byPlayer || this.armored[i]) return amount;
+    let mult = this.playerDamageMult;
+    if (this.damageRollMax > this.damageRollMin) mult *= this.damageRollMin + (this.damageRollMax - this.damageRollMin) * this.nextRoll();
+    else mult *= this.damageRollMin;
+    if (mult === 1) return amount;
+    return Math.max(1, Math.round(amount * mult));
+  }
+
+  /** Cheap xorshift for damage rolls, 0..1. */
+  private nextRoll(): number {
+    let x = this.rollSeed;
+    x ^= x << 13; x ^= x >>> 17; x ^= x << 5;
+    this.rollSeed = x >>> 0;
+    return this.rollSeed / 4294967296;
   }
 
   /**

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { tierHealth } from "../src/config";
+import { DAMAGE_ROLL, tierHealth } from "../src/config";
 import { LootKind } from "../src/entities/LootSystem";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { CALIBRATION_DEFS, UPGRADE_BY_ID, type Currency } from "../src/progression/UpgradeDefinitions";
@@ -16,7 +16,9 @@ import {
 
 /** A Lab-upgraded pistol shot: 1 base + 8 Bullet Damage + 5 Marksman. */
 const REFERENCE_SHOT = 14;
-const hits = (tier: number, mult: number): number => tierHealth(tier, 0.5) / (REFERENCE_SHOT * mult);
+/** A roll averages the middle of DAMAGE_ROLL. */
+const AVERAGE_ROLL = (DAMAGE_ROLL.min + DAMAGE_ROLL.max) / 2;
+const hits = (tier: number, mult: number): number => tierHealth(tier) / (REFERENCE_SHOT * AVERAGE_ROLL * mult);
 const CURRENCY_OF: Record<number, Currency> = {
   [LootKind.Gold]: "gold",
   [LootKind.Crystal]: "crystals",
@@ -76,6 +78,22 @@ describe("Tier balance", () => {
     // The Siege Drill's bonus only lands on armored cells.
     expect(w.breachBonus(3, 4, 2000)).toBe(2000);
     expect(w.breachBonus(2, 4, 2000)).toBe(0);
+  });
+
+  it("gives every block of a tier the same health and rolls each squad hit between min and max", () => {
+    const w = new PixelWorld({ width: 16, height: 16, cellSize: 8, roomSize: 4 });
+    w.damageRollMin = DAMAGE_ROLL.min;
+    w.damageRollMax = DAMAGE_ROLL.max;
+    const seen = new Set<number>();
+    for (let k = 0; k < 400; k++) {
+      w.health[0] = 1000;
+      w.damage(0, 0, 1, true);
+      seen.add(1000 - w.health[0]);
+    }
+    expect(Math.min(...seen)).toBe(1);
+    expect(Math.max(...seen)).toBe(5);
+    expect(seen.size).toBe(5);
+    expect(tierHealth(4, 0)).toBe(tierHealth(4, 1));
   });
 
   it("stacks every bought Calibration stage into the squad's terrain multiplier", () => {

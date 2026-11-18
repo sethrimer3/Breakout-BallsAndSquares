@@ -3,7 +3,7 @@ import { GROWTH } from '../src/config';
 import { hasVisibleGrowthGlows } from '../src/rendering/GrowthGlowVisibility';
 
 function fixture() {
-  const world={width:16,cellSize:8,health:new Uint16Array(256)};
+  const world={width:16,cellSize:8,health:new Uint32Array(256)};
   world.health.fill(10);
   const growth={glowCount:1,glowHead:1,glowIndex:new Int32Array(4),glowTime:new Float32Array(4)};
   const cam={viewW:120,viewH:80,worldToScreenX:(x:number)=>x,worldToScreenY:(y:number)=>y};

@@ -1,6 +1,6 @@
 import { marketFor, marketNode, WEAPON_MARKETS } from "../progression/BlackMarket";
 import { marketLayout } from "./marketLayout";
-import { CIRCUIT, TERRAIN } from "../config";
+import { damageRange, TERRAIN } from "../config";
 import { mutationCompatibility, resolvePrimaryMutation, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
 import type { SoldierBehavior } from "../progression/SaveManager";
@@ -1379,34 +1379,34 @@ export class UpgradeTree {
       const mutationHtml=mutationOptions.length?`<div class="lc-section-lbl">BLACK MARKET — NEXT DEPLOYMENT</div><div class="lc-weapons">${mutationOptions.map(m=>`<button class="btn lc-mbtn ${curM===m.id?"btn-primary":""}" data-slot="${i}" data-mutation="${m.id??""}" ${m.unlocked?"":"disabled"}>${m.label}${m.unlocked?"":" · LOCKED"}</button>`).join("")}</div>${compatHtml}`:"";
       const curB: SoldierBehavior = this.game.isBehaviorUnlocked(ld.behavior) ? ld.behavior : "free";
 
-      let wSummary = `1 round · ${st.damage} DMG · ${st.fireRate.toFixed(2)}/s`;
+      let wSummary = `1 round · ${damageRange(st.damage)} DMG · ${st.fireRate.toFixed(2)}/s`;
       if (curW === "shotgun") {
-        wSummary = `${st.shotgunPellets} pellets · ${st.shotgunDamage} DMG · ${st.shotgunFireRate.toFixed(2)}/s`;
+        wSummary = `${st.shotgunPellets} pellets · ${damageRange(st.shotgunDamage)} DMG · ${st.shotgunFireRate.toFixed(2)}/s`;
       } else if (curW === "assault_rifle") {
-        wSummary = `Rapid · ${st.arDamage} DMG · ${st.arPierce} Pierce · ${st.arFireRate.toFixed(1)}/s`;
+        wSummary = `Rapid · ${damageRange(st.arDamage)} DMG · ${st.arPierce} Pierce · ${st.arFireRate.toFixed(1)}/s`;
       } else if (curW === "rocket_launcher") {
-        wSummary = `AoE ${st.rocketBlastRadius.toFixed(1)}r · ${st.rocketDamage} DMG · ${st.rocketFireRate.toFixed(2)}/s`;
+        wSummary = `AoE ${st.rocketBlastRadius.toFixed(1)}r · ${damageRange(st.rocketDamage)} DMG · ${st.rocketFireRate.toFixed(2)}/s`;
       } else if (curW === "sniper_rifle") {
-        wSummary = `Sniper · ${st.sniperDamage} DMG · ${st.sniperPierce} Pierce · ${Math.round(st.sniperCritChance * 100)}% Crit`;
+        wSummary = `Sniper · ${damageRange(st.sniperDamage)} DMG · ${st.sniperPierce} Pierce · ${Math.round(st.sniperCritChance * 100)}% Crit`;
       } else if (curW === "katana") {
-        wSummary = `${st.katanaDash ? "Rebound dash · " : ""}Slash · ${st.katanaDamage} DMG (${st.katanaBlightMultiplier}× Blight) · ${st.katanaPierce} Pierce · ${st.katanaFireRate.toFixed(1)}/s`;
+        wSummary = `${st.katanaDash ? "Rebound dash · " : ""}Slash · ${damageRange(st.katanaDamage)} DMG (${st.katanaBlightMultiplier}× Blight) · ${st.katanaPierce} Pierce · ${st.katanaFireRate.toFixed(1)}/s`;
       } else if (curW === "flamethrower") {
-        wSummary = `Flame · ${st.flameDamage} DMG · ${st.flameFireRate.toFixed(1)}/s · ignites rubble`;
+        wSummary = `Flame · ${damageRange(st.flameDamage)} DMG · ${st.flameFireRate.toFixed(1)}/s · ignites rubble`;
       }
-      if(curM==="reverse_revolver")wSummary=`Pause → rewind exact shot path · ${st.damage} DMG`;
-      else if(curM==="orbit_cylinder")wSummary=`Orbit rounds (${st.damage} DMG) → sling on real wall bounce`;
-      else if(curM==="drone_shepherd")wSummary=`Independent pistol drones · ${st.droneCapacity} cap · ${st.droneReleaseInterval.toFixed(2)}s · ${st.droneDamage} DMG`;
+      if(curM==="reverse_revolver")wSummary=`Pause → rewind exact shot path · ${damageRange(st.damage)} DMG`;
+      else if(curM==="orbit_cylinder")wSummary=`Orbit rounds (${damageRange(st.damage)} DMG) → sling on real wall bounce`;
+      else if(curM==="drone_shepherd")wSummary=`Independent pistol drones · ${st.droneCapacity} cap · ${st.droneReleaseInterval.toFixed(2)}s · ${damageRange(st.droneDamage)} DMG`;
       else if(curW==="squelch")wSummary=`Stick → mine → rebound · ${st.gooMass.toFixed(2)} mass · ${st.gooDistance} range`;
-      else if(curM==="homing_shotgun")wSummary=`Homing pellets · ${st.shotgunPellets} pellets · ${st.shotgunDamage} DMG`;
+      else if(curM==="homing_shotgun")wSummary=`Homing pellets · ${st.shotgunPellets} pellets · ${damageRange(st.shotgunDamage)} DMG`;
       else if(curM==="vacuum_pulse")wSummary=`0.5× cadence (${(st.shotgunFireRate*0.5).toFixed(2)}/s) · sucks debris → +pellets & DMG`;
       else if(curM==="overcharge_conductor")wSummary=`Charging rounds (0 hit DMG) · 3+ hits arm delayed chain + blast · ±${st.overchargeSpreadDeg<=0.2?st.overchargeSpreadDeg.toFixed(1):st.overchargeSpreadDeg.toFixed(2)}°`;
-      else if(curM==="circuit_runner")wSummary=`Laser turns 90° at blocks · ${st.arDamage} DMG · ${CIRCUIT.pierce+st.arPierce} Pierce · ${CIRCUIT.baseRange} range`;
-      else if(curM==="burrower")wSummary=`Drills terrain → grouped mines detonate together · ${st.rocketDamage} DMG`;
+      else if(curM==="circuit_runner")wSummary=`Laser turns 90° at blocks · ${damageRange(st.arDamage)} DMG · ${st.circuitPierce+st.arPierce} Pierce · ${st.circuitRange} range`;
+      else if(curM==="burrower")wSummary=`Drills terrain → grouped mines detonate together · ${damageRange(st.rocketDamage)} DMG`;
       else if(curM==="freeze_rockets")wSummary=`Cold-only burst · 50% slow / 2× DMG / 0.5× Blight · shatter`;
-      else if(curM==="chromatic_prism")wSummary=`Prism laser · BAND ${st.prismSpectrum+1}/7 · ${st.prismBounces} bounces · ${st.prismDamage} DMG`;
-      else if(curM==="rail_lance")wSummary=`Charge → 1 ultra-long piercing strike · ${st.sniperDamage} DMG`;
+      else if(curM==="chromatic_prism")wSummary=`Prism laser · BAND ${st.prismSpectrum+1}/7 · ${st.prismBounces} bounces · ${damageRange(st.prismDamage)} DMG`;
+      else if(curM==="rail_lance")wSummary=`Charge → 1 ultra-long piercing strike · ${damageRange(st.sniperDamage)} DMG`;
       else if(curM==="gale_edge")wSummary=`Flying crescents · ${st.galeDistance} range · Momentum inactive`;
-      else if(curM==="napalm_garden")wSummary=`Unlit fuel (10s) · lit by other weapons → 15× ${st.flameDamage} DMG / 3s`;
+      else if(curM==="napalm_garden")wSummary=`Unlit fuel (10s) · lit by other weapons → 15× ${damageRange(st.flameDamage)} DMG / 3s`;
       else if(curM==="cryospray")wSummary=`Freezing mist · 50% slow / 2× DMG / 0.5× Blight · shatter`;
       if (curS === "grenade") {
         wSummary += ` · NADE: ${st.grenadeBlocksRequired} blk (${st.grenadeDamage} dmg)`;
