@@ -4,6 +4,7 @@ import { sanitizeSaveData } from "../src/progression/SaveManager";
 import { DoorSystem } from "../src/world/DoorSystem";
 import { LabProgress } from "../src/world/LabProgress";
 import {
+  buildAuthoredLayout,
   LAB_BLUEPRINT,
   LAB_WORLDS,
   SECTOR_CHARS,
@@ -121,6 +122,38 @@ describe("hand-made lab", () => {
     expect(sectorAtCell(frame, a.roomX0 + 5, a.roomY0 + 5)).toBe(0);
     expect(a.blockHealthAt(a.roomX0 - 3, a.roomY0)).toBeLessThanOrEqual(5);
     expectAllRoomsReachable(a);
+  });
+
+  it("lines hallways up with the rooms they enter instead of their corners", () => {
+    for (const def of [Z1, Z2]) {
+      const w = new PixelWorld(WORLD);
+      const layout = buildAuthoredLayout(labFrame(w, def)!);
+      const crowded: string[] = [];
+      let entries = 0;
+      for (const seg of layout.corridors) {
+        if (seg.gate) continue;
+        for (const r of layout.rooms) {
+          const rx1 = r.x + r.size - 1;
+          const ry1 = r.y + r.size - 1;
+          // Which room side does this hallway cross, if any?
+          const crossesX = seg.x0 < r.x !== seg.x1 < r.x || seg.x0 <= rx1 !== seg.x1 <= rx1;
+          const crossesY = seg.y0 < r.y !== seg.y1 < r.y || seg.y0 <= ry1 !== seg.y1 <= ry1;
+          const overlap = seg.x0 <= rx1 && seg.x1 >= r.x && seg.y0 <= ry1 && seg.y1 >= r.y;
+          if (!overlap) continue;
+          // Squares of one freeform room overlap each other; only a plain square's sides count.
+          if (layout.rooms.some((o) => o !== r && o.group === r.group)) continue;
+          if (seg.axis === "h" && crossesX) {
+            entries++;
+            if (seg.y0 < r.y + 2 || seg.y1 > ry1 - 2) crowded.push(`zone ${def.id} h ${seg.x0},${seg.y0} room ${r.id}`);
+          } else if (seg.axis === "v" && crossesY) {
+            entries++;
+            if (seg.x0 < r.x + 2 || seg.x1 > rx1 - 2) crowded.push(`zone ${def.id} v ${seg.x0},${seg.y0} room ${r.id}`);
+          }
+        }
+      }
+      expect(entries).toBeGreaterThan(50);
+      expect(crowded).toEqual([]);
+    }
   });
 
   it("builds zone 2 deterministically with tiers 4-6, Blight-crusted walls and every room reachable", () => {

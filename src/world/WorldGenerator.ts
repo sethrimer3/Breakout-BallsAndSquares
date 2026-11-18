@@ -344,7 +344,9 @@ export function placeCrystalVeins(world: PixelWorld, frame: LabFrame, runSeed: n
         mat[i] = MAT.crystal;
         const x = i % width;
         const y = (i - x) / width;
-        const steps = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) => isWall(x + dx, y + dy));
+        // Stay in the sector, so a vein never wanders into a tier 1 sector next door.
+        const steps = [[1, 0], [-1, 0], [0, 1], [0, -1]].filter(([dx, dy]) =>
+          x + dx >= b.x0 && x + dx <= b.x1 && y + dy >= b.y0 && y + dy <= b.y1 && isWall(x + dx, y + dy));
         if (steps.length === 0) break;
         const [dx, dy] = steps[rng.int(steps.length)];
         i = (y + dy) * width + x + dx;
