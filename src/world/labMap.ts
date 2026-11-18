@@ -654,7 +654,8 @@ export function worldBlueprint(def: LabWorldDef): Blueprint {
 /**
  * Turn the blueprint into a lab layout placed at `frame`. Rooms get a 2-cell
  * margin inside their characters for walls; hallways run between character
- * centers, 3-5 cells wide.
+ * centers, 3-5 cells wide, and are lined up with the rooms they enter (see
+ * `placeHalls`).
  */
 export function buildAuthoredLayout(frame: LabFrame, blueprint: Blueprint = worldBlueprint(frame.def)): LabLayout {
   const def = frame.def;
@@ -662,7 +663,6 @@ export function buildAuthoredLayout(frame: LabFrame, blueprint: Blueprint = worl
   const corridors: LabCorridorSegment[] = [];
   const charX = (c: number): number => frame.x0 + c * CHAR_CELLS;
   const charY = (r: number): number => frame.y0 + r * CHAR_CELLS;
-  const mid = (CHAR_CELLS - 1) / 2;
   const zoneAt = (cx: number, cy: number): 0 | 1 | 2 => sectorZone(def, nearestSector(frame, cx, cy));
   for (const b of blueprint.rooms) {
     const x = charX(b.col) + 2;
@@ -681,23 +681,10 @@ export function buildAuthoredLayout(frame: LabFrame, blueprint: Blueprint = worl
       group: b.group,
     });
   }
-  for (const h of blueprint.halls) {
-    const roll = hash2(h.line * 3 + (h.axis === "h" ? 0 : 1), h.from, def.seed + 5);
-    const width = 3 + Math.floor(roll * 3);
-    const halfLo = Math.floor((width - 1) / 2);
-    const halfHi = width - 1 - halfLo;
-    const wallThickness = 1 + Math.floor(hash2(h.from, h.line, def.seed + 9) * 2);
-    const rubble = hash2(h.to, h.line, def.seed + 13) < FACILITY.rubbleCorridorChance;
-    const a = (h.axis === "h" ? charX(h.from) : charY(h.from)) + mid;
-    const b = (h.axis === "h" ? charX(h.to) : charY(h.to)) + mid;
-    const across = (h.axis === "h" ? charY(h.line) : charX(h.line)) + mid;
-    const seg: LabCorridorSegment =
-      h.axis === "h"
-        ? { zone: 0, axis: "h", x0: a - halfLo, x1: b + halfHi, y0: across - halfLo, y1: across + halfHi, width, wallThickness, rubble }
-        : { zone: 0, axis: "v", x0: across - halfLo, x1: across + halfHi, y0: a - halfLo, y1: b + halfHi, width, wallThickness, rubble };
+  corridors.push(...placeHalls(frame, blueprint, rooms).map((seg) => {
     seg.zone = zoneAt((seg.x0 + seg.x1) >> 1, (seg.y0 + seg.y1) >> 1);
-    corridors.push(seg);
-  }
+    return seg;
+  }));
   // Gates: a wide vestibule from the edge character's hallway out through the
   // lab's edge, a huge door, and a short passage beyond it.
   for (const g of def.gates) {
@@ -712,6 +699,227 @@ export function buildAuthoredLayout(frame: LabFrame, blueprint: Blueprint = worl
       width: GATE_HALF * 2 + 1, wallThickness: 2, rubble: false, gate: true });
   }
   return { seed: def.seed, rooms, corridors, frame };
+}
+
+/** Interior cells a hallway opening keeps clear of a room's inner corners. */
+const DOOR_MARGIN = 2;
+/** Room faces shorter than this many cells take their hallways dead center. */
+const CENTER_FACE_BELOW = 5 * CHAR_CELLS - 4;
+/** Longest sideways step a hallway takes to line up with a room; bigger ones would snake. */
+const JOG_MAX = 6;
+
+interface CellRect { x0: number; y0: number; x1: number; y1: number }
+
+const overlaps = (a: CellRect, b: CellRect, pad: number): boolean =>
+  a.x0 - pad <= b.x1 && a.x1 + pad >= b.x0 && a.y0 - pad <= b.y1 && a.y1 + pad >= b.y0;
+
+/** One blueprint hallway run while it is being lined up. */
+interface HallPlan {
+  h: BlueprintHall;
+  width: number;
+  halfLo: number;
+  halfHi: number;
+  wallThickness: number;
+  rubble: boolean;
+  /** Middle cell across the run (y for "h", x for "v"). */
+  across: number;
+  /** Inclusive carved extent along the run. */
+  lo: number;
+  hi: number;
+  /** Room group at the `from` / `to` end, or -1 for a junction or dead end. */
+  fromRoom: number;
+  toRoom: number;
+  /** Ends that turned into a jog and so no longer meet a junction. */
+  jogged: { from: boolean; to: boolean };
+}
+
+/**
+ * Turn blueprint hallway runs into corridor rectangles that meet rooms
+ * cleanly. A run is drawn through character centers, so taken literally a
+ * hallway entering a room's first or last row of characters (or any side of
+ * a 2×2 room) runs flush along a wall or into a corner. Instead every opening
+ * is lined up with the room face it enters: centered on faces up to four
+ * characters long, and at least DOOR_MARGIN cells from the inner corners on
+ * longer ones. A run whose rooms agree is shifted sideways as a whole; when
+ * shifting would crowd another room or hallway, or the two rooms disagree,
+ * the run keeps its line and jogs over in the character next to the room.
+ * Hallway ends at junctions are trimmed or stretched to exactly cover the
+ * hallways they meet, so corners are square and widths never leave nubs.
+ */
+function placeHalls(frame: LabFrame, blueprint: Blueprint, rooms: LabRoom[]): LabCorridorSegment[] {
+  const def = frame.def;
+  const lines = def.blueprint;
+  const mid = (CHAR_CELLS - 1) / 2;
+  const charX = (c: number): number => frame.x0 + c * CHAR_CELLS;
+  const charY = (r: number): number => frame.y0 + r * CHAR_CELLS;
+  const group = new Map<number, number>();
+  const key = (c: number, r: number): number => r * 4096 + c;
+  for (const b of blueprint.rooms) {
+    for (let r = b.row; r < b.row + b.span; r++) for (let c = b.col; c < b.col + b.span; c++) group.set(key(c, r), b.group);
+  }
+  const roomAt = (c: number, r: number): number => group.get(key(c, r)) ?? -1;
+  const squares = new Map<number, number>();
+  for (const b of blueprint.rooms) squares.set(b.group, (squares.get(b.group) ?? 0) + 1);
+  // Along/across helpers: "h" runs along columns, "v" runs along rows.
+  const alongCell = (h: BlueprintHall, k: number): number => (h.axis === "h" ? charX(k) : charY(k)) + mid;
+  const acrossOrigin = (h: BlueprintHall, j: number): number => (h.axis === "h" ? charY(j) : charX(j));
+  const roomOf = (h: BlueprintHall, k: number, j: number): number => (h.axis === "h" ? roomAt(k, j) : roomAt(j, k));
+  const charOf = (h: BlueprintHall, k: number): string => (h.axis === "h" ? lines[h.line]?.[k] : lines[k]?.[h.line]) ?? ".";
+  const rectOf = (axis: "h" | "v", lo: number, hi: number, across: number, halfLo: number, halfHi: number): CellRect =>
+    axis === "h"
+      ? { x0: lo, x1: hi, y0: across - halfLo, y1: across + halfHi }
+      : { x0: across - halfLo, x1: across + halfHi, y0: lo, y1: hi };
+
+  const plans: HallPlan[] = blueprint.halls.map((h) => {
+    const roll = hash2(h.line * 3 + (h.axis === "h" ? 0 : 1), h.from, def.seed + 5);
+    const width = 3 + Math.floor(roll * 3);
+    const halfLo = Math.floor((width - 1) / 2);
+    const halfHi = width - 1 - halfLo;
+    return {
+      h, width, halfLo, halfHi,
+      wallThickness: 1 + Math.floor(hash2(h.from, h.line, def.seed + 9) * 2),
+      rubble: hash2(h.to, h.line, def.seed + 13) < FACILITY.rubbleCorridorChance,
+      across: acrossOrigin(h, h.line) + mid,
+      lo: alongCell(h, h.from) - halfLo,
+      hi: alongCell(h, h.to) + halfHi,
+      fromRoom: roomOf(h, h.from, h.line),
+      toRoom: roomOf(h, h.to, h.line),
+      jogged: { from: false, to: false },
+    };
+  });
+  const original = plans.map((p) => rectOf(p.h.axis, p.lo, p.hi, p.across, p.halfLo, p.halfHi));
+  /** Do two runs share a character (cross, touch at a junction or meet end to end)? */
+  const connected = (a: BlueprintHall, b: BlueprintHall): boolean =>
+    a.axis === b.axis
+      ? a.line === b.line && a.from <= b.to && b.from <= a.to
+      : b.line >= a.from && b.line <= a.to && a.line >= b.from && a.line <= b.to;
+
+  /** Would this rectangle of plan `p` crowd a room or hallway it does not belong to? */
+  const crowds = (p: HallPlan, rect: CellRect): boolean => {
+    for (const r of rooms) {
+      if (r.group === p.fromRoom || r.group === p.toRoom) continue;
+      if (overlaps(rect, { x0: r.x, y0: r.y, x1: r.x + r.size - 1, y1: r.y + r.size - 1 }, 3)) return true;
+    }
+    for (let i = 0; i < plans.length; i++) {
+      const q = plans[i];
+      if (q === p || connected(p.h, q.h)) continue;
+      if (overlaps(rect, original[i], 2)) return true;
+    }
+    return false;
+  };
+
+  /** Allowed middle cells for a run entering room `g` at character `k`; `side` steps back into the hallway. */
+  const doorRange = (p: HallPlan, k: number, g: number, side: number): { min: number; max: number; center: number; short: boolean; small: boolean } => {
+    const h = p.h;
+    const onFace = (j: number): boolean => roomOf(h, k, j) === g && roomOf(h, k + side, j) !== g;
+    let j0 = h.line, j1 = h.line;
+    while (onFace(j0 - 1)) j0--;
+    while (onFace(j1 + 1)) j1++;
+    const faceLo = acrossOrigin(h, j0) + 2;
+    const faceHi = acrossOrigin(h, j1) + CHAR_CELLS - 3;
+    // The opening's middle is across + (halfHi - halfLo) / 2.
+    const center = Math.floor((faceLo + faceHi - (p.halfHi - p.halfLo)) / 2);
+    const min = faceLo + DOOR_MARGIN + p.halfLo;
+    const max = faceHi - DOOR_MARGIN - p.halfHi;
+    // Only plain square rooms are centered; freeform shapes just keep clear of corners.
+    const short = faceHi - faceLo + 1 < CENTER_FACE_BELOW;
+    const small = short && squares.get(g) === 1;
+    return min > max ? { min: center, max: center, center, short, small } : { min, max, center, short, small };
+  };
+
+  const extra: LabCorridorSegment[] = [];
+  const segment = (p: HallPlan, axis: "h" | "v", r: CellRect, rubble = false): LabCorridorSegment => ({
+    zone: 0, axis, ...r, width: p.width, wallThickness: p.wallThickness, rubble,
+  });
+  const clamp = (v: number, r: { min: number; max: number }): number => Math.min(r.max, Math.max(r.min, v));
+  /** The square where a run steps sideways from `a` to `b` at along-cell `c`. */
+  const bendRect = (p: HallPlan, c: number, a: number, b: number): CellRect =>
+    rectOf(p.h.axis, c - p.halfLo, c + p.halfHi, Math.min(a, b), p.halfLo, Math.max(a, b) - Math.min(a, b) + p.halfHi);
+
+  for (const p of plans) {
+    const h = p.h;
+    const perp = h.axis === "h" ? "v" : "h";
+    const ends = [
+      { at: "from" as const, k: h.from, g: p.fromRoom, side: 1 },
+      { at: "to" as const, k: h.to, g: p.toRoom, side: -1 },
+    ].filter((e) => e.g >= 0).map((e) => ({ ...e, ...doorRange(p, e.k, e.g, e.side) }));
+    if (ends.length === 0) continue;
+    const off = ends.filter((e) => p.across < e.min || p.across > e.max);
+    // Small rooms read best with their doors centered, even when a run already clears the corners.
+    const wantsCenter = ends.some((e) => e.small && p.across !== e.center);
+    if (off.length === 0 && !wantsCenter) continue;
+    const both = { min: Math.max(...ends.map((e) => e.min)), max: Math.min(...ends.map((e) => e.max)) };
+    let bulkhead = false;
+    for (let k = h.from; k <= h.to; k++) if (charOf(h, k) === "=") bulkhead = true;
+    if (both.min <= both.max) {
+      if (bulkhead) continue;
+      // Aim for the middle of short faces, and stay put on long ones.
+      const goal = Math.round(ends.reduce((s, e) => s + (e.short ? e.center : clamp(p.across, e)), 0) / ends.length);
+      const tries = [clamp(goal, both), clamp(p.across, both)];
+      const t = tries.find((v) => !crowds(p, rectOf(h.axis, p.lo, p.hi, v, p.halfLo, p.halfHi)));
+      if (t !== undefined) {
+        p.across = t;
+        continue;
+      }
+      if (off.length === 0) continue;
+    } else if (ends.length === 2) {
+      // The two rooms want different lines: one step in the middle of the run.
+      const [a, b] = ends;
+      const ta = clamp(p.across, a);
+      const tb = clamp(p.across, b);
+      const km = (h.from + h.to) >> 1;
+      if (km > h.from && km < h.to && !bulkhead && Math.abs(ta - tb) <= JOG_MAX) {
+        const c = alongCell(h, km);
+        const first = rectOf(h.axis, p.lo, c + p.halfHi, ta, p.halfLo, p.halfHi);
+        const second = rectOf(h.axis, c - p.halfLo, p.hi, tb, p.halfLo, p.halfHi);
+        const bend = bendRect(p, c, ta, tb);
+        if (!crowds(p, first) && !crowds(p, second) && !crowds(p, bend)) {
+          p.across = ta;
+          p.hi = c + p.halfHi;
+          extra.push(segment(p, h.axis, second, p.rubble), segment(p, perp, bend));
+          continue;
+        }
+      }
+    }
+    if (bulkhead) continue;
+    // Crowded: keep the run's line and step over in the character before the room.
+    for (const e of off) {
+      const kj = e.k + e.side;
+      if (kj <= h.from || kj >= h.to) continue;
+      const t = clamp(p.across, e);
+      if (Math.abs(t - p.across) > JOG_MAX) continue;
+      const c = alongCell(h, kj);
+      const stub = rectOf(h.axis, e.at === "to" ? c - p.halfLo : p.lo, e.at === "to" ? p.hi : c + p.halfHi, t, p.halfLo, p.halfHi);
+      const bend = bendRect(p, c, p.across, t);
+      if (crowds(p, stub) || crowds(p, bend)) continue;
+      extra.push(segment(p, h.axis, stub), segment(p, perp, bend));
+      if (e.at === "to") p.hi = c + p.halfHi;
+      else p.lo = c - p.halfLo;
+      p.jogged[e.at] = true;
+    }
+  }
+
+  // Square up junctions: an end that meets crossing hallways covers exactly them.
+  const lo = plans.map((p) => p.lo);
+  const hi = plans.map((p) => p.hi);
+  plans.forEach((p, i) => {
+    const h = p.h;
+    for (const end of ["from", "to"] as const) {
+      if ((end === "from" ? p.fromRoom : p.toRoom) >= 0 || p.jogged[end]) continue;
+      const k = end === "from" ? h.from : h.to;
+      let a = Infinity, b = -Infinity;
+      for (const q of plans) {
+        if (q.h.axis === h.axis || q.h.line !== k || h.line < q.h.from || h.line > q.h.to) continue;
+        a = Math.min(a, q.across - q.halfLo);
+        b = Math.max(b, q.across + q.halfHi);
+      }
+      if (a > b) continue;
+      if (end === "from") lo[i] = a;
+      else hi[i] = b;
+    }
+  });
+  const out = plans.map((p, i) => segment(p, p.h.axis, rectOf(p.h.axis, lo[i], hi[i], p.across, p.halfLo, p.halfHi), p.rubble));
+  return out.concat(extra);
 }
 
 /** Inclusive cell bounds of a gate's door and of the passage beyond it. */
