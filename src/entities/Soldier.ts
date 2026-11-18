@@ -17,6 +17,14 @@ import {
   SOLDIER,
   TURRET,
   FOG,
+  REVERSE,
+  ORBIT,
+  VACUUM,
+  CIRCUIT,
+  BURROWER,
+  FREEZE,
+  RAIL,
+  NAPALM,
 } from "../config";
 import type { SoldierBehavior } from "../progression/SaveManager";
 import { baseSoldierMods, type SoldierMods } from "../progression/SoldierUpgrades";
@@ -60,6 +68,8 @@ export interface SoldierStats {
   // Core global soldier combat buffs (apply to ALL soldiers regardless of weapon)
   globalFireRateMult: number;
   globalDamageBonus: number;
+  /** Arsenal Calibration: multiplier on squad damage against terrain and the Blight (not bulkheads or enemies). */
+  terrainDamageMult: number;
   globalBulletSpeedMult: number;
   // Pistol stats
   fireRate: number;
@@ -80,6 +90,31 @@ export interface SoldierStats {
   napalmUnlocked: boolean;
   cryosprayUnlocked: boolean;
   circuitUnlocked: boolean;
+  // Black Market path research (see progression/MarketResearch.ts)
+  reverseDamageMult: number;
+  reversePause: number;
+  orbitMaxRounds: number;
+  orbitDamageMult: number;
+  homingRange: number;
+  homingTurnRate: number;
+  vacuumRange: number;
+  vacuumDamagePerMass: number;
+  overchargePowerMult: number;
+  circuitRange: number;
+  circuitPierce: number;
+  burrowerDrillCells: number;
+  burrowerDrillDist: number;
+  burrowerExtraMines: number;
+  freezeRocketDuration: number;
+  freezeRocketRadiusMult: number;
+  railPierce: number;
+  railDamageMult: number;
+  galePierce: number;
+  galeWidth: number;
+  napalmFuelLife: number;
+  napalmRadius: number;
+  cryoDuration: number;
+  cryoReachMult: number;
   // Shotgun stats
   shotgunUnlocked: boolean;
   homingShotgunUnlocked: boolean;
@@ -219,6 +254,7 @@ export function baseSoldierStats(): SoldierStats {
     soldierHealth: 0,
     globalFireRateMult: 1,
     globalDamageBonus: 0,
+    terrainDamageMult: 1,
     globalBulletSpeedMult: 1,
     fireRate: SOLDIER.fireRate,
     damage: SOLDIER.damage,
@@ -228,6 +264,13 @@ export function baseSoldierStats(): SoldierStats {
     reverseUnlocked: false, orbitUnlocked: false, overchargeUnlocked: false, overchargeSpreadDeg: OVERCHARGE.initialSpreadDeg, galeUnlocked: false, galeDistance: GALE.distance,
     vacuumUnlocked: false, burrowerUnlocked: false, freezeRocketsUnlocked: false,
     railLanceUnlocked: false, napalmUnlocked: false, cryosprayUnlocked: false, circuitUnlocked: false,
+    reverseDamageMult: 1, reversePause: REVERSE.pause, orbitMaxRounds: ORBIT.maxRounds, orbitDamageMult: 1,
+    homingRange: 128, homingTurnRate: Math.PI * 1.5, vacuumRange: VACUUM.range, vacuumDamagePerMass: VACUUM.damagePerMass,
+    overchargePowerMult: 1, circuitRange: CIRCUIT.baseRange, circuitPierce: CIRCUIT.pierce,
+    burrowerDrillCells: BURROWER.maxDrillCells, burrowerDrillDist: BURROWER.maxDrillDist, burrowerExtraMines: 0,
+    freezeRocketDuration: FREEZE.duration, freezeRocketRadiusMult: 1, railPierce: RAIL.bonusPierce, railDamageMult: 1,
+    galePierce: GALE.pierce, galeWidth: GALE.width, napalmFuelLife: NAPALM.unlitDuration, napalmRadius: NAPALM.patchRadius,
+    cryoDuration: FREEZE.duration, cryoReachMult: 1,
     shotgunUnlocked: false,
     homingShotgunUnlocked: false,
     shotgunFireRate: SHOTGUN.fireRate,

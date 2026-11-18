@@ -106,10 +106,10 @@ export interface CategoryInfo {
 export const CATEGORIES: readonly CategoryInfo[] = [
   {
     id: "systems",
-    name: "CORE / MONEY / BLIGHT / BASE",
+    name: "CORE / MONEY / BLIGHT / BASE / ARSENAL",
     icon: "soldier",
     color: UI_COLORS.soldier,
-    branches: ["core", "resources", "blight", "facility"],
+    branches: ["core", "resources", "blight", "facility", "arsenal"],
   },
   {
     id: "primary",
@@ -159,7 +159,7 @@ interface TreeSource {
 
 export function categoryForBranch(b: UpgradeBranch): UpgradeCategory {
   if (b === "formations") return "formations";
-  if (b === "core" || b === "resources" || b === "blight" || b === "facility") return "systems";
+  if (b === "core" || b === "resources" || b === "blight" || b === "facility" || b === "arsenal") return "systems";
   if (b === "grenade" || b === "turret") return "secondary";
   if (b === "soldier") return "soldiers";
   return "primary";
@@ -181,6 +181,7 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
   grenade: { icon: "grenade", color: "#ff9d3b" },
   turret: { icon: "turret", color: "#38d6ff" },
   facility: { icon: "keycard", color: "#7fb2ff" },
+  arsenal: { icon: "impact", color: "#ffb347" },
   soldier: { icon: "soldier", color: UI_COLORS.soldier },
 };
 
@@ -316,6 +317,7 @@ export class UpgradeTree {
                 <button class="tree-tab" data-tab="resources">${tabHtml("resources", "RESOURCES")}</button>
                 <button class="tree-tab" data-tab="blight">${tabHtml("blight", "BLIGHT")}</button>
                 <button class="tree-tab" data-tab="facility">${tabHtml("facility", "RESEARCH BASE")}</button>
+                <button class="tree-tab" data-tab="arsenal">${tabHtml("arsenal", "CALIBRATION")}</button>
               </div>
               <div class="tree-cat-panel hidden" data-cat="primary">
                 ${WEAPON_MARKETS.map(m => `<div class="tree-weapon-tab">
@@ -601,11 +603,13 @@ export class UpgradeTree {
       } else if (tab === "formations") {
         this.subEl.textContent = "SQUAD FORMATIONS & INDIVIDUAL SOLDIER BEHAVIORS";
       } else if (tab === "resources") {
-        this.subEl.textContent = "RESOURCE EXTRACTION — GOLD DROPS, TIER 2 ORANGE & TIER 3 GREEN CRYSTALS";
+        this.subEl.textContent = "RESOURCE EXTRACTION — LAB GOLD, WARDS ORANGE & FOREST GREEN CRYSTALS";
       } else if (tab === "blight") {
         this.subEl.textContent = "BLIGHT CONTAINMENT — REPLICATION DAMPENING & BLIGHT CORE PURGES";
       } else if (tab === "facility") {
         this.subEl.textContent = "RESEARCH BASE SYSTEMS — DORMANT SENTRIES & FACILITY MAPPING";
+      } else if (tab === "arsenal") {
+        this.subEl.textContent = "ARSENAL CALIBRATION — SQUAD DAMAGE VS TERRAIN & BLIGHT, ONE STAGE PER WORLD IN ITS OWN CURRENCY";
       } else if (tab === "pistol") {
         this.subEl.textContent = "SIDEARM WEAPON TREE — STANDARD ISSUE (UNLOCKED)";
       } else if (tab === "squelch") {

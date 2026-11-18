@@ -109,7 +109,7 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
     const primaryCat = CATEGORIES.find((c) => c.id === "primary")!;
     const secondaryCat = CATEGORIES.find((c) => c.id === "secondary")!;
 
-    expect(systemsCat.branches).toEqual(["core", "resources", "blight", "facility"]);
+    expect(systemsCat.branches).toEqual(["core", "resources", "blight", "facility", "arsenal"]);
     expect(categoryForBranch("facility")).toBe("systems");
     expect(primaryCat.branches).toEqual([
       "pistol",
@@ -273,11 +273,11 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
     expect(soldier.secondaryEnergy).toBe(90);
   });
 
-  it("Core Autonomous Primer upgrade costs green crystals and gates automatic activation", () => {
+  it("Core Autonomous Primer upgrade costs orange crystals and gates automatic activation", () => {
     const autoDef = UPGRADE_BY_ID.auto_ability;
     expect(autoDef).toBeDefined();
     expect(autoDef.branch).toBe("core");
-    expect(autoDef.currency).toBe("greenCrystals");
+    expect(autoDef.currency).toBe("crystals");
     expect(autoDef.maxLevel).toBe(1);
 
     const stats = baseSoldierStats();
@@ -304,8 +304,8 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
     const quantityNode = UPGRADE_BY_ID.turret_quantity;
     expect(quantityNode).toBeDefined();
     expect(quantityNode.maxLevel).toBe(4);
-    expect(quantityNode.currency).toBe("crystals");
-    // Costs orange crystals and 5 essence per level
+    expect(quantityNode.currency ?? "gold").toBe("gold");
+    // Costs gold (it is bought in the Lab) and 5 essence per level
     expect(quantityNode.essenceCost).toBe(5);
   });
 

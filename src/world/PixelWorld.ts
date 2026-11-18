@@ -204,6 +204,13 @@ export class PixelWorld implements SolidQuery {
   boundaryThickness = 3;
   /** Per-cell special material (`MAT`). */
   readonly mat: Uint8Array;
+  /**
+   * Armored cells (late-world bulkheads): Arsenal Calibration does not multiply
+   * damage against them, and only they take the Siege Drill's bonus.
+   */
+  readonly armored: Uint8Array;
+  /** Arsenal Calibration: multiplier on squad (`byPlayer`) damage against unarmored terrain. */
+  playerDamageMult = 1;
   /** Glass weakened by sustained overdrive contact; independent of HP. */
   readonly glassCracked: Uint8Array;
   /** Per-cell door id (`0` = none, `id >= 1` = `doors[id - 1]`). */
@@ -300,6 +307,7 @@ export class PixelWorld implements SolidQuery {
     this.glassCracked = new Uint8Array(dims.width * dims.height);
     this.boundary = new Uint8Array(dims.width * dims.height);
     this.mat = new Uint8Array(dims.width * dims.height);
+    this.armored = new Uint8Array(dims.width * dims.height);
     this.doorId = new Uint16Array(dims.width * dims.height);
     this.subKind = new Uint8Array(dims.width * 2 * dims.height * 2);
     this.subHealth = new Uint16Array(this.subWidth * this.subHeight);
@@ -602,6 +610,26 @@ export class PixelWorld implements SolidQuery {
    * Returns 0 if nothing happened, 1 if damaged, 2 if destroyed.
    * `byPlayer` marks a hit the squad dealt itself (see `damageSub`).
    */
+  /** Squad damage after Arsenal Calibration; armored cells and non-squad damage are unscaled. */
+  private scaled(i: number, amount: number, byPlayer: boolean): number {
+    if (!byPlayer || this.playerDamageMult === 1 || this.armored[i]) return amount;
+    return Math.round(amount * this.playerDamageMult);
+  }
+
+  /**
+   * The Siege Drill's bonus against cell `(cx, cy)`: full against armored
+   * bulkheads, nothing against ordinary terrain (Calibration covers that).
+   */
+  breachBonus(cx: number, cy: number, bonus: number): number {
+    if (bonus === 0 || !this.inBounds(cx, cy)) return 0;
+    return this.armored[cy * this.width + cx] ? bonus : 0;
+  }
+
+  /** `breachBonus` for half-size sub-cell `(sx, sy)`. */
+  breachBonusSub(sx: number, sy: number, bonus: number): number {
+    return this.breachBonus(sx >> 1, sy >> 1, bonus);
+  }
+
   damage(cx: number, cy: number, amount: number, byPlayer = false, attackDx = 0, attackDy = -1): 0 | 1 | 2 {
     if (!this.inBounds(cx, cy)) return 0;
     const i = cy * this.width + cx;
@@ -628,7 +656,7 @@ export class PixelWorld implements SolidQuery {
         return 1;
       }
     }
-    const next = Math.max(0, hp - amount);
+    const next = Math.max(0, hp - this.scaled(i, amount, byPlayer));
     this.health[i] = next;
     if (next === 0) {
       this.blight[i] = 0;
@@ -661,7 +689,7 @@ export class PixelWorld implements SolidQuery {
     const si = sy * this.subWidth + sx;
     const hp = this.subHealth[si];
     if (hp === 0) return 0;
-    const next = Math.max(0, hp - amount);
+    const next = Math.max(0, hp - this.scaled(i, amount, byPlayer));
     this.subHealth[si] = next;
     if (next === 0) {
       const spreads = this.subKind[si] !== SUB.blight;

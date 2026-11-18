@@ -30,7 +30,7 @@ function fresh(): { save: SaveManager; upg: UpgradeManager } {
 }
 
 describe("Currencies on the Upgrade Matrix", () => {
-  it("prices secondary weapons and special weapon upgrades in orange crystals", () => {
+  it("prices everything the Lab can reach in gold, since only the Blighted Wards drop orange crystals", () => {
     for (const id of [
       "ar_pierce",
       "rocket_radius",
@@ -43,25 +43,29 @@ describe("Currencies on the Upgrade Matrix", () => {
       "grenade_radius",
       "grenade_shrapnel",
       "grenade_blight_mult",
+      "keycard_t2",
+      "keycard_t3",
+      "ar_unlock",
+      "ar_fire_rate",
+      "grenade_unlock",
+      "rocket_damage",
     ] as const) {
-      expect(UPGRADE_BY_ID[id].currency, id).toBe("crystals");
-    }
-    // Plain upgrades and weapon unlocks stay on gold.
-    for (const id of ["ar_unlock", "ar_fire_rate", "grenade_unlock", "rocket_damage"] as const) {
       expect(UPGRADE_BY_ID[id].currency ?? "gold", id).toBe("gold");
     }
+    // Each world's exit keycard is paid in that world's own currency.
+    expect(UPGRADE_BY_ID.keycard_t6.currency).toBe("crystals");
+    expect(UPGRADE_BY_ID.keycard_t9.currency).toBe("biomass");
   });
 
   it("spends crystals, not gold, on a crystal node", () => {
     const { save, upg } = fresh();
     save.data.bank = 100_000;
-    expect(upg.buy("ar_unlock")).toBe(true);
-    const bankAfterUnlock = save.data.bank;
-    expect(upg.canBuy("ar_pierce")).toBe(false);
-    save.data.crystals = upg.costOf("ar_pierce");
-    expect(upg.buy("ar_pierce")).toBe(true);
+    const bankBefore = save.data.bank;
+    expect(upg.canBuy("tier3_dark_matter")).toBe(false);
+    save.data.crystals = upg.costOf("tier3_dark_matter");
+    expect(upg.buy("tier3_dark_matter")).toBe(true);
     expect(save.data.crystals).toBe(0);
-    expect(save.data.bank).toBe(bankAfterUnlock);
+    expect(save.data.bank).toBe(bankBefore);
   });
 });
 
@@ -111,7 +115,7 @@ describe("Soldier upgrade trees", () => {
     expect(upg.soldierBuy(0, "s_penetrator")).toBe(true);
     expect(upg.soldierBuy(0, "s_twin_fire")).toBe(true);
     expect(upg.soldierTreeLevel(0)).toBe(3);
-    expect(save.data.greenCrystals).toBe(100_000 - 30);
+    expect(save.data.greenCrystals).toBe(100_000 - 150);
   });
 
   it("saves levels per soldier and clamps bad ones", () => {

@@ -39,6 +39,9 @@ export interface NapalmPatch {
  */
 export class NapalmSystem {
   readonly patches: NapalmPatch[] = [];
+  /** Seconds unlit fuel lasts, and patch reach (Black Market research raises both). */
+  fuelLife: number = NAPALM.unlitDuration;
+  patchRadius: number = NAPALM.patchRadius;
   worldGen = 1;
   totalPlaced = 0;
   totalIgnited = 0;
@@ -107,27 +110,27 @@ export class NapalmSystem {
       if (!p.active || p.worldGen !== this.worldGen || p.ownerId !== ownerId || p.hostKind !== hostKind) continue;
       if (hostKind === "cell" && p.cx === cx && p.cy === cy) {
         p.damage = Math.max(p.damage, damage);
-        if (!p.lit) p.unlitLeft = NAPALM.unlitDuration;
+        if (!p.lit) p.unlitLeft = this.fuelLife;
         return p;
       }
       if (hostKind === "subcell" && p.sx === sx && p.sy === sy) {
         p.damage = Math.max(p.damage, damage);
-        if (!p.lit) p.unlitLeft = NAPALM.unlitDuration;
+        if (!p.lit) p.unlitLeft = this.fuelLife;
         return p;
       }
       if (hostKind === "creature" && p.creatureId === creatureId) {
         p.damage = Math.max(p.damage, damage);
-        if (!p.lit) p.unlitLeft = NAPALM.unlitDuration;
+        if (!p.lit) p.unlitLeft = this.fuelLife;
         return p;
       }
       if (hostKind === "encounter" && p.encounterId === encounterId) {
         p.damage = Math.max(p.damage, damage);
-        if (!p.lit) p.unlitLeft = NAPALM.unlitDuration;
+        if (!p.lit) p.unlitLeft = this.fuelLife;
         return p;
       }
       if (hostKind === "ground" && (p.x - x) ** 2 + (p.y - y) ** 2 <= 16) {
         p.damage = Math.max(p.damage, damage);
-        if (!p.lit) p.unlitLeft = NAPALM.unlitDuration;
+        if (!p.lit) p.unlitLeft = this.fuelLife;
         return p;
       }
     }
@@ -160,7 +163,7 @@ export class NapalmSystem {
     slot.terrainDamageBonus = terrainDamageBonus;
     slot.blightMultiplier = blightMultiplier;
     slot.lit = false;
-    slot.unlitLeft = NAPALM.unlitDuration;
+    slot.unlitLeft = this.fuelLife;
     slot.burnElapsed = 0;
     slot.ticksDone = 0;
     this.totalPlaced++;
@@ -197,7 +200,7 @@ export class NapalmSystem {
    * Status-only cold hits and Napalm's own burn ticks must NEVER call this.
    */
   igniteAt(x: number, y: number, radius: number, ignitionOwnerId: number): number {
-    const r = radius + NAPALM.patchRadius;
+    const r = radius + this.patchRadius;
     const r2 = r * r;
     let litCount = 0;
     for (const p of this.patches) {
@@ -294,13 +297,13 @@ export class NapalmSystem {
     if (p.hostKind === "cell") {
       const ci = p.cy * this.world.width + p.cx;
       const isBlight = this.world.blight[ci] > 0;
-      const dmg = (p.damage + p.terrainDamageBonus) * (isBlight ? p.blightMultiplier : 1);
+      const dmg = (p.damage + this.world.breachBonus(p.cx, p.cy, p.terrainDamageBonus)) * (isBlight ? p.blightMultiplier : 1);
       const res = this.world.damage(p.cx, p.cy, dmg, true);
       if (res > 0) this.onTerrainTick?.(p.cx, p.cy, res, false, p.cx * 2, p.cy * 2, p.ownerId);
     } else if (p.hostKind === "subcell") {
       const si = p.sy * this.world.subWidth + p.sx;
       const isPink = this.world.isPinkSub(si);
-      const dmg = (p.damage + p.terrainDamageBonus) * (isPink ? p.blightMultiplier : 1);
+      const dmg = (p.damage + this.world.breachBonusSub(p.sx, p.sy, p.terrainDamageBonus)) * (isPink ? p.blightMultiplier : 1);
       const res = this.world.damageSub(p.sx, p.sy, dmg, true);
       if (res > 0) this.onTerrainTick?.(p.sx >> 1, p.sy >> 1, res, true, p.sx, p.sy, p.ownerId);
     } else if (p.hostKind === "creature" && p.creature && creatures) {
@@ -315,14 +318,14 @@ export class NapalmSystem {
       if (this.world.inBounds(cx, cy)) {
         const ci = cy * this.world.width + cx;
         if (this.world.health[ci] > 0 && this.world.blight[ci] > 0) {
-          const res = this.world.damage(cx, cy, (p.damage + p.terrainDamageBonus) * p.blightMultiplier, true);
+          const res = this.world.damage(cx, cy, (p.damage + this.world.breachBonus(cx, cy, p.terrainDamageBonus)) * p.blightMultiplier, true);
           if (res > 0) this.onTerrainTick?.(cx, cy, res, false, cx * 2, cy * 2, p.ownerId);
         } else if (this.world.anySolidInCell(cx, cy)) {
           for (let sy = cy * 2; sy <= cy * 2 + 1; sy++) {
             for (let sx = cx * 2; sx <= cx * 2 + 1; sx++) {
               const si = sy * this.world.subWidth + sx;
               if (this.world.subHealth[si] > 0 && this.world.isPinkSub(si)) {
-                const res = this.world.damageSub(sx, sy, (p.damage + p.terrainDamageBonus) * p.blightMultiplier, true);
+                const res = this.world.damageSub(sx, sy, (p.damage + this.world.breachBonusSub(sx, sy, p.terrainDamageBonus)) * p.blightMultiplier, true);
                 if (res > 0) this.onTerrainTick?.(cx, cy, res, true, sx, sy, p.ownerId);
               }
             }
@@ -330,12 +333,12 @@ export class NapalmSystem {
         }
       }
       if (creatures) {
-        creatures.explode(p.x, p.y, NAPALM.patchRadius, p.damage);
+        creatures.explode(p.x, p.y, this.patchRadius, p.damage);
       }
       if (late) {
         for (const a of late.actors) {
           if (!a.alive || a.kind === "grove") continue;
-          const r = NAPALM.patchRadius + this.world.cellSize * (a.kind === "boss" ? 2.8 : a.kind === "brute" ? 1.2 : 0.8);
+          const r = this.patchRadius + this.world.cellSize * (a.kind === "boss" ? 2.8 : a.kind === "brute" ? 1.2 : 0.8);
           if (Math.hypot(a.x - p.x, a.y - p.y) < r) {
             late.damageEncounter(a, p.damage);
           }

@@ -141,7 +141,7 @@ export class RailLanceSystem {
           const isPink = isSub
             ? this.world.isPinkSub(sy * this.world.subWidth + sx)
             : this.world.blight[ci] > 0;
-          const totalDmg = (damage + owner.mods.terrainDamageBonus) * (isPink ? owner.mods.blightMult : 1);
+          const totalDmg = (damage + this.world.breachBonus(cx, cy, owner.mods.terrainDamageBonus)) * (isPink ? owner.mods.blightMult : 1);
           const res = isSub
             ? this.world.damageSub(sx, sy, totalDmg, true, dx, dy)
             : this.world.damage(cx, cy, totalDmg, true, dx, dy);

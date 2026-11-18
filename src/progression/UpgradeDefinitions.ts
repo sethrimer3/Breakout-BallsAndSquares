@@ -1,5 +1,7 @@
 import { BLACK_MARKET_DEFS, marketNode, type BlackMarketAccessId } from "./BlackMarket";
 import { EXPANSION_DEFS, type ExpansionUpgradeId } from "./WeaponExpansionUpgrades";
+import { MARKET_RESEARCH_DEFS, type MarketResearchId } from "./MarketResearch";
+import { CALIBRATION } from "../world/tierEconomy";
 import {
   ASSAULT_RIFLE,
   FACILITY,
@@ -35,13 +37,16 @@ export type UpgradeBranch =
   | "grenade"
   | "turret"
   | "facility"
+  | "arsenal"
   | "soldier";
 
 export type UpgradeId =
   | BlackMarketAccessId
   | ExpansionUpgradeId
+  | MarketResearchId
   | "goo_unlock" | "goo_mass" | "goo_distance"
   | "keycard_t6" | "keycard_t9"
+  | "calibration_1" | "calibration_2" | "calibration_3" | "calibration_4" | "calibration_5"
   | "connected_air_mapping"
   | "unlock_map" | "unlock_resources" | "unlock_primary" | "unlock_blight"
   | "unlock_formations" | "unlock_secondary" | "unlock_facility"
@@ -341,8 +346,8 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: -1, row: 1 },
     parent: null,
     maxLevel: 1,
-    currency: "greenCrystals",
-    baseCost: 5,
+    currency: "crystals",
+    baseCost: 60,
     costMultiplier: 1,
     valueAt: (lvl) => lvl,
     formatValue: (v) => (v > 0 ? "UNLOCKED" : "LOCKED"),
@@ -437,8 +442,8 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
   {
     id: "tier2_crystal_yield",
     branch: "resources",
-    name: "Crystal Harvester [T2]",
-    shortDesc: "+8% Zone 2 Orange Crystal yield per level",
+    name: "Crystal Harvester [W2]",
+    shortDesc: "+8% orange crystal yield per level (orange crystals drop only in the Blighted Wards)",
     color: "#ff8c2e",
     grid: { col: 1, row: 0 },
     parent: null,
@@ -446,8 +451,8 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     baseCost: 40,
     costMultiplier: 1.6,
     valueAt: (lvl) => Math.round((1 + 0.08 * lvl) * 100),
-    formatValue: (v) => `${v}% T2`,
-    formatDelta: () => "+8% T2",
+    formatValue: (v) => `${v}% W2`,
+    formatDelta: () => "+8% W2",
     apply: (s, lvl) => {
       s.crystalDropBonus = 0.08 * lvl;
     },
@@ -456,8 +461,8 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
   {
     id: "tier2_crystal_refinery",
     branch: "resources",
-    name: "Crystal Refinery [T2]",
-    shortDesc: "+10% Zone 2 Orange Crystal yield per level",
+    name: "Crystal Refinery [W2]",
+    shortDesc: "+10% orange crystal yield per level (orange crystals drop only in the Blighted Wards)",
     color: "#ff8c2e",
     grid: { col: 1, row: -1 },
     parent: "tier2_crystal_yield",
@@ -465,8 +470,8 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     baseCost: 75,
     costMultiplier: 1.75,
     valueAt: (lvl) => lvl * 10,
-    formatValue: (v) => `+${v}% T2`,
-    formatDelta: () => "+10% T2",
+    formatValue: (v) => `+${v}% W2`,
+    formatDelta: () => "+10% W2",
     apply: (s, lvl) => {
       s.crystalDropBonus += 0.1 * lvl;
     },
@@ -475,17 +480,18 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
   {
     id: "tier3_dark_matter",
     branch: "resources",
-    name: "Green Crystal Siphon [T3]",
-    shortDesc: "+10% Zone 3 Green Crystal yield per level",
+    name: "Green Crystal Siphon [W3]",
+    shortDesc: "+10% green crystal yield per level (green crystals drop only in the Canopy Forest)",
     color: "#52f296",
     grid: { col: 2, row: 0 },
     parent: "tier2_crystal_yield",
     maxLevel: 5,
-    baseCost: 150,
+    currency: "crystals",
+    baseCost: 60,
     costMultiplier: 1.85,
     valueAt: (lvl) => Math.round((1 + 0.1 * lvl) * 100),
-    formatValue: (v) => `${v}% T3`,
-    formatDelta: () => "+10% T3",
+    formatValue: (v) => `${v}% W3`,
+    formatDelta: () => "+10% W3",
     apply: (s, lvl) => {
       s.tier3ResourceBonus = 0.1 * lvl;
     },
@@ -494,17 +500,18 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
   {
     id: "tier3_quantum_extractor",
     branch: "resources",
-    name: "Quantum Extractor [T3]",
-    shortDesc: "+12% Zone 3 Green Crystal yield per level",
+    name: "Quantum Extractor [W3]",
+    shortDesc: "+12% green crystal yield per level (green crystals drop only in the Canopy Forest)",
     color: "#52f296",
     grid: { col: 2, row: 1 },
     parent: "tier3_dark_matter",
     maxLevel: 5,
-    baseCost: 220,
+    currency: "crystals",
+    baseCost: 90,
     costMultiplier: 1.95,
     valueAt: (lvl) => lvl * 12,
-    formatValue: (v) => `+${v}% T3`,
-    formatDelta: () => "+12% T3",
+    formatValue: (v) => `+${v}% W3`,
+    formatDelta: () => "+12% W3",
     apply: (s, lvl) => {
       s.tier3ResourceBonus += 0.12 * lvl;
     },
@@ -812,8 +819,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "fire_rate",
     maxLevel: 10,
-    currency: "crystals",
-    baseCost: 20,
+    baseCost: 60,
     costMultiplier: 1.7,
     valueAt: (lvl) => lvl * 5,
     formatValue: (v) => `${v}%`,
@@ -873,8 +879,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: -1, row: 0 },
     parent: "shotgun_unlock",
     maxLevel: 8,
-    currency: "crystals",
-    baseCost: 10,
+    baseCost: 30,
     costMultiplier: 1.6,
     valueAt: (lvl) => SHOTGUN.pellets + lvl,
     formatValue: (v) => `${v} PELLETS`,
@@ -951,8 +956,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: 1 },
     parent: "shotgun_choke",
     maxLevel: 6,
-    currency: "crystals",
-    baseCost: 10,
+    baseCost: 30,
     costMultiplier: 1.55,
     valueAt: (lvl) => Math.round((1 + 0.18 * lvl) * 100),
     formatValue: (v) => `${v}% RNG`,
@@ -1041,8 +1045,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: -1 },
     parent: "ar_unlock",
     maxLevel: 5,
-    currency: "crystals",
-    baseCost: 15,
+    baseCost: 45,
     costMultiplier: 1.75,
     valueAt: (lvl) => ASSAULT_RIFLE.pierce + lvl,
     formatValue: (v) => `${v} PIERCE`,
@@ -1142,8 +1145,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: -1, row: 0 },
     parent: "rocket_unlock",
     maxLevel: 6,
-    currency: "crystals",
-    baseCost: 16,
+    baseCost: 48,
     costMultiplier: 1.68,
     valueAt: (lvl) => +(ROCKET_LAUNCHER.blastRadiusCells + 0.4 * lvl).toFixed(1),
     formatValue: (v) => `${v.toFixed(1)} RAD`,
@@ -1201,8 +1203,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "rocket_unlock",
     maxLevel: 4,
-    currency: "crystals",
-    baseCost: 30,
+    baseCost: 90,
     costMultiplier: 1.9,
     valueAt: (lvl) => lvl,
     formatValue: (v) => `${v} BOMBS`,
@@ -1263,8 +1264,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: -1 },
     parent: "sniper_unlock",
     maxLevel: 6,
-    currency: "crystals",
-    baseCost: 15,
+    baseCost: 45,
     costMultiplier: 1.68,
     valueAt: (lvl) => SNIPER_RIFLE.pierce + lvl,
     formatValue: (v) => `${v} PIERCE`,
@@ -1303,8 +1303,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "sniper_unlock",
     maxLevel: 8,
-    currency: "crystals",
-    baseCost: 14,
+    baseCost: 42,
     costMultiplier: 1.62,
     valueAt: (lvl) => Math.min(100, lvl * 10),
     formatValue: (v) => `${v}% CRIT`,
@@ -1365,8 +1364,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: -1 },
     parent: "katana_unlock",
     maxLevel: 6,
-    currency: "crystals",
-    baseCost: 14,
+    baseCost: 42,
     costMultiplier: 1.65,
     valueAt: (lvl) => +(KATANA.blightMultiplier + 0.5 * lvl).toFixed(1),
     formatValue: (v) => `${v}× BLIGHT`,
@@ -1385,8 +1383,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "katana_unlock",
     maxLevel: 6,
-    currency: "crystals",
-    baseCost: 14,
+    baseCost: 42,
     costMultiplier: 1.66,
     valueAt: (lvl) => KATANA.pierce + lvl,
     formatValue: (v) => `${v} PIERCE`,
@@ -1425,8 +1422,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: 1 },
     parent: "katana_damage",
     maxLevel: 6,
-    currency: "crystals",
-    baseCost: 13,
+    baseCost: 40,
     costMultiplier: 1.62,
     valueAt: (lvl) => KATANA.slashWidth + 3 * lvl,
     formatValue: (v) => `${v} WIDTH`,
@@ -1487,8 +1483,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: -1 },
     parent: "flame_unlock",
     maxLevel: 5,
-    currency: "crystals",
-    baseCost: 12,
+    baseCost: 36,
     costMultiplier: 1.65,
     valueAt: (lvl) => Math.round(100 * (1 + 0.15 * lvl)),
     formatValue: (v) => `${v}% REACH`,
@@ -1526,8 +1521,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "flame_unlock",
     maxLevel: 4,
-    currency: "crystals",
-    baseCost: 10,
+    baseCost: 30,
     costMultiplier: 1.7,
     valueAt: (lvl) => Math.round(100 * (1 + 0.3 * lvl)),
     formatValue: (v) => `${v}% BURN`,
@@ -1569,8 +1563,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: -1 },
     parent: "grenade_unlock",
     maxLevel: 6,
-    currency: "crystals",
-    baseCost: 15,
+    baseCost: 45,
     costMultiplier: 1.6,
     valueAt: (lvl) => Math.max(30, GRENADE.energyRequired - 8 * lvl),
     formatValue: (v) => `${v} ENERGY`,
@@ -1591,8 +1584,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: 0 },
     parent: "grenade_unlock",
     maxLevel: 6,
-    currency: "crystals",
-    baseCost: 16,
+    baseCost: 48,
     costMultiplier: 1.65,
     valueAt: (lvl) => GRENADE.damage + 3 * lvl,
     formatValue: (v) => `${v} DMG`,
@@ -1611,8 +1603,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: -1, row: 0 },
     parent: "grenade_unlock",
     maxLevel: 6,
-    currency: "crystals",
-    baseCost: 16,
+    baseCost: 48,
     costMultiplier: 1.62,
     valueAt: (lvl) => +(GRENADE.blastRadiusCells + 0.4 * lvl).toFixed(1),
     formatValue: (v) => `${v.toFixed(1)} RAD`,
@@ -1631,8 +1622,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "grenade_unlock",
     maxLevel: 4,
-    currency: "crystals",
-    baseCost: 25,
+    baseCost: 75,
     costMultiplier: 1.7,
     valueAt: (lvl) => 2 * lvl,
     formatValue: (v) => `${v} FRAGS`,
@@ -1651,8 +1641,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: 1 },
     parent: "grenade_damage",
     maxLevel: 4,
-    currency: "crystals",
-    baseCost: 18,
+    baseCost: 54,
     costMultiplier: 1.65,
     valueAt: (lvl) => +(GRENADE.blightMultiplier + 0.75 * lvl).toFixed(2),
     formatValue: (v) => `${v}× BLIGHT`,
@@ -1694,8 +1683,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: 0 },
     parent: "turret_unlock",
     maxLevel: 5,
-    currency: "crystals",
-    baseCost: 20,
+    baseCost: 60,
     costMultiplier: 1.6,
     valueAt: (lvl) => TURRET.baseDamage + lvl,
     formatValue: (v) => `+${v} DMG`,
@@ -1714,8 +1702,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: -1 },
     parent: "turret_unlock",
     maxLevel: 5,
-    currency: "crystals",
-    baseCost: 18,
+    baseCost: 54,
     costMultiplier: 1.55,
     valueAt: (lvl) => Math.round(TURRET.baseFireRate * (1 + 0.2 * lvl) * 10) / 10,
     formatValue: (v) => `${v}/s`,
@@ -1734,8 +1721,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: -1, row: 0 },
     parent: "turret_unlock",
     maxLevel: 5,
-    currency: "crystals",
-    baseCost: 15,
+    baseCost: 45,
     costMultiplier: 1.5,
     valueAt: (lvl) => Math.round((TURRET.baseTurnSpeed + Math.PI * 0.25 * lvl) * (180 / Math.PI)),
     formatValue: (v) => `${v}°/s`,
@@ -1754,9 +1740,8 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 0, row: 1 },
     parent: "turret_unlock",
     maxLevel: 4,
-    currency: "crystals",
     essenceCost: 5,
-    baseCost: 60,
+    baseCost: 180,
     costMultiplier: 2.2,
     valueAt: (lvl) => 2 + lvl,
     formatValue: (v) => `${v} TURRETS`,
@@ -1800,8 +1785,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: -1 },
     parent: null,
     maxLevel: 1,
-    currency: "crystals",
-    baseCost: 45,
+    baseCost: 150,
     costMultiplier: 1,
     valueAt: (lvl) => lvl,
     formatValue: (v) => (v > 0 ? "GRANTED" : "DENIED"),
@@ -1820,9 +1804,8 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 2, row: -1 },
     parent: null,
     maxLevel: 1,
-    currency: "greenCrystals",
     essenceCost: 6,
-    baseCost: 40,
+    baseCost: 500,
     costMultiplier: 1,
     valueAt: (lvl) => lvl,
     formatValue: (v) => (v > 0 ? "GRANTED" : "DENIED"),
@@ -1860,8 +1843,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: -2, row: 0 },
     parent: "sentry_uplink",
     maxLevel: 5,
-    currency: "crystals",
-    baseCost: 20,
+    baseCost: 60,
     costMultiplier: 1.6,
     valueAt: (lvl) => FACILITY.sentryDamage + lvl,
     formatValue: (v) => `${v} DMG`,
@@ -1900,8 +1882,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 2, row: 0 },
     parent: "cartography_uplink",
     maxLevel: 5,
-    currency: "crystals",
-    baseCost: 15,
+    baseCost: 45,
     costMultiplier: 1.6,
     valueAt: (lvl) => FOG.soldierSightCells + FOG.sightPerLevel * lvl,
     formatValue: (v) => `${v} CELLS`,
@@ -1912,6 +1893,50 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     icon: "range",
   },
 ];
+
+/**
+ * Arsenal Calibration, one stage per world, each paid in that world's own
+ * currency: the squad's damage multiplier against terrain and the Blight.
+ * Numbers live in CALIBRATION (world/tierEconomy.ts); see docs/BALANCE.md.
+ */
+const CALIBRATION_PRICES: readonly { currency: Currency; base: number; mult: number }[] = [
+  { currency: "gold", base: 50, mult: 2.5 },
+  { currency: "crystals", base: 25, mult: 1.55 },
+  { currency: "greenCrystals", base: 150, mult: 2.4 },
+  { currency: "essence", base: 2000, mult: 2.5 },
+  { currency: "essence", base: 4000, mult: 2.5 },
+];
+const ROMAN = ["I", "II", "III", "IV", "V"];
+/** Each stage wears its world's currency color. */
+const CALIBRATION_COLORS = ["#ffd84d", "#ff8c2e", "#52f296", "#ff4b8b", "#ff4b8b"];
+/** Stage I hangs off the tab's hub, then the chain bends back underneath it. */
+const CALIBRATION_GRID = [{ col: 1, row: 0 }, { col: 2, row: 0 }, { col: 2, row: 1 }, { col: 1, row: 1 }, { col: 0, row: 1 }];
+const WORLD_NAMES = ["the Lab", "the Blighted Wards", "the Canopy Forest", "the Fallen City", "the Mothership"];
+
+export const CALIBRATION_DEFS: readonly UpgradeDef[] = CALIBRATION.map((stage, i): UpgradeDef => {
+  const price = CALIBRATION_PRICES[i];
+  const per = stage.perLevel;
+  return {
+    id: `calibration_${i + 1}` as UpgradeId,
+    branch: "arsenal",
+    name: `Arsenal Calibration ${ROMAN[i]}`,
+    shortDesc: `×${per.toFixed(2)} squad damage against terrain and the Blight per level, tuned for ${WORLD_NAMES[i]}. Bulkheads and enemies are unaffected.`,
+    color: CALIBRATION_COLORS[i],
+    grid: CALIBRATION_GRID[i],
+    parent: i === 0 ? null : (`calibration_${i}` as UpgradeId),
+    maxLevel: stage.levels,
+    currency: price.currency,
+    baseCost: price.base,
+    costMultiplier: price.mult,
+    valueAt: (lvl) => Math.pow(per, lvl),
+    formatValue: (v) => `×${v < 10 ? v.toFixed(2) : v.toFixed(1)}`,
+    formatDelta: () => `×${per.toFixed(2)} TERRAIN DMG`,
+    apply: (s, lvl) => {
+      s.terrainDamageMult *= Math.pow(per, Math.max(0, Math.min(stage.levels, lvl)));
+    },
+    icon: "impact",
+  };
+});
 
 /** Milestones run left-to-right, right-to-left, then left-to-right. */
 export const CORE_HUB_GRID = { col: -2.5, row: -1.5 } as const;
@@ -1961,7 +1986,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     };
     return { ...base, branch: "core", grid: { col: col - (columns - 1) / 2, row: row - (Math.ceil((CORE_PATH.length + 1) / columns) - 1) / 2 },
       parent: index > 0 ? CORE_PATH[index - 1] : null, placeholder,
-      ...(id === "keycard_t6" ? { currency: "greenCrystals" as const, essenceCost: 100, icon: "keycard" as const,
+      ...(id === "keycard_t6" ? { currency: "crystals" as const, baseCost: 3000, essenceCost: 100, icon: "keycard" as const,
         apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,6); } } : {}),
       ...(id === "keycard_t9" ? { currency: "biomass" as const, essenceCost: 2000, icon: "keycard" as const,
         apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,9); } } : {}),
@@ -1970,7 +1995,9 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
     };
   }),
   ...EXISTING_DEFS.filter((d) => !CORE_PATH.includes(d.id)),
+  ...CALIBRATION_DEFS,
   ...EXPANSION_DEFS,
+  ...MARKET_RESEARCH_DEFS,
   ...BLACK_MARKET_DEFS,
 ];
 
@@ -1984,6 +2011,7 @@ for (const access of BLACK_MARKET_DEFS) {
 
 export const BRANCH_UNLOCK: Partial<Record<UpgradeBranch, UpgradeId>> = {
   resources: "unlock_resources", blight: "unlock_blight", formations: "unlock_formations", facility: "unlock_facility",
+  arsenal: "unlock_primary",
   pistol: "unlock_primary", shotgun: "unlock_primary", squelch: "unlock_primary", assault_rifle: "unlock_primary", rocket_launcher: "unlock_primary",
   sniper_rifle: "unlock_primary", katana: "unlock_primary", flamethrower: "unlock_primary",
   grenade: "unlock_secondary", turret: "unlock_secondary",

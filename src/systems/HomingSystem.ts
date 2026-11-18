@@ -7,13 +7,13 @@ import { hasLineOfSight } from "./PhysicsSystem";
 export const HOMING = { range: 128, retargetSeconds: 0.12, turnRate: Math.PI * 1.5, minForwardDot: 0.25 } as const;
 
 /** Steering preserves speed, damage and range; movement still uses swept collisions. */
-export function steerHomingBullet(b: Bullet, dt: number, world: PixelWorld, creatures?: CreatureSystem | null, late?: LateEncounters | null): void {
+export function steerHomingBullet(b: Bullet, dt: number, world: PixelWorld, creatures?: CreatureSystem | null, late?: LateEncounters | null, range: number = HOMING.range, turnRate: number = HOMING.turnRate): void {
   if (!b.homing) return;
   b.homingCooldown -= dt;
   if (b.homingCooldown <= 0) {
     b.homingCooldown = HOMING.retargetSeconds;
     b.homingLocked = false;
-    let best = HOMING.range * HOMING.range;
+    let best = range * range;
     const consider = (x: number, y: number): void => {
       const dx=x-b.x,dy=y-b.y,d2=dx*dx+dy*dy;
       if (d2 < 1e-6 || d2 >= best || (dx*b.dx+dy*b.dy)/Math.sqrt(d2) < HOMING.minForwardDot) return;
@@ -28,8 +28,8 @@ export function steerHomingBullet(b: Bullet, dt: number, world: PixelWorld, crea
     if (late) for (const actor of late.actors) if(actor.alive&&actor.hp>0)consider(actor.x,actor.y);
     // Scan only a bounded neighborhood, and only at the acquisition cadence.
     const cs=world.cellSize,ss=world.subCellSize;
-    const x0=Math.max(0,Math.floor((b.x-HOMING.range)/cs)),x1=Math.min(world.width-1,Math.floor((b.x+HOMING.range)/cs));
-    const y0=Math.max(0,Math.floor((b.y-HOMING.range)/cs)),y1=Math.min(world.height-1,Math.floor((b.y+HOMING.range)/cs));
+    const x0=Math.max(0,Math.floor((b.x-range)/cs)),x1=Math.min(world.width-1,Math.floor((b.x+range)/cs));
+    const y0=Math.max(0,Math.floor((b.y-range)/cs)),y1=Math.min(world.height-1,Math.floor((b.y+range)/cs));
     for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){
       const i=y*world.width+x;
       if(world.boundary[i])continue;
@@ -43,6 +43,6 @@ export function steerHomingBullet(b: Bullet, dt: number, world: PixelWorld, crea
   if (!b.homingLocked) return;
   const desired=Math.atan2(b.homingY-b.y,b.homingX-b.x),current=Math.atan2(b.dy,b.dx);
   const delta=Math.atan2(Math.sin(desired-current),Math.cos(desired-current));
-  const turn=Math.max(-HOMING.turnRate*dt,Math.min(HOMING.turnRate*dt,delta));
+  const turn=Math.max(-turnRate*dt,Math.min(turnRate*dt,delta));
   b.dx=Math.cos(current+turn);b.dy=Math.sin(current+turn);
 }

@@ -38,10 +38,12 @@ export type SpawnOrbitBulletFn = (
  */
 export class OrbitCylinderSystem {
   readonly items: OrbitRound[] = [];
+  /** Rounds one carrier can hold (Black Market research raises it). */
+  maxRounds: number = ORBIT.maxRounds;
   totalLoaded = 0;
   totalReleased = 0;
 
-  constructor(poolSize = ORBIT.maxRounds * 16) {
+  constructor(poolSize = ORBIT.maxRounds * 32) {
     for (let i = 0; i < poolSize; i++) {
       this.items.push({
         active: false,
@@ -75,7 +77,7 @@ export class OrbitCylinderSystem {
   }
 
   isFull(ownerId: number): boolean {
-    return this.countFor(ownerId) >= ORBIT.maxRounds;
+    return this.countFor(ownerId) >= this.maxRounds;
   }
 
   clearFor(ownerId: number): void {
@@ -97,7 +99,7 @@ export class OrbitCylinderSystem {
     pierce: number,
   ): boolean {
     const count = this.countFor(owner.id);
-    if (count >= ORBIT.maxRounds) return false;
+    if (count >= this.maxRounds) return false;
     let slot: OrbitRound | null = null;
     for (const r of this.items) {
       if (!r.active) {
@@ -107,7 +109,7 @@ export class OrbitCylinderSystem {
     }
     if (!slot) return false;
 
-    const angle = owner.facingAngle + (count * Math.PI * 2) / ORBIT.maxRounds;
+    const angle = owner.facingAngle + (count * Math.PI * 2) / this.maxRounds;
     slot.active = true;
     slot.ownerId = owner.id;
     slot.owner = owner;

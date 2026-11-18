@@ -3,8 +3,9 @@ import type { TreeNodeDef } from "./UpgradeDefinitions";
 
 /**
  * Each soldier's own upgrade tree. Four arms grow out of the soldier: a Tier 1
- * node paid in gold, a Tier 2 node paid in orange crystals, and a Tier 3 node
- * paid in green crystals. Tier 4 specializations use outdoor biomass. Advanced nodes also cost
+ * node paid in gold (the Lab), a Tier 2 node paid in orange crystals (the
+ * Blighted Wards), and a Tier 3 node paid in green crystals (the forest).
+ * Tier 4 specializations use outdoor biomass. Advanced nodes also cost
  * Blight Essence, more at each tier and each level. Levels live on the
  * soldier's loadout slot, so two soldiers can be built differently.
  */
@@ -91,14 +92,14 @@ const TIERS = {
   2: {
     currency: "crystals",
     color: "#ff8c2e",
-    baseCost: 40,
+    baseCost: 80,
     costMultiplier: 1.6,
     essenceCost: 6,
   },
   3: {
     currency: "greenCrystals",
     color: "#52f296",
-    baseCost: 30,
+    baseCost: 150,
     costMultiplier: 1.7,
     essenceCost: 15,
   },
@@ -162,7 +163,7 @@ export const SOLDIER_UPGRADE_DEFS: readonly SoldierUpgradeDef[] = [
     essenceCost: 1500,
     name: "Siege Drill",
     shortDesc:
-      "+2,000 terrain damage per level for this soldier; does not boost damage against enemies.",
+      "+2,000 damage per level against armored bulkheads for this soldier; ordinary terrain scales with Calibration instead, and enemies are unaffected.",
     icon: "impact",
     valueAt: (l) => 2000 * l,
     formatValue: (v) => `+${v} TERRAIN`,

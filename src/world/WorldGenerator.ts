@@ -132,6 +132,7 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
   world.upgradeSpots = [];
   const def = options.labWorld ?? LAB_WORLDS[1];
   world.boundary.fill(0);
+  world.armored.fill(0);
   const frame = options.procedural ? null : labFrame(world, def);
   world.labLayout = null;
   // Distance, depth and tiers count from the world's own start.

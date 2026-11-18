@@ -78,6 +78,7 @@ export function carveLateBlueprint(w: PixelWorld, f: LabFrame, layout: LabLayout
             if (!w.inBounds(x, y)) continue;
             const i = y * w.width + x;
             w.health[i] = bulkheadHp;
+            w.armored[i] = 1;
             w.wall[i] = 0;
             w.decor[i] = 0;
           }
