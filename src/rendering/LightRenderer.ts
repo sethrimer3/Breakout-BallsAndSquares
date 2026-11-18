@@ -1,3 +1,4 @@
+import { maskScrollRegions } from "./MaskScrollRegions";
 import { hasVisibleGrowthGlows } from "./GrowthGlowVisibility";
 import { LightRegion, type ScreenRect } from "./LightRegion";
 import { visibleRoomLightIndices } from "./RoomLightIndex";
@@ -138,6 +139,8 @@ export class LightRenderer {
   } | null = null;
   private maskCanvas: HTMLCanvasElement;
   private maskCtx: CanvasRenderingContext2D;
+  private maskBackCanvas: HTMLCanvasElement | null = null;
+  private maskBackCtx: CanvasRenderingContext2D | null = null;
   private softener = new CanvasSoftener(SOFT_SHADOWS);
   /** Set per frame from the visual setting. */
   private softShadows = false;
@@ -170,6 +173,26 @@ export class LightRenderer {
     [this.wallCanvas, this.wallCtx] = makeLayer(true);
   }
 
+  /** Copy into a separate backing store: self-copying a canvas requires a
+   * browser snapshot, potentially adding another full-screen copy. */
+  private scrollMask(dx: number, dy: number, width: number, height: number): void {
+    if (!this.maskBackCanvas) [this.maskBackCanvas, this.maskBackCtx] = makeLayer(true);
+    const source = this.maskCanvas, sourceCtx = this.maskCtx;
+    this.maskCanvas = this.maskBackCanvas;
+    this.maskCtx = this.maskBackCtx!;
+    this.maskBackCanvas = source;
+    this.maskBackCtx = sourceCtx;
+    if (this.maskCanvas.width !== width || this.maskCanvas.height !== height) {
+      this.maskCanvas.width = width; this.maskCanvas.height = height;
+    }
+    const mask = this.maskCtx;
+    mask.setTransform(1, 0, 0, 1, 0, 0);
+    mask.imageSmoothingEnabled = false;
+    mask.globalCompositeOperation = "copy";
+    mask.drawImage(source, dx, dy);
+    mask.globalCompositeOperation = "source-over";
+  }
+
   /** Build the lightmap and composite it onto the scene in `ctx`. */
   renderLighting(ctx: CanvasRenderingContext2D, game: Game, dpr: number): void {
     const cam = game.camera;
@@ -181,8 +204,8 @@ export class LightRenderer {
     const viewH = Math.max(1, Math.round(cam.viewH));
     const devW = ctx.canvas.width;
     const devH = ctx.canvas.height;
-    for (const c of [this.lmCanvas, this.layerCanvas, this.maskCanvas]) {
-      if (c.width !== devW || c.height !== devH) {
+    for (const c of [this.lmCanvas, this.layerCanvas, this.maskCanvas, this.maskBackCanvas]) {
+      if (c && (c.width !== devW || c.height !== devH)) {
         c.width = devW;
         c.height = devH;
       }
@@ -195,13 +218,29 @@ export class LightRenderer {
     // are unchanged. Pending chunk work invalidates it as each chunk is built.
     const m = this.maskState, terrain = game.terrain;
     const revision = terrain.visibleOpacityRevision(cam);
-    const sameView = m && m.terrain === terrain && m.x === cam.x && m.y === cam.y && m.zoom === cam.zoom &&
+    const compatible = m && m.terrain === terrain && m.zoom === cam.zoom &&
       m.viewW === cam.viewW && m.viewH === cam.viewH && m.dpr === dpr &&
       m.width === devW && m.height === devH && m.ambient === ambient;
+    const sameView = compatible && m.x === cam.x && m.y === cam.y;
     if (!sameView || m.revision !== revision) {
-      const bounds = sameView ? terrain.opacityUpdateBounds(cam, m.opacityVersion, devW, devH, dpr)
-        : { x: 0, y: 0, width: devW, height: devH };
-      if (bounds) {
+      let regions: ScreenRect[] | null = null;
+      let scroll: { dx: number; dy: number } | null = null;
+      if (compatible) {
+        const dirty = terrain.opacityUpdateBounds(cam, m.opacityVersion, devW, devH, dpr);
+        if (sameView) regions = dirty ? [dirty] : [];
+        else {
+          const offset = terrain.opacityScrollOffset(cam, m.x, m.y, dpr);
+          if (offset) {
+            regions = offset.dx === 0 && offset.dy === 0 && offset.sameChunks
+              ? dirty ? [dirty] : []
+              : maskScrollRegions(devW, devH, offset.dx, offset.dy, dpr, dirty);
+            if (regions) scroll = offset;
+          }
+        }
+      }
+      if (regions === null) regions = [{ x: 0, y: 0, width: devW, height: devH }];
+      if (scroll && (scroll.dx !== 0 || scroll.dy !== 0)) this.scrollMask(scroll.dx, scroll.dy, devW, devH);
+      for (const bounds of regions) {
         const mask = this.maskCtx;
         const partial = bounds.x !== 0 || bounds.y !== 0 || bounds.width !== devW || bounds.height !== devH;
         mask.setTransform(1, 0, 0, 1, 0, 0);

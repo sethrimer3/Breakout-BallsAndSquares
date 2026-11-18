@@ -96,13 +96,13 @@ const destination = process.env.BREACH_REPORT || '/tmp/breach-active-render-repo
     if(target===undefined)throw Error('No damage target');const tx=target%w.width,ty=Math.floor(target/w.width);
     w.health[target]=Math.max(2,w.maxHealthAt(tx,ty));w.damage(tx,ty,1);flush();render();if(masks!==1)throw Error('Ordinary damage rebuilt mask');
     const checks=[['glass',()=>{w.mat[target]=MAT.glass;w.health[target]=Math.max(3,w.maxHealthAt(tx,ty));w.damage(tx,ty,1)}],['destruction',()=>w.damage(tx,ty,1000)],['growth',()=>w.setCell(tx,ty,10,'grown')],['pan',()=>c.x+=.1],['zoom',()=>c.zoom+=.01],['regeneration',()=>t.rebuildAll()],['resize',()=>c.viewW-=1]];
-    for(const [label,change]of checks){const before=masks;change();flush();render();if(masks<=before)throw Error(label+' did not rebuild mask');fixedDraw(()=>old.draw());
+    for(const [label,change]of checks){const before=lr.maskState;change();flush();render();if(lr.maskState===before)throw Error(label+' did not refresh mask state');fixedDraw(()=>old.draw());
       const aa=old.lightRenderer.maskCtx.getImageData(0,0,g.canvas.width,g.canvas.height).data;
       const bb=lr.maskCtx.getImageData(0,0,g.canvas.width,g.canvas.height).data;
       let channels=0,maxDelta=0;for(let i=3;i<aa.length;i+=4){const d=Math.abs(aa[i]-bb[i]);if(d){channels++;maxDelta=Math.max(maxDelta,d)}}
       pixels.push({label:'mask-alpha-'+label,channels,maxDelta});if(channels)throw Error('Mask alpha differs: '+label);
     }
-    const invalidation={ordinaryDamageRebuilds:0,checks:checks.map(x=>x[0]),maskRebuilds:masks};t.draw=draw;
+    const invalidation={ordinaryDamageRebuilds:0,checks:checks.map(x=>x[0]),maskTerrainDrawCalls:masks};t.draw=draw;
     // Undo the synthetic material and keep a durable opaque target for HP hits.
     w.mat[target]=MAT.none;w.blight[target]=0;w.health[target]=100;t.chunks.markCell(tx,ty);flush();
     c.viewW=innerWidth;c.viewH=innerHeight;

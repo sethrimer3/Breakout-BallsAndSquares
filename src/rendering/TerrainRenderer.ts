@@ -689,6 +689,30 @@ export class TerrainRenderer {
     return revision;
   }
 
+  /** A scroll is exact only when both ends of every visible chunk translate
+   * equally, with no device-pixel resampling. Fractional zoom can reject it. */
+  opacityScrollOffset(cam: CameraSystem, oldX: number, oldY: number, dpr: number): { dx: number; dy: number; sameChunks: boolean } | null {
+    const unit = this.world.cellSize * this.chunks.chunkSize;
+    const x0 = Math.max(0, Math.floor(((0 - cam.viewW / 2) / cam.zoom + oldX) / unit));
+    const x1 = Math.min(this.chunks.cols - 1, Math.floor(((cam.viewW - cam.viewW / 2) / cam.zoom + oldX) / unit));
+    const y0 = Math.max(0, Math.floor(((0 - cam.viewH / 2) / cam.zoom + oldY) / unit));
+    const y1 = Math.min(this.chunks.rows - 1, Math.floor(((cam.viewH - cam.viewH / 2) / cam.zoom + oldY) / unit));
+    let dx: number | undefined, dy: number | undefined, valid = true, sameChunks = true, count = 0;
+    this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
+      const oldLeft = Math.round((kx * unit - oldX) * cam.zoom + cam.viewW / 2);
+      const oldRight = Math.round(((kx + 1) * unit - oldX) * cam.zoom + cam.viewW / 2);
+      const oldTop = Math.round((ky * unit - oldY) * cam.zoom + cam.viewH / 2);
+      const oldBottom = Math.round(((ky + 1) * unit - oldY) * cam.zoom + cam.viewH / 2);
+      dx ??= sx - oldLeft; dy ??= sy - oldTop;
+      if (sx - oldLeft !== dx || sx + sw - oldRight !== dx || sy - oldTop !== dy || sy + sh - oldBottom !== dy) valid = false;
+      if (kx < x0 || kx > x1 || ky < y0 || ky > y1) sameChunks = false;
+      count++;
+    });
+    if (!valid || dx === undefined || dy === undefined || !Number.isInteger(dx * dpr) || !Number.isInteger(dy * dpr)) return null;
+    sameChunks &&= count === Math.max(0, x1 - x0 + 1) * Math.max(0, y1 - y0 + 1);
+    return { dx: dx * dpr, dy: dy * dpr, sameChunks };
+  }
+
   /** Device-pixel union of opacity tiles changed since this mask's last build.
    * Revisions are persistent, so skipped frames and independent views are safe. */
   opacityUpdateBounds(cam: CameraSystem, since: number, width: number, height: number, dpr: number): ScreenRect | null {

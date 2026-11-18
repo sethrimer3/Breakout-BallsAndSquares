@@ -1,6 +1,6 @@
 /* Full Game.step + terrain + shadows + rendering with real generator replication.
  * Vite required. BREACH_BASELINE_REF, BREACH_REPORT, BREACH_SAMPLES (>=20),
- * BREACH_DEVICES and BREACH_RATES (comma-separated multipliers) are optional. */
+ * BREACH_DEVICES, BREACH_RATES, BREACH_ZOOMS and BREACH_CAMERAS (comma-separated) are optional. */
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
 let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/node_modules/playwright')}
 const root=path.resolve(__dirname,'..'),ref=cp.execFileSync('git',['rev-parse',process.env.BREACH_BASELINE_REF||'HEAD'],{cwd:root,encoding:'utf8'}).trim();
@@ -21,7 +21,7 @@ const pct=a=>{a.sort((a,b)=>a-b);return{p50:a[Math.floor(a.length*.5)],p95:a[Mat
    await p.goto(url,{waitUntil:'domcontentloaded'});await p.waitForFunction(()=>!!window.__game);
    await p.evaluate(async()=>{const g=window.__game,raf=requestAnimationFrame.bind(window);g.paused=true;g.mainMenu.hide();window.requestAnimationFrame=()=>0;await new Promise(r=>raf(()=>raf(r)));window.__growthBench={g,raf,clock:performance.now.bind(performance)};});
   }
-  for(const multiplier of (process.env.BREACH_RATES||'.05,1,4').split(',').map(Number))for(const moving of [false,true])for(const zoom of [.5,1.13]){
+  for(const multiplier of (process.env.BREACH_RATES||'.05,1,4').split(',').map(Number))for(const moving of (process.env.BREACH_CAMERAS||'stationary,moving').split(',').map(v=>v==='moving'))for(const zoom of (process.env.BREACH_ZOOMS||'.5,1.13').split(',').map(Number)){
    for(const p of pages)await p.evaluate(({multiplier,zoom})=>{
     const {g}=window.__growthBench;g.save.data.seed='GROWTH42';g.rng.s=305419896;g.startRun();g.paused=true;g.mainMenu.hide();
     g.save.data.settings.renderQuality='high';g.save.data.settings.softShadows=false;g.save.data.settings.fieryMuzzleFlash=false;g.save.data.settings.alwaysShootWhenAutoMoveOff=false;g.renderer.resize();

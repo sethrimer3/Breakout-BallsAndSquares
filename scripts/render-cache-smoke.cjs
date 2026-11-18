@@ -19,17 +19,17 @@ for(const scale of [1,1.25,2])for(const zoom of [.5,1.13,2]){
  let diff=0;for(let i=0;i<x.length;i++)if(x[i]!==y[i])diff++;
  comparisons.push({scale,zoom,diff});if(diff)throw Error(JSON.stringify(comparisons));
 }
-const lr=g.renderer.lightRenderer,draw=t.draw;let masks=0;
+const lr=g.renderer.lightRenderer,draw=t.draw;let masks=0,refreshes=0;
 t.draw=function(ctx,...args){if(ctx===lr.maskCtx)masks++;return draw.call(this,ctx,...args)};
 lr.maskState=null;const ctx=g.canvas.getContext('2d');
-const render=()=>lr.renderLighting(ctx,g,1);
-render();render();if(masks!==1)throw Error('Unchanged mask was not reused');
-c.x+=1;render();if(masks!==2)throw Error('Pan did not invalidate mask');
-c.zoom+=.01;render();if(masks!==3)throw Error('Zoom did not invalidate mask');
-t.chunks.markCell(g.world.roomX0,g.world.roomY0);t.update();render();if(masks!==4)throw Error('Terrain update did not invalidate mask');
-t.rebuildAll();render();if(masks!==5)throw Error('Regeneration did not invalidate mask');
-lr.renderLighting(ctx,g,1.25);if(masks!==6)throw Error('Device scale did not invalidate mask');
-c.viewW-=1;render();if(masks!==7)throw Error('Viewport did not invalidate mask');
-return{comparisons,maskRebuilds:masks};});
+const render=(dpr=1)=>{const before=lr.maskState;lr.renderLighting(ctx,g,dpr);if(lr.maskState!==before)refreshes++};
+render();render();if(refreshes!==1)throw Error('Unchanged mask was not reused');
+c.x+=1;render();if(refreshes!==2)throw Error('Pan did not invalidate mask');
+c.zoom+=.01;render();if(refreshes!==3)throw Error('Zoom did not invalidate mask');
+t.chunks.markCell(g.world.roomX0,g.world.roomY0);t.update();render();if(refreshes!==4)throw Error('Terrain update did not invalidate mask');
+t.rebuildAll();render();if(refreshes!==5)throw Error('Regeneration did not invalidate mask');
+render(1.25);if(refreshes!==6)throw Error('Device scale did not invalidate mask');
+c.viewW-=1;render();if(refreshes!==7)throw Error('Viewport did not invalidate mask');
+return{comparisons,maskRebuilds:refreshes,maskTerrainDrawCalls:masks};});
 assert.ok(result.comparisons.every(x=>x.diff===0));console.log(JSON.stringify(result));
 }finally{await browser.close()}})().catch(e=>{console.error(e);process.exitCode=1});
