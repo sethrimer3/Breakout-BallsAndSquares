@@ -1,6 +1,5 @@
 import { accessId, WEAPON_MARKETS } from "./BlackMarket";
 import { RENDER_QUALITIES, type RenderQuality } from "../rendering/RenderScale";
-import { parseProfileSeed, randomProfileSeed } from "../core/ProfileSeed";
 import type { SpeedrunData } from "../core/SpeedrunTimer";
 import { parseLateMarkers, sectorCount, sectorTier } from "../world/labMap";
 import { clamp } from "../core/math";
@@ -13,7 +12,8 @@ import { UPGRADE_DEFS, upgradePrices, type UpgradeId } from "./UpgradeDefinition
 export const SAVE_KEY = "breach.save.v1";
 export const SAVE_VERSION = 1;
 export const SAVE_SLOTS_COUNT = 3;
-export const NEW_PROFILE_SEED_KEY = "breach.new_profile_seed.v1";
+/** Old per-install "seed for new saves" setting; only removed now. */
+export const LEGACY_NEW_PROFILE_SEED_KEY = "breach.new_profile_seed.v1";
 export const ACTIVE_SLOT_KEY = "breach.active_slot.v1";
 
 export function getSlotKey(slot: number): string {
@@ -105,8 +105,6 @@ export const MUZZLE_FLASH_MULTIPLIER: Record<MuzzleFlashLevel, number> = {
 };
 
 export interface SaveData {
-  /** Fixed generation code for this profile. */
-  seed: string;
   speedrun: SpeedrunData;
   version: number;
   bank: number;
@@ -189,7 +187,7 @@ function defaultLab(): SaveData["lab"] {
   return { world: 1, unlocked: 1, lateLayout: 1, worlds };
 }
 
-export function defaultSaveData(seed = randomProfileSeed()): SaveData {
+export function defaultSaveData(): SaveData {
   const upgrades = {} as Record<UpgradeId, number>;
   for (const d of UPGRADE_DEFS) upgrades[d.id] = 0;
   const loadouts: SoldierLoadout[] = [];
@@ -197,7 +195,6 @@ export function defaultSaveData(seed = randomProfileSeed()): SaveData {
     loadouts.push({ weapon: "pistol", mutation: null, secondary: null, behavior: "free", equipment: [null, null], upgrades: {} });
   }
   return {
-    seed,
     speedrun: { enabled: false, elapsedMs: 0 },
     version: SAVE_VERSION,
     bank: 0,
@@ -341,7 +338,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
   if (!raw || typeof raw !== "object") return def;
   const obj = raw as Record<string, unknown>;
 
-  def.seed = parseProfileSeed(obj.seed) ?? def.seed;
+  // Old saves carry a per-profile `seed`; maps are fixed now, so it is dropped.
   if (obj.speedrun && typeof obj.speedrun === "object") {
     const timer = obj.speedrun as Record<string, unknown>;
     def.speedrun.enabled = timer.enabled === true;
@@ -655,7 +652,6 @@ export interface StorageLike {
 export interface SlotSummary {
   slot: number;
   exists: boolean;
-  seed: string | null;
   speedrun: SpeedrunData;
   bank: number;
   crystals: number;
@@ -677,7 +673,7 @@ export class SaveManager {
   /** Remove every BREACH save slot and setting, leaving other apps' storage alone. */
   deleteAllData(): void {
     if (this.storage) {
-      for (const key of [SAVE_KEY, getSlotKey(2), getSlotKey(3), ACTIVE_SLOT_KEY, NEW_PROFILE_SEED_KEY]) {
+      for (const key of [SAVE_KEY, getSlotKey(2), getSlotKey(3), ACTIVE_SLOT_KEY, LEGACY_NEW_PROFILE_SEED_KEY]) {
         if (this.storage.removeItem) this.storage.removeItem(key);
         else this.storage.setItem(key, "");
       }
@@ -691,24 +687,8 @@ export class SaveManager {
     this.data = this.loadSlot(this.activeSlot);
   }
 
-  /** Installation-wide default, applied only when a new profile is created. */
-  get newProfileSeed(): string {
-    try { return parseProfileSeed(this.storage?.getItem(NEW_PROFILE_SEED_KEY)) ?? ""; }
-    catch { return ""; }
-  }
-
-  setNewProfileSeed(value: string): boolean {
-    const seed = value.trim() === "" ? "" : parseProfileSeed(value);
-    if (seed === null) return false;
-    try { this.storage?.setItem(NEW_PROFILE_SEED_KEY, seed); }
-    catch { return false; }
-    // An empty slot is only a preview until initialized or first saved.
-    if (!this.slotExists(this.activeSlot)) this.data.seed = seed || randomProfileSeed();
-    return true;
-  }
-
   private freshSave(): SaveData {
-    return defaultSaveData(this.newProfileSeed || randomProfileSeed());
+    return defaultSaveData();
   }
 
   private readActiveSlot(): number {
@@ -743,13 +723,7 @@ export class SaveManager {
       const raw = this.storage.getItem(this.getSlotKey(slot));
       if (!raw || raw.trim() === "") return this.freshSave();
       const parsed = JSON.parse(raw);
-      const data = sanitizeSaveData(parsed);
-      // Assign legacy profiles a code once, including when inspected from the menu.
-      if (parsed && typeof parsed === "object" && parsed.seed !== data.seed) {
-        try { this.storage.setItem(this.getSlotKey(slot), JSON.stringify(data)); }
-        catch { /* Keep loaded progress usable even when storage is read-only. */ }
-      }
-      return data;
+      return sanitizeSaveData(parsed);
     } catch (err) {
       console.warn(`BREACH: corrupted save data in slot ${slot}, resetting to defaults.`, err);
       return this.freshSave();
@@ -829,7 +803,6 @@ export class SaveManager {
       return {
         slot,
         exists: false,
-        seed: null,
         speedrun: { enabled: false, elapsedMs: 0 },
         bank: 0,
         crystals: 0,
@@ -856,7 +829,6 @@ export class SaveManager {
     return {
       slot,
       exists: true,
-      seed: data.seed,
       speedrun: { ...data.speedrun },
       bank: data.bank,
       crystals: data.crystals,

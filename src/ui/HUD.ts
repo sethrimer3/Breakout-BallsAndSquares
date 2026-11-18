@@ -235,7 +235,7 @@ export class HUD {
     this.fields.time.textContent = fmtTime(s.time);
     this.boxes.speedrun.classList.toggle("hidden", !game.save.data.speedrun.enabled);
     this.fields.speedrun.textContent = formatSpeedrunTime(game.save.data.speedrun.elapsedMs);
-    this.boxes.speedrun.title = `Profile seed ${game.save.data.seed} · total active run time`;
+    this.boxes.speedrun.title = "Total active run time";
     this.fields.pixels.textContent = s.pixelsDestroyed.toLocaleString();
     this.fields.currency.textContent = s.currency.toLocaleString();
 

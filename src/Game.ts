@@ -4,7 +4,7 @@ import { lateBlockReward } from "./world/campaignBalance";
 import { BULLET, CAMERA, COLORS, FACILITY, FOG, GROWTH, LIGHT, LOOT, SIM, SOLDIER, TERRAIN, WORLD } from "./config";
 import { AudioSystem } from "./audio/AudioSystem";
 import { fireAmbienceMix } from "./audio/fireAmbience";
-import { profileWorldSeed } from "./core/ProfileSeed";
+import { labWorldSeed } from "./core/WorldSeed";
 import { SpeedrunTimer } from "./core/SpeedrunTimer";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
@@ -645,7 +645,7 @@ export class Game {
     const def = this.labDef;
     const lab = this.labSave;
     if (!this.canDeployInto(lab.spawn)) lab.spawn = def.start;
-    generateWorld(this.world, profileWorldSeed(this.save.data.seed, def.id), { conquered: this.labProgress.conquered, labWorld: def, spawn: lab.spawn });
+    generateWorld(this.world, labWorldSeed(def.id), { conquered: this.labProgress.conquered, labWorld: def, spawn: lab.spawn });
     this.labProgress.attach(this.world);
     this.creatures.flowerMult = def.alien ? FACILITY.alienFlowerMult : 1;
     this.gateNotice = null;
