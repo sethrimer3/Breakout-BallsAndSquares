@@ -629,7 +629,8 @@ export class UpgradeTree {
       }
     }
     const market = marketFor(tab);
-    const discovery = market?.unlock ?? (tab === "grenade" ? "grenade_unlock" : null);
+    const discovery =
+      market?.unlock ?? (tab === "grenade" ? "grenade_unlock" : tab === "turret" ? "turret_unlock" : null);
     if (!this.inLoadoutScreen && discovery && this.game.upgrades.needsFinding(discovery)) this.subEl.textContent = "??? — FIND UPGRADE IN THE LAB";
     this.tabsEl.classList.toggle("hidden", this.inLoadoutScreen);
     // Keeps its height on other tabs so the panel doesn't jump when switching.
@@ -1240,7 +1241,6 @@ export class UpgradeTree {
         (branch === "flamethrower" && def.id !== "flame_unlock" && u.levelOf("flame_unlock") === 0) ||
         (branch === "grenade" && def.id !== "grenade_unlock" && u.levelOf("grenade_unlock") === 0) ||
         (branch === "turret" && def.id !== "turret_unlock" && u.levelOf("turret_unlock") === 0);
-      const rem = Math.max(0, def.unlockLifetimePixels - this.game.lifetimePixels);
       let prerequisite = def.parent;
       while (branch === "core" && prerequisite && treeDef(prerequisite).placeholder) prerequisite = treeDef(prerequisite).parent;
       const needParent =
@@ -1248,8 +1248,6 @@ export class UpgradeTree {
       const lockMsg =
         def.id === "prism_overload" && u.levelOf("prism_spectrum") < 6
           ? "LOCKED — Requires Spectrum Ascension VI"
-          : rem > 0
-          ? `LOCKED — Destroy ${def.unlockLifetimePixels} lifetime pixels (${rem} more)`
           : needCenter
             ? `LOCKED — Unlock this weapon at the center node first`
             : needParent
@@ -1429,12 +1427,17 @@ export class UpgradeTree {
 
       const sBtnsHtml = secondaryDefs
         .map(
-          (sec) => `
-            <button class="lc-sbtn ${curS === sec.id ? "equipped" : ""} ${!sec.unlocked ? "locked" : ""}" data-slot="${i}" data-secondary="${sec.id ?? ""}" title="${sec.id === "grenade" && this.game.upgrades.needsFinding("grenade_unlock") ? "???" : sec.label}" ${!sec.unlocked ? "disabled" : ""}>
+          (sec) => {
+            const unknown =
+              (sec.id === "grenade" && this.game.upgrades.needsFinding("grenade_unlock")) ||
+              (sec.id === "turret" && this.game.upgrades.needsFinding("turret_unlock"));
+            return `
+            <button class="lc-sbtn ${curS === sec.id ? "equipped" : ""} ${!sec.unlocked ? "locked" : ""}" data-slot="${i}" data-secondary="${sec.id ?? ""}" title="${unknown ? "???" : sec.label}" ${!sec.unlocked ? "disabled" : ""}>
               ${sprite(sec.icon, { color: sec.unlocked ? (curS === sec.id ? "#ffd84d" : "#ff9d3b") : "#6d8197", scale: 1 })}
-              ${sec.unlocked ? `<span class="lc-sname">${sec.label}</span>` : `<span class="lc-sname">${sec.id === "grenade" && this.game.upgrades.needsFinding("grenade_unlock") ? "???" : lockIcon()}</span>`}
+              ${sec.unlocked ? `<span class="lc-sname">${sec.label}</span>` : `<span class="lc-sname">${unknown ? "???" : lockIcon()}</span>`}
             </button>
-          `,
+          `;
+          },
         )
         .join("");
 
@@ -1603,7 +1606,8 @@ export class UpgradeTree {
       const weapon = tabLocks.find(([id]) => id === branch);
       button.disabled = !this.game.upgrades.isBranchUnlocked(branch);
       const market = marketFor(branch);
-      const discovery = market?.unlock ?? (branch === "grenade" ? "grenade_unlock" : null);
+      const discovery =
+        market?.unlock ?? (branch === "grenade" ? "grenade_unlock" : branch === "turret" ? "turret_unlock" : null);
       const unknown = !!discovery && this.game.upgrades.needsFinding(discovery);
       button.innerHTML = button.disabled || unknown ? `${lockIcon()} ???` : tabHtml(branch, weapon?.[1] ?? label, weapon ? !weapon[2] : false);
       button.title = button.disabled ? "Locked — unlock on the Core path" : "";

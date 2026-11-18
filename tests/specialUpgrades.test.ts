@@ -4,9 +4,9 @@ import type { PixelWorld } from "../src/world/PixelWorld";
 import type { Soldier } from "../src/entities/Soldier";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { UpgradeManager } from "../src/progression/UpgradeManager";
-import { SPECIAL_UNLOCKS, specialWorld } from "../src/progression/specialUnlocks";
-import { UPGRADE_BY_ID } from "../src/progression/UpgradeDefinitions";
-import { LAB_WORLDS } from "../src/world/labMap";
+import { SPECIAL_UNLOCKS, specialSpotFor, specialWorld } from "../src/progression/specialUnlocks";
+import { CORE_PATH, UPGRADE_BY_ID } from "../src/progression/UpgradeDefinitions";
+import { LAB_WORLDS, parseLateMarkers, sectorTier, upgradeSpotSector } from "../src/world/labMap";
 import { unlockTabs } from "./helpers/progression";
 
 class MemStorage implements StorageLike {
@@ -67,13 +67,38 @@ describe("special upgrade blocks", () => {
 
 describe("special upgrade unlocks", () => {
   it("map every lab spot to a real upgrade, each at most once", () => {
-    const spots = Object.values(LAB_WORLDS).flatMap((w) => w.upgrades.map((u) => u.id));
+    const spots = Object.values(LAB_WORLDS).flatMap((w) => {
+      if (!w.framework) return w.upgrades.map((u) => u.id);
+      let idx = 0;
+      return parseLateMarkers(w.blueprint)
+        .filter((m) => m.kind === "special")
+        .map(() => `z${w.id}-special-${++idx}`);
+    });
     for (const [spot, id] of Object.entries(SPECIAL_UNLOCKS)) {
       expect(spots).toContain(spot);
       expect(UPGRADE_BY_ID[id]).toBeDefined();
-      expect(LAB_WORLDS[specialWorld(spot)].upgrades.some((u) => u.id === spot)).toBe(true);
+      const w = LAB_WORLDS[specialWorld(spot)];
+      if (!w.framework) {
+        expect(w.upgrades.some((u) => u.id === spot)).toBe(true);
+      }
     }
     expect(new Set(Object.values(SPECIAL_UNLOCKS)).size).toBe(Object.keys(SPECIAL_UNLOCKS).length);
+  });
+
+  it("places all core upgrades on the map and puts secondary weapons in Tier 4 after Tier 3 keycard", () => {
+    for (const id of CORE_PATH) {
+      if (!UPGRADE_BY_ID[id].placeholder) {
+        expect(specialSpotFor(id), `core upgrade ${id} must have a golden block`).toBeDefined();
+      }
+    }
+    expect(CORE_PATH.indexOf("unlock_secondary")).toBeGreaterThan(CORE_PATH.indexOf("keycard_t3"));
+    for (const id of ["unlock_secondary", "grenade_unlock", "turret_unlock"] as const) {
+      const spotId = specialSpotFor(id)!;
+      expect(specialWorld(spotId)).toBe(2);
+      const def = LAB_WORLDS[2];
+      const spot = def.upgrades.find((u) => u.id === spotId)!;
+      expect(sectorTier(def, upgradeSpotSector(def, spot))).toBe(4);
+    }
   });
 
   it("keep an upgrade unbuyable until its block is found, and survive a reload", () => {

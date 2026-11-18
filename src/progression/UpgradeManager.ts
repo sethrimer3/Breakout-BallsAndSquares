@@ -70,7 +70,6 @@ export class UpgradeManager {
       while (parent && UPGRADE_BY_ID[parent].placeholder) parent = UPGRADE_BY_ID[parent].parent;
       if (parent && this.levelOf(parent) === 0) return false;
     }
-    if (this.save.data.lifetimePixels < def.unlockLifetimePixels) return false;
     if (def.id === "gale_range" && this.levelOf("gale_unlock") === 0) return false;
     if (def.id.startsWith("drone_") && def.id !== "drone_unlock" && this.levelOf("drone_unlock") === 0) return false;
     if (def.id.startsWith("prism_") && def.id !== "prism_unlock" && this.levelOf("prism_unlock") === 0) return false;
@@ -109,8 +108,10 @@ export class UpgradeManager {
 
   /** True while `id` is still hidden in an unfound gold special-upgrade block. */
   needsFinding(id: UpgradeId): boolean {
-    const market = marketFor(UPGRADE_BY_ID[id].branch);
-    const discovery = market?.unlock ?? (UPGRADE_BY_ID[id].branch === "grenade" ? "grenade_unlock" : null);
+    const branch = UPGRADE_BY_ID[id].branch;
+    const market = marketFor(branch);
+    const discovery =
+      market?.unlock ?? (branch === "grenade" ? "grenade_unlock" : branch === "turret" ? "turret_unlock" : null);
     return needsSpecial(this.save.data, id) || !!(discovery && needsSpecial(this.save.data, discovery));
   }
 

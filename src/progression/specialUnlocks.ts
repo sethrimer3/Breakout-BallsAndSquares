@@ -9,12 +9,27 @@ import type { UpgradeId } from "./UpgradeDefinitions";
 export const SPECIAL_UNLOCKS: Readonly<Record<string, UpgradeId>> = {
   "z1-special-1": "shotgun_unlock",
   "z1-special-2": "ar_unlock",
-  "z1-special-3": "grenade_unlock",
+  "z1-special-3": "unlock_facility",
   "z1-special-4": "sniper_unlock",
+  "z1-core-keycard-t1": "keycard_t1",
+  "z1-core-map": "unlock_map",
+  "z1-core-air": "connected_air_mapping",
+  "z1-core-resources": "unlock_resources",
+  "z1-core-soldier": "extra_soldier",
+  "z1-core-primary": "unlock_primary",
+  "z1-core-blight": "unlock_blight",
+  "z1-core-keycard-t2": "keycard_t2",
+  "z1-core-formations": "unlock_formations",
+  "z1-core-keycard-t3": "keycard_t3",
   "z2-special-1": "rocket_unlock",
   "z2-special-2": "katana_unlock",
   "z2-special-3": "flame_unlock",
   "z2-special-4": "auto_ability",
+  "z2-core-secondary": "unlock_secondary",
+  "z2-secondary-grenade": "grenade_unlock",
+  "z2-secondary-turret": "turret_unlock",
+  "z2-core-keycard-t6": "keycard_t6",
+  "z3-special-1": "keycard_t9",
 };
 
 /** Lab world each spot id lives in (from its "zN-" prefix). */

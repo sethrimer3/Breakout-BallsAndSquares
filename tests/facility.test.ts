@@ -11,6 +11,7 @@ import { GlassSystem } from "../src/world/GlassSystem";
 import { GrowthSystem } from "../src/world/GrowthSystem";
 import { MAT, PixelWorld, SUB } from "../src/world/PixelWorld";
 import { generateWorld } from "../src/world/WorldGenerator";
+import { findAllSpecials } from "./helpers/progression";
 
 class MemStorage {
   private m = new Map<string, string>();
@@ -131,6 +132,7 @@ describe("research base facility", () => {
 
   it("gates keycards along the Core path", () => {
     const save = new SaveManager(new MemStorage());
+    findAllSpecials(save.data);
     const upg = new UpgradeManager(save);
     save.data.lifetimePixels = 10000;
     save.data.bank = 10000;

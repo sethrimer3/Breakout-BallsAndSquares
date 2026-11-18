@@ -29,7 +29,7 @@ function node(id: ExpansionUpgradeId, branch: UpgradeBranch, name: string, desc:
   const isPrism = id.startsWith("prism_");
   const isDrone = id.startsWith("drone_");
   return { id, branch, name, shortDesc: desc, grid: { col, row }, maxLevel: levels,
-    baseCost: cost, costMultiplier: levels === 1 ? 1 : 1.65, unlockLifetimePixels: isDrone ? 120 : isPrism ? 200 : 80,
+    baseCost: cost, costMultiplier: levels === 1 ? 1 : 1.65,
     color: isGoo ? "#9cde68" : isPrism ? "#d37cff" : "#38d6ff",
     apply, valueAt: value, formatValue: format, formatDelta: () => desc, parent, currency,
     icon: isGoo ? "grenade" : isDrone ? "turret" : branch === "katana" ? "katana" : "bulletFast" };

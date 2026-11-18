@@ -48,26 +48,22 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(s4.data.upgrades.extra_soldier).toBe(UPGRADE_BY_ID.extra_soldier.maxLevel);
   });
 
-  it("gates Multishot at 40 lifetime pixels and Additional Soldier at 100", () => {
+  it("unlocks Multishot without lifetime pixels and gates Additional Soldier behind its golden block", () => {
     const save = new SaveManager(new MemStorage());
     unlockTabs(save);
-    const upg = new UpgradeManager(save); findAllSpecials(save.data);
+    const upg = new UpgradeManager(save);
     save.data.bank = 10_000; save.data.crystals = 10_000;
+
+    expect(upg.isUnlocked("extra_soldier")).toBe(false);
+    findAllSpecials(save.data);
 
     expect(upg.isUnlocked("keycard_t1")).toBe(true);
     expect(upg.isUnlocked("fire_rate")).toBe(true);
     expect(upg.isUnlocked("bullet_speed")).toBe(true);
     expect(upg.isUnlocked("bullet_damage")).toBe(true);
-    expect(upg.isUnlocked("multishot")).toBe(false);
-    expect(upg.isUnlocked("extra_soldier")).toBe(false);
-    expect(upg.buy("multishot")).toBe(false);
-
-    save.data.lifetimePixels = 40;
     expect(upg.isUnlocked("multishot")).toBe(true);
-    expect(upg.isUnlocked("extra_soldier")).toBe(false);
     expect(upg.buy("multishot")).toBe(true);
 
-    save.data.lifetimePixels = 100;
     expect(upg.isUnlocked("extra_soldier")).toBe(true);
     expect(upg.buy("extra_soldier")).toBe(true);
     expect(upg.getSoldierStats().maxSoldiers).toBe(2);

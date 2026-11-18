@@ -133,7 +133,6 @@ function node(spec: NodeSpec): SoldierUpgradeDef {
     grid: { col: spec.col, row: spec.row },
     parent: spec.parent,
     maxLevel: spec.maxLevel,
-    unlockLifetimePixels: 0,
     icon: spec.icon,
     valueAt: spec.valueAt,
     formatValue: spec.formatValue,

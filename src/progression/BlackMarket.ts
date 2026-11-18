@@ -42,6 +42,6 @@ export const BLACK_MARKET_DEFS: readonly UpgradeDef[] = WEAPON_MARKETS.map(m=>({
   id:accessId(m.weapon),branch:m.weapon,name:"Black Market",
   shortDesc:"Open this weapon's Black Market tree. Choose one mutation path; pay again to switch sides.",
   color:"#ff4b8b",grid:{col:2,row:-1},parent:m.unlock,maxLevel:1,baseCost:20,costMultiplier:1,
-  currency:"essence",unlockLifetimePixels:0,icon:m.icon,
+  currency:"essence",icon:m.icon,
   apply:()=>{},valueAt:l=>l,formatValue:l=>l?"OPEN":"LOCKED",formatDelta:()=>"OPEN BLACK MARKET",
 }));

@@ -40,7 +40,8 @@ describe("Core progression", () => {
       expect(upg.buy(id), id).toBe(true);
       if (id.startsWith("unlock_") && id !== "unlock_map") opened.push(id);
     }
-    expect(opened).toEqual(["unlock_resources", "unlock_primary", "unlock_blight", "unlock_formations", "unlock_secondary", "unlock_facility"]);
+    expect(opened).toEqual(["unlock_resources", "unlock_primary", "unlock_blight", "unlock_formations", "unlock_facility", "unlock_secondary"]);
+    expect(CORE_PATH.indexOf("unlock_secondary")).toBeGreaterThan(CORE_PATH.indexOf("keycard_t3"));
     expect(upg.canBuy("fire_rate")).toBe(true);
     expect(upg.getSoldierStats().keycardTier).toBe(9);
   });

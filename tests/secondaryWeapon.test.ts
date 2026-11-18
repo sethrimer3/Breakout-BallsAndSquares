@@ -50,19 +50,20 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
     expect(v.s).toBe(1);
   });
 
-  it("Gates Grenade child upgrades behind center unlock node and lifetime pixels", () => {
+  it("Gates Grenade behind finding its golden block and gates child upgrades behind center unlock node", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const upg = new UpgradeManager(save); findAllSpecials(save.data);
+    const upg = new UpgradeManager(save);
+    save.data.bank = 1000; save.data.crystals = 100_000;
 
-    // Initial state: 0 pixels destroyed, 0 bank
+    // Locked until its Tier 4 golden block is found
+    expect(upg.needsFinding("grenade_unlock")).toBe(true);
     expect(upg.isUnlocked("grenade_unlock")).toBe(false);
     expect(upg.isUnlocked("grenade_damage")).toBe(false);
 
-    // Destroy 80 lifetime pixels
-    save.data.lifetimePixels = 80;
-    save.data.bank = 1000; save.data.crystals = 100_000;
+    findAllSpecials(save.data);
+    expect(upg.needsFinding("grenade_unlock")).toBe(false);
     expect(upg.isUnlocked("grenade_unlock")).toBe(true);
     // Child node still locked because grenade_unlock level is 0
     expect(upg.isUnlocked("grenade_damage")).toBe(false);
@@ -308,20 +309,21 @@ describe("Secondary Abilities — Grenade & Category Matrix", () => {
     expect(quantityNode.essenceCost).toBe(5);
   });
 
-  it("Gates Turret child upgrades behind center unlock node and lifetime pixels", () => {
+  it("Gates Turret behind finding its golden block and gates child upgrades behind center unlock node", () => {
     const store = new MemStorage();
     const save = new SaveManager(store);
     unlockTabs(save);
-    const mgr = new UpgradeManager(save); findAllSpecials(save.data);
-
-    // Lifetime pixels 0 -> unlock node locked
-    expect(mgr.canBuy("turret_unlock")).toBe(false);
-
-    // Add lifetime pixels to unlock center node
-    save.data.lifetimePixels = 60000;
+    const mgr = new UpgradeManager(save);
     save.data.bank = 10000;
     save.data.crystals = 10000;
     save.data.essence = 1000;
+
+    // Locked until its Tier 4 golden block is found
+    expect(mgr.needsFinding("turret_unlock")).toBe(true);
+    expect(mgr.canBuy("turret_unlock")).toBe(false);
+
+    findAllSpecials(save.data);
+    expect(mgr.needsFinding("turret_unlock")).toBe(false);
     expect(mgr.isUnlocked("turret_unlock")).toBe(true);
     expect(mgr.canBuy("turret_unlock")).toBe(true);
 

@@ -7,6 +7,7 @@ import { PKind, ParticleSystem } from "../src/entities/ParticleSystem";
 import { Soldier } from "../src/entities/Soldier";
 import { SaveManager, type StorageLike } from "../src/progression/SaveManager";
 import { UpgradeManager } from "../src/progression/UpgradeManager";
+import { findAllSpecials } from "./helpers/progression";
 import { CombatSystem } from "../src/systems/CombatSystem";
 import { LightingSystem } from "../src/systems/LightingSystem";
 import { PhysicsSystem, circleIsClear, findSpawnPoint } from "../src/systems/PhysicsSystem";
@@ -122,6 +123,7 @@ function simulateRun(
 describe("Phase 5 — Multi-run progression & balancing verification (Rev 2)", () => {
   it("progresses cleanly across 8 runs and keeps excavation from regressing as upgrades are bought", () => {
     const save = new SaveManager(new MemStorage());
+    findAllSpecials(save.data);
     const upg = new UpgradeManager(save);
 
     const first = simulateRun(101, upg);
