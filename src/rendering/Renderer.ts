@@ -59,7 +59,7 @@ export class Renderer {
   private creatureRenderer = new CreatureRenderer();
   private lightRenderer: LightRenderer;
   private fieryFlash: FieryFlashRenderer;
-  private bloomRenderer = new BloomRenderer();
+  private bloomRenderer: BloomRenderer;
   private damageNumberRenderer = new DamageNumberRenderer();
   private fireRenderer = new FireRenderer();
   private lateAtmosphere = new LateAtmosphere();
@@ -73,6 +73,7 @@ export class Renderer {
     this.sprites = createSprites();
     this.lightRenderer = new LightRenderer(this.sprites);
     this.fieryFlash = new FieryFlashRenderer(this.lightRenderer);
+    this.bloomRenderer = new BloomRenderer(this.sprites);
     this.fogRenderer = new FogRenderer(game.fog);
     this.vignette = document.createElement("div");
     this.vignette.className = "game-vignette";
