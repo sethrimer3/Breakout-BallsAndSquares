@@ -1,13 +1,17 @@
 /* Full Game.step + terrain + shadows + rendering with real generator replication.
  * Vite required. BREACH_BASELINE_REF, BREACH_REPORT, BREACH_SAMPLES (>=20),
- * BREACH_DEVICES, BREACH_RATES, BREACH_ZOOMS and BREACH_CAMERAS (comma-separated) are optional. */
+ * BREACH_DEVICES, BREACH_RATES, BREACH_ZOOMS and BREACH_CAMERAS (comma-separated) are optional.
+ * BREACH_RUN_SECONDS sets run time; BREACH_SOFT_SHADOWS=1 enables default shadows.
+ * BREACH_OVERDRIVE_SECONDS stages mature overdrive; BREACH_ALL_PIXELS=1 checks every frame. */
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process');
 let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/node_modules/playwright')}
 const root=path.resolve(__dirname,'..'),ref=cp.execFileSync('git',['rev-parse',process.env.BREACH_BASELINE_REF||'HEAD'],{cwd:root,encoding:'utf8'}).trim();
 const dir=fs.mkdtempSync(path.join(root,'node_modules/.cache/live-growth-'));
 cp.execFileSync('tar',['-x','-C',dir],{input:cp.execFileSync('git',['archive',ref,'src','index.html'],{cwd:root,maxBuffer:32e6})});
 if(fs.existsSync(path.join(root,'public')))fs.cpSync(path.join(root,'public'),dir,{recursive:true});
-const report={baseline:ref,samples:Math.max(20,Number(process.env.BREACH_SAMPLES||40)),rows:[]};
+const runSeconds=Math.max(0,Number(process.env.BREACH_RUN_SECONDS||80)),softShadows=process.env.BREACH_SOFT_SHADOWS==='1';
+const overdriveSeconds=Math.max(0,Number(process.env.BREACH_OVERDRIVE_SECONDS||0)),allPixels=process.env.BREACH_ALL_PIXELS==='1';
+const report={baseline:ref,runSeconds,softShadows,overdriveSeconds,allPixels,samples:Math.max(20,Number(process.env.BREACH_SAMPLES||40)),rows:[]};
 const pct=a=>{a.sort((a,b)=>a-b);return{p50:a[Math.floor(a.length*.5)],p95:a[Math.floor(a.length*.95)],p99:a[Math.floor(a.length*.99)]}};
 (async()=>{const browser=await pw.chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});report.browser=browser.version();try{
  for(const device of [{name:'desktop',width:1000,height:700,dpr:1,cpu:1},{name:'mobile',width:390,height:844,dpr:2,cpu:4}]){
@@ -22,37 +26,53 @@ const pct=a=>{a.sort((a,b)=>a-b);return{p50:a[Math.floor(a.length*.5)],p95:a[Mat
    await p.evaluate(async()=>{const g=window.__game,raf=requestAnimationFrame.bind(window);g.paused=true;g.mainMenu.hide();window.requestAnimationFrame=()=>0;await new Promise(r=>raf(()=>raf(r)));window.__growthBench={g,raf,clock:performance.now.bind(performance)};});
   }
   for(const multiplier of (process.env.BREACH_RATES||'.05,1,4').split(',').map(Number))for(const moving of (process.env.BREACH_CAMERAS||'stationary,moving').split(',').map(v=>v==='moving'))for(const zoom of (process.env.BREACH_ZOOMS||'.5,1.13').split(',').map(Number)){
-   for(const p of pages)await p.evaluate(({multiplier,zoom})=>{
+   for(const p of pages)await p.evaluate(async({multiplier,zoom,overdriveSeconds,runSeconds,softShadows})=>{
     const {g}=window.__growthBench;g.save.data.seed='GROWTH42';g.rng.s=305419896;g.startRun();g.paused=true;g.mainMenu.hide();
-    g.save.data.settings.renderQuality='high';g.save.data.settings.softShadows=false;g.save.data.settings.fieryMuzzleFlash=false;g.save.data.settings.alwaysShootWhenAutoMoveOff=false;g.renderer.resize();
+    g.save.data.settings.renderQuality='high';g.save.data.settings.softShadows=softShadows;g.save.data.settings.fieryMuzzleFlash=false;g.save.data.settings.alwaysShootWhenAutoMoveOff=false;g.renderer.resize();
     const w=g.world,cores=w.blightCores.filter(c=>c.alive&&c.size===2).slice(0,8);
     if(!cores.length)throw Error('No generator fixtures');
     for(const c of cores)for(let y=c.cy-20;y<=c.cy+21;y++)for(let x=c.cx-20;x<=c.cx+21;x++)if(w.inBounds(x,y)&&!w.coreId[y*w.width+x])w.setCell(x,y,0,'set');
-    g.growth.reset();g.growth.rateMultiplier=multiplier;g.growth.explosiveChance=0;g.terrain.rebuildAll();g.rng.s=305419896;
+    // Mature wall replication can otherwise kill the passive soldier and stop
+    // real Game.step work. A sealed, indestructible fixture chamber preserves
+    // the live-run guard without suppressing growth or rescuing dead soldiers.
+    if(overdriveSeconds>0){
+     const {SUB}=await import('/src/world/PixelWorld.ts');
+     const px=Math.floor(w.roomCenterX/w.cellSize),py=Math.floor(w.roomCenterY/w.cellSize);
+     for(let y=py-3;y<=py+3;y++)for(let x=px-3;x<=px+3;x++){
+      if(!w.inBounds(x,y)||w.coreId[y*w.width+x])throw Error('Unsafe passive-soldier chamber');
+      const rim=Math.abs(x-px)===3||Math.abs(y-py)===3;
+      w.setCell(x,y,0,'set');
+      // Fine rubble blocks entry without becoming a full-wall replication source.
+      if(rim){for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){
+       const sx=x*2+dx,sy=y*2+dy;w.subKind[sy*w.subWidth+sx]=SUB.rubble;w.setSubCell(sx,sy,100,'set');
+      }w.boundary[y*w.width+x]=1;}
+     }
+    }
+    g.growth.reset();if(overdriveSeconds>0){g.growth.overdrive=true;g.growth.overdriveTime=overdriveSeconds;}g.growth.rateMultiplier=multiplier;g.growth.explosiveChance=0;g.terrain.rebuildAll();g.rng.s=305419896;
     g.reserves=1;g.paused=false;g.deploySoldier(w.roomCenterX,w.roomCenterY,1,0);g.paused=true;g.autoMove=false;
     if(g.soldiers.length!==1)throw Error('Could not place the passive soldier');
     const ox=(cores[0].cx+5)*w.cellSize,oy=(cores[0].cy+5)*w.cellSize;g.camera.following=false;g.camera.zoom=zoom;g.camera.x=ox;g.camera.y=oy;g.fog.light.fill(1);
-    g.runStats.time=80;window.__growthBench.ox=ox;window.__growthBench.oy=oy;
+    g.runStats.time=runSeconds;window.__growthBench.ox=ox;window.__growthBench.oy=oy;
     for(let i=0;i<8;i++){g.lightOverBudgetFrames=0;g.lighting.quality='high';g.updateFlashPolygons();g.renderer.draw();}
-   },{multiplier,zoom});
+   },{multiplier,zoom,overdriveSeconds,runSeconds,softShadows});
    const times=[[],[]],states=[[],[]],frameRows=[[],[]];
    for(let frame=0;frame<report.samples+12;frame++){
     for(const j of frame%2?[1,0]:[0,1]){
-     const row=await pages[j].evaluate(async({frame,moving,zoom,samples})=>{
+     const row=await pages[j].evaluate(async({frame,moving,zoom,samples,allPixels})=>{
       const {g,raf,clock,ox,oy}=window.__growthBench;await new Promise(r=>raf(r));
       const before=g.growth.totalEvents,floorBefore=g.terrain.floorRevision,start=clock();
       g.step(1/60);const sim=clock();g.terrain.update();const terrain=clock();
-      if(g.runOver||!g.soldiers[0]?.alive)throw Error('Passive soldier did not survive fixture');
+      if(g.runOver||!g.soldiers[0]?.alive)throw Error('Passive soldier did not survive fixture '+JSON.stringify({frame,runOver:g.runOver,soldiers:g.soldiers.map(s=>({x:s.x,y:s.y,alive:s.alive,health:s.health})),death:g.lastDeath,spawn:[g.world.roomCenterX,g.world.roomCenterY]}));
       g.camera.following=false;g.camera.zoom=zoom;g.camera.x=ox+(moving?Math.sin(frame*.09)*45:0);g.camera.y=oy+(moving?Math.cos(frame*.07)*30:0);g.fog.light.fill(1);
       performance.now=()=>100000+frame*1000/60;g.lightOverBudgetFrames=0;g.lighting.quality='high';g.updateFlashPolygons();const shadows=clock();g.renderer.draw();const drawn=clock();performance.now=clock;
       const row={simMs:sim-start,terrainMs:terrain-sim,shadowMs:shadows-terrain,drawMs:drawn-shadows,totalMs:drawn-start,events:g.growth.totalEvents-before,subEvents:g.growth.totalSubBlightEvents,rate:g.growth.rate,exposed:g.growth.exposedCoresCount,pending:g.terrain.chunks.pending,rebuilt:g.terrain.rebuiltLastFrame,floorPaints:g.terrain.floorRevision-floorBefore};
-      if(frame===12||frame===Math.floor(samples/2)+12||frame===samples+11){
+      if(allPixels||frame===12||frame===Math.floor(samples/2)+12||frame===samples+11){
        const digest=async a=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new Uint8Array(a.buffer,a.byteOffset,a.byteLength)))).map(v=>v.toString(16).padStart(2,'0')).join('');
        const w=g.world,ctx=g.canvas.getContext('2d');row.state=await Promise.all([w.health,w.subHealth,w.subTint,w.tint,w.mat,w.blight,w.glassCracked].map(digest));
        row.pixels=await digest(ctx.getImageData(0,0,g.canvas.width,g.canvas.height).data);
       }
       return row;
-     },{frame,moving,zoom,samples:report.samples});
+     },{frame,moving,zoom,samples:report.samples,allPixels});
      if(frame>=12){times[j].push(row.totalMs);frameRows[j].push(row);}
      if(row.state)states[j].push({frame,state:row.state,pixels:row.pixels});
     }

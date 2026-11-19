@@ -13,6 +13,10 @@ export class TerrainChunks {
   readonly geometryDirty: Uint8Array;
   /** Alpha may change, including HP-only damage to translucent glass. */
   readonly opacityDirty: Uint8Array;
+  /** Small artwork tiles retain separated edits inside a chunk's enclosing bounds. */
+  readonly paintTileSize = 2;
+  readonly paintTileCols: number;
+  readonly paintTiles: Uint8Array;
   /** Inclusive local cell bounds of pending artwork edits, including neighboring relief. */
   readonly x0: Uint32Array;
   readonly y0: Uint32Array;
@@ -25,6 +29,8 @@ export class TerrainChunks {
     this.chunkSize = chunkSize;
     this.cols = Math.ceil(world.width / chunkSize);
     this.rows = Math.ceil(world.height / chunkSize);
+    this.paintTileCols = Math.ceil(chunkSize / this.paintTileSize);
+    this.paintTiles = new Uint8Array(this.cols * this.rows * this.paintTileCols ** 2);
     this.dirty = new Uint8Array(this.cols * this.rows);
     this.x0 = new Uint32Array(this.dirty.length);
     this.y0 = new Uint32Array(this.dirty.length);
@@ -32,14 +38,28 @@ export class TerrainChunks {
     this.y1 = new Uint32Array(this.dirty.length);
     this.geometryDirty = new Uint8Array(this.dirty.length);
     this.opacityDirty = new Uint8Array(this.dirty.length);
-    world.addListener((cx, cy, kind) => {
+    world.addListener((cx, cy, kind, sx, sy) => {
       const geometry = kind !== "damaged";
-      this.markCell(cx, cy, geometry, geometry || world.mat[cy * world.width + cx] === MAT.glass);
+      const opacity = geometry || world.mat[cy * world.width + cx] === MAT.glass;
+      if (sx === undefined || sy === undefined) this.markCell(cx, cy, geometry, opacity);
+      else {
+        // Edge masks still need all eight coarse neighbors. Albedo relief only
+        // reads face-sharing fine cells: the parent and at most two neighbors.
+        for (let y = cy - 1; y <= cy + 1; y++) for (let x = cx - 1; x <= cx + 1; x++) {
+          this.markChunkAt(x, y, geometry, opacity, false);
+        }
+        this.markChunkAt(cx, cy, false, false);
+        if (geometry) {
+          this.markChunkAt(cx + (sx % 2 ? 1 : -1), cy, false, false);
+          this.markChunkAt(cx, cy + (sy % 2 ? 1 : -1), false, false);
+        }
+      }
     });
   }
 
   markAll(): void {
     this.queue.length = 0;
+    this.paintTiles.fill(1);
     for (let i = 0; i < this.dirty.length; i++) {
       this.dirty[i] = this.geometryDirty[i] = this.opacityDirty[i] = 1;
       this.x0[i] = this.y0[i] = 0;
@@ -55,7 +75,7 @@ export class TerrainChunks {
     }
   }
 
-  private markChunkAt(cx: number, cy: number, geometry: boolean, opacity: boolean): void {
+  private markChunkAt(cx: number, cy: number, geometry: boolean, opacity: boolean, paint = true): void {
     if (cx < 0 || cy < 0) return;
     const kx = Math.floor(cx / this.chunkSize);
     const ky = Math.floor(cy / this.chunkSize);
@@ -64,6 +84,8 @@ export class TerrainChunks {
     if (geometry) this.geometryDirty[k] = 1;
     if (opacity) this.opacityDirty[k] = 1;
     const x = cx - kx * this.chunkSize, y = cy - ky * this.chunkSize;
+    const tiles = this.paintTileCols;
+    if (paint) this.paintTiles[k * tiles * tiles + Math.floor(y / this.paintTileSize) * tiles + Math.floor(x / this.paintTileSize)] = 1;
     if (this.dirty[k]) {
       this.x0[k] = Math.min(this.x0[k], x);
       this.y0[k] = Math.min(this.y0[k], y);

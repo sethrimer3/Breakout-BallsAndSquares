@@ -1,3 +1,4 @@
+import { ChunkRegions } from "./ChunkRegions";
 import { LightRegion, type ScreenRect } from "./LightRegion";
 import { BinaryMask } from "./BinaryMask";
 import { FloorRegions } from "./FloorRegions";
@@ -181,6 +182,7 @@ export class TerrainRenderer {
   private readonly opacityTiles: Uint32Array;
   private readonly opacityRegion = new LightRegion();
   readonly chunks: TerrainChunks;
+  private readonly paintRegions: ChunkRegions;
   private canvases: HTMLCanvasElement[] = [];
   private blightCanvases: (HTMLCanvasElement | null)[] = [];
   /** Four classification bits per terrain cell, allocated only in Blight chunks. */
@@ -241,6 +243,7 @@ export class TerrainRenderer {
 
   constructor(private world: PixelWorld, chunkSize: number) {
     this.chunks = new TerrainChunks(world, chunkSize);
+    this.paintRegions = new ChunkRegions(chunkSize, chunkSize, this.chunks.paintTileSize);
     this.floorRegions = new FloorRegions(world.width, world.height);
     const n = this.chunks.cols * this.chunks.rows;
     this.opacityChunkRevisions = new Uint32Array(n);
@@ -745,6 +748,38 @@ export class TerrainRenderer {
       }
       this.chunks.opacityDirty[k] = 0;
     }
+    const { world, chunks, paintRegions } = this;
+    const cs = chunks.chunkSize, kx = k % chunks.cols, ky = Math.floor(k / chunks.cols);
+    const x0 = chunks.x0[k], y0 = chunks.y0[k], x1 = chunks.x1[k], y1 = chunks.y1[k];
+    const count = chunks.paintTileCols ** 2;
+    const tiles = chunks.paintTiles.subarray(k * count, (k + 1) * count);
+    paintRegions.update(tiles, undefined, x0, y0, x1, y1);
+    for (let r = 0; r < paintRegions.count; r++) {
+      const p = r * 4, rects = paintRegions.rects;
+      this.paintChunkRegion(k, rects[p], rects[p + 1], rects[p] + rects[p + 2] - 1, rects[p + 1] + rects[p + 3] - 1);
+    }
+    tiles.fill(0);
+
+    if (this.chunks.geometryDirty[k]) {
+      const subs = cs * 2;
+      const geometry = this.surfaceGeometry[k] ?? new SurfaceOutlineCache(subs);
+      const changed = geometry.update(world, kx * subs, ky * subs, this.edgeSolid, {
+        x0: x0 * 2, y0: y0 * 2, x1: (x1 + 1) * 2 - 1, y1: (y1 + 1) * 2 - 1,
+      });
+      this.surfaceGeometry[k] = geometry.empty ? null : geometry;
+      if (geometry.empty) this.surfaceOutlines[k] = null;
+      else if (changed) {
+        const path = new Path2D();
+        geometry.trace((x, y, width, height) => path.rect(x, y, width, height));
+        this.surfaceOutlines[k] = path;
+      }
+      this.buildEdgeMask(k, kx, ky);
+      this.chunks.geometryDirty[k] = 0;
+    }
+  }
+
+  /** Paint/upload only valid rectangles of the shared scratch image. */
+  private paintChunkRegion(k: number, x0: number, y0: number, x1: number, y1: number): void {
     const { world } = this;
     const cs = this.chunks.chunkSize;
     const texCs = cs * TEX;
@@ -763,8 +798,6 @@ export class TerrainRenderer {
       data[p + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
       data[p + 3] = a;
     };
-    const x0 = this.chunks.x0[k], y0 = this.chunks.y0[k];
-    const x1 = this.chunks.x1[k], y1 = this.chunks.y1[k];
     for (let ly = y0; ly <= y1; ly++) {
       const cy = ky * cs + ly;
       for (let lx = x0; lx <= x1; lx++) {
@@ -995,23 +1028,6 @@ export class TerrainRenderer {
       canvas.getContext("2d")!.putImageData(this.image, 0, 0, tx0, ty0, tw, th);
       this.blightCanvases[k] = canvas;
     } else this.blightCanvases[k] = null;
-
-    if (this.chunks.geometryDirty[k]) {
-      const subs = cs * 2;
-      const geometry = this.surfaceGeometry[k] ?? new SurfaceOutlineCache(subs);
-      const changed = geometry.update(world, kx * subs, ky * subs, this.edgeSolid, {
-        x0: x0 * 2, y0: y0 * 2, x1: (x1 + 1) * 2 - 1, y1: (y1 + 1) * 2 - 1,
-      });
-      this.surfaceGeometry[k] = geometry.empty ? null : geometry;
-      if (geometry.empty) this.surfaceOutlines[k] = null;
-      else if (changed) {
-        const path = new Path2D();
-        geometry.trace((x, y, width, height) => path.rect(x, y, width, height));
-        this.surfaceOutlines[k] = path;
-      }
-      this.buildEdgeMask(k, kx, ky);
-      this.chunks.geometryDirty[k] = 0;
-    }
   }
 
   /** Albedo of a live half-size pixel, before relief shading. */

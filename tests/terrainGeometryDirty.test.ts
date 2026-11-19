@@ -88,3 +88,49 @@ describe('terrain artwork edit bounds', () => {
     expect(chunks.pending).toBe(1);
   });
 });
+
+describe('sparse terrain artwork tiles', () => {
+  it('retains distant edit islands and their relief neighbors across chunk budgets', () => {
+    const w = new PixelWorld({width:65,height:67,cellSize:8,roomSize:4});
+    const c = new TerrainChunks(w,32), batch:number[]=[];
+    c.markCell(2,2); c.markCell(28,28); c.markCell(32,32);
+    const tiles=c.paintTileCols, stride=tiles*tiles;
+    const marked=(k:number,x:number,y:number)=>c.paintTiles[k*stride+Math.floor(y/c.paintTileSize)*tiles+Math.floor(x/c.paintTileSize)];
+    expect(marked(0,2,2)).toBe(1);
+    expect(marked(0,28,28)).toBe(1);
+    expect(marked(0,16,16)).toBe(0);
+    expect(marked(0,31,31)).toBe(1);
+    expect(marked(1,0,31)).toBe(1);
+    expect(marked(3,31,0)).toBe(1);
+    expect(marked(4,0,0)).toBe(1);
+    c.take(1,batch);
+    // Publication clears only the consumed chunk; queued edits survive.
+    c.paintTiles.fill(0,batch[0]*stride,(batch[0]+1)*stride);
+    expect(marked(4,0,0)).toBe(1);
+    c.markCell(16,16);
+    expect(marked(0,16,16)).toBe(1);
+    expect(marked(0,2,2)).toBe(0);
+    c.markAll();
+    expect(c.paintTiles.every(v=>v===1)).toBe(true);
+  });
+});
+
+describe('fine terrain artwork dependencies', () => {
+  it.each([[0,0],[1,0],[0,1],[1,1]])('keeps diagonal edge invalidation without repainting diagonal albedo (%s,%s)', (dx,dy) => {
+    const w=new PixelWorld({width:65,height:65,cellSize:8,roomSize:4});
+    const c=new TerrainChunks(w,32), stride=c.paintTileCols**2;
+    w.setSubCell(64+dx,64+dy,10);
+    // The northwest chunk can affect the diagonal edge mask, but a fine cell
+    // never changes its albedo: fine relief only reads cardinal neighbors.
+    expect(c.geometryDirty[0]).toBe(1);
+    expect(c.paintTiles.slice(0,stride).some(Boolean)).toBe(false);
+    expect(c.paintTiles[4*stride]).toBe(1);
+    expect(c.paintTiles.slice(stride,2*stride).some(Boolean)).toBe(dy===0);
+    expect(c.paintTiles.slice(3*stride,4*stride).some(Boolean)).toBe(dx===0);
+    c.paintTiles.fill(0);
+    w.damageSub(64+dx,64+dy,1);
+    // Nonlethal damage changes the parent's color, never neighboring relief.
+    expect([...c.paintTiles].filter(Boolean)).toHaveLength(1);
+    expect(c.paintTiles[4*stride]).toBe(1);
+  });
+});

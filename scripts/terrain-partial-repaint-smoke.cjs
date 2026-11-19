@@ -36,6 +36,23 @@ let pw; try { pw = require('playwright'); } catch { pw = require('/opt/codex/cua
           same(a.dormantMasks[k],b.dormantMasks[k],label+' dormant mask '+k);
         }
       };
+      // All fine-cell orientations at a chunk seam, then removal in reverse.
+      // A stale scratch-image upload would overwrite a different edit island.
+      for (let n=0;n<64;n++) {
+        w.setSubCell(60+n%8,60+Math.floor(n/8),10);
+        if(n%8===7)check('fine seam growth '+n);
+      }
+      for (let n=63;n>=0;n--) {
+        w.damageSub(60+n%8,60+Math.floor(n/8),1000);
+        if(n%8===0)check('fine seam removal '+n);
+      }
+      let regionCalls=0;
+      const paint=a.paintChunkRegion;
+      a.paintChunkRegion=function(...args){regionCalls++;return paint.apply(this,args);};
+      w.setSubCell(4,4,10);w.setSubCell(56,56,10);
+      check('separated fine edit islands');
+      a.paintChunkRegion=paint;
+      if(regionCalls<2)throw Error('Sparse repaint path was not exercised');
       for (let frame=0;frame<48;frame++) {
         // Seams, diagonals, world borders, and repeated edits before budgeted flushes.
         for (const [x,y] of [[0,0],[31,31],[32,32],[31,32],[64,66],[12+frame%9,10]]) {
@@ -75,7 +92,7 @@ let pw; try { pw = require('playwright'); } catch { pw = require('/opt/codex/cua
       w.setSubCell(63,63,10);check('reappear');
       const cam = new CameraSystem(w);cam.viewW=600;cam.viewH=450;cam.x=260.37;cam.y=268.71;
       const canvases=[a,b].map(()=>{const c=document.createElement('canvas');return c;});
-      for(const scale of [1,1.25,2])for(const zoom of [.5,1.13,2.75]) {
+      for(const scale of [.75,1,1.25,1.5,2,3])for(const zoom of [.5,1.13,2.5,2.75]) {
         cam.zoom=zoom;
         for(const [j,r] of [a,b].entries()) {
           const c=canvases[j];c.width=600*scale;c.height=450*scale;
@@ -84,7 +101,7 @@ let pw; try { pw = require('playwright'); } catch { pw = require('/opt/codex/cua
         }
         same(...canvases,'composite '+scale+' / '+zoom);
       }
-      return {comparisons,changedChannels:0,hpClassificationQueries,emptyClassificationReleased:true};
+      return {comparisons,changedChannels:0,hpClassificationQueries,sparseRegionCalls:regionCalls,emptyClassificationReleased:true};
     });
     console.log(JSON.stringify(result));
     fs.writeFileSync(process.env.BREACH_REPORT||'/tmp/terrain-partial-repaint-regressions.json',JSON.stringify(result,null,2));

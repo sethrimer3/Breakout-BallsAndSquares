@@ -1,0 +1,11 @@
+{
+  "comparisons": 2762,
+  "changedChannels": 0,
+  "hpClassificationQueries": 0,
+  "sparseRegionCalls": 4,
+  "emptyClassificationReleased": true,
+  "testFiles": 92,
+  "tests": 672,
+  "typeCheck": true,
+  "productionBuild": true
+}

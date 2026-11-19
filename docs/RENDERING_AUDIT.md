@@ -1,5 +1,7 @@
 # Rendering audit and validated changes
 
+For sparse terrain uploads and fine-cell artwork dependencies during replication, see [sparse terrain repaint results](SPARSE_TERRAIN_REPAINT.md).
+
 For exact lighting-mask reuse during camera movement, see [scrolling mask results](SCROLL_MASK_CACHE.md).
 
 For regional lighting-mask updates during active growth, see [opacity region results](OPACITY_REGION_CACHE.md).
