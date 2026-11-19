@@ -60,6 +60,10 @@ describe("Core progression", () => {
     expect(UPGRADE_BY_ID.keycard_t1.icon).toBe("keycard");
     expect(UPGRADE_BY_ID.keycard_t1.parent).toBeNull();
     expect(CORE_PATH[0]).toBe("keycard_t1");
+    expect(CORE_PATH[1]).toBe("better_flashlight");
+    expect(CORE_PATH[2]).toBe("unlock_map");
+    expect(UPGRADE_BY_ID.better_flashlight.parent).toBe("keycard_t1");
+    expect(UPGRADE_BY_ID.unlock_map.parent).toBe("better_flashlight");
     for (let i = 1; i < positions.length; i++) {
       expect(Math.abs(positions[i].col - positions[i - 1].col) + Math.abs(positions[i].row - positions[i - 1].row)).toBe(1);
     }

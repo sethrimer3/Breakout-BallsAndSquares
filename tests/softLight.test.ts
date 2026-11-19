@@ -78,4 +78,45 @@ describe("Fiery muzzle flash setting & soft-light layers", () => {
     }
   });
 
+  it("illuminates deeper into solid walls with Better Flashlight, attenuating by distance from exposed air", () => {
+    const world = new PixelWorld({ width: 32, height: 32, cellSize: 8, roomSize: 10 });
+    // Build a 5-thick solid wall starting at x = 18..22 along y = 14..18, with air at x = 17 and x = 23.
+    for (let y = 14; y <= 18; y++) {
+      for (let x = 18; x <= 22; x++) {
+        world.health[y * world.width + x] = 20;
+      }
+    }
+    const soldier = new Soldier(16 * 8 + 4, 16 * 8 + 4, 1, 0, 60);
+    const camera = new CameraSystem(world);
+    camera.viewW = 800; camera.viewH = 600; camera.x = soldier.x; camera.y = soldier.y; camera.zoom = 2;
+    const lighting = new LightingSystem(world);
+
+    // Without Better Flashlight: only the exposed wall face (x = 18) is lit.
+    lighting.updateSoftLights([soldier], soldier.x, soldier.y, camera);
+    const baseGlow = lighting.softLights[1];
+    const baseCells = Array.from(baseGlow.lit.cells.subarray(0, baseGlow.lit.count));
+    expect(baseCells).toContain(16 * world.width + 18);
+    expect(baseCells).not.toContain(16 * world.width + 19);
+
+    // With Better Flashlight: radius grows and wall depth 1..4 are lit at 100%, 75%, 50%, 25%,
+    // while depth 5 (x = 22) and air beyond (x = 23) remain unlit.
+    lighting.soldierLightRadius = 96;
+    lighting.soldierLightStrength = 1.0;
+    lighting.soldierWallDepth = 4;
+    lighting.updateSoftLights([soldier], soldier.x, soldier.y, camera);
+    const upgradedGlow = lighting.softLights[1];
+    expect(upgradedGlow.radius).toBe(96);
+    expect(upgradedGlow.strength).toBe(1.0);
+    const weightByCell = new Map<number, number>();
+    for (let i = 0; i < upgradedGlow.lit.count; i++) {
+      weightByCell.set(upgradedGlow.lit.cells[i], upgradedGlow.lit.weights![i]);
+    }
+    expect(weightByCell.get(16 * world.width + 18)).toBe(1);
+    expect(weightByCell.get(16 * world.width + 19)).toBe(0.75);
+    expect(weightByCell.get(16 * world.width + 20)).toBe(0.5);
+    expect(weightByCell.get(16 * world.width + 21)).toBe(0.25);
+    expect(weightByCell.has(16 * world.width + 22)).toBe(false);
+    expect(weightByCell.has(16 * world.width + 23)).toBe(false);
+  });
+
 });
