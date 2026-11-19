@@ -85,13 +85,16 @@ describe("special upgrade unlocks", () => {
     expect(new Set(Object.values(SPECIAL_UNLOCKS)).size).toBe(Object.keys(SPECIAL_UNLOCKS).length);
   });
 
-  it("places all core upgrades on the map and puts secondary weapons in Tier 4 after Tier 3 keycard", () => {
+  it("places all core upgrades (except keycard_t1) on the map and puts secondary weapons in Tier 4 after Tier 4 keycard", () => {
+    expect(specialSpotFor("keycard_t1")).toBeUndefined();
+    expect(UPGRADE_BY_ID.keycard_t1.baseCost).toBe(5);
+    expect(UPGRADE_BY_ID.keycard_t1.currency ?? "gold").toBe("gold");
     for (const id of CORE_PATH) {
-      if (!UPGRADE_BY_ID[id].placeholder) {
+      if (id !== "keycard_t1" && !UPGRADE_BY_ID[id].placeholder) {
         expect(specialSpotFor(id), `core upgrade ${id} must have a golden block`).toBeDefined();
       }
     }
-    expect(CORE_PATH.indexOf("unlock_secondary")).toBeGreaterThan(CORE_PATH.indexOf("keycard_t3"));
+    expect(CORE_PATH.indexOf("unlock_secondary")).toBeGreaterThan(CORE_PATH.indexOf("keycard_t4"));
     for (const id of ["unlock_secondary", "grenade_unlock", "turret_unlock"] as const) {
       const spotId = specialSpotFor(id)!;
       expect(specialWorld(spotId)).toBe(2);

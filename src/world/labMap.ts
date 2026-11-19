@@ -7,7 +7,7 @@ import { MOTHERSHIP_BLUEPRINT } from "./late/mothership";
 
 /**
  * The hand-made research lab: fixed blueprints shared by every run, one per
- * world (zone). Zone 1 is the lab itself; a huge tier 3 gate on its east side
+ * world (zone). Zone 1 is the lab itself; a huge tier 4 gate on its east side
  * leads into zone 2, where the Blight has begun turning the lab into something
  * alien; onward lie the forest, fallen city and mothership campaign worlds.
  *
@@ -272,22 +272,22 @@ export const LAB_WORLDS: Readonly<Record<number, LabWorldDef>> = {
     freeform: false,
     alien: false,
     seed: LAB_SEED,
-    gates: [{ side: "east", row: 4, tier: 3, to: 2 }],
+    gates: [{ side: "east", row: 4, tier: 4, to: 2 }],
     upgrades: [
       { id: "z1-special-1", col: 22, row: 18 },
       { id: "z1-special-2", col: 30, row: 30 },
       { id: "z1-special-3", col: 43, row: 8 },
       { id: "z1-special-4", col: 8, row: 50 },
-      { id: "z1-core-keycard-t1", col: 4, row: 9 },
       { id: "z1-core-map", col: 11, row: 9 },
       { id: "z1-core-air", col: 16, row: 2 },
       { id: "z1-core-resources", col: 16, row: 9 },
       { id: "z1-core-soldier", col: 2, row: 16 },
       { id: "z1-core-primary", col: 25, row: 2 },
       { id: "z1-core-blight", col: 30, row: 9 },
-      { id: "z1-core-keycard-t2", col: 23, row: 23 },
+      { id: "z1-core-keycard-t2", col: 8, row: 16 },
       { id: "z1-core-formations", col: 18, row: 30 },
-      { id: "z1-core-keycard-t3", col: 58, row: 30 },
+      { id: "z1-core-keycard-t3", col: 39, row: 32 },
+      { id: "z1-core-keycard-t4", col: 1, row: 57 },
     ],
   },
   2: {
@@ -302,7 +302,7 @@ export const LAB_WORLDS: Readonly<Record<number, LabWorldDef>> = {
     alien: true,
     seed: 0x2b11e7,
     gates: [
-      { side: "west", row: 5, tier: 3, to: 0 },
+      { side: "west", row: 5, tier: 4, to: 0 },
       { side: "east", row: 5, tier: 6, to: 3 },
     ],
     upgrades: [

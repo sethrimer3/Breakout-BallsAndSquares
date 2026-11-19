@@ -312,6 +312,8 @@ function placeSentry(world: PixelWorld, r: LabRoom, rng: Rng): void {
 /** Two-cell-thick blast doors, jamb lights and hazard stripes at every corridor opening. */
 function paintDoors(world: PixelWorld, r: LabRoom, interior: Uint8Array): void {
   const tier = world.tierBase + r.zone + 1;
+  // Tier 4 has no room doors; the Tier 4 keycard only opens the gate from Tier 3 into Tier 4.
+  if (tier === 4) return;
   for (const cell of roomSides(r)) {
     let along = 0;
     while (along < r.size) {

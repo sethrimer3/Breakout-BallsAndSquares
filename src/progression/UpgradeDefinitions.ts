@@ -144,6 +144,7 @@ export type UpgradeId =
   | "keycard_t1"
   | "keycard_t2"
   | "keycard_t3"
+  | "keycard_t4"
   | "sentry_uplink"
   | "sentry_calibration"
   | "cartography_uplink"
@@ -1799,7 +1800,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     id: "keycard_t3",
     branch: "facility",
     name: "Tier 3 Keycard",
-    shortDesc: "Tier 3 doors and the gate to the next zone open when shot",
+    shortDesc: "Tier 3 (orange) doors slide open when shot",
     color: "#d65c12",
     grid: { col: 2, row: -1 },
     parent: null,
@@ -1812,6 +1813,26 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     formatDelta: () => "ACCESS",
     apply: (s, lvl) => {
       if (lvl > 0) s.keycardTier = Math.max(s.keycardTier, 3);
+    },
+    icon: "keycard",
+  },
+  {
+    id: "keycard_t4",
+    branch: "facility",
+    name: "Tier 4 Keycard",
+    shortDesc: "Opens the gate from the Research Lab into Tier 4 (Blighted Wards) when shot",
+    color: "#8a6ad0",
+    grid: { col: 3, row: -1 },
+    parent: null,
+    maxLevel: 1,
+    essenceCost: 12,
+    baseCost: 800,
+    costMultiplier: 1,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "GRANTED" : "DENIED"),
+    formatDelta: () => "ACCESS",
+    apply: (s, lvl) => {
+      if (lvl > 0) s.keycardTier = Math.max(s.keycardTier, 4);
     },
     icon: "keycard",
   },
@@ -1944,7 +1965,7 @@ export const CORE_HUB_GRID = { col: -2.5, row: -1.5 } as const;
 export const CORE_PATH: readonly UpgradeId[] = [
   "keycard_t1", "unlock_map", "connected_air_mapping", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
   "core_placeholder_3", "unlock_blight", "keycard_t2", "core_placeholder_4", "unlock_formations", "core_placeholder_5", "unlock_facility",
-  "core_placeholder_6", "keycard_t3", "unlock_secondary", "auto_ability", "core_placeholder_7", "keycard_t6", "keycard_t9",
+  "core_placeholder_6", "keycard_t3", "keycard_t4", "unlock_secondary", "auto_ability", "keycard_t6", "keycard_t9",
 ];
 
 const MILESTONES: Partial<Record<UpgradeId, [string, string, number]>> = {
@@ -1990,7 +2011,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
         apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,6); } } : {}),
       ...(id === "keycard_t9" ? { currency: "biomass" as const, essenceCost: 2000, icon: "keycard" as const,
         apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,9); } } : {}),
-      ...(id === "keycard_t1" ? { baseCost: 8, icon: "keycard" as const } : {}),
+      ...(id === "keycard_t1" ? { baseCost: 5, icon: "keycard" as const } : {}),
       ...(id === "connected_air_mapping" ? { apply: (s: SoldierStats, level: number) => { s.connectedAirMapping = level > 0; } } : {}),
     };
   }),
