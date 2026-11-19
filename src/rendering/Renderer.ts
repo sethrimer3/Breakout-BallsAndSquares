@@ -13,6 +13,7 @@ import type { Soldier } from "../entities/Soldier";
 import { PKind } from "../entities/ParticleSystem";
 import type { Game } from "../Game";
 import { FieryFlashRenderer } from "./FieryFlashRenderer";
+import { BloomRenderer } from "./BloomRenderer";
 import { FireRenderer } from "./FireRenderer";
 import { CreatureRenderer } from "./CreatureRenderer";
 import { FogRenderer } from "./FogRenderer";
@@ -56,6 +57,7 @@ export class Renderer {
   private creatureRenderer = new CreatureRenderer();
   private lightRenderer: LightRenderer;
   private fieryFlash: FieryFlashRenderer;
+  private bloomRenderer = new BloomRenderer();
   private damageNumberRenderer = new DamageNumberRenderer();
   private fireRenderer = new FireRenderer();
   private lateAtmosphere = new LateAtmosphere();
@@ -219,6 +221,8 @@ export class Renderer {
     this.fireRenderer.drawGlow(ctx, cam, game.fire, game.world, still ? 0 : wallClockMs / 1000);
     this.drawAdditiveParticles();
     ctx.restore();
+
+    this.bloomRenderer.render(ctx, game, this.fireRenderer, still, wallClockMs / 1000);
 
     drawMapBoundary(ctx, game.world, cam);
 

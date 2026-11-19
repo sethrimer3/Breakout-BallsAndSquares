@@ -273,6 +273,7 @@ export class SettingsModal {
       ).join("");
       const fiery = set.fieryMuzzleFlash;
       const softSh = set.softShadows;
+      const bloom = set.bloom;
       body.innerHTML = `
         <div class="set-row"><div class="set-info"><div class="set-label">PRISM PATTERNS</div><div class="set-desc">Distinct beam dash lengths supplement color and thickness.</div></div>
           <button class="btn" data-set="prism-patterns">${set.prismPatterns ? "ON" : "OFF"}</button></div>
@@ -294,6 +295,16 @@ export class SettingsModal {
           <button class="btn set-toggle set-check ${softSh ? "btn-primary is-checked" : ""}" data-set="softshadows"
             role="checkbox" aria-checked="${softSh}">
             <span class="px-check" aria-hidden="true"></span>${softSh ? "ON" : "OFF"}
+          </button>
+        </div>
+        <div class="set-row">
+          <div class="set-info">
+            <div class="set-label">LIGHT BLOOM</div>
+            <div class="set-desc">Subtle soft glow around light panels, LEDs, and fires</div>
+          </div>
+          <button class="btn set-toggle set-check ${bloom ? "btn-primary is-checked" : ""}" data-set="bloom"
+            role="checkbox" aria-checked="${bloom}">
+            <span class="px-check" aria-hidden="true"></span>${bloom ? "ON" : "OFF"}
           </button>
         </div>
         <div class="set-group">
@@ -324,6 +335,12 @@ export class SettingsModal {
 
       body.querySelector('[data-set="softshadows"]')!.addEventListener("click", () => {
         set.softShadows = !set.softShadows;
+        this.game.save.save();
+        this.render();
+      });
+
+      body.querySelector('[data-set="bloom"]')!.addEventListener("click", () => {
+        set.bloom = !set.bloom;
         this.game.save.save();
         this.render();
       });

@@ -490,6 +490,11 @@ export class Game {
     return this.save.data.settings.softShadows;
   }
 
+  /** Subtle low-res bloom around glowing lights and panels (visual setting). */
+  get bloom(): boolean {
+    return this.save.data.settings.bloom;
+  }
+
   get lifetimePixels(): number {
     return this.save.data.lifetimePixels;
   }

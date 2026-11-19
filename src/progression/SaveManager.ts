@@ -135,6 +135,8 @@ export interface SaveData {
     fieryMuzzleFlash: boolean;
     /** Blur shadow edges in open-air light instead of crisp lines. */
     softShadows: boolean;
+    /** Subtle low-res bloom around glowing lights and panels. */
+    bloom: boolean;
     /** Canvas pixel density: "auto" lowers it while frames run slow. */
     renderQuality: RenderQuality;
     prismPatterns: boolean;
@@ -217,6 +219,7 @@ export function defaultSaveData(): SaveData {
       muzzleFlash: "brightest",
       fieryMuzzleFlash: false,
       softShadows: false,
+      bloom: true,
       renderQuality: "auto",
       prismPatterns: true,
       autoFollowCamera: false,
@@ -515,6 +518,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
       typeof s.fieryMuzzleFlash === "boolean" ? s.fieryMuzzleFlash : false;
     def.settings.prismPatterns = typeof s.prismPatterns === "boolean" ? s.prismPatterns : true;
     def.settings.softShadows = typeof s.softShadows === "boolean" ? s.softShadows : false;
+    def.settings.bloom = typeof s.bloom === "boolean" ? s.bloom : true;
     if (typeof s.renderQuality === "string" && (RENDER_QUALITIES as readonly string[]).includes(s.renderQuality)) {
       def.settings.renderQuality = s.renderQuality as RenderQuality;
     }

@@ -37,6 +37,16 @@ describe("Fiery muzzle flash setting & soft-light layers", () => {
     expect(sanitizeSaveData({ settings: { softShadows: 1 } }).settings.softShadows).toBe(false);
   });
 
+  it("light bloom defaults on, persists off, and sanitizes bad values", () => {
+    const store = new MemStorage();
+    const s1 = new SaveManager(store);
+    expect(s1.data.settings.bloom).toBe(true);
+    s1.data.settings.bloom = false;
+    s1.save();
+    expect(new SaveManager(store).data.settings.bloom).toBe(false);
+    expect(sanitizeSaveData({ settings: { bloom: "no" } }).settings.bloom).toBe(true);
+  });
+
   it("layers widen outward while alpha falls off smoothly to zero", () => {
     const opts = { layers: 10, baseAlpha: 0.3, spread: 3, falloff: 2.2 };
     expect(softLayerAlpha(0, opts)).toBeCloseTo(0.3);

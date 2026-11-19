@@ -507,7 +507,7 @@ export class TerrainRenderer {
   }
 
   /** The lit tubes themselves, drawn additively after the lighting pass. */
-  drawPanels(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number): void {
+  drawPanels(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number, bloomOnly = false): void {
     const w = this.world;
     const still = this.reducedMotion?.matches ?? false;
     const cs = w.cellSize;
@@ -536,11 +536,14 @@ export class TerrainRenderer {
         const ty = y + (horizontal ? l.wallFace === "south" ? .75 : .1 : .15) * unit;
         const tw = (horizontal ? .7 : .15) * unit, th = (horizontal ? .15 : .7) * unit;
         const color = ctx.fillStyle;
-        ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
-        ctx.fillStyle = "#080c10"; ctx.fillRect(tx-unit*.06,ty-unit*.06,tw+unit*.12,th+unit*.12);
-        ctx.fillStyle = color; ctx.globalAlpha = level * .9;
+        if (!bloomOnly) {
+          ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+          ctx.fillStyle = "#080c10"; ctx.fillRect(tx-unit*.06,ty-unit*.06,tw+unit*.12,th+unit*.12);
+          ctx.fillStyle = color;
+        }
+        ctx.globalAlpha = level * .9;
         ctx.fillRect(tx,ty,tw,th);
-        ctx.globalCompositeOperation = "lighter";
+        if (!bloomOnly) ctx.globalCompositeOperation = "lighter";
         continue;
       }
       // Halo, then the tube, inset half a subcell so the panel frame shows.
