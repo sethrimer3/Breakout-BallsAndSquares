@@ -80,13 +80,13 @@ export class HUD {
 
     this.launchBtn = document.createElement("button");
     this.launchBtn.className = "hud-launch-btn";
-    this.launchBtn.title = "Deploy Reserve Soldier";
+    this.launchBtn.title = "Open the portal at the landing spot";
     this.launchBtn.innerHTML =
       `<span class="launch-count"></span>` +
       sprite("soldier", { color: UI_COLORS.soldier, scale: 3 }) +
       `<span class="launch-lbl">DEPLOY</span>`;
     this.launchCountEl = this.launchBtn.querySelector(".launch-count") as HTMLSpanElement;
-    this.launchBtn.addEventListener("click", () => this.game.launchInRandomDirection());
+    this.launchBtn.addEventListener("click", () => this.game.deployAtLandingSpot());
 
     // On-screen stand-ins for keyboard shortcuts, shown on touch screens only (see CSS).
     this.touchBar = document.createElement("div");
@@ -414,7 +414,8 @@ export class HUD {
           ? `MANUAL COMMANDER #${cmdr.slotIndex + 1} ACTIVE — WASD to move, aim & click to shoot`
           : "MANUAL CONTROL — All soldiers defeated";
       } else if (game.reserves > 0 && game.canDeploy)
-        status = `Click / tap to place (random dir) or drag to aim (${game.reserves} in reserve)`;
+        status = `Click / tap to open the portal — all ${game.reserves} operators come through`;
+      else if (game.portal) status = "Portal open — operators coming through";
       else if (game.reserves > 0) status = "Cannot deploy";
       else status = "Soldiers autonomous";
       this.helpStatusEl.textContent = status;

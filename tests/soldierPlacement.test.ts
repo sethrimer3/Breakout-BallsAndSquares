@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { SOLDIER, WORLD } from "../src/config";
-import { Rng } from "../src/core/Rng";
 import { Soldier } from "../src/entities/Soldier";
+import { PORTAL, portalHeading, SpawnPortal } from "../src/systems/SpawnPortal";
 import { Input, type InputHandlers } from "../src/systems/Input";
 import { PixelWorld } from "../src/world/PixelWorld";
 
@@ -42,7 +42,7 @@ function setupMockWindow() {
   return { mockWindow, mockCanvas, windowListeners, canvasListeners };
 }
 
-describe("Soldier Placement & Slingshot Aim Mechanics", () => {
+describe("Soldier Placement & Deployment Portal", () => {
   describe("Deployment anywhere and boundary clamping", () => {
     it("places soldiers at the exact specified world coordinates", () => {
       const speed = SOLDIER.speed;
@@ -92,110 +92,73 @@ describe("Soldier Placement & Slingshot Aim Mechanics", () => {
     });
   });
 
-  describe("Click and let go -> random cardinal direction", () => {
-    it("sends soldiers in only one of the 4 cardinal directions (straight up, right, left, down)", () => {
-      const rng = new Rng(42);
-      const CARDINAL = [
-        { dx: 0, dy: -1 }, // straight up
-        { dx: 1, dy: 0 },  // right
-        { dx: 0, dy: 1 },  // down
-        { dx: -1, dy: 0 }, // left
-      ];
-
-      const counts = [0, 0, 0, 0];
-      for (let i = 0; i < 200; i++) {
-        const idx = Math.floor(rng.range(0, 4));
-        const dir = CARDINAL[idx];
-        counts[idx]++;
-
-        // Check it is strictly a valid cardinal direction
-        const matches = CARDINAL.some((c) => c.dx === dir.dx && c.dy === dir.dy);
-        expect(matches).toBe(true);
-
-        const soldier = new Soldier(100, 100, dir.dx, dir.dy, SOLDIER.speed);
-        // Speed must match
-        expect(Math.hypot(soldier.vx, soldier.vy)).toBeCloseTo(SOLDIER.speed);
-
-        // Movement must align with exactly one cardinal axis
-        if (dir.dx === 0 && dir.dy === -1) {
-          expect(soldier.vx).toBeCloseTo(0);
-          expect(soldier.vy).toBeCloseTo(-SOLDIER.speed);
-        } else if (dir.dx === 1 && dir.dy === 0) {
-          expect(soldier.vx).toBeCloseTo(SOLDIER.speed);
-          expect(soldier.vy).toBeCloseTo(0);
-        } else if (dir.dx === 0 && dir.dy === 1) {
-          expect(soldier.vx).toBeCloseTo(0);
-          expect(soldier.vy).toBeCloseTo(SOLDIER.speed);
-        } else if (dir.dx === -1 && dir.dy === 0) {
-          expect(soldier.vx).toBeCloseTo(-SOLDIER.speed);
-          expect(soldier.vy).toBeCloseTo(0);
+  describe("Deployment portal: everyone through one portal, clockwise from north", () => {
+    it("fans n operators out at equal clockwise angles, the first heading north", () => {
+      const close = (h: { dx: number; dy: number }, dx: number, dy: number) => {
+        expect(h.dx).toBeCloseTo(dx, 9);
+        expect(h.dy).toBeCloseTo(dy, 9);
+      };
+      close(portalHeading(0, 1), 0, -1);
+      // Two: north, then south (180 degrees).
+      close(portalHeading(0, 2), 0, -1);
+      close(portalHeading(1, 2), 0, 1);
+      // Four: north, east, south, west (clockwise on a y-down screen).
+      close(portalHeading(0, 4), 0, -1);
+      close(portalHeading(1, 4), 1, 0);
+      close(portalHeading(2, 4), 0, 1);
+      close(portalHeading(3, 4), -1, 0);
+      // Three: 120 degrees apart, the second one down and to the right.
+      const h = portalHeading(1, 3);
+      expect(Math.atan2(h.dy, h.dx) * 180 / Math.PI).toBeCloseTo(30, 6);
+      for (let n = 1; n <= 8; n++) {
+        for (let k = 0; k < n; k++) {
+          const a = portalHeading(k, n);
+          const b = portalHeading((k + 1) % n, n);
+          expect(Math.hypot(a.dx, a.dy)).toBeCloseTo(1, 9);
+          // Each next operator is turned clockwise by exactly 360/n degrees.
+          if (n > 1) {
+            const turn = Math.atan2(a.dx * b.dy - a.dy * b.dx, a.dx * b.dx + a.dy * b.dy);
+            const want = n === 2 ? Math.PI : (Math.PI * 2) / n;
+            expect(Math.abs(turn)).toBeCloseTo(want, 6);
+            if (n > 2) expect(turn).toBeGreaterThan(0);
+          }
         }
       }
-
-      // Verify all 4 directions were sampled
-      for (let i = 0; i < 4; i++) {
-        expect(counts[i]).toBeGreaterThan(20);
-      }
     });
-  });
 
-  describe("Press, drag and let go -> arrow facing opposite direction, soldier goes away from release", () => {
-    it("arrow faces opposite direction to drag, and soldier moves away from release point", () => {
-      // Test cases: [dragDx, dragDy, expectedAimDx, expectedAimDy]
-      const tests = [
-        // Drag downwards (pull back down) -> launches straight up (away from release)
-        { drag: { dx: 0, dy: 50 }, expected: { dx: 0, dy: -1 } },
-        // Drag upwards (pull back up) -> launches straight down (away from release)
-        { drag: { dx: 0, dy: -50 }, expected: { dx: 0, dy: 1 } },
-        // Drag right -> launches straight left (away from release)
-        { drag: { dx: 60, dy: 0 }, expected: { dx: -1, dy: 0 } },
-        // Drag left -> launches straight right (away from release)
-        { drag: { dx: -60, dy: 0 }, expected: { dx: 1, dy: 0 } },
-        // Drag diagonally down-right -> launches up-left (away from release)
-        { drag: { dx: 30, dy: 40 }, expected: { dx: -0.6, dy: -0.8 } },
-        // Drag diagonally up-left -> launches down-right (away from release)
-        { drag: { dx: -30, dy: -40 }, expected: { dx: 0.6, dy: 0.8 } },
-      ];
+    it("opens first, then sends every operator through 0.5 s apart, then shuts", () => {
+      const p = new SpawnPortal(50, 60, 3);
+      const out: { k: number; t: number; dx: number; dy: number }[] = [];
+      const dt = 1 / 120;
+      let alive = true;
+      let steps = 0;
+      while (alive && steps++ < 2000) alive = p.update(dt, (k, dx, dy) => out.push({ k, t: p.t, dx, dy }));
+      expect(alive).toBe(false);
+      expect(out.map((o) => o.k)).toEqual([0, 1, 2]);
+      expect(out[0].t).toBeGreaterThanOrEqual(PORTAL.openTime - 1e-9);
+      expect(out[0].t).toBeLessThan(PORTAL.openTime + dt * 1.5);
+      expect(out[1].t - out[0].t).toBeCloseTo(0.5, 1);
+      expect(out[2].t - out[1].t).toBeCloseTo(0.5, 1);
+      expect(PORTAL.interval).toBe(0.5);
+      expect(out[0].dy).toBeCloseTo(-1, 9);
+      expect(p.phase).toBe("done");
+    });
 
-      for (const { drag, expected } of tests) {
-        const startX = 200;
-        const startY = 200;
-        const endX = startX + drag.dx;
-        const endY = startY + drag.dy;
-
-        // 1. Drag vector from press to cursor:
-        const dragDx = endX - startX;
-        const dragDy = endY - startY;
-
-        // 2. Arrow vector faces opposite direction:
-        const aimDx = -dragDx;
-        const aimDy = -dragDy;
-        const aimLen = Math.hypot(aimDx, aimDy);
-        const normAimX = aimDx / aimLen;
-        const normAimY = aimDy / aimLen;
-
-        expect(normAimX).toBeCloseTo(expected.dx, 5);
-        expect(normAimY).toBeCloseTo(expected.dy, 5);
-
-        // 3. Direction away from where player let go:
-        // Where player let go is (endX, endY). Origin is (startX, startY).
-        // Vector away from (endX, endY) towards (startX, startY) is:
-        const launchDx = startX - endX;
-        const launchDy = startY - endY;
-        const launchLen = Math.hypot(launchDx, launchDy);
-        const normLaunchX = launchDx / launchLen;
-        const normLaunchY = launchDy / launchLen;
-
-        expect(normLaunchX).toBeCloseTo(expected.dx, 5);
-        expect(normLaunchY).toBeCloseTo(expected.dy, 5);
-
-        // 4. Soldier spawned at (startX, startY) with this direction
-        const s = new Soldier(startX, startY, normLaunchX, normLaunchY, SOLDIER.speed);
-        expect(s.x).toBe(startX);
-        expect(s.y).toBe(startY);
-        expect(s.vx).toBeCloseTo(expected.dx * SOLDIER.speed, 3);
-        expect(s.vy).toBeCloseTo(expected.dy * SOLDIER.speed, 3);
-      }
+    it("grows open, stays open while operators come through, then collapses", () => {
+      const p = new SpawnPortal(0, 0, 2);
+      expect(p.openness).toBeCloseTo(0, 6);
+      p.update(PORTAL.openTime + 0.1, () => {});
+      expect(p.phase).toBe("open");
+      expect(p.openness).toBe(1);
+      p.update(p.closeAt - p.t + PORTAL.closeTime / 2, () => {});
+      expect(p.phase).toBe("closing");
+      expect(p.openness).toBeGreaterThan(0);
+      expect(p.openness).toBeLessThan(1);
+      // A long frame still sends everyone, in order.
+      const big = new SpawnPortal(0, 0, 4);
+      const ks: number[] = [];
+      big.update(10, (k) => ks.push(k));
+      expect(ks).toEqual([0, 1, 2, 3]);
     });
   });
 
@@ -243,26 +206,29 @@ describe("Soldier Placement & Slingshot Aim Mechanics", () => {
       expect(releaseCalled).toBe(false);
     });
 
-    it("dispatches onAimRelease on press and drag", () => {
+    it("turns a press and drag into a camera pan, with no portal", () => {
       const { mockCanvas } = setupMockWindow();
-      let releaseData: { startSx: number; startSy: number; endSx: number; endSy: number } | null = null;
       let clickCalled = false;
+      let releaseCalled = false;
+      const onPan = vi.fn();
+      const onAimCancel = vi.fn();
 
       const handlers: InputHandlers = {
         canPlace: () => true,
         onAimStart: vi.fn(),
         onAimMove: vi.fn(),
+        onAimCancel,
+        onPan,
         onAimClick: () => {
           clickCalled = true;
         },
-        onAimRelease: (startSx, startSy, endSx, endSy) => {
-          releaseData = { startSx, startSy, endSx, endSy };
+        onAimRelease: () => {
+          releaseCalled = true;
         },
       };
 
       new Input(mockCanvas as any, handlers);
 
-      // Pointer down at (100, 100)
       mockCanvas.dispatchCanvasEvent({
         type: "pointerdown",
         button: 0,
@@ -271,33 +237,15 @@ describe("Soldier Placement & Slingshot Aim Mechanics", () => {
         clientY: 100,
         preventDefault: () => {},
       });
+      (globalThis as any).window.dispatchEvent({ type: "pointermove", pointerType: "mouse", clientX: 100, clientY: 160 });
+      (globalThis as any).window.dispatchEvent({ type: "pointermove", pointerType: "mouse", clientX: 110, clientY: 170 });
+      (globalThis as any).window.dispatchEvent({ type: "pointerup", button: 0, pointerType: "mouse", clientX: 110, clientY: 170 });
 
-      // Pointer move to (100, 160) -> 60px down
-      (globalThis as any).window.dispatchEvent({
-        type: "pointermove",
-        pointerType: "mouse",
-        clientX: 100,
-        clientY: 160,
-      });
-
-      expect(handlers.onAimMove).toHaveBeenCalledWith(100, 160);
-
-      // Pointer up at (100, 160)
-      (globalThis as any).window.dispatchEvent({
-        type: "pointerup",
-        button: 0,
-        pointerType: "mouse",
-        clientX: 100,
-        clientY: 160,
-      });
-
+      expect(onAimCancel).toHaveBeenCalled();
+      expect(onPan).toHaveBeenCalledWith(0, 60);
+      expect(onPan).toHaveBeenCalledWith(10, 10);
       expect(clickCalled).toBe(false);
-      expect(releaseData).toEqual({
-        startSx: 100,
-        startSy: 100,
-        endSx: 100,
-        endSy: 160,
-      });
+      expect(releaseCalled).toBe(false);
     });
 
     it("pans camera when canPlace returns false", () => {

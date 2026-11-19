@@ -3,7 +3,7 @@ import { WORLD } from "../src/config";
 import type { Soldier } from "../src/entities/Soldier";
 import { BlightWardenSystem, WARDEN, clearOfCells, wardenHealth } from "../src/systems/BlightWardens";
 import { SPECIAL_UPGRADE, SpecialUpgradeSystem } from "../src/systems/SpecialUpgrades";
-import { LAB_WORLDS } from "../src/world/labMap";
+import { LAB_WORLDS, LAB_WORLD_COUNT, labWorld, sectorAtCell, sectorBounds, sectorSpawnCell, upgradeSpotSector } from "../src/world/labMap";
 import { PixelWorld } from "../src/world/PixelWorld";
 import { generateWorld } from "../src/world/WorldGenerator";
 
@@ -115,5 +115,35 @@ describe("Blight Wardens", () => {
     g.aggro = 100;
     for (let i = 0; i < 600; i++) wardens.update(1 / 60, [far]);
     expect(Math.hypot(g.x - g.homeX, g.y - g.homeY)).toBeLessThanOrEqual(WARDEN.leashCells * cs + WARDEN.lungeSpeed * WARDEN.lungeTime + 1);
+  });
+
+  it("keep squads from deploying into the sector they hold until both fall", () => {
+    const { w, specials, wardens } = lab();
+    const frame = w.labLayout!.frame!;
+    const cs = w.cellSize;
+    const b = specials.blocks[0];
+    const sector = sectorAtCell(frame, b.cx, b.cy);
+    // Right beside the block, and anywhere else in its sector.
+    expect(wardens.guardsZoneAt((b.x0 + b.x1) / 2, b.y1 + 2 * cs)).toBe(true);
+    const box = sectorBounds(frame, sector);
+    expect(wardens.guardsZoneAt((box.x0 + 0.5) * cs, (box.y0 + 0.5) * cs)).toBe(true);
+    expect(wardens.guardsZoneAt((box.x1 + 0.5) * cs, (box.y1 + 0.5) * cs)).toBe(true);
+    // The start sector holds no gold block, so it stays open.
+    const start = sectorSpawnCell(frame, LAB_WORLDS[1].start);
+    expect(wardens.guardsZoneAt((start.cx + 0.5) * cs, (start.cy + 0.5) * cs)).toBe(false);
+    // One Warden down is not enough; both down frees the sector.
+    const mine = wardens.wardens.filter((g) => g.blockId === b.id);
+    wardens.damage(mine[0], mine[0].maxHp, mine[0].x, mine[0].y);
+    const others = specials.blocks.filter((o) => o !== b && sectorAtCell(frame, o.cx, o.cy) === sector);
+    expect(wardens.guardsZoneAt((box.x0 + 0.5) * cs, (box.y0 + 0.5) * cs)).toBe(true);
+    wardens.damage(mine[1], mine[1].maxHp, mine[1].x, mine[1].y);
+    if (others.length === 0) expect(wardens.guardsZoneAt((box.x0 + 0.5) * cs, (box.y0 + 0.5) * cs)).toBe(false);
+  });
+
+  it("never hold a world's starting sector, so the lab map always has somewhere to deploy", () => {
+    for (let id = 1; id <= LAB_WORLD_COUNT; id++) {
+      const def = labWorld(id);
+      for (const spot of def.upgrades) expect(upgradeSpotSector(def, spot)).not.toBe(def.start);
+    }
   });
 });
