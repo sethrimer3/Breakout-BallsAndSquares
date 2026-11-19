@@ -81,6 +81,22 @@ export class Renderer {
     return this.dpr;
   }
 
+  /** Capture actual density and auto-quality state when exporting diagnostics. */
+  diagnostics() {
+    return {
+      quality: this.game.renderQuality,
+      density: this.dpr,
+      devicePixelRatio: window.devicePixelRatio || 1,
+      cssSize: [window.innerWidth, window.innerHeight],
+      backingSize: [this.canvas.width, this.canvas.height],
+      softShadows: this.game.save.data.settings.softShadows,
+      auto: this.governor ? {
+        step: this.governor.step, cap: this.governor.cap,
+        locked: this.governor.locked, typicalIntervalMs: this.governor.lastTypical,
+      } : null,
+    };
+  }
+
   resize(): void {
     const deviceRatio = window.devicePixelRatio || 1;
     const w = window.innerWidth;

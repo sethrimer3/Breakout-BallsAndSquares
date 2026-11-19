@@ -1,3 +1,4 @@
+import { FrameTimings } from "./core/FrameTimings";
 import { DamageNumbers } from "./entities/DamageNumbers";
 import { LateEncounters } from "./systems/LateEncounters";
 import { GROVE_CACHE_STACKS, LATE_DROP_CHANCE, lateBlockReward } from "./world/campaignBalance";
@@ -210,6 +211,7 @@ export class Game {
 
   private acc = 0;
   private last = 0;
+  private readonly frameTimings = new FrameTimings();
   private fpsAcc = 0;
   private fpsFrames = 0;
 
@@ -2353,7 +2355,15 @@ export class Game {
         nearSoldierGrowthPct: +this.growth.nearSoldierPercent(r.time).toFixed(1),
         upgrades: this.save.data.upgrades,
         samples: r.samples,
-        timing: this.debugInfo,
+        timing: {
+          ...this.debugInfo,
+          recentActiveFrames: this.frameTimings.snapshot(),
+          rendering: this.renderer.diagnostics(),
+          connectedAirMapping: this.stats.connectedAirMapping,
+          visible: !document.hidden,
+          paused: this.paused,
+          userAgent: navigator.userAgent,
+        },
         weapons: { combat: this.combat.telemetry, goo: { contacts: this.combat.goo.contacts, deposits: this.combat.goo.deposits, bursts: this.combat.goo.bursts, bounceHistogram: this.combat.goo.bounceHistogram, orbs: this.combat.goo.orbs.activeCount, mines: this.combat.goo.mines.activeCount, droppedOrbs: this.combat.goo.droppedOrbs, droppedMines: this.combat.goo.droppedMines },
           drones: { active: this.combat.drones.pool.activeCount, launched: this.combat.drones.launched, shots: this.combat.drones.shots, hits: this.combat.drones.usefulHits, dropped: this.combat.drones.dropped },
           prism: { shots: this.combat.laser.shots, bounces: this.combat.laser.bounces, hits: this.combat.laser.hits, droppedSegments: this.combat.laser.droppedSegments } },
@@ -2364,6 +2374,7 @@ export class Game {
   }
 
   frame = (now: number): void => {
+    const frameStart = performance.now();
     this.syncSpeedrun(now);
     if (this.runStarted && !this.paused && !this.runOver && this.save.data.speedrun.enabled && now - this.speedrunSavedAt >= 5000) {
       this.speedrunSavedAt = now;
@@ -2374,6 +2385,8 @@ export class Game {
     this.last = now;
     // Only live gameplay frames tune the auto render quality.
     const playing = this.runStarted && this.runStats.soldiersDeployed > 0 && !this.paused && !this.runOver && !document.hidden;
+    const continuousGameplay = playing && this.wasPlaying;
+    if (playing && !this.wasPlaying) this.frameTimings.reset();
     if (playing && this.wasPlaying) this.renderer.sampleFrame(intervalMs);
     else if (!playing && this.wasPlaying) this.renderer.resetFrameSampling();
     this.wasPlaying = playing;
@@ -2412,7 +2425,9 @@ export class Game {
     this.debugOverlay.update();
     const t2 = performance.now();
 
-    this.fpsAcc += real;
+    // Simulation time is capped for catch-up; FPS must use real elapsed time.
+    // Otherwise every interval >=100 ms is incorrectly reported as 10 FPS.
+    this.fpsAcc += intervalMs / 1000;
     this.fpsFrames++;
     if (this.fpsAcc >= 0.5) {
       this.debugInfo.fps = this.fpsFrames / this.fpsAcc;
@@ -2420,7 +2435,10 @@ export class Game {
       this.fpsFrames = 0;
     }
     this.debugInfo.simMs = t1 - t0;
-    this.debugInfo.frameMs = t2 - t0;
+    this.debugInfo.frameMs = t2 - frameStart;
+    // Keep the last gameplay window while paused, so opening diagnostics does
+    // not overwrite slow gameplay with cheap menu frames. Resume starts fresh.
+    if (continuousGameplay) this.frameTimings.sample(intervalMs, this.debugInfo.frameMs);
     requestAnimationFrame(this.frame);
   };
 

@@ -1,0 +1,43 @@
+{
+  "syntheticIntervalMs": 200,
+  "reportedFps": 4.999999999999999,
+  "recent": {
+    "samples": 4,
+    "windowSeconds": 0.8,
+    "fps": 5,
+    "intervalMs": {
+      "p50": 200,
+      "p95": 200,
+      "p99": 200,
+      "max": 200
+    },
+    "workMs": {
+      "p50": 15.700000000186265,
+      "p95": 66.90000000037253,
+      "p99": 66.90000000037253,
+      "max": 66.90000000037253
+    }
+  },
+  "rendering": {
+    "quality": "auto",
+    "density": 1.5,
+    "devicePixelRatio": 2.625,
+    "cssSize": [
+      412,
+      915
+    ],
+    "backingSize": [
+      618,
+      1373
+    ],
+    "softShadows": false,
+    "auto": {
+      "step": 1,
+      "cap": 1.5,
+      "locked": false,
+      "typicalIntervalMs": 0
+    }
+  },
+  "pausePreservesHistory": true,
+  "resumeResetsHistory": true
+}
