@@ -18,7 +18,7 @@ import { FireRenderer } from "./FireRenderer";
 import { CreatureRenderer } from "./CreatureRenderer";
 import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
-import { createSprites, soldierShapeSprite, type Sprites } from "./sprites";
+import { createSprites, radialSprite, soldierShapeSprite, type Sprites } from "./sprites";
 import { soldierShapeIndex } from "../entities/soldierShapes";
 import { CRACK_PATTERNS, subPixelColor, subPixelTexelShade, TIER_PAINT } from "./materials";
 import { ledLevel } from "./TerrainRenderer";
@@ -58,6 +58,7 @@ export class Renderer {
   /** CSS overlay standing in for a full-screen vignette pass on the canvas. */
   private vignette: HTMLDivElement;
   private sprites: Sprites;
+  private doorGlowSprites: (HTMLCanvasElement | undefined)[] = [];
   private creatureRenderer = new CreatureRenderer();
   private wardenRenderer = new WardenRenderer();
   private lightRenderer: LightRenderer;
@@ -219,6 +220,7 @@ export class Renderer {
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
+    this.drawDoorGlow(still ? 0 : wallClockMs / 1000);
     this.drawBlightCorePulses();
     this.drawLoot();
     drawSpecialGlow(ctx, cam, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
@@ -513,6 +515,45 @@ export class Renderer {
         }
       }
     }
+  }
+
+  /** Subtle, slowly pulsing tier-colored glow around closed doors. */
+  private drawDoorGlow(t: number): void {
+    const { ctx, game } = this;
+    const w = game.world;
+    if (w.doors.length === 0) return;
+    const cam = game.camera;
+    const cs = w.cellSize;
+    const sz = cs * cam.zoom;
+    const x0 = cam.screenToWorldX(0) / cs - 2;
+    const y0 = cam.screenToWorldY(0) / cs - 2;
+    const x1 = cam.screenToWorldX(cam.viewW) / cs + 2;
+    const y1 = cam.screenToWorldY(cam.viewH) / cs + 2;
+    for (const d of w.doors) {
+      if (d.open || d.x1 < x0 || d.y1 < y0 || d.x0 > x1 || d.y0 > y1) continue;
+      let sprite = this.doorGlowSprites[d.tier];
+      if (!sprite) {
+        const [r, g, b] = TIER_PAINT[d.tier] ?? TIER_PAINT[1];
+        sprite = radialSprite(64, [
+          [0, `rgba(${r}, ${g}, ${b}, 0.55)`],
+          [0.45, `rgba(${r}, ${g}, ${b}, 0.18)`],
+          [1, `rgba(${r}, ${g}, ${b}, 0)`],
+        ]);
+        this.doorGlowSprites[d.tier] = sprite;
+      }
+      const pulse = 0.5 + 0.5 * Math.sin(t * 1.1 + d.id * 1.37);
+      const rad = sz * (1.2 + 0.25 * pulse);
+      ctx.globalAlpha = 0.16 + 0.18 * pulse;
+      for (const i of d.cells) {
+        if (w.health[i] === 0) continue;
+        const cx = i % w.width;
+        const cy = (i - cx) / w.width;
+        const sx = cam.worldToScreenX((cx + 0.5) * cs);
+        const sy = cam.worldToScreenY((cy + 0.5) * cs);
+        ctx.drawImage(sprite, sx - rad, sy - rad, rad * 2, rad * 2);
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   /**
