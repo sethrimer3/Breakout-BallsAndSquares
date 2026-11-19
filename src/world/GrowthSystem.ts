@@ -5,6 +5,7 @@ import type { Soldier } from "../entities/Soldier";
 import { cellOverlapsCircle, circleIsClear } from "../systems/PhysicsSystem";
 import { BlightColonies } from "./BlightColonies";
 import { Frontier } from "./Frontier";
+import { updateGeneratorTiers } from "./GeneratorTiers";
 import type { PixelWorld } from "./PixelWorld";
 
 export interface GrowthEvents {
@@ -46,6 +47,8 @@ export class GrowthSystem {
   coreRate = 0;
   /** Number of living Blight Cores currently exposed to open air via their connected pink blight. */
   exposedCoresCount = 0;
+  /** Generator takeovers (a tougher colony converting a weaker generator) in progress. */
+  takeovers = 0;
   graceSeconds = GROWTH.graceSeconds;
   startRate = GROWTH.baseRate;
   expBase = GROWTH.expBase;
@@ -228,6 +231,7 @@ export class GrowthSystem {
   updateCoreGenerators(dt: number, runTime: number, soldiers: readonly Soldier[]): void {
     const cols = this.colonies;
     cols.update(dt, GROWTH.splitCheckSeconds);
+    this.takeovers = updateGeneratorTiers(this.world, cols.list, dt);
     const cores = this.world.blightCores;
     let exposed = 0;
     const rate = this.rate;

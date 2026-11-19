@@ -25,6 +25,7 @@ import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { CombinedTargets, RoomFixtures } from "./systems/RoomFixtures";
 import { SpecialUpgradeSystem } from "./systems/SpecialUpgrades";
+import { BlightWardenSystem, type Warden } from "./systems/BlightWardens";
 import { SPECIAL_UNLOCKS } from "./progression/specialUnlocks";
 import { UPGRADE_BY_ID } from "./progression/UpgradeDefinitions";
 import { FireSystem } from "./systems/FireSystem";
@@ -83,6 +84,8 @@ export class Game {
   readonly fixtures: RoomFixtures;
   /** Glowing gold special-upgrade blocks and the motes they burst into. */
   readonly specials: SpecialUpgradeSystem;
+  /** Blight Wardens guarding the gold special-upgrade blocks. */
+  readonly wardens: BlightWardenSystem;
   readonly late: LateEncounters;
   /** Flamethrower flames and burning rubble. */
   readonly fire: FireSystem;
@@ -254,6 +257,7 @@ export class Game {
         this.creatures.explode(x, y, radius, damage);
         this.fixtures.explode(x, y, radius);
         this.late.explode(x, y, radius, damage);
+        this.wardens.explode(x, y, radius, damage);
         this.specials.explode(x, y, radius);
         this.audio.playGoo("burst", x, y);
         this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.2, radius, 0xff963c, 8);
@@ -374,7 +378,25 @@ export class Game {
       onMoteAbsorbed: (s) => this.audio.playPickup(s.x, s.y),
       onAbsorbed: (id, s) => this.grantSpecialUpgrade(id, s),
     }, () => this.rng.next());
-    this.combat.targets = new CombinedTargets([this.creatures, this.fixtures, this.late, this.specials]);
+    this.wardens = new BlightWardenSystem(this.world, {
+      onSoldierHit: (s, dmg, x, y) => this.hurtSoldier(s, dmg, x, y),
+      onSpit: (x, y) => this.audio.playSpore(x, y),
+      onSpitBurst: (x, y, r) => this.onSporeBurst(x, y, r),
+      onLunge: (w) => this.audio.playSpore(w.x, w.y),
+      onHurt: (_w, x, y) => {
+        for (let i = 0; i < 3; i++) {
+          const a = this.rng.range(0, Math.PI * 2), sp = this.rng.range(20, 70);
+          this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.2, 0.4), 1, 0xd8267a, 4);
+        }
+      },
+      onKilled: (w) => this.onWardenKilled(w),
+      onBlockFreed: (_id, x, y) => {
+        this.audio.playGlassShatter(x, y);
+        this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.3, 22, 0xff4b8b, 1);
+      },
+    }, () => this.rng.next());
+    this.specials.isShielded = (id) => this.wardens.isGuarded(id);
+    this.combat.targets = new CombinedTargets([this.creatures, this.fixtures, this.late, this.wardens, this.specials]);
     this.combat.late = this.late;
     this.camera = new CameraSystem(this.world);
     this.audio.setCamera(this.camera);
@@ -1473,6 +1495,7 @@ export class Game {
     if (!visualOnly && damage > 0) {
       this.creatures.explode(x, y, radiusWorld, damage);
       this.late.explode(x, y, radiusWorld, damage);
+      this.wardens.explode(x, y, radiusWorld, damage);
       this.specials.explode(x, y, radiusWorld);
     }
     this.fixtures.explode(x, y, radiusWorld);
@@ -1733,6 +1756,22 @@ export class Game {
     this.loot.spawnDropsForBlock(x, y, chance, this.stats.pickupLifetime, this.rng, loot.kind, loot.value);
   }
 
+  /** A Blight Warden fell: a burst of pink gore and a heavy drop of its zone's loot. */
+  private onWardenKilled(w: Warden): void {
+    this.audio.playDestroy(w.x, w.y);
+    this.addScreenShake(4);
+    for (let i = 0; i < 28; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(25, 140);
+      this.particles.spawn(PKind.Debris, w.x, w.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.35, 0.8), 1, i % 3 ? 0xd8267a : 0x5a0f36, 4);
+    }
+    this.particles.spawn(PKind.Burst, w.x, w.y, 0, 0, 0.25, 16, 0xff4b8b, 1);
+    const cx = Math.floor(w.x / this.world.cellSize);
+    const cy = Math.floor(w.y / this.world.cellSize);
+    const loot = this.terrainLoot(cx, cy, this.world.zoneAt(cx, cy));
+    this.loot.spawnDropsForBlock(w.x, w.y, 8, this.stats.pickupLifetime, this.rng, loot.kind, loot.value);
+  }
+
   /** A dormant pixel crumbled to Necrosis Protocol: a puff of dark dust. */
   private onBlightDecay(sx: number, sy: number): void {
     if (this.rng.next() > 0.35) return;
@@ -1755,6 +1794,7 @@ export class Game {
     this.labProgress.attachThreats(this.late.actors);
     this.fixtures.reset();
     this.specials.reset(this.labSave.specials);
+    this.wardens.reset(this.specials.blocks);
     this.specialNotice = null;
     this.glass.reset();
     this.doors.reset();
@@ -2025,6 +2065,7 @@ export class Game {
     this.creatures.update(dt, this.runStats.time, this.soldiers, this.growth);
     this.doors.update(dt);
     this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
+    this.wardens.update(dt, this.soldiers);
     this.specials.update(dt);
     this.updateFog(dt);
     if (!this.labDef.framework) this.growth.update(dt, this.runStats.time, this.soldiers);

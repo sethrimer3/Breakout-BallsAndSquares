@@ -60,6 +60,8 @@ interface MoteStream {
 
 export interface SpecialUpgradeEvents {
   onHit?(block: SpecialBlock, x: number, y: number): void;
+  /** A hit glanced off the Blight membrane of a block its wardens still guard. */
+  onShieldHit?(block: SpecialBlock, x: number, y: number): void;
   onShatter?(block: SpecialBlock, soldier: Soldier): void;
   onMoteAbsorbed?(soldier: Soldier, x: number, y: number): void;
   /** Every mote has reached the soldier: the upgrade is theirs. */
@@ -76,6 +78,8 @@ export class SpecialUpgradeSystem implements BulletTargets {
   motes: GoldMote[] = [];
   private streams: MoteStream[] = [];
   private selected: SpecialBlock | null = null;
+  /** True while block `id` is still guarded (its Blight Wardens live); hits glance off. */
+  isShielded: (id: string) => boolean = () => false;
   /** Soldier-glow timers keyed by soldier, for the absorb shimmer. */
   readonly glow = new Map<Soldier, number>();
   get targetKey(): object | null {
@@ -145,6 +149,11 @@ export class SpecialUpgradeSystem implements BulletTargets {
   }
 
   private hit(b: SpecialBlock, x: number, y: number): void {
+    if (this.isShielded(b.id)) {
+      b.flash = Math.max(b.flash, 0.06);
+      this.events.onShieldHit?.(b, x, y);
+      return;
+    }
     b.hitsLeft--;
     b.flash = 0.12;
     this.events.onHit?.(b, x, y);
