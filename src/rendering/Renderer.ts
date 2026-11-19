@@ -27,6 +27,8 @@ import { FACILITY } from "../config";
 import { paletteColor, SPRITES } from "../ui/pixelArt";
 import type { Door } from "../world/PixelWorld";
 import { autoStartIndex, densityFor, FIXED_CAPS, RenderScaleGovernor } from "./RenderScale";
+import { drawGeneratorRims } from "./GeneratorRimRenderer";
+import { WardenRenderer } from "./WardenRenderer";
 import { drawSpecialBlocks, drawSpecialGlow, drawSpecialNotice, drawSpecialPlinths } from "./SpecialUpgradeRenderer";
 
 /** Keycard colors by tier, as on the research-base upgrades. */
@@ -57,6 +59,7 @@ export class Renderer {
   private vignette: HTMLDivElement;
   private sprites: Sprites;
   private creatureRenderer = new CreatureRenderer();
+  private wardenRenderer = new WardenRenderer();
   private lightRenderer: LightRenderer;
   private fieryFlash: FieryFlashRenderer;
   private bloomRenderer: BloomRenderer;
@@ -198,6 +201,7 @@ export class Renderer {
     const still = this.motion.matches;
     game.terrain.drawSurfaceOutlines(ctx, cam);
     drawSpecialBlocks(ctx, cam, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
+    this.wardenRenderer.draw(ctx, cam, game.wardens, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
@@ -236,6 +240,8 @@ export class Renderer {
       game.terrain.drawBlightThroughFog(ctx, cam);
     }
     game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);
+    // Generator tier rims sit on top of the Blight's own edges (Blight shows through fog).
+    drawGeneratorRims(ctx, cam, game.world, still ? 0 : wallClockMs / 1000);
     // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
     // its full palette even when it outruns the light creeping after it.
     drawWeaponExpansion(ctx, game, still);

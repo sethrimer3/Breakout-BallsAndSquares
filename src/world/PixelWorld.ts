@@ -2,6 +2,7 @@ import { blockHealthForTier, FACILITY, GROWTH, maxHealthForDistance, TERRAIN, ti
 import { nearestSector, SECTOR_CELLS, sectorZone } from "./labMap";
 import type { SolidQuery } from "../core/gridRaycast";
 import type { LabLayout } from "./WorldGenerator";
+import { coreCellMaxHealth, generatorCellHealth } from "./GeneratorTiers";
 
 export interface BlightCore {
   id: number;
@@ -15,6 +16,15 @@ export interface BlightCore {
   alive: boolean;
   /** Edge length in cells: 2 for a room's Blight Core, 1 for a small generator in a glass tank. */
   size: 1 | 2;
+  /**
+   * Generator level: the block tier it was found at (set lazily from the zone,
+   * see world/GeneratorTiers). A tougher colony raises it by taking it over.
+   */
+  level?: number;
+  /** Level a running takeover is raising this generator to. */
+  convertTo?: number;
+  /** Takeover progress, 0..1 (linear; see `conversionProgress`). */
+  convert?: number;
 }
 
 /** Special block materials (`world.mat`). */
@@ -502,7 +512,10 @@ export class PixelWorld implements SolidQuery {
       const w = this.wall[i];
       if (w > 0) return this.labLayout?.frame?.def.id === 1
         ? tierHealth(fill, t) : tierWallHealth(this.tierBase + w, t);
-      if (this.coreId[i] > 0) return tierHealth(fill, t) + GROWTH.coreHealthBonus;
+      if (this.coreId[i] > 0) {
+        const core = this.blightCores[this.coreId[i] - 1];
+        return core ? coreCellMaxHealth(this, core) : generatorCellHealth(fill);
+      }
     }
     return tierHealth(fill, t);
   }
@@ -616,12 +629,20 @@ export class PixelWorld implements SolidQuery {
    */
   /** Squad damage after Arsenal Calibration; armored cells and non-squad damage are unscaled. */
   private scaled(i: number, amount: number, byPlayer: boolean): number {
-    if (!byPlayer || this.armored[i]) return amount;
+    if (!byPlayer || (i >= 0 && this.armored[i])) return amount;
     let mult = this.playerDamageMult;
     if (this.damageRollMax > this.damageRollMin) mult *= this.damageRollMin + (this.damageRollMax - this.damageRollMin) * this.nextRoll();
     else mult *= this.damageRollMin;
     if (mult === 1) return amount;
     return Math.max(1, Math.round(amount * mult));
+  }
+
+  /**
+   * Squad damage against a Blight creature that follows Blight-block rules
+   * (Blight Wardens): rolled and scaled by Arsenal Calibration.
+   */
+  squadBlightDamage(amount: number): number {
+    return this.scaled(-1, amount, true);
   }
 
   /** Cheap xorshift for damage rolls, 0..1. */
