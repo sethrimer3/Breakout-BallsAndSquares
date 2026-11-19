@@ -65,15 +65,27 @@ describe("air-exposed surface outlines", () => {
     expect(covers(r, 3.05, 3.05)).toBe(true);
     expect(covers(r, 3.2, 3.2)).toBe(false);
   });
-  it("uses the same thin rim on half pixels and suppresses edges touching full blocks", () => {
+  it("uses the same thin rim on half pixels and outlines edges touching full blocks", () => {
     const w = scene();
     w.setSubCell(6, 6, 10);
     w.setCell(2, 3, 10);
     const r = outline(w);
     expect(covers(r, 3.45, 3.25)).toBe(true);
     expect(covers(r, 3.25, 3.05)).toBe(true);
-    expect(covers(r, 3.05, 3.25)).toBe(false);
+    expect(covers(r, 3.05, 3.25)).toBe(true);
+    expect(covers(r, 2.95, 3.25)).toBe(false);
     expect(covers(r, 3.25, 3.25)).toBe(false);
+  });
+  it("merges adjacent half pixels and joins concave corners around full blocks", () => {
+    const w = scene();
+    w.setCell(2, 2, 10); // subcells 4..5, 4..5
+    w.setSubCell(6, 5, 10); // right of full block
+    w.setSubCell(5, 6, 10); // below full block
+    w.setSubCell(6, 6, 10); // diagonal from full block, touching both half pixels
+    const r = outline(w);
+    expect(covers(r, 3.05, 3.05)).toBe(true);
+    expect(covers(r, 3.05, 3.25)).toBe(false);
+    expect(covers(r, 3.25, 3.05)).toBe(false);
   });
   it("rebuilds both sides of a chunk seam after mining and removes destroyed outlines", () => {
     const w = scene(),

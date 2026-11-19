@@ -16,7 +16,7 @@ const WILT = ["#241a2c", "#3a2a46", "#544063", "#6e5a7c", "#8a7896", "#a898b0"] 
 const SPECIMEN = ["#0d2a22", "#1d5244", "#2f8a6c", "#56c49a", "#a8f0cf"] as const;
 
 /** Collects one frame's pixels, then draws them as screen rects. */
-class PixelBatch {
+export class PixelBatch {
   private xs: number[] = [];
   private ys: number[] = [];
   private cs: string[] = [];

@@ -586,6 +586,7 @@ export class LightRenderer {
     const W = game.world.width;
     const cs = game.world.cellSize;
     const offsets = fixedFixture ? this.fixtureFalloff.get(lit,x,y,radius,W,cs,LUT_STEPS) : null;
+    const weights = lit.weights;
     for (let i = 0; i < lit.count; i++) {
       const cell = lit.cells[i];
       const cx = cell % W;
@@ -599,10 +600,11 @@ export class LightRenderer {
         if (t >= 1) continue;
         e = Math.floor(t * LUT_STEPS) * 3;
       }
+      const w = weights ? weights[i] * strength : strength;
       const p = cell * 4;
-      data[p] += lut[e] * strength;
-      data[p + 1] += lut[e + 1] * strength;
-      data[p + 2] += lut[e + 2] * strength;
+      data[p] += lut[e] * w;
+      data[p + 1] += lut[e + 1] * w;
+      data[p + 2] += lut[e + 2] * w;
       data[p + 3] = 255;
       const chunks = game.terrain.chunks;
       this.wallChunks[Math.floor(cy / chunks.chunkSize) * chunks.cols + Math.floor(cx / chunks.chunkSize)] = 1;

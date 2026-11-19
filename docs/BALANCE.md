@@ -93,3 +93,17 @@ Crescent, Stable Fuel / Wide Spill, Deep Chill / Long Mist. Defined in
 Income per minute is a model, not a measurement. Watch time-to-afford for
 Calibration II level 1 on arriving in the Wards (31 hits per T4 block) and the
 crystal sink of soldier T2 nodes (now 80 base) across a full squad.
+
+## Blight generators and Wardens
+
+- **Generator tiers** (`src/world/GeneratorTiers.ts`): every generator has a level, the block tier of
+  the zone it sits in. Each generator cell holds a fifth of that tier's block health
+  (`GENERATOR.healthFrac`). Its rim is painted in the tier's colors with 1-3 studs for the tier step
+  inside its world. When a tougher generator's creep joins a weaker one's colony, the weaker
+  generator is taken over over `GENERATOR.convertSeconds`: its rim recolors and its health climbs
+  smoothly to the tougher level, keeping the share of health it had left.
+- **Blight Wardens** (`src/systems/BlightWardens.ts`): two bosses guard every gold special-upgrade
+  block. While either lives, the block is wrapped in a Blight membrane and hits glance off. Warden
+  health is `WARDEN.hpBlocks` (4) ordinary blocks of the spot's tier, and squad hits on them roll
+  and take Arsenal Calibration like hits on Blight. Damage per bite or blob is 1 in the Lab, 2 in the
+  Wards, and the CAMPAIGN enemy damage in later worlds (lunges hit twice as hard).

@@ -3,6 +3,7 @@ import { drawMapBoundary } from "./MapBoundaryRenderer";
 import { drawWeaponExpansion } from "./WeaponExpansionRenderer";
 import { drawGoo } from "./GooRenderer";
 import { LateAtmosphere } from "./LateAtmosphere";
+import { drawPortalPreview, drawSpawnDenied, drawSpawnPortal } from "./PortalRenderer";
 import { bayer, drawPixelSprite, fillArtPixel, pixelDiscSprite } from "./pixelFx";
 import { worldAtmosphere } from "../world/worldAtmosphere";
 import { LootKind } from "../entities/LootSystem";
@@ -13,18 +14,22 @@ import type { Soldier } from "../entities/Soldier";
 import { PKind } from "../entities/ParticleSystem";
 import type { Game } from "../Game";
 import { FieryFlashRenderer } from "./FieryFlashRenderer";
+import { BloomRenderer } from "./BloomRenderer";
 import { FireRenderer } from "./FireRenderer";
 import { CreatureRenderer } from "./CreatureRenderer";
 import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
-import { createSprites, soldierShapeSprite, type Sprites } from "./sprites";
+import { createSprites, radialSprite, soldierShapeSprite, type Sprites } from "./sprites";
 import { soldierShapeIndex } from "../entities/soldierShapes";
-import { CRACK_PATTERNS } from "./materials";
-import { TIER_PAINT } from "./materials";
+import { CRACK_PATTERNS, subPixelColor, subPixelTexelShade, TIER_PAINT } from "./materials";
+import { ledLevel } from "./TerrainRenderer";
+import { SUB } from "../world/PixelWorld";
 import { FACILITY } from "../config";
 import { paletteColor, SPRITES } from "../ui/pixelArt";
 import type { Door } from "../world/PixelWorld";
 import { autoStartIndex, densityFor, FIXED_CAPS, RenderScaleGovernor } from "./RenderScale";
+import { drawGeneratorRims } from "./GeneratorRimRenderer";
+import { WardenRenderer } from "./WardenRenderer";
 import { drawSpecialBlocks, drawSpecialGlow, drawSpecialNotice, drawSpecialPlinths } from "./SpecialUpgradeRenderer";
 
 /** Keycard colors by tier, as on the research-base upgrades. */
@@ -54,9 +59,12 @@ export class Renderer {
   /** CSS overlay standing in for a full-screen vignette pass on the canvas. */
   private vignette: HTMLDivElement;
   private sprites: Sprites;
+  private doorGlowSprites: (HTMLCanvasElement | undefined)[] = [];
   private creatureRenderer = new CreatureRenderer();
+  private wardenRenderer = new WardenRenderer();
   private lightRenderer: LightRenderer;
   private fieryFlash: FieryFlashRenderer;
+  private bloomRenderer: BloomRenderer;
   private damageNumberRenderer = new DamageNumberRenderer();
   private fireRenderer = new FireRenderer();
   private lateAtmosphere = new LateAtmosphere();
@@ -70,6 +78,7 @@ export class Renderer {
     this.sprites = createSprites();
     this.lightRenderer = new LightRenderer(this.sprites);
     this.fieryFlash = new FieryFlashRenderer(this.lightRenderer);
+    this.bloomRenderer = new BloomRenderer(this.sprites);
     this.fogRenderer = new FogRenderer(game.fog);
     this.vignette = document.createElement("div");
     this.vignette.className = "game-vignette";
@@ -178,6 +187,7 @@ export class Renderer {
 
     game.terrain.drawFloor(ctx, cam);
     game.terrain.draw(ctx, cam, game.showChunkBorders);
+    this.drawSubPixels();
     this.drawDoors();
     drawSpecialPlinths(ctx, cam, game.world);
     this.lateAtmosphere.drawFloorProps(ctx, cam, game.world, this.motion.matches ? 0 : performance.now() / 1000);
@@ -201,6 +211,7 @@ export class Renderer {
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
     game.terrain.drawPanels(ctx, cam, performance.now() / 1000);
     game.terrain.drawLabLights(ctx, cam, performance.now() / 1000, this.motion.matches);
+    this.drawSubPixelLights(performance.now() / 1000, this.motion.matches);
     this.drawSentries();
     game.late.draw(ctx, cam);
     this.creatureRenderer.draw(ctx, cam, game.creatures, this.motion.matches ? 0 : performance.now() / 1000);
@@ -208,6 +219,7 @@ export class Renderer {
     const still = this.motion.matches;
     game.terrain.drawSurfaceOutlines(ctx, cam);
     drawSpecialBlocks(ctx, cam, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
+    this.wardenRenderer.draw(ctx, cam, game.wardens, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
@@ -225,6 +237,7 @@ export class Renderer {
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
+    this.drawDoorGlow(still ? 0 : wallClockMs / 1000);
     this.drawBlightCorePulses();
     this.drawLoot();
     drawSpecialGlow(ctx, cam, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
@@ -236,6 +249,8 @@ export class Renderer {
     this.drawAdditiveParticles();
     ctx.restore();
 
+    this.bloomRenderer.render(ctx, game, this.fireRenderer, still, wallClockMs / 1000);
+
     drawMapBoundary(ctx, game.world, cam);
 
     // 4) Fog of war over the whole world; the aim indicator stays readable on top.
@@ -244,9 +259,13 @@ export class Renderer {
       game.terrain.drawBlightThroughFog(ctx, cam);
     }
     game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);
+    // Generator tier rims sit on top of the Blight's own edges (Blight shows through fog).
+    drawGeneratorRims(ctx, cam, game.world, still ? 0 : wallClockMs / 1000);
     // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
     // its full palette even when it outruns the light creeping after it.
     drawWeaponExpansion(ctx, game, still);
+    // The deployment portal sits under the operators stepping out of it.
+    if (game.portal) drawSpawnPortal(ctx, cam, game.portal, still ? 0 : wallClockMs / 1000);
     this.drawSoldiers();
     this.drawGrenades();
     drawGoo(ctx, cam, game.combat.goo, still, game.lighting.quality === "low");
@@ -335,6 +354,77 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = smoothing;
+  }
+
+  private readonly subColorScratch = [0, 0, 0];
+  private readonly subTexelScratch = [0, 0, 0];
+
+  private drawSubPixels(): void {
+    const { ctx, game } = this;
+    const sp = game.subPixels;
+    if (sp.count === 0) return;
+    const cam = game.camera;
+    const ss = game.world.subCellSize;
+    const sz = Math.max(1, ss * cam.zoom);
+    const half = sz * 0.5;
+    const col = this.subColorScratch;
+    const tex = this.subTexelScratch;
+    for (let i = 0; i < sp.count; i++) {
+      const sx = cam.worldToScreenX(sp.x[i]);
+      const sy = cam.worldToScreenY(sp.y[i]);
+      if (sx + half < 0 || sy + half < 0 || sx - half > cam.viewW || sy - half > cam.viewH) continue;
+      const origSx = sp.origSx[i];
+      const origSy = sp.origSy[i];
+      const kind = sp.kind[i];
+      subPixelColor(kind, sp.tint[i], origSy, sp.hp[i], sp.maxHp[i], false, col);
+      const x0 = sx - half;
+      const y0 = sy - half;
+      for (let oy = 0; oy < 2; oy++) {
+        for (let ox = 0; ox < 2; ox++) {
+          subPixelTexelShade(kind, origSx, origSy, ox, oy, true, true, true, true, col, tex);
+          ctx.fillStyle = `rgb(${tex[0]},${tex[1]},${tex[2]})`;
+          ctx.fillRect(x0 + ox * half, y0 + oy * half, half, half);
+        }
+      }
+    }
+  }
+
+  private drawSubPixelLights(time: number, still: boolean): void {
+    const { ctx, game } = this;
+    const sp = game.subPixels;
+    if (sp.activeLightCount === 0) return;
+    const cam = game.camera;
+    const ss = game.world.subCellSize;
+    const px = ss * cam.zoom;
+    const half = px * 0.5;
+    const t = still ? 0 : time;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < sp.count; i++) {
+      const k = sp.kind[i];
+      if (k !== SUB.led && k !== SUB.core) continue;
+      const tint = sp.tint[i];
+      const r = tint & 63;
+      let level: number;
+      let c: readonly [number, number, number];
+      if (k === SUB.led) {
+        c = COLORS.labLed[tint >> 6];
+        level = still ? 0.8 : ledLevel(r, t);
+      } else {
+        c = COLORS.labCore[tint >> 6];
+        level = still ? 0.7 : 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * (1.2 + (r & 7) * 0.15) + (sp.origSx[i] + sp.origSy[i]) * 0.45 + (r >> 3)));
+      }
+      if (level <= 0.02) continue;
+      const lx = cam.worldToScreenX(sp.x[i]) - half;
+      const ly = cam.worldToScreenY(sp.y[i]) - half;
+      if (lx + px * 2 < 0 || ly + px * 2 < 0 || lx - px > cam.viewW || ly - px > cam.viewH) continue;
+      ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      ctx.globalAlpha = level * (k === SUB.core ? 0.16 : 0.12);
+      ctx.fillRect(lx - px, ly - px, px * 3, px * 3);
+      ctx.globalAlpha = level;
+      ctx.fillRect(lx, ly, px, px);
+    }
+    ctx.restore();
   }
 
   private drawCasings(): void {
@@ -444,6 +534,45 @@ export class Renderer {
         }
       }
     }
+  }
+
+  /** Subtle, slowly pulsing tier-colored glow around closed doors. */
+  private drawDoorGlow(t: number): void {
+    const { ctx, game } = this;
+    const w = game.world;
+    if (w.doors.length === 0) return;
+    const cam = game.camera;
+    const cs = w.cellSize;
+    const sz = cs * cam.zoom;
+    const x0 = cam.screenToWorldX(0) / cs - 2;
+    const y0 = cam.screenToWorldY(0) / cs - 2;
+    const x1 = cam.screenToWorldX(cam.viewW) / cs + 2;
+    const y1 = cam.screenToWorldY(cam.viewH) / cs + 2;
+    for (const d of w.doors) {
+      if (d.open || d.x1 < x0 || d.y1 < y0 || d.x0 > x1 || d.y0 > y1) continue;
+      let sprite = this.doorGlowSprites[d.tier];
+      if (!sprite) {
+        const [r, g, b] = TIER_PAINT[d.tier] ?? TIER_PAINT[1];
+        sprite = radialSprite(64, [
+          [0, `rgba(${r}, ${g}, ${b}, 0.55)`],
+          [0.45, `rgba(${r}, ${g}, ${b}, 0.18)`],
+          [1, `rgba(${r}, ${g}, ${b}, 0)`],
+        ]);
+        this.doorGlowSprites[d.tier] = sprite;
+      }
+      const pulse = 0.5 + 0.5 * Math.sin(t * 1.1 + d.id * 1.37);
+      const rad = sz * (1.2 + 0.25 * pulse);
+      ctx.globalAlpha = 0.16 + 0.18 * pulse;
+      for (const i of d.cells) {
+        if (w.health[i] === 0) continue;
+        const cx = i % w.width;
+        const cy = (i - cx) / w.width;
+        const sx = cam.worldToScreenX((cx + 0.5) * cs);
+        const sy = cam.worldToScreenY((cy + 0.5) * cs);
+        ctx.drawImage(sprite, sx - rad, sy - rad, rad * 2, rad * 2);
+      }
+    }
+    ctx.globalAlpha = 1;
   }
 
   /**
@@ -1130,154 +1259,20 @@ export class Renderer {
     const { ctx, game } = this;
     const cam = game.camera;
 
+    const now = performance.now() / 1000;
+    const denied = game.spawnDenied;
+    if (denied) drawSpawnDenied(ctx, cam, denied.x, denied.y, now - denied.t0, denied.guarded);
+
     if (game.aimState.active) {
-      // The player is pressing and may be dragging to aim
-      const sx = cam.worldToScreenX(game.aimState.startWx);
-      const sy = cam.worldToScreenY(game.aimState.startWy);
-      const gr = SOLDIER.ringRadius * cam.zoom;
-      const br = SOLDIER.renderRadius * cam.zoom;
-
-      // Draw ghost soldier at placement origin
-      ctx.drawImage(this.sprites.soldierGlow, sx - gr, sy - gr, gr * 2, gr * 2);
-      ctx.save();
-      ctx.globalAlpha = 0.85;
-      this.drawSoldierSprite(this.sprites.soldier, sx, sy);
-      ctx.restore();
-
-      // Outer targeting ring
-      ctx.save();
-      ctx.strokeStyle = "#9ff3ff";
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.arc(sx, sy, br + 3, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-
-      if (game.aimState.isDragging) {
-        // Player is dragging: show the arrow facing the opposite direction of drag
-        const curSx = game.aimState.curSx;
-        const curSy = game.aimState.curSy;
-        const dragDx = curSx - sx;
-        const dragDy = curSy - sy;
-        const dragDist = Math.hypot(dragDx, dragDy);
-
-        if (dragDist > 1e-3) {
-          // Opposite direction: away from where pointer is / away from drag
-          const aimDx = -dragDx / dragDist;
-          const aimDy = -dragDy / dragDist;
-
-          // 1) Pull-back slingshot tether (elastic dotted line to cursor)
-          ctx.save();
-          ctx.strokeStyle = "rgba(160, 230, 255, 0.45)";
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath();
-          ctx.moveTo(sx, sy);
-          ctx.lineTo(curSx, curSy);
-          ctx.stroke();
-
-          // Small tether handle at pointer
-          ctx.fillStyle = "rgba(160, 230, 255, 0.75)";
-          ctx.beginPath();
-          ctx.arc(curSx, curSy, 4, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
-
-          // 2) Arrow facing OPPOSITE direction (away from cursor / where player let go)
-          const arrowLen = Math.min(100, Math.max(35, dragDist * 0.85));
-          const startDist = br + 3;
-          const startX = sx + aimDx * startDist;
-          const startY = sy + aimDy * startDist;
-          const tipX = sx + aimDx * (startDist + arrowLen);
-          const tipY = sy + aimDy * (startDist + arrowLen);
-
-          // Arrow shaft with glow
-          ctx.save();
-          // Glow layer
-          ctx.strokeStyle = "rgba(0, 229, 255, 0.4)";
-          ctx.lineWidth = 6;
-          ctx.lineCap = "round";
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          ctx.lineTo(tipX, tipY);
-          ctx.stroke();
-
-          // Core shaft
-          ctx.strokeStyle = "#9ff3ff";
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          ctx.moveTo(startX, startY);
-          ctx.lineTo(tipX, tipY);
-          ctx.stroke();
-
-          // Arrowhead pointing forward
-          const headLen = 14;
-          const headWidth = 11;
-          const nx = -aimDy; // normal vector
-          const ny = aimDx;
-          const baseMidX = tipX - aimDx * headLen;
-          const baseMidY = tipY - aimDy * headLen;
-          const c1X = baseMidX + nx * (headWidth / 2);
-          const c1Y = baseMidY + ny * (headWidth / 2);
-          const c2X = baseMidX - nx * (headWidth / 2);
-          const c2Y = baseMidY - ny * (headWidth / 2);
-          const notchX = tipX - aimDx * (headLen * 0.7);
-          const notchY = tipY - aimDy * (headLen * 0.7);
-
-          ctx.fillStyle = "#ffffff";
-          ctx.shadowColor = "#00e5ff";
-          ctx.shadowBlur = 10;
-          ctx.beginPath();
-          ctx.moveTo(tipX, tipY);
-          ctx.lineTo(c1X, c1Y);
-          ctx.lineTo(notchX, notchY);
-          ctx.lineTo(c2X, c2Y);
-          ctx.closePath();
-          ctx.fill();
-          ctx.restore();
-        }
-      } else {
-        // Active click/press before drag threshold: show 4 cardinal direction hints (straight up, right, down, left)
-        ctx.save();
-        ctx.strokeStyle = "rgba(160, 230, 255, 0.6)";
-        ctx.lineWidth = 2;
-        const tickDist = br + 4;
-        const tickLen = 6;
-        // Up
-        ctx.beginPath();
-        ctx.moveTo(sx, sy - tickDist);
-        ctx.lineTo(sx, sy - tickDist - tickLen);
-        // Right
-        ctx.moveTo(sx + tickDist, sy);
-        ctx.lineTo(sx + tickDist + tickLen, sy);
-        // Down
-        ctx.moveTo(sx, sy + tickDist);
-        ctx.lineTo(sx, sy + tickDist + tickLen);
-        // Left
-        ctx.moveTo(sx - tickDist, sy);
-        ctx.lineTo(sx - tickDist - tickLen, sy);
-        ctx.stroke();
-        ctx.restore();
-      }
+      // Pressing: the portal will open here when the press lets go.
+      const wx = game.aimState.startWx;
+      const wy = game.aimState.startWy;
+      drawPortalPreview(ctx, cam, wx, wy, now, game.spawnGuardedAt(wx, wy), 0.95);
     } else if (game.input.mouseInside && game.canPlaceSoldier()) {
-      // Hovering with mouse while soldiers are in reserve: show placement cursor reticle
-      const sx = game.input.mouseX;
-      const sy = game.input.mouseY;
-      const br = SOLDIER.renderRadius * cam.zoom;
-      ctx.save();
-      ctx.strokeStyle = "rgba(160, 230, 255, 0.45)";
-      ctx.lineWidth = 1.5;
-      ctx.setLineDash([3, 3]);
-      ctx.beginPath();
-      ctx.arc(sx, sy, br, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // Subtle center dot
-      ctx.fillStyle = "rgba(160, 230, 255, 0.6)";
-      ctx.beginPath();
-      ctx.arc(sx, sy, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
+      // Hovering with the squad still in reserve: where the portal would open.
+      const wx = cam.screenToWorldX(game.input.mouseX);
+      const wy = cam.screenToWorldY(game.input.mouseY);
+      drawPortalPreview(ctx, cam, wx, wy, now, game.spawnGuardedAt(wx, wy), 0.6);
     } else if (game.input.mouseInside && !game.canPlaceSoldier() && !game.paused && !game.runOver) {
       const sx = game.input.mouseX;
       const sy = game.input.mouseY;

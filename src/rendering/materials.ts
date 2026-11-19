@@ -1,4 +1,6 @@
+import { COLORS } from "../config";
 import { hash2, valueNoise } from "../core/math";
+import { SUB } from "../world/PixelWorld";
 
 /**
  * Matte wall materials, one per terrain tier, painted at quarter-pixel
@@ -406,4 +408,105 @@ const FRAMEWORK_BASE: Readonly<Record<number, RGB>> = {
 };
 export function materialColor(tier: number, framework = false): RGB {
   return (framework ? FRAMEWORK_BASE[tier] : undefined) ?? MATERIAL_BASE[tier] ?? MATERIAL_BASE[MATERIAL_BASE.length - 1];
+}
+
+type Ramp4 = readonly [readonly [number, number, number], readonly [number, number, number], readonly [number, number, number], readonly [number, number, number]];
+
+function sampleSubRamp(ramp: Ramp4, t: number, out: number[]): void {
+  const s = t * 3;
+  const idx = Math.min(2, Math.floor(s));
+  const f = s - idx;
+  const a = ramp[idx];
+  const b = ramp[idx + 1];
+  out[0] = a[0] + (b[0] - a[0]) * f;
+  out[1] = a[1] + (b[1] - a[1]) * f;
+  out[2] = a[2] + (b[2] - a[2]) * f;
+}
+
+/** Albedo of a live half-size pixel, before relief shading. */
+export function subPixelColor(
+  kind: number,
+  tint: number,
+  sy: number,
+  hp: number,
+  maxHp: number,
+  dormant: boolean,
+  out: number[],
+): void {
+  const subT = tint / 255;
+  if (kind === SUB.rubble) {
+    const pal = COLORS.rubble;
+    const c = pal[(tint & 7) % pal.length];
+    const v = 0.82 + ((tint >> 3) / 32) * 0.36;
+    out[0] = c[0] * v;
+    out[1] = c[1] * v;
+    out[2] = c[2] * v;
+  } else if (kind === SUB.metal || kind === SUB.pipe) {
+    sampleSubRamp(kind === SUB.metal ? COLORS.labMetal : COLORS.labPipe, 0.3 + subT * 0.4, out);
+  } else if (kind === SUB.led) {
+    const c = COLORS.labLed[tint >> 6];
+    out[0] = 24 + c[0] * 0.22;
+    out[1] = 24 + c[1] * 0.22;
+    out[2] = 28 + c[2] * 0.22;
+  } else if (kind === SUB.core) {
+    const c = COLORS.labCore[tint >> 6];
+    out[0] = c[0] * 0.6;
+    out[1] = c[1] * 0.6;
+    out[2] = c[2] * 0.6;
+  } else if (kind === SUB.wreck) {
+    sampleSubRamp(COLORS.labWreck, subT, out);
+  } else if (kind === SUB.screen) {
+    const c = COLORS.labScreen[(tint >> 6) & 3];
+    const v = (sy & 1) === 0 ? 0.95 : 0.7;
+    out[0] = c[0] * v;
+    out[1] = c[1] * v;
+    out[2] = c[2] * v;
+  } else {
+    sampleSubRamp(COLORS.pinkBlight, subT, out);
+  }
+  if (dormant) {
+    const rot = hp < maxHp ? 1 - hp / maxHp : 0;
+    const lum = (out[0] + out[1] + out[2]) / 3;
+    const k = 0.5 - rot * 0.3;
+    out[0] = (lum * 0.55 + out[0] * 0.45) * k;
+    out[1] = (lum * 0.55 + out[1] * 0.45) * k * 0.85;
+    out[2] = (lum * 0.55 + out[2] * 0.45) * k * 1.1;
+  } else if (hp < maxHp) {
+    const d = 1 - hp / maxHp;
+    const lighten = d * 0.55;
+    out[0] += (255 - out[0]) * lighten;
+    out[1] += (255 - out[1]) * lighten;
+    out[2] += (255 - out[2]) * lighten;
+  }
+}
+
+/**
+ * Apply the 2×2 micro-grain and bevel relief shading for one texel `(ox, oy)`
+ * of a half-size pixel originating at `(origSx, origSy)`.
+ */
+export function subPixelTexelShade(
+  kind: number,
+  origSx: number,
+  origSy: number,
+  ox: number,
+  oy: number,
+  subUp: boolean,
+  subLeft: boolean,
+  subDown: boolean,
+  subRight: boolean,
+  col: readonly number[],
+  out: number[],
+): void {
+  const flat = kind === SUB.screen || kind === SUB.led || kind === SUB.core;
+  let m = flat ? 1 : 0.92 + hash2(origSx * 2 + ox, origSy * 2 + oy, 5) * 0.16;
+  let add = 0;
+  if ((subUp && oy === 0) || (subLeft && ox === 0)) {
+    m *= 1.4;
+    add = 8;
+  } else if ((subDown && oy === 1) || (subRight && ox === 1)) {
+    m *= 0.7;
+  }
+  out[0] = Math.min(255, Math.max(0, Math.round(col[0] * m + add)));
+  out[1] = Math.min(255, Math.max(0, Math.round(col[1] * m + add)));
+  out[2] = Math.min(255, Math.max(0, Math.round(col[2] * m + add)));
 }

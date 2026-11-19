@@ -14,13 +14,12 @@ import { paintPortal } from "./portalNoise";
 import type { CameraSystem } from "../systems/CameraSystem";
 import { hash2 } from "../core/math";
 import { DECOR } from "../world/LabDetails";
-import { lateMaterial, materialColor, TEX, TIER_PAINT, crackTexelAt, materialShade, type LateFeature } from "./materials";
+import { lateMaterial, materialColor, subPixelColor, subPixelTexelShade, TEX, TIER_PAINT, crackTexelAt, materialShade, type LateFeature } from "./materials";
 import { CHAR_CELLS, SECTOR_CELLS, type LabFrame } from "../world/labMap";
 import { roomLightPosition, LIGHT_KIND, MAT, SUB, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
 
 type RGB = readonly [number, number, number];
-type Ramp4 = readonly [RGB, RGB, RGB, RGB];
 
 function lateBlendedTier(frame: LabFrame, cx: number, cy: number): number {
   if (frame.def.id !== 3) return frame.def.tierBase + 1;
@@ -100,18 +99,6 @@ export function flickerLevel(t: number, phase: number): number {
   return h < 0.45 ? 0.9 : 0.06;
 }
 
-function mix(a: RGB, b: RGB, t: number, out: number[]): void {
-  out[0] = a[0] + (b[0] - a[0]) * t;
-  out[1] = a[1] + (b[1] - a[1]) * t;
-  out[2] = a[2] + (b[2] - a[2]) * t;
-}
-
-function sampleRamp(ramp: Ramp4, t: number, out: number[]): void {
-  if (t < 1 / 3) mix(ramp[0], ramp[1], t * 3, out);
-  else if (t < 2 / 3) mix(ramp[1], ramp[2], (t - 1 / 3) * 3, out);
-  else mix(ramp[2], ramp[3], (t - 2 / 3) * 3, out);
-}
-
 /**
  * True when texel (ox, oy) lies on the band `depth` texels in from an open
  * diagonal neighbor, joining the bands of the two walls that meet at an inside
@@ -146,7 +133,7 @@ function hash01(n: number): number {
 }
 
 /** Brightness (0..1) of a status light with rhythm `r` (0..63) at `time`. */
-function ledLevel(r: number, time: number): number {
+export function ledLevel(r: number, time: number): number {
   const rate = 0.5 + (r & 7) * 0.22;
   const phase = (r >> 3) / 8;
   const f = (time * rate + phase) % 1;
@@ -520,7 +507,7 @@ export class TerrainRenderer {
   }
 
   /** The lit tubes themselves, drawn additively after the lighting pass. */
-  drawPanels(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number): void {
+  drawPanels(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number, bloomOnly = false): void {
     const w = this.world;
     const still = this.reducedMotion?.matches ?? false;
     const cs = w.cellSize;
@@ -549,11 +536,14 @@ export class TerrainRenderer {
         const ty = y + (horizontal ? l.wallFace === "south" ? .75 : .1 : .15) * unit;
         const tw = (horizontal ? .7 : .15) * unit, th = (horizontal ? .15 : .7) * unit;
         const color = ctx.fillStyle;
-        ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
-        ctx.fillStyle = "#080c10"; ctx.fillRect(tx-unit*.06,ty-unit*.06,tw+unit*.12,th+unit*.12);
-        ctx.fillStyle = color; ctx.globalAlpha = level * .9;
+        if (!bloomOnly) {
+          ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1;
+          ctx.fillStyle = "#080c10"; ctx.fillRect(tx-unit*.06,ty-unit*.06,tw+unit*.12,th+unit*.12);
+          ctx.fillStyle = color;
+        }
+        ctx.globalAlpha = level * .9;
         ctx.fillRect(tx,ty,tw,th);
-        ctx.globalCompositeOperation = "lighter";
+        if (!bloomOnly) ctx.globalCompositeOperation = "lighter";
         continue;
       }
       // Halo, then the tube, inset half a subcell so the panel frame shows.
@@ -574,6 +564,28 @@ export class TerrainRenderer {
       if (subHealth[si] > 0 && (k === SUB.led || k === SUB.core)) found.push(si);
     }
     this.lights = Int32Array.from(found);
+    this.lightIndex = new SortedGridIndex(this.lights, this.world.subWidth, this.world.subHeight);
+  }
+
+  /** Register a newly settled LED or Core subcell so its blinking/pulsing light stays active. */
+  addLabLight(sx: number, sy: number): void {
+    const si = sy * this.world.subWidth + sx;
+    const k = this.world.subKind[si];
+    if (this.world.subHealth[si] === 0 || (k !== SUB.led && k !== SUB.core)) return;
+    // Binary search for insertion point in sorted `lights`.
+    let lo = 0;
+    let hi = this.lights.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (this.lights[mid] < si) lo = mid + 1;
+      else hi = mid;
+    }
+    if (lo < this.lights.length && this.lights[lo] === si) return;
+    const next = new Int32Array(this.lights.length + 1);
+    next.set(this.lights.subarray(0, lo), 0);
+    next[lo] = si;
+    next.set(this.lights.subarray(lo), lo + 1);
+    this.lights = next;
     this.lightIndex = new SortedGridIndex(this.lights, this.world.subWidth, this.world.subHeight);
   }
 
@@ -833,19 +845,11 @@ export class TerrainRenderer {
               const subDown = sy < world.subHeight - 1 && !world.subSolidAt(sx, sy + 1);
               const subRight = sx < world.subWidth - 1 && !world.subSolidAt(sx + 1, sy);
               const sk = world.subKind[si];
-              const flat = sk === SUB.screen || sk === SUB.led || sk === SUB.core;
+              const shaded = [0, 0, 0];
               for (let oy = 0; oy < 2; oy++) {
                 for (let ox = 0; ox < 2; ox++) {
-                  let m = flat ? 1 : 0.92 + hash2(sx * 2 + ox, sy * 2 + oy, 5) * 0.16;
-                  let add = 0;
-                  // A lit lip on the faces toward the upper left, a shadow on the others.
-                  if ((subUp && oy === 0) || (subLeft && ox === 0)) {
-                    m *= 1.4;
-                    add = 8;
-                  } else if ((subDown && oy === 1) || (subRight && ox === 1)) {
-                    m *= 0.7;
-                  }
-                  put(bx + ox, by + oy, col[0] * m + add, col[1] * m + add, col[2] * m + add, 255);
+                  subPixelTexelShade(sk, sx, sy, ox, oy, subUp, subLeft, subDown, subRight, col, shaded);
+                  put(bx + ox, by + oy, shaded[0], shaded[1], shaded[2], 255);
                 }
               }
             }
@@ -1033,57 +1037,15 @@ export class TerrainRenderer {
   /** Albedo of a live half-size pixel, before relief shading. */
   private subColor(si: number, sx: number, sy: number, subHp: number, col: number[]): void {
     const world = this.world;
-    const subT = world.subTint[si] / 255;
-    const sk = world.subKind[si];
-    if (sk === SUB.rubble) {
-      const pal = COLORS.rubble;
-      // Tint bits 0-2 pick the stone's color, bits 3-7 its brightness (see CaveIns).
-      const c = pal[(world.subTint[si] & 7) % pal.length];
-      const v = 0.82 + ((world.subTint[si] >> 3) / 32) * 0.36;
-      col[0] = c[0] * v;
-      col[1] = c[1] * v;
-      col[2] = c[2] * v;
-    } else if (sk === SUB.metal || sk === SUB.pipe) {
-      sampleRamp(sk === SUB.metal ? COLORS.labMetal : COLORS.labPipe, 0.3 + subT * 0.4, col);
-    } else if (sk === SUB.led) {
-      // Unlit lamp housing; the blinking light is drawn on top each frame.
-      const c = COLORS.labLed[world.subTint[si] >> 6];
-      col[0] = 24 + c[0] * 0.22;
-      col[1] = 24 + c[1] * 0.22;
-      col[2] = 28 + c[2] * 0.22;
-    } else if (sk === SUB.core) {
-      const c = COLORS.labCore[world.subTint[si] >> 6];
-      col[0] = c[0] * 0.6;
-      col[1] = c[1] * 0.6;
-      col[2] = c[2] * 0.6;
-    } else if (sk === SUB.wreck) {
-      sampleRamp(COLORS.labWreck, subT, col);
-    } else if (sk === SUB.screen) {
-      const c = COLORS.labScreen[(world.subTint[si] >> 6) & 3];
-      // Scanline flicker baked per pixel; brighter on even rows.
-      const v = (sy & 1) === 0 ? 0.95 : 0.7;
-      col[0] = c[0] * v;
-      col[1] = c[1] * v;
-      col[2] = c[2] * v;
-    } else {
-      sampleRamp(COLORS.pinkBlight, subT, col);
-    }
-    const maxSubHp = world.maxSubHealthAt(sx, sy);
-    if (this.dormantAt?.(si)) {
-      // Dormant: drained to a bruised violet, and decay darkens it further.
-      const rot = subHp < maxSubHp ? 1 - subHp / maxSubHp : 0;
-      const lum = (col[0] + col[1] + col[2]) / 3;
-      const k = 0.5 - rot * 0.3;
-      col[0] = (lum * 0.55 + col[0] * 0.45) * k;
-      col[1] = (lum * 0.55 + col[1] * 0.45) * k * 0.85;
-      col[2] = (lum * 0.55 + col[2] * 0.45) * k * 1.1;
-    } else if (subHp < maxSubHp) {
-      const d = 1 - subHp / maxSubHp;
-      const lighten = d * 0.55;
-      col[0] += (255 - col[0]) * lighten;
-      col[1] += (255 - col[1]) * lighten;
-      col[2] += (255 - col[2]) * lighten;
-    }
+    subPixelColor(
+      world.subKind[si],
+      world.subTint[si],
+      sy,
+      subHp,
+      world.maxSubHealthAt(sx, sy),
+      this.dormantAt?.(si) ?? false,
+      col,
+    );
   }
 
   /**

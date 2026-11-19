@@ -80,13 +80,13 @@ export class HUD {
 
     this.launchBtn = document.createElement("button");
     this.launchBtn.className = "hud-launch-btn";
-    this.launchBtn.title = "Deploy Reserve Soldier";
+    this.launchBtn.title = "Open the portal at the landing spot";
     this.launchBtn.innerHTML =
       `<span class="launch-count"></span>` +
       sprite("soldier", { color: UI_COLORS.soldier, scale: 3 }) +
       `<span class="launch-lbl">DEPLOY</span>`;
     this.launchCountEl = this.launchBtn.querySelector(".launch-count") as HTMLSpanElement;
-    this.launchBtn.addEventListener("click", () => this.game.launchInRandomDirection());
+    this.launchBtn.addEventListener("click", () => this.game.deployAtLandingSpot());
 
     // On-screen stand-ins for keyboard shortcuts, shown on touch screens only (see CSS).
     this.touchBar = document.createElement("div");
@@ -101,9 +101,13 @@ export class HUD {
     this.followBtn.title = "Follow soldiers (tap again to cycle in order)";
     this.followBtn.innerHTML = sprite("follow", { color: UI_COLORS.soldier, scale: 3 });
     this.followBtn.addEventListener("click", () => {
-      const cam = this.game.camera;
-      if (cam.following) cam.cycleTarget(this.game.soldiers);
-      else cam.resumeAuto();
+      if (!this.game.autoMove) {
+        this.game.cycleCommander();
+      } else {
+        const cam = this.game.camera;
+        if (cam.following) cam.cycleTarget(this.game.soldiers);
+        else cam.resumeAuto();
+      }
       this.update(this.game, performance.now(), true);
     });
     this.touchBar.append(pauseBtn, this.followBtn);
@@ -131,6 +135,7 @@ export class HUD {
     this.autoMoveCheck = this.tacticalBar.querySelector(".hud-automove") as HTMLInputElement;
     this.autoMoveCheck.addEventListener("change", () => {
       this.game.setAutoMove(this.autoMoveCheck.checked);
+      this.autoMoveCheck.blur();
       this.update(this.game, performance.now(), true);
     });
 
@@ -414,7 +419,8 @@ export class HUD {
           ? `MANUAL COMMANDER #${cmdr.slotIndex + 1} ACTIVE — WASD to move, aim & click to shoot`
           : "MANUAL CONTROL — All soldiers defeated";
       } else if (game.reserves > 0 && game.canDeploy)
-        status = `Click / tap to place (random dir) or drag to aim (${game.reserves} in reserve)`;
+        status = `Click / tap to open the portal — all ${game.reserves} operators come through`;
+      else if (game.portal) status = "Portal open — operators coming through";
       else if (game.reserves > 0) status = "Cannot deploy";
       else status = "Soldiers autonomous";
       this.helpStatusEl.textContent = status;

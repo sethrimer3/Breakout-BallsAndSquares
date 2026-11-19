@@ -41,4 +41,20 @@ describe('cached surface outlines', () => {
     cache.update(grid,0,0,scratch,region);expect(cache.empty).toBe(true);
     expect(cache.update(grid,0,0,scratch,region)).toBe(false);
   });
+
+  it('matches traceSurfaceOutline when both full cells and 0.5 pixels are present', () => {
+    const full=new Uint8Array(12*12), sub=new Uint8Array(24*24);
+    const grid={
+      solidAt:(cx:number,cy:number)=>cx>=0&&cy>=0&&cx<12&&cy<12?full[cy*12+cx]>0:false,
+      subSolidAt:(sx:number,sy:number)=>sx>=0&&sy>=0&&sx<24&&sy<24?(full[(sy>>1)*12+(sx>>1)]>0||sub[sy*24+sx]>0):false,
+    };
+    full[2*12+2]=1; full[2*12+3]=1;
+    sub[4*24+8]=1; sub[5*24+8]=1; sub[6*24+5]=1;
+    const subs=8, cache=new SurfaceOutlineCache(subs), scratch=new Uint8Array((subs+2)**2);
+    cache.update(grid,4,4,scratch,{x0:0,y0:0,x1:subs-1,y1:subs-1});
+    const actual:number[][]=[],expected:number[][]=[];
+    cache.trace((...r)=>actual.push(r));
+    traceSurfaceOutline(grid,4,4,subs,scratch,(...r)=>expected.push(r));
+    expect(actual).toEqual(expected);
+  });
 });

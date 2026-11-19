@@ -2,6 +2,7 @@ import { blockHealthForTier, FACILITY, GROWTH, maxHealthForDistance, TERRAIN, ti
 import { nearestSector, SECTOR_CELLS, sectorZone } from "./labMap";
 import type { SolidQuery } from "../core/gridRaycast";
 import type { LabLayout } from "./WorldGenerator";
+import { coreCellMaxHealth, generatorCellHealth } from "./GeneratorTiers";
 
 export interface BlightCore {
   id: number;
@@ -15,6 +16,15 @@ export interface BlightCore {
   alive: boolean;
   /** Edge length in cells: 2 for a room's Blight Core, 1 for a small generator in a glass tank. */
   size: 1 | 2;
+  /**
+   * Generator level: the block tier it was found at (set lazily from the zone,
+   * see world/GeneratorTiers). A tougher colony raises it by taking it over.
+   */
+  level?: number;
+  /** Level a running takeover is raising this generator to. */
+  convertTo?: number;
+  /** Takeover progress, 0..1 (linear; see `conversionProgress`). */
+  convert?: number;
 }
 
 /** Special block materials (`world.mat`). */
@@ -502,7 +512,10 @@ export class PixelWorld implements SolidQuery {
       const w = this.wall[i];
       if (w > 0) return this.labLayout?.frame?.def.id === 1
         ? tierHealth(fill, t) : tierWallHealth(this.tierBase + w, t);
-      if (this.coreId[i] > 0) return tierHealth(fill, t) + GROWTH.coreHealthBonus;
+      if (this.coreId[i] > 0) {
+        const core = this.blightCores[this.coreId[i] - 1];
+        return core ? coreCellMaxHealth(this, core) : generatorCellHealth(fill);
+      }
     }
     return tierHealth(fill, t);
   }
@@ -616,12 +629,20 @@ export class PixelWorld implements SolidQuery {
    */
   /** Squad damage after Arsenal Calibration; armored cells and non-squad damage are unscaled. */
   private scaled(i: number, amount: number, byPlayer: boolean): number {
-    if (!byPlayer || this.armored[i]) return amount;
+    if (!byPlayer || (i >= 0 && this.armored[i])) return amount;
     let mult = this.playerDamageMult;
     if (this.damageRollMax > this.damageRollMin) mult *= this.damageRollMin + (this.damageRollMax - this.damageRollMin) * this.nextRoll();
     else mult *= this.damageRollMin;
     if (mult === 1) return amount;
     return Math.max(1, Math.round(amount * mult));
+  }
+
+  /**
+   * Squad damage against a Blight creature that follows Blight-block rules
+   * (Blight Wardens): rolled and scaled by Arsenal Calibration.
+   */
+  squadBlightDamage(amount: number): number {
+    return this.scaled(-1, amount, true);
   }
 
   /** Cheap xorshift for damage rolls, 0..1. */
@@ -690,9 +711,8 @@ export class PixelWorld implements SolidQuery {
   /**
    * Apply damage at subcell coordinates `(sx, sy)`.
    * If the parent normal cell `(sx >> 1, sy >> 1)` is solid, damages the parent normal cell.
-   * Otherwise damages the 50% pink blight subcell at `(sx, sy)`.
-   * Destroyed non-Blight subcells deal their full maximum HP to all eight
-   * neighboring subcells. Secondary non-Blight breaks continue the cascade.
+   * Otherwise damages the 50% subcell at `(sx, sy)`.
+   * Destroyed non-Blight subcells trigger `onSubBreakPush` to push nearby 0.5 pixels away.
    */
   damageSub(sx: number, sy: number, amount: number, byPlayer = false, attackDx = 0, attackDy = -1): 0 | 1 | 2 {
     if (!this.subInBounds(sx, sy)) return 0;
@@ -708,11 +728,10 @@ export class PixelWorld implements SolidQuery {
     const next = Math.max(0, hp - this.scaled(i, amount, byPlayer));
     this.subHealth[si] = next;
     if (next === 0) {
-      const spreads = this.subKind[si] !== SUB.blight;
-      const debrisDamage = this.maxSubHealthAt(sx, sy);
+      const pushes = this.subKind[si] !== SUB.blight;
       this.emit(cx, cy, "destroyed", sx, sy);
       this.emitDestroy(cx, cy, true, sx, sy);
-      if (spreads) this.spreadDebrisDamage(sx, sy, debrisDamage, byPlayer);
+      if (pushes) this.onSubBreakPush?.(sx, sy);
       return 2;
     }
     if (byPlayer && this.subHealth[si] > 0 && this.subHealth[si] < hp) {
@@ -722,38 +741,32 @@ export class PixelWorld implements SolidQuery {
     return 1;
   }
 
-  /** Called for each rubble sub-pixel that crumbles as a knock-on break (for debris effects). */
-  onRubbleCrumble: ((sx: number, sy: number) => void) | null = null;
+  /** Called when a non-Blight 0.5-pixel breaks, to push neighboring 0.5 pixels away with physics. */
+  onSubBreakPush: ((sx: number, sy: number) => void) | null = null;
 
-  private debrisQueue: { sx: number; sy: number; damage: number; byPlayer: boolean }[] = [];
-  private drainingDebris = false;
+  /** Detach a live subcell from the static grid (without emitting a destruction event) so it can move with physics. */
+  detachSub(sx: number, sy: number): void {
+    if (!this.subInBounds(sx, sy)) return;
+    const si = sy * this.subWidth + sx;
+    if (this.subHealth[si] === 0) return;
+    this.subHealth[si] = 0;
+    this.emit(sx >> 1, sy >> 1, "set", sx, sy);
+  }
 
-  /** Drain iteratively so a large debris field cannot overflow the call stack. */
-  private spreadDebrisDamage(sx: number, sy: number, damage: number, byPlayer: boolean): void {
-    this.debrisQueue.push({ sx, sy, damage, byPlayer });
-    if (this.drainingDebris) return;
-    this.drainingDebris = true;
-    try {
-      for (let head = 0; head < this.debrisQueue.length; head++) {
-        const source = this.debrisQueue[head];
-        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-          if (dx === 0 && dy === 0) continue;
-          const nx = source.sx + dx, ny = source.sy + dy;
-          if (!this.subInBounds(nx, ny)) continue;
-          const parent = (ny >> 1) * this.width + (nx >> 1);
-          // Only half-size pixels receive splash, never full-size terrain or hull.
-          if (this.health[parent] > 0 || this.boundary[parent]) continue;
-          const ni = ny * this.subWidth + nx;
-          const rubble = this.subKind[ni] === SUB.rubble;
-          if (this.damageSub(nx, ny, source.damage, source.byPlayer, dx, dy) === 2 && rubble) {
-            this.onRubbleCrumble?.(nx, ny);
-          }
-        }
-      }
-    } finally {
-      this.debrisQueue.length = 0;
-      this.drainingDebris = false;
-    }
+  /** Place a settled 0.5-pixel back into an empty subcell on the static grid. */
+  placeSub(sx: number, sy: number, kind: number, tint: number, hp: number): boolean {
+    if (!this.subInBounds(sx, sy) || hp <= 0) return false;
+    const cx = sx >> 1;
+    const cy = sy >> 1;
+    const parent = cy * this.width + cx;
+    if (this.health[parent] > 0 || this.boundary[parent]) return false;
+    const si = sy * this.subWidth + sx;
+    if (this.subHealth[si] > 0) return false;
+    this.subKind[si] = kind;
+    this.subTint[si] = tint;
+    this.subHealth[si] = hp;
+    this.emit(cx, cy, "set", sx, sy);
+    return true;
   }
 
   /**

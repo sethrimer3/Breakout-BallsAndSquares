@@ -657,6 +657,12 @@ export const LIGHT = {
   soldierLightRadius: 64,
   /** Steady baseline independent of gunfire, upgrades and muzzle-flash settings. */
   soldierLightStrength: 0.9,
+  /** Better Flashlight upgrade: wider soldier visibility pool (twelve cells). */
+  betterFlashlightRadius: 96,
+  /** Better Flashlight upgrade: slightly stronger soldier glow. */
+  betterFlashlightStrength: 1.0,
+  /** Better Flashlight upgrade: per-depth wall illumination weights (depth 1 = exposed face). */
+  betterFlashlightWallWeights: [1, 0.75, 0.5, 0.25] as const,
   /** Faint glow radius at the center of the spawn room (world units). */
   roomLightRadius: 54,
   /** Spawn-room glow strength. */
@@ -681,6 +687,33 @@ export const CASING = {
   drag: 4.5,
   gravity: 38,
 };
+
+export const SUBPIXEL_PHYSICS = {
+  /** Maximum simultaneously moving 0.5-pixel blocks (SoA pool capacity). */
+  poolSize: 512,
+  /** Push radius in subcells when a 0.5-pixel breaks. */
+  pushRadiusSub: 3,
+  /** Outward impulse speed (world units/s) at distance 0 (diminishes quadratically to 0 at pushRadius). */
+  pushStrength: 110,
+  /** Maximum speed (world units/s) of a moving 0.5-pixel. */
+  maxSpeed: 180,
+  /** Open-air floor drag (1/s). */
+  airDrag: 6.0,
+  /** Extra drag (1/s) when touching/hugging a wall so pixels slightly stick instead of sliding everywhere. */
+  wallDrag: 15.0,
+  /** Tangential velocity multiplier on wall impact (0..1). */
+  wallTangentialFriction: 0.65,
+  /** Normal restitution on wall impact (0..1). */
+  wallBounce: 0.1,
+  /** Minimum impulse (world units/s) required to break a wall-hugging 0.5-pixel loose. */
+  wallBreakawaySpeed: 12,
+  /** Speed (world units/s) below which a 0.5-pixel settles back into the grid in open air. */
+  settleSpeed: 4,
+  /** Speed (world units/s) below which a wall-touching 0.5-pixel sticks and settles. */
+  wallSettleSpeed: 11,
+  /** Safety max flight time (seconds) before forcing a settle. */
+  maxFlightTime: 4.0,
+} as const;
 
 export const LOOT = {
   /** Maximum active golden square pickups (SoA pool capacity). */

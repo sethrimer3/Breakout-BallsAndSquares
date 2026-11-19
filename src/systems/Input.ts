@@ -186,7 +186,16 @@ export class Input {
       this.aimCurY = this.mouseY;
       const slop = this.downType === "mouse" ? CLICK_SLOP_MOUSE : CLICK_SLOP_TOUCH;
       if (Math.abs(this.aimCurX - this.aimStartX) + Math.abs(this.aimCurY - this.aimStartY) > slop) {
-        this.aimDragging = true;
+        // Deployment has no aim: a press that drags is a camera pan, not a portal.
+        this.aiming = false;
+        this.aimDragging = false;
+        this.handlers.onAimCancel?.();
+        this.panning = true;
+        if (tracked) this.mouseInside = false;
+        this.handlers.onPan?.(e.clientX - this.downX, e.clientY - this.downY);
+        this.lastX = e.clientX;
+        this.lastY = e.clientY;
+        return;
       }
       this.handlers.onAimMove?.(this.aimCurX, this.aimCurY);
     } else if (this.panning) {

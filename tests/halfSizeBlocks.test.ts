@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { FOG } from "../src/config";
+import { FOG, SUBPIXEL_PHYSICS } from "../src/config";
 import { LightingSystem } from "../src/systems/LightingSystem";
+import { SubPixelPhysics } from "../src/systems/SubPixelPhysics";
 import { FogOfWar } from "../src/world/FogOfWar";
 import { PixelWorld, SUB } from "../src/world/PixelWorld";
 
@@ -37,59 +38,147 @@ describe("half-size blocks", () => {
   });
 });
 
-describe("half-size debris damage", () => {
-  const makeWorld = () => new PixelWorld({ width: 64, height: 64, cellSize: 8, roomSize: 4 });
+describe("half-size physics push", () => {
+  const makeWorld = () => {
+    const w = new PixelWorld({ width: 64, height: 64, cellSize: 8, roomSize: 4 });
+    const phys = new SubPixelPhysics(w);
+    w.onSubBreakPush = (sx, sy) => phys.pushFromBreak(sx, sy);
+    return { w, phys };
+  };
   const put = (w: PixelWorld, x: number, y: number, kind: number, hp: number) => {
     const i = y * w.subWidth + x;
-    w.subKind[i] = kind; w.subHealth[i] = hp;
+    w.subKind[i] = kind;
+    w.subHealth[i] = hp;
     return i;
   };
 
   it.each([SUB.rubble, SUB.metal, SUB.pipe, SUB.screen, SUB.led, SUB.core, SUB.wreck])(
-    "kind %i deals its maximum HP to all eight neighbors even after an earlier hit", kind => {
-      const w = makeWorld(), center = put(w, 16, 16, kind, 1);
-      const damage = w.maxSubHealthAt(16, 16);
-      const neighbors: number[] = [];
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
-        if (dx || dy) neighbors.push(put(w, 16 + dx, 16 + dy, SUB.blight, damage + 7));
-      }
+    "kind %i does not break neighbors; it pushes nearby non-blight 0.5 pixels away",
+    (kind) => {
+      const { w, phys } = makeWorld();
+      const center = put(w, 16, 16, kind, 1);
+      const ortho = put(w, 17, 16, SUB.rubble, 7);
+      const diag = put(w, 17, 17, SUB.metal, 5);
+      const blight = put(w, 15, 16, SUB.blight, 4);
+      const solid = 8 * w.width + 7; // full cell (7,8) covers subcells (14..15, 16..17) -> keep blight at (15,15) instead
+      w.subHealth[blight] = 0;
+      const blight2 = put(w, 16, 15, SUB.blight, 4);
+      w.health[solid] = 123;
+
       w.damageSub(16, 16, 1, true);
       expect(w.subHealth[center]).toBe(0);
-      for (const i of neighbors) expect(w.subHealth[i]).toBe(7);
+      // Blight and full-size blocks are never detached or damaged.
+      expect(w.subHealth[blight2]).toBe(4);
+      expect(w.health[solid]).toBe(123);
+      // Orthogonal and diagonal non-blight neighbors were detached into physics, not broken.
+      expect(w.subHealth[ortho]).toBe(0);
+      expect(w.subHealth[diag]).toBe(0);
+      expect(phys.count).toBe(2);
+      // Both were pushed outward (+x for ortho, +x/+y for diag) with their HP preserved.
+      expect(phys.vx[0]).toBeGreaterThan(0);
+      expect(phys.hp[0]).toBe(7);
+      expect(phys.vx[1]).toBeGreaterThan(0);
+      expect(phys.vy[1]).toBeGreaterThan(0);
+      expect(phys.hp[1]).toBe(5);
     },
   );
 
-  it("chains through diagonal debris regardless of who dealt the first damage", () => {
-    const w = makeWorld();
-    const line = [put(w, 8, 8, SUB.metal, 1), put(w, 9, 9, SUB.rubble, 1), put(w, 10, 10, SUB.pipe, 1)];
-    w.damageSub(8, 8, 1);
-    expect(line.map(i => w.subHealth[i])).toEqual([0, 0, 0]);
+  it("diminishes push force over distance", () => {
+    const { w, phys } = makeWorld();
+    put(w, 20, 20, SUB.rubble, 1);
+    put(w, 21, 20, SUB.rubble, 5); // distance 1 subcell
+    put(w, 22, 20, SUB.rubble, 5); // distance 2 subcells
+    put(w, 23, 20, SUB.rubble, 5); // distance 3 subcells
+    put(w, 25, 20, SUB.rubble, 5); // outside push radius
+
+    w.damageSub(20, 20, 1, true);
+    expect(phys.count).toBe(3);
+    // Speeds strictly decrease with distance: d=1 > d=2 > d=3.
+    expect(phys.vx[0]).toBeGreaterThan(phys.vx[1]);
+    expect(phys.vx[1]).toBeGreaterThan(phys.vx[2]);
+    expect(phys.vx[2]).toBeGreaterThan(0);
+    // Pixel outside push radius stays static.
+    expect(w.subHealth[20 * w.subWidth + 25]).toBe(5);
   });
 
-  it("does not spread from destroyed Blight or from merely damaged debris", () => {
-    const w = makeWorld(), source = put(w, 8, 8, SUB.blight, 1), neighbor = put(w, 9, 9, SUB.rubble, 10);
+  it("does not push neighbors from destroyed Blight or from merely damaged debris", () => {
+    const { w, phys } = makeWorld();
+    const source = put(w, 8, 8, SUB.blight, 1);
+    const neighbor = put(w, 9, 8, SUB.rubble, 10);
     w.damageSub(8, 8, 1, true);
-    expect(w.subHealth[source]).toBe(0); expect(w.subHealth[neighbor]).toBe(10);
-    w.damageSub(9, 9, 1, true);
+    expect(w.subHealth[source]).toBe(0);
+    expect(w.subHealth[neighbor]).toBe(10);
+    expect(phys.count).toBe(0);
+
+    w.damageSub(9, 8, 1, true);
     expect(w.subHealth[neighbor]).toBe(9);
+    expect(phys.count).toBe(0);
   });
 
-  it("does not damage full-size blocks, and emits destruction once per destroyed subcell", () => {
-    const w = makeWorld(), destroyed: string[] = [];
-    w.addDestroyListener((_x, _y, sub, sx, sy) => { if (sub) destroyed.push(`${sx},${sy}`); });
-    put(w, 7, 8, SUB.rubble, 1); put(w, 7, 9, SUB.screen, 1);
-    const solid = 4 * w.width + 4; w.health[solid] = 123;
-    w.damageSub(7, 8, 1);
-    expect(w.health[solid]).toBe(123);
-    expect(destroyed.sort()).toEqual(["7,8", "7,9"]);
+  it("sticks slightly to walls and settles back into PixelWorld", () => {
+    const { w, phys } = makeWorld();
+    // Place a full-size wall at cell (12, 10) -> subcells x=24..25, y=20..21.
+    w.setCell(12, 10, 50);
+    // Distant wall-hugging pixel at (23, 20) (3 subcells from break at 20,20) resists tiny nudge.
+    const wallHugger = put(w, 23, 20, SUB.metal, 5);
+    // Closer pixel at (21, 20) breaks free, travels right, hits wall at x=24, sticks & settles.
+    put(w, 20, 20, SUB.rubble, 1);
+    put(w, 21, 20, SUB.rubble, 6);
+
+    w.damageSub(20, 20, 1, true);
+    expect(w.subHealth[wallHugger]).toBe(5);
+    expect(phys.count).toBe(1);
+
+    for (let step = 0; step < 120; step++) phys.update(1 / 60);
+    expect(phys.count).toBe(0);
+    // Settled before the wall (sx <= 23), never penetrating into cell (12, 10).
+    expect(w.health[10 * w.width + 12]).toBe(50);
+    const settledIdx = 20 * w.subWidth + 22;
+    const settledBeforeWall = w.subHealth[settledIdx] === 6 || w.subHealth[20 * w.subWidth + 23] === 6 || w.subHealth[20 * w.subWidth + 21] === 6;
+    expect(settledBeforeWall).toBe(true);
   });
 
-  it("clears a large connected heap without recursion overflow or duplicate destructions", () => {
-    const w = makeWorld(); let count = 0;
-    w.addDestroyListener(() => count++);
-    for (let y = 0; y < w.subHeight; y++) for (let x = 0; x < w.subWidth; x++) put(w, x, y, SUB.rubble, 1);
-    w.damageSub(0, 0, 1);
-    expect(count).toBe(w.subHealth.length);
-    expect(w.subHealth.every(hp => hp === 0)).toBe(true);
+  it("casts real-time shadows and preserves active LED/core light tracking while moving", () => {
+    const { w, phys } = makeWorld();
+    const light = new LightingSystem(w);
+    light.subPixels = phys;
+
+    // Place a break trigger at (10, 20) and an LED + rubble neighbor at (12, 20) / (11, 20).
+    put(w, 10, 20, SUB.rubble, 1);
+    const led = put(w, 11, 20, SUB.led, 4);
+    w.damageSub(10, 20, 1, true);
+    expect(w.subHealth[led]).toBe(0);
+    expect(phys.count).toBe(1);
+    expect(phys.activeLightCount).toBe(1);
+
+    // Light at x=30, y=82 looking right toward the moving LED at ~(46, 82) should be occluded by it.
+    const poly = new Float32Array(4096 * 2);
+    const n = light.computeVisibilityPolygon(30, 82, 1, 0, 120, -1, [], poly);
+    expect(n).toBeGreaterThan(0);
+    let minHitX = Infinity;
+    for (let i = 0; i < n; i++) {
+      const x = poly[i * 2];
+      const y = poly[i * 2 + 1];
+      if (Math.abs(y - 82) < 1 && x > 30) minHitX = Math.min(minHitX, x);
+    }
+    expect(minHitX).toBeLessThan(60);
+
+    let settledAt: [number, number] | null = null;
+    phys.onSubLightSettled = (sx, sy) => {
+      settledAt = [sx, sy];
+    };
+    for (let step = 0; step < 120; step++) phys.update(1 / 60);
+    expect(phys.count).toBe(0);
+    expect(phys.activeLightCount).toBe(0);
+    expect(settledAt).not.toBeNull();
+  });
+
+  it("caps active physics bodies cleanly on a dense heap without errors", () => {
+    const { w, phys } = makeWorld();
+    for (let y = 10; y < 40; y++) for (let x = 10; x < 40; x++) put(w, x, y, SUB.rubble, 2);
+    for (let x = 10; x < 40; x += 2) w.damageSub(x, 20, 2);
+    expect(phys.count).toBeLessThanOrEqual(SUBPIXEL_PHYSICS.poolSize);
+    for (let step = 0; step < 180; step++) phys.update(1 / 60);
+    expect(phys.count).toBe(0);
   });
 });

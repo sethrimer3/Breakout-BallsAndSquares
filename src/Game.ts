@@ -9,6 +9,7 @@ import { labWorldSeed } from "./core/WorldSeed";
 import { SpeedrunTimer } from "./core/SpeedrunTimer";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
+import { SubPixelPhysics } from "./systems/SubPixelPhysics";
 import { SentrySystem } from "./entities/Sentry";
 import { CreatureSystem, type Creature } from "./entities/Creatures";
 import { LootKind, lootKindForZone, LootSystem } from "./entities/LootSystem";
@@ -25,6 +26,8 @@ import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { CombinedTargets, RoomFixtures } from "./systems/RoomFixtures";
 import { SpecialUpgradeSystem } from "./systems/SpecialUpgrades";
+import { BlightWardenSystem, type Warden } from "./systems/BlightWardens";
+import { SpawnPortal } from "./systems/SpawnPortal";
 import { SPECIAL_UNLOCKS } from "./progression/specialUnlocks";
 import { UPGRADE_BY_ID } from "./progression/UpgradeDefinitions";
 import { FireSystem } from "./systems/FireSystem";
@@ -49,7 +52,7 @@ import { generateWorld } from "./world/WorldGenerator";
 import { LabMap } from "./ui/LabMap";
 import { renderSectorThumbs } from "./rendering/SectorThumbs";
 import { LabProgress } from "./world/LabProgress";
-import { gateGeometry, labWorld, LAB_WORLD_COUNT, sectorCount, sectorSpawnCell, type LabWorldDef } from "./world/labMap";
+import { gateGeometry, labWorld, LAB_WORLD_COUNT, sectorCount, sectorSpawnCell, upgradeSpotSector, type LabWorldDef } from "./world/labMap";
 import type { Door } from "./world/PixelWorld";
 import type { LabWorldProgress } from "./progression/SaveManager";
 
@@ -83,6 +86,8 @@ export class Game {
   readonly fixtures: RoomFixtures;
   /** Glowing gold special-upgrade blocks and the motes they burst into. */
   readonly specials: SpecialUpgradeSystem;
+  /** Blight Wardens guarding the gold special-upgrade blocks. */
+  readonly wardens: BlightWardenSystem;
   readonly late: LateEncounters;
   /** Flamethrower flames and burning rubble. */
   readonly fire: FireSystem;
@@ -101,6 +106,7 @@ export class Game {
   readonly damageNumbers: DamageNumbers;
   readonly particles = new ParticleSystem(3000);
   readonly casings = new CasingSystem();
+  readonly subPixels: SubPixelPhysics;
   readonly loot = new LootSystem();
   readonly runStats = new RunStats();
   readonly save: SaveManager;
@@ -126,6 +132,10 @@ export class Game {
   doorFlashes: DoorFlash[] = [];
   reserves = 0;
   canDeploy = true;
+  /** The squad's deployment portal while it is open (see SpawnPortal). */
+  portal: SpawnPortal | null = null;
+  /** Last refused portal tap (wall-clock seconds), shown as a red mark. */
+  spawnDenied: { x: number; y: number; t0: number; guarded: boolean } | null = null;
   growthRate = 0;
   private readonly speedrunClock = new SpeedrunTimer();
   private speedrunSavedAt = 0;
@@ -208,6 +218,8 @@ export class Game {
   private lightOverBudgetFrames = 0;
   /** Historical trail of commander positions for obstacle-aware squad navigation. */
   private commanderTrail: { x: number; y: number }[] = [];
+  /** Currently selected commander soldier ID (0 = lowest-numbered living soldier). */
+  private commanderId = 0;
 
   private acc = 0;
   private last = 0;
@@ -254,6 +266,7 @@ export class Game {
         this.creatures.explode(x, y, radius, damage);
         this.fixtures.explode(x, y, radius);
         this.late.explode(x, y, radius, damage);
+        this.wardens.explode(x, y, radius, damage);
         this.specials.explode(x, y, radius);
         this.audio.playGoo("burst", x, y);
         this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.2, radius, 0xff963c, 8);
@@ -374,22 +387,38 @@ export class Game {
       onMoteAbsorbed: (s) => this.audio.playPickup(s.x, s.y),
       onAbsorbed: (id, s) => this.grantSpecialUpgrade(id, s),
     }, () => this.rng.next());
-    this.combat.targets = new CombinedTargets([this.creatures, this.fixtures, this.late, this.specials]);
+    this.wardens = new BlightWardenSystem(this.world, {
+      onSoldierHit: (s, dmg, x, y) => this.hurtSoldier(s, dmg, x, y),
+      onSpit: (x, y) => this.audio.playSpore(x, y),
+      onSpitBurst: (x, y, r) => this.onSporeBurst(x, y, r),
+      onLunge: (w) => this.audio.playSpore(w.x, w.y),
+      onHurt: (_w, x, y) => {
+        for (let i = 0; i < 3; i++) {
+          const a = this.rng.range(0, Math.PI * 2), sp = this.rng.range(20, 70);
+          this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.2, 0.4), 1, 0xd8267a, 4);
+        }
+      },
+      onKilled: (w) => this.onWardenKilled(w),
+      onBlockFreed: (_id, x, y) => {
+        this.audio.playGlassShatter(x, y);
+        this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.3, 22, 0xff4b8b, 1);
+      },
+    }, () => this.rng.next());
+    this.specials.isShielded = (id) => this.wardens.isGuarded(id);
+    this.combat.targets = new CombinedTargets([this.creatures, this.fixtures, this.late, this.wardens, this.specials]);
     this.combat.late = this.late;
     this.camera = new CameraSystem(this.world);
     this.audio.setCamera(this.camera);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.camera.following = this.camera.defaultFollow;
-    // Knock-on rubble breaks puff a little grit.
-    this.world.onRubbleCrumble = (sx, sy) => {
-      const ss = this.world.subCellSize;
-      const a = this.rng.range(0, Math.PI * 2);
-      const sp = this.rng.range(10, 40);
-      this.particles.spawn(PKind.Debris, (sx + 0.5) * ss, (sy + 0.5) * ss, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.25, 0.5), 1, 0x5a544c, 4);
-    };
+    this.subPixels = new SubPixelPhysics(this.world);
+    this.lighting.subPixels = this.subPixels;
+    // When a non-Blight 0.5 pixel breaks, push nearby 0.5 pixels away with physics.
+    this.world.onSubBreakPush = (sx, sy) => this.subPixels.pushFromBreak(sx, sy);
     this.loadLabProgress();
     this.generateLab();
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
+    this.subPixels.onSubLightSettled = (sx, sy) => this.terrain.addLabLight(sx, sy);
     this.terrain.dormantAt = (si) => this.growth.colonies.isDormantSub(si);
     this.growth.colonies.onVisualChange = (sx, sy) => this.terrain.chunks.markCell(sx >> 1, sy >> 1);
     this.terrain.rebuildAll();
@@ -494,6 +523,11 @@ export class Game {
     return this.save.data.settings.softShadows;
   }
 
+  /** Subtle low-res bloom around glowing lights and panels (visual setting). */
+  get bloom(): boolean {
+    return this.save.data.settings.bloom;
+  }
+
   get lifetimePixels(): number {
     return this.save.data.lifetimePixels;
   }
@@ -506,6 +540,18 @@ export class Game {
     this.stats = this.upgrades.getSoldierStats();
     this.fog.permanent = this.stats.permanentMapping;
     this.fog.connectedAir = this.stats.connectedAirMapping;
+    this.fog.wallPenetrationCells = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightWallWeights.length
+      : 0;
+    this.lighting.soldierLightRadius = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightRadius
+      : LIGHT.soldierLightRadius;
+    this.lighting.soldierLightStrength = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightStrength
+      : LIGHT.soldierLightStrength;
+    this.lighting.soldierWallDepth = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightWallWeights.length
+      : 1;
     this.applyFacilityStats();
     this.combat.stats = this.stats;
     this.world.playerDamageMult = this.stats.terrainDamageMult;
@@ -582,6 +628,8 @@ export class Game {
     this.growth.explosiveDamage = this.stats.explosiveBlightDamage;
     this.growth.explosiveRadius = this.stats.explosiveBlightRadius;
     this.soldiers = [];
+    this.commanderId = 0;
+    this.commanderTrail.length = 0;
     for (const fl of this.flashes) {
       this.flashPolyPool.push(fl.poly);
       this.flashLitPool.push(fl.lit);
@@ -597,11 +645,14 @@ export class Game {
     this.fire.clear();
     this.fire.burnMult = this.stats.flameBurnMult;
     this.casings.clear();
+    this.subPixels.clear();
     this.loot.clear();
     this.runStats.reset();
     this.acc = 0;
     this.reserves = this.stats.maxSoldiers;
     this.canDeploy = true;
+    this.portal = null;
+    this.spawnDenied = null;
     this.growthRate = 0;
     this.paused = false;
     this.runOver = false;
@@ -668,10 +719,22 @@ export class Game {
     if (frame && this.labMap) this.labMap.setThumbs(renderSectorThumbs(this.world, this.terrain, frame));
   }
 
-  /** Normal deployments require conquest; the dev override allows any valid sector. */
+  /**
+   * Normal deployments require conquest; the dev override allows any valid
+   * sector. Either way, a sector whose gold block is still uncollected is
+   * held by its Blight Wardens and cannot be deployed into.
+   */
   canDeployInto(sector: number): boolean {
     return Number.isInteger(sector) && sector >= 0 && sector < sectorCount(this.labDef)
-      && (this.devMapAccess || this.labProgress.conquered.has(sector));
+      && (this.devMapAccess || this.labProgress.conquered.has(sector))
+      && !this.sectorGuarded(sector);
+  }
+
+  /** True while Blight Wardens hold `sector`: it has a gold block not yet collected. */
+  sectorGuarded(sector: number): boolean {
+    const def = this.labDef;
+    const collected = this.labSave.specials;
+    return def.upgrades.some((spot) => upgradeSpotSector(def, spot) === sector && !collected.includes(spot.id));
   }
 
   /**
@@ -786,6 +849,7 @@ export class Game {
       this.damageNumbers.clear();
       this.fire.clear();
       this.casings.clear();
+    this.subPixels.clear();
       this.loot.clear();
       // Arrive in a loose huddle in the gateway room.
       const cs = this.world.cellSize;
@@ -936,10 +1000,12 @@ export class Game {
     }
     switch (code) {
       case "KeyF":
-        this.camera.resumeAuto();
+        if (!this.autoMove) this.cycleCommander();
+        else this.camera.resumeAuto();
         break;
       case "Tab":
-        this.camera.cycleTarget(this.soldiers);
+        if (!this.autoMove) this.cycleCommander();
+        else this.camera.cycleTarget(this.soldiers);
         break;
       case "Space":
         if (!this.runOver && !this.pauseMenu.visible) this.paused = !this.paused;
@@ -978,7 +1044,7 @@ export class Game {
   }
 
   canPlaceSoldier(): boolean {
-    return !this.paused && !this.runOver && this.reserves > 0;
+    return !this.paused && !this.runOver && this.reserves > 0 && !this.portal;
   }
 
   onAimStart(sx: number, sy: number): void {
@@ -997,42 +1063,19 @@ export class Game {
     if (!this.aimState.active) return;
     this.aimState.curSx = sx;
     this.aimState.curSy = sy;
-    const dist = Math.hypot(sx - this.aimState.startSx, sy - this.aimState.startSy);
-    if (dist >= 6) {
-      this.aimState.isDragging = true;
-    }
   }
 
+  /** Tap and let go: open the squad's portal on that spot. */
   onAimClick(_sx: number, _sy: number): void {
     if (!this.aimState.active) return;
-    const wx = this.aimState.startWx;
-    const wy = this.aimState.startWy;
     this.aimState.active = false;
     this.aimState.isDragging = false;
-
-    // Click and let go: send in a random direction (straight up, right, left, down)
-    const CARDINAL = [
-      { dx: 0, dy: -1 }, // straight up
-      { dx: 1, dy: 0 },  // right
-      { dx: 0, dy: 1 },  // down
-      { dx: -1, dy: 0 }, // left
-    ];
-    const dir = CARDINAL[Math.floor(this.rng.range(0, 4))];
-    this.deploySoldier(wx, wy, dir.dx, dir.dy);
+    this.openPortal(this.aimState.startWx, this.aimState.startWy);
   }
 
-  onAimRelease(startSx: number, startSy: number, endSx: number, endSy: number): void {
-    if (!this.aimState.active) return;
-    const wx = this.aimState.startWx;
-    const wy = this.aimState.startWy;
-    this.aimState.active = false;
-    this.aimState.isDragging = false;
-
-    // Soldier will go away from where the player let go (endSx, endSy).
-    // Vector from end to start points away from release:
-    const dx = startSx - endSx;
-    const dy = startSy - endSy;
-    this.deploySoldier(wx, wy, dx, dy);
+  /** There is no aiming any more: a press that ends elsewhere still opens the portal where it began. */
+  onAimRelease(_startSx: number, _startSy: number, _endSx: number, _endSy: number): void {
+    this.onAimClick(0, 0);
   }
 
   onAimCancel(): void {
@@ -1040,25 +1083,65 @@ export class Game {
     this.aimState.isDragging = false;
   }
 
+  /**
+   * True when Blight Wardens still guard the zone holding world point (wx, wy):
+   * in the hand-made lab, any sector whose gold block has a living Warden; in
+   * small test worlds, the ground within a Warden's leash of its block.
+   */
+  spawnGuardedAt(wx: number, wy: number): boolean {
+    return this.wardens.guardsZoneAt(wx, wy);
+  }
+
+  /**
+   * Open a portal at world point (wx, wy) and send the whole reserve through
+   * it. Refused (with a red mark on the spot) inside a Warden-guarded zone or
+   * where no clear ground is near. Returns the portal, or null if refused.
+   */
+  openPortal(wx: number, wy: number): SpawnPortal | null {
+    if (!this.canPlaceSoldier()) return null;
+    const spot = this.clearDeploySpot(wx, wy);
+    if (!spot || this.spawnGuardedAt(spot.x, spot.y)) {
+      this.spawnDenied = { x: spot?.x ?? wx, y: spot?.y ?? wy, t0: performance.now() / 1000, guarded: !!spot };
+      return null;
+    }
+    this.spawnDenied = null;
+    this.portal = new SpawnPortal(spot.x, spot.y, this.reserves);
+    this.audio.playMarkerPing(spot.x, spot.y);
+    return this.portal;
+  }
+
+  /** Step the open portal: operators come through on schedule, then it shuts. */
+  private updatePortal(dt: number): void {
+    const p = this.portal;
+    if (!p) return;
+    const alive = p.update(dt, (_k, dx, dy) => {
+      this.deploySoldier(p.x, p.y, dx, dy);
+    });
+    if (!alive) this.portal = null;
+  }
+
+  /** Nearest spot to (wx, wy), inside the world, with clearance for a soldier. */
+  private clearDeploySpot(wx: number, wy: number): { x: number; y: number } | null {
+    const cs = this.world.cellSize;
+    const r = SOLDIER.collisionRadius;
+    const maxX = this.world.width * cs - r;
+    const maxY = this.world.height * cs - r;
+    return findClearDeployPoint(
+      this.world,
+      Math.max(r, Math.min(maxX, wx)),
+      Math.max(r, Math.min(maxY, wy)),
+      r,
+      SOLDIER.deployClearance,
+    );
+  }
+
   /** Deploy a reserve soldier at world coordinates (wx, wy) with direction (dx, dy). */
   deploySoldier(wx: number, wy: number, dx: number, dy: number): Soldier | null {
     if (this.paused || this.runOver || this.reserves <= 0) return null;
 
-    const cs = this.world.cellSize;
-    const r = SOLDIER.collisionRadius;
-    const minX = r;
-    const minY = r;
-    const maxX = this.world.width * cs - r;
-    const maxY = this.world.height * cs - r;
     // Never drop a soldier inside terrain: nudge it to the nearest spot with at
     // least a pixel of clearance from every wall, or keep it in reserve.
-    const spot = findClearDeployPoint(
-      this.world,
-      Math.max(minX, Math.min(maxX, wx)),
-      Math.max(minY, Math.min(maxY, wy)),
-      r,
-      SOLDIER.deployClearance,
-    );
+    const spot = this.clearDeploySpot(wx, wy);
     if (!spot) return null;
     const clampedX = spot.x;
     const clampedY = spot.y;
@@ -1099,35 +1182,14 @@ export class Game {
     return s;
   }
 
-  launchInRandomDirection(): void {
-    if (this.reserves <= 0 || this.paused || this.runOver) return;
+  /** The HUD's deploy button: open the portal at the current landing spot. */
+  deployAtLandingSpot(): void {
+    if (!this.canPlaceSoldier()) return;
     const spawn = findSpawnPoint(this.world, SOLDIER.collisionRadius) ?? {
       x: this.camera.x,
       y: this.camera.y,
     };
-    const CARDINAL = [
-      { dx: 0, dy: -1 },
-      { dx: 1, dy: 0 },
-      { dx: 0, dy: 1 },
-      { dx: -1, dy: 0 },
-    ];
-    const dir = CARDINAL[Math.floor(this.rng.range(0, 4))];
-    this.deploySoldier(spawn.x, spawn.y, dir.dx, dir.dy);
-  }
-
-  /** Launch a reserve soldier toward screen position in a random cardinal direction or directly. */
-  tryLaunch(sx: number, sy: number): void {
-    if (this.paused || this.runOver || this.reserves <= 0) return;
-    const wx = this.camera.screenToWorldX(sx);
-    const wy = this.camera.screenToWorldY(sy);
-    const CARDINAL = [
-      { dx: 0, dy: -1 },
-      { dx: 1, dy: 0 },
-      { dx: 0, dy: 1 },
-      { dx: -1, dy: 0 },
-    ];
-    const dir = CARDINAL[Math.floor(this.rng.range(0, 4))];
-    this.deploySoldier(wx, wy, dir.dx, dir.dy);
+    this.openPortal(spawn.x, spawn.y);
   }
 
   isWeaponUnlocked(w: Soldier["weapon"]): boolean {
@@ -1163,27 +1225,52 @@ export class Game {
     return this.stats.grenadeBlocksRequired;
   }
 
+  private releaseManualControl(s: Soldier): void {
+    // Hand the soldier back to autonomous bounce in a fresh random direction
+    // (it may have been standing still or crawling along a wall under manual control).
+    s.isManual = false;
+    s.wasManualShooting = false;
+    this.combat.cancelRailCharge(s);
+    const a = this.rng.range(0, Math.PI * 2);
+    s.vx = Math.cos(a) * s.speed;
+    s.vy = Math.sin(a) * s.speed;
+    s.facingAngle = a;
+  }
+
   setAutoMove(enabled: boolean): void {
     this.autoMove = enabled;
     this.save.data.settings.autoMove = enabled;
     this.save.save();
     if (enabled) {
-      // Hand the commander back to the autonomous bounce in a fresh random direction
-      // (it may have been standing still or crawling along a wall under manual control).
       const cmdr = this.getCommander();
-      if (cmdr) {
-        cmdr.isManual = false;
-        const a = this.rng.range(0, Math.PI * 2);
-        cmdr.vx = Math.cos(a) * cmdr.speed;
-        cmdr.vy = Math.sin(a) * cmdr.speed;
-        cmdr.facingAngle = a;
-      }
+      if (cmdr) this.releaseManualControl(cmdr);
     } else {
       const cmdr = this.getCommander();
       if (cmdr) {
         this.camera.lockOn(cmdr.id);
       }
     }
+  }
+
+  /** Switch manual commander control to the next living soldier in deploy-slot order. */
+  cycleCommander(): void {
+    const living = this.soldiers
+      .filter((s) => s.alive)
+      .sort((a, b) => a.slotIndex - b.slotIndex || a.id - b.id);
+    if (living.length === 0) return;
+
+    const current = this.getCommander();
+    const idx = current ? living.findIndex((s) => s.id === current.id) : -1;
+    const next = living[(idx + 1) % living.length];
+
+    if (current && current !== next) {
+      this.releaseManualControl(current);
+      this.commanderTrail.length = 0;
+    }
+
+    this.commanderId = next.id;
+    next.isManual = true;
+    this.camera.lockOn(next.id);
   }
 
   toggleFormation(formation: "line" | "triangle"): void {
@@ -1201,7 +1288,9 @@ export class Game {
     const living = this.soldiers.filter((s) => s.alive);
     if (living.length === 0) return null;
     living.sort((a, b) => a.slotIndex - b.slotIndex || a.id - b.id);
-    return living[0];
+    const chosen = living.find((s) => s.id === this.commanderId) ?? living[0];
+    this.commanderId = chosen.id;
+    return chosen;
   }
 
   isBehaviorUnlocked(b: SoldierBehavior): boolean {
@@ -1459,6 +1548,7 @@ export class Game {
     if (!visualOnly && damage > 0) {
       this.creatures.explode(x, y, radiusWorld, damage);
       this.late.explode(x, y, radiusWorld, damage);
+      this.wardens.explode(x, y, radiusWorld, damage);
       this.specials.explode(x, y, radiusWorld);
     }
     this.fixtures.explode(x, y, radiusWorld);
@@ -1719,6 +1809,22 @@ export class Game {
     this.loot.spawnDropsForBlock(x, y, chance, this.stats.pickupLifetime, this.rng, loot.kind, loot.value);
   }
 
+  /** A Blight Warden fell: a burst of pink gore and a heavy drop of its zone's loot. */
+  private onWardenKilled(w: Warden): void {
+    this.audio.playDestroy(w.x, w.y);
+    this.addScreenShake(4);
+    for (let i = 0; i < 28; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(25, 140);
+      this.particles.spawn(PKind.Debris, w.x, w.y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.35, 0.8), 1, i % 3 ? 0xd8267a : 0x5a0f36, 4);
+    }
+    this.particles.spawn(PKind.Burst, w.x, w.y, 0, 0, 0.25, 16, 0xff4b8b, 1);
+    const cx = Math.floor(w.x / this.world.cellSize);
+    const cy = Math.floor(w.y / this.world.cellSize);
+    const loot = this.terrainLoot(cx, cy, this.world.zoneAt(cx, cy));
+    this.loot.spawnDropsForBlock(w.x, w.y, 8, this.stats.pickupLifetime, this.rng, loot.kind, loot.value);
+  }
+
   /** A dormant pixel crumbled to Necrosis Protocol: a puff of dark dust. */
   private onBlightDecay(sx: number, sy: number): void {
     if (this.rng.next() > 0.35) return;
@@ -1741,6 +1847,7 @@ export class Game {
     this.labProgress.attachThreats(this.late.actors);
     this.fixtures.reset();
     this.specials.reset(this.labSave.specials);
+    this.wardens.reset(this.specials.blocks);
     this.specialNotice = null;
     this.glass.reset();
     this.doors.reset();
@@ -1799,6 +1906,18 @@ export class Game {
     this.fog.reset(this.rng.int(1 << 30));
     this.fog.permanent = this.stats.permanentMapping;
     this.fog.connectedAir = this.stats.connectedAirMapping;
+    this.fog.wallPenetrationCells = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightWallWeights.length
+      : 0;
+    this.lighting.soldierLightRadius = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightRadius
+      : LIGHT.soldierLightRadius;
+    this.lighting.soldierLightStrength = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightStrength
+      : LIGHT.soldierLightStrength;
+    this.lighting.soldierWallDepth = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightWallWeights.length
+      : 1;
     for (let i = 0; i < 40; i++) this.updateFog(0.1, true);
   }
 
@@ -1855,6 +1974,7 @@ export class Game {
   }
 
   step(dt: number): void {
+    this.updatePortal(dt);
     if (this.runStats.soldiersDeployed === 0) return;
     this.runStats.time += dt;
     this.updateLabProgress(dt);
@@ -2002,6 +2122,7 @@ export class Game {
     this.creatures.update(dt, this.runStats.time, this.soldiers, this.growth);
     this.doors.update(dt);
     this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
+    this.wardens.update(dt, this.soldiers);
     this.specials.update(dt);
     this.updateFog(dt);
     if (!this.labDef.framework) this.growth.update(dt, this.runStats.time, this.soldiers);
@@ -2010,6 +2131,8 @@ export class Game {
     this.particles.update(dt);
     this.damageNumbers.update(dt);
     this.casings.update(dt, this.world);
+    this.subPixels.update(dt, this.soldiers);
+    this.lighting.invalidateMovingSubPixels();
     const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
     if (collected > 0) {
       this.runStats.currency += this.loot.collectedGold;
@@ -2038,12 +2161,12 @@ export class Game {
       if ((df.life -= dt) <= 0) this.doorFlashes.splice(i, 1);
     }
     if (this.doorFlashes.length > 256) this.doorFlashes.splice(0, this.doorFlashes.length - 256);
-    this.canDeploy = this.reserves > 0;
+    this.canDeploy = this.reserves > 0 && !this.portal;
 
     // Once deployment has begun, losing the last active soldier ends the run,
     // even when undeployed reserves remain.
     const alive = this.soldiers.some((s) => s.alive);
-    if (!alive && this.runStats.soldiersDeployed > 0) {
+    if (!alive && this.runStats.soldiersDeployed > 0 && !this.portal) {
       this.endRun();
     }
   }
@@ -2392,7 +2515,7 @@ export class Game {
     this.wasPlaying = playing;
     const t0 = performance.now();
     if (!this.paused) {
-      if (this.runStats.soldiersDeployed > 0) this.acc += real * this.timeScale * this.deathTimeScale;
+      if (this.runStats.soldiersDeployed > 0 || this.portal) this.acc += real * this.timeScale * this.deathTimeScale;
       const maxSteps = SIM.maxStepsPerFrame * Math.max(1, this.timeScale);
       let steps = 0;
       while (this.acc >= SIM.dt && steps < maxSteps) {

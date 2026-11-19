@@ -13,6 +13,7 @@ import {
   labFrame,
   parseBlueprint,
   sectorAtCell,
+  sectorDistance,
   sectorName,
   sectorSpawnCell,
   sectorTier,
@@ -197,13 +198,13 @@ describe("hand-made lab", () => {
     expect(sectorAtCell(w.labLayout!.frame!, w.roomX0 + 5, w.roomY0 + 5)).toBe(Z3.start);
   });
 
-  it("puts a locked tier 3 gate in the middle of zone 1's east side that only the keycard opens", () => {
+  it("puts a locked tier 4 gate in the middle of zone 1's east side that only the tier 4 keycard opens", () => {
     const w = new PixelWorld(WORLD);
     generateWorld(w, 9);
     const frame = w.labLayout!.frame!;
     const gate = w.doors.find((d) => d.gate)!;
     expect(gate).toBeDefined();
-    expect(gate.tier).toBe(3);
+    expect(gate.tier).toBe(4);
     expect(gate.gate!.to).toBe(2);
     const g = gateGeometry(frame, Z1.gates[0]);
     expect(g.door.x0).toBe(frame.x0 + 9 * 49);
@@ -219,12 +220,12 @@ describe("hand-made lab", () => {
     const cx = i % w.width;
     const cy = (i - cx) / w.width;
     const hp = w.health[i];
-    w.keycardTier = 2;
+    w.keycardTier = 3;
     for (let k = 0; k < 20; k++) w.damage(cx, cy, 1e6, true);
     expect(w.health[i]).toBe(hp);
     expect(gate.open).toBe(false);
     expect(locked.length).toBe(20);
-    w.keycardTier = 3;
+    w.keycardTier = 4;
     w.damage(cx, cy, 1, true);
     expect(gate.open).toBe(true);
     doors.update(5);
@@ -243,6 +244,26 @@ describe("hand-made lab", () => {
       // Spread out: not all in the first tier band.
       expect(new Set(w.upgradeSpots.map((s) => sectorZone(def, s.sector))).size).toBeGreaterThan(1);
     }
+  });
+
+  it("places tier 2-4 keycards on zone edges and omits room doors in tier 4", () => {
+    expect(Z1.upgrades.some((u) => u.id === "z1-core-keycard-t1")).toBe(false);
+    const byId = new Map(Z1.upgrades.map((u) => [u.id, upgradeSpotSector(Z1, u)]));
+    const s2 = byId.get("z1-core-keycard-t2")!;
+    const s3 = byId.get("z1-core-keycard-t3")!;
+    const s4 = byId.get("z1-core-keycard-t4")!;
+    expect(sectorTier(Z1, s2)).toBe(1);
+    expect(sectorDistance(Z1, s2)).toBe(Z1.bands[0] - 1);
+    expect(sectorTier(Z1, s3)).toBe(2);
+    expect(sectorDistance(Z1, s3)).toBe(Z1.bands[1] - 1);
+    expect(sectorTier(Z1, s4)).toBe(3);
+    expect(sectorDistance(Z1, s4)).toBe(Z1.sectors - 1);
+    // Away from the east gate in sector row 4, col 8 (I5).
+    expect(s4).not.toBe(4 * Z1.sectors + 8);
+
+    const w2 = new PixelWorld(WORLD);
+    generateWorld(w2, 5, { labWorld: Z2 });
+    expect(w2.doors.some((d) => !d.gate && d.tier === 4)).toBe(false);
   });
 
   it("clears conquered sectors and spawns in the chosen one", () => {
