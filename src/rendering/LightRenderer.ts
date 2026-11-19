@@ -216,6 +216,9 @@ export class LightRenderer {
 
     // Reuse the ambient-colored silhouette while camera, size and terrain opacity
     // are unchanged. Pending chunk work invalidates it as each chunk is built.
+    const maskStart = performance.now();
+    const metrics = game.frameTimings?.current;
+    let repainted = false;
     const m = this.maskState, terrain = game.terrain;
     const revision = terrain.visibleOpacityRevision(cam);
     const compatible = m && m.terrain === terrain && m.zoom === cam.zoom &&
@@ -239,10 +242,19 @@ export class LightRenderer {
         }
       }
       if (regions === null) regions = [{ x: 0, y: 0, width: devW, height: devH }];
-      if (scroll && (scroll.dx !== 0 || scroll.dy !== 0)) this.scrollMask(scroll.dx, scroll.dy, devW, devH);
+      if (scroll && (scroll.dx !== 0 || scroll.dy !== 0)) {
+        this.scrollMask(scroll.dx, scroll.dy, devW, devH);
+        if (metrics) metrics.maskScrolls++;
+      }
       for (const bounds of regions) {
         const mask = this.maskCtx;
         const partial = bounds.x !== 0 || bounds.y !== 0 || bounds.width !== devW || bounds.height !== devH;
+        repainted = true;
+        if (metrics) {
+          if (partial) metrics.maskPartialRegions++;
+          else metrics.maskFullRebuilds++;
+          metrics.maskRepaintPixels += bounds.width * bounds.height;
+        }
         mask.setTransform(1, 0, 0, 1, 0, 0);
         if (partial) {
           // Clip in integer device pixels; source-in must not clear retained pixels.
@@ -265,6 +277,11 @@ export class LightRenderer {
       }
       this.maskState = { terrain, revision, opacityVersion: terrain.opacityRevision, x: cam.x, y: cam.y,
         zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: devW, height: devH, dpr, ambient };
+    }
+
+    if (metrics) {
+      metrics.lightingMaskMs = performance.now() - maskStart;
+      if (!repainted) metrics.maskReuses++;
     }
 
     // Empty views need only the ambient/terrain result. Reuse that exact

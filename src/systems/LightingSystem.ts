@@ -267,7 +267,10 @@ export class LightingSystem {
    * Trace light and shadow for the ceiling panels near the view: up to
    * `FACILITY.panelTracesPerFrame` stale ones a frame, nearest first in list order.
    */
+  retracedLastUpdate = 0;
+
   updateFixtures(cam: CameraSystem): void {
+    this.retracedLastUpdate = 0;
     const w = this.world;
     if (w.roomLights !== this.fixtureSource) {
       this.fixtureSource = w.roomLights;
@@ -307,6 +310,7 @@ export class LightingSystem {
       if (!f || f.light.destroyed || !f.dirty || f.x < x0 || f.x > x1 || f.y < y0 || f.y > y1) continue;
       budget--;
       f.dirty = false;
+      this.retracedLastUpdate++;
       const n = this.trace(
         f.x, f.y, 1, 0, f.radius, -3, [], this.scratchPoly, this.scratchLit,
         FACILITY.panelBaseRays, 0, this.preset.maxCornerRays,

@@ -1,3 +1,4 @@
+import { BrowserFrameEvents } from "./core/BrowserFrameEvents";
 import { FrameTimings } from "./core/FrameTimings";
 import { DamageNumbers } from "./entities/DamageNumbers";
 import { LateEncounters } from "./systems/LateEncounters";
@@ -223,7 +224,8 @@ export class Game {
 
   private acc = 0;
   private last = 0;
-  private readonly frameTimings = new FrameTimings();
+  readonly frameTimings = new FrameTimings();
+  private readonly browserFrameEvents = new BrowserFrameEvents(this.frameTimings, () => this.wasPlaying);
   private fpsAcc = 0;
   private fpsFrames = 0;
 
@@ -2124,15 +2126,26 @@ export class Game {
     this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
     this.wardens.update(dt, this.soldiers);
     this.specials.update(dt);
+    const fogStart = performance.now();
     this.updateFog(dt);
+    const growthStart = performance.now();
+    const metrics = this.frameTimings.current;
+    metrics.fogUpdateMs += growthStart - fogStart;
+    metrics.airMappingMs += this.fog.airMetrics.updateMs;
+    metrics.airFloods += this.fog.airMetrics.floods;
+    metrics.airCellsVisited += this.fog.airMetrics.visitedCells;
+    metrics.mappedAirTiles = this.fog.airMetrics.mappedTiles;
     if (!this.labDef.framework) this.growth.update(dt, this.runStats.time, this.soldiers);
+    metrics.growthUpdateMs += performance.now() - growthStart;
     this.growthRate = this.growth.rate;
     this.runStats.recordSampleIfDue(this.growthRate);
     this.particles.update(dt);
     this.damageNumbers.update(dt);
     this.casings.update(dt, this.world);
+    const subStart = performance.now();
     this.subPixels.update(dt, this.soldiers);
     this.lighting.invalidateMovingSubPixels();
+    metrics.subPixelSimulationMs += performance.now() - subStart;
     const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
     if (collected > 0) {
       this.runStats.currency += this.loot.collectedGold;
@@ -2465,6 +2478,9 @@ export class Game {
 
   exportTelemetryJson(): string {
     const r = this.runStats;
+    const memory = (performance as Performance & {memory?: {usedJSHeapSize:number;totalJSHeapSize:number;jsHeapSizeLimit:number}}).memory;
+    const heapAtExport = memory ? {usedBytes:memory.usedJSHeapSize,allocatedBytes:memory.totalJSHeapSize,limitBytes:memory.jsHeapSizeLimit} : null;
+    const recent = this.frameTimings.snapshot();
     return JSON.stringify(
       {
         time: +r.time.toFixed(2),
@@ -2479,8 +2495,12 @@ export class Game {
         upgrades: this.save.data.upgrades,
         samples: r.samples,
         timing: {
+          schemaVersion: 3,
+          heapAtExport,
           ...this.debugInfo,
-          recentActiveFrames: this.frameTimings.snapshot(),
+          recentActiveFrames: recent,
+          browserEvents: this.browserFrameEvents.snapshot(recent.startMs, recent.endMs),
+          simulation: { fixedStepMs: SIM.dt * 1000, timeScale: this.timeScale, deathTimeScale: this.deathTimeScale, maxStepsPerFrame: SIM.maxStepsPerFrame * Math.max(1, this.timeScale) },
           rendering: this.renderer.diagnostics(),
           connectedAirMapping: this.stats.connectedAirMapping,
           visible: !document.hidden,
@@ -2498,6 +2518,9 @@ export class Game {
 
   frame = (now: number): void => {
     const frameStart = performance.now();
+    const previousWorkMs = this.debugInfo.frameMs;
+    const metrics = this.frameTimings.current;
+    this.frameTimings.beginFrame();
     this.syncSpeedrun(now);
     if (this.runStarted && !this.paused && !this.runOver && this.save.data.speedrun.enabled && now - this.speedrunSavedAt >= 5000) {
       this.speedrunSavedAt = now;
@@ -2509,11 +2532,18 @@ export class Game {
     // Only live gameplay frames tune the auto render quality.
     const playing = this.runStarted && this.runStats.soldiersDeployed > 0 && !this.paused && !this.runOver && !document.hidden;
     const continuousGameplay = playing && this.wasPlaying;
-    if (playing && !this.wasPlaying) this.frameTimings.reset();
+    if (playing && !this.wasPlaying) {
+      this.frameTimings.reset();
+      this.browserFrameEvents.reset();
+    }
     if (playing && this.wasPlaying) this.renderer.sampleFrame(intervalMs);
     else if (!playing && this.wasPlaying) this.renderer.resetFrameSampling();
     this.wasPlaying = playing;
     const t0 = performance.now();
+    metrics.preFrameMs = t0 - frameStart;
+    metrics.clampedWallTimeMs = Math.max(0, intervalMs - 100);
+    const cameraX = this.camera.x, cameraY = this.camera.y;
+    const growthBefore = this.growth.totalEvents;
     if (!this.paused) {
       if (this.runStats.soldiersDeployed > 0 || this.portal) this.acc += real * this.timeScale * this.deathTimeScale;
       const maxSteps = SIM.maxStepsPerFrame * Math.max(1, this.timeScale);
@@ -2523,7 +2553,11 @@ export class Game {
         this.acc -= SIM.dt;
         steps++;
       }
-      if (steps >= maxSteps) this.acc = 0;
+      metrics.simulationSteps = steps;
+      if (steps >= maxSteps) {
+        metrics.discardedSimulationMs = this.acc * 1000;
+        this.acc = 0;
+      }
       if (!this.aimState.active) {
         this.camera.update(real, this.soldiers);
       }
@@ -2532,21 +2566,34 @@ export class Game {
     this.updateScreenShake(real);
     this.transition.update(real);
     const t1 = performance.now();
+    metrics.simulationMs = t1 - t0;
+    metrics.growthEvents = Math.max(0, this.growth.totalEvents - growthBefore);
+    metrics.cameraTravelWorld = Math.hypot(this.camera.x - cameraX, this.camera.y - cameraY);
+    metrics.cameraZoom = this.camera.zoom;
     // The opaque main menu has its own gameplay backdrop. Other full menus
     // retain the upstream last-frame cache, including redraws after resizing.
     if (!this.mainMenu.visible) {
+      const terrainStart = performance.now();
       this.terrain.update();
+      metrics.terrainUpdateMs = performance.now() - terrainStart;
+      metrics.terrainChunksRebuilt = this.terrain.rebuiltLastFrame;
+      metrics.terrainChunksPending = this.terrain.chunks.pending;
       const covered = this.paused && (this.upgradeTree.visible || this.labMap?.visible || this.resultsScreen.visible);
       if (!covered || this.renderer.needsDraw) {
+        const shadowStart = performance.now();
         this.updateFlashPolygons();
+        metrics.shadowPreparationMs = performance.now() - shadowStart;
+        metrics.fixtureRetraces = this.lighting.retracedLastUpdate;
         this.renderer.draw();
       }
     }
+    const hudStart = performance.now();
     const fireMix = this.paused || this.runOver ? { gain: 0, pan: 0 } : fireAmbienceMix(this.fire, this.world, this.camera);
     this.audio.updateFireAmbience(fireMix.gain, fireMix.pan);
     this.hud.update(this, now);
     this.debugOverlay.update();
     const t2 = performance.now();
+    metrics.hudAudioMs = t2 - hudStart;
 
     // Simulation time is capped for catch-up; FPS must use real elapsed time.
     // Otherwise every interval >=100 ms is incorrectly reported as 10 FPS.
@@ -2561,8 +2608,10 @@ export class Game {
     this.debugInfo.frameMs = t2 - frameStart;
     // Keep the last gameplay window while paused, so opening diagnostics does
     // not overwrite slow gameplay with cheap menu frames. Resume starts fresh.
-    if (continuousGameplay) this.frameTimings.sample(intervalMs, this.debugInfo.frameMs);
+    if (continuousGameplay) this.frameTimings.sample(intervalMs, this.debugInfo.frameMs, frameStart, previousWorkMs);
     requestAnimationFrame(this.frame);
+    this.debugInfo.frameMs = performance.now() - frameStart;
+    if (continuousGameplay) this.frameTimings.finishWork(this.debugInfo.frameMs);
   };
 
   start(): void {

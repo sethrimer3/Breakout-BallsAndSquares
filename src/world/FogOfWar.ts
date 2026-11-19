@@ -62,6 +62,7 @@ export class FogOfWar {
   /** Explored areas keep a dim memory instead of going black. */
   permanent = false;
   connectedAir = false;
+  readonly airMetrics = { updateMs: 0, floods: 0, visitedCells: 0, mappedTiles: 0 };
   /** How many solid terrain cells sight rays penetrate into walls (Better Flashlight). */
   wallPenetrationCells = 0;
   private air: ConnectedAir | null = null;
@@ -239,7 +240,9 @@ export class FogOfWar {
       const reach = s.facingAngle === undefined ? 1 : FOG.forwardSightMult;
       this.trace(s, Math.max(16, Math.round((rays * s.radiusCells * reach) / FOG.soldierSightCells)));
     }
+    this.airMetrics.updateMs = this.airMetrics.floods = this.airMetrics.visitedCells = this.airMetrics.mappedTiles = 0;
     if (this.connectedAir) {
+      const airStart = performance.now();
       this.air ??= new ConnectedAir(this.world, this.tileCells);
       for (const tile of this.air.update(dt, sources)) {
         this.revealBoost[tile] = this.seenStamp[tile] === this.stamp ? Math.max(1.5, this.revealBoost[tile]) : 1.5;
@@ -247,6 +250,10 @@ export class FogOfWar {
         const x = tile % this.tw, y = (tile - x) / this.tw;
         this.grow(x, y, x, y);
       }
+      this.airMetrics.updateMs = performance.now() - airStart;
+      this.airMetrics.floods = this.air.rebuiltLastUpdate ? 1 : 0;
+      this.airMetrics.visitedCells = this.air.visitedLastUpdate;
+      this.airMetrics.mappedTiles = this.air.tiles.length;
     }
     if (this.bx0 > this.bx1) return;
 

@@ -1,0 +1,747 @@
+{
+  "integratedMain": "f9455af",
+  "tests": 704,
+  "testFiles": 96,
+  "typeCheck": true,
+  "productionBuild": true,
+  "renderPixels": {
+    "baseline": "3eb3b97",
+    "browser": "156.0.8078.79",
+    "reports": [
+      {
+        "device": {
+          "width": 1000,
+          "height": 700,
+          "dpr": 1
+        },
+        "comparisons": 12,
+        "changedChannels": 0
+      },
+      {
+        "device": {
+          "width": 412,
+          "height": 915,
+          "dpr": 2.625
+        },
+        "comparisons": 24,
+        "changedChannels": 0
+      }
+    ]
+  },
+  "standaloneSamplerCalibration": {
+    "cpuThrottle": 4,
+    "framesPerBatch": 2000,
+    "batches": 10,
+    "stopwatchReadsPerFrame": 32,
+    "samplingMsPerFrame": {
+      "p50": 0.0581999999997206,
+      "p95": 0.07129999999981373
+    },
+    "scope": "fixed-buffer reset/copy and clock reads only; excludes scene probes and browser observer delivery"
+  },
+  "calibrationContext": "Standalone before unrelated UI/world-layout integration; sampler source unchanged. Concurrent integration-test calibration is not used.",
+  "syntheticCadenceIntegration": {
+    "syntheticIntervalMs": 200,
+    "reportedFps": 4.999999999999999,
+    "recent": {
+      "samples": 4,
+      "windowSeconds": 0.8,
+      "startMs": 8396.200000000186,
+      "endMs": 8809.700000000186,
+      "fps": 5,
+      "intervalMs": {
+        "p50": 200,
+        "p95": 200,
+        "p99": 200,
+        "max": 200
+      },
+      "workMs": {
+        "p50": 32.799999999813735,
+        "p95": 127.20000000018626,
+        "p99": 127.20000000018626,
+        "max": 127.20000000018626
+      },
+      "outsideCallbackMs": {
+        "p50": 170.20000000018626,
+        "p95": 176.29999999981374,
+        "p99": 176.29999999981374,
+        "max": 176.29999999981374
+      },
+      "phasesMs": {
+        "preFrameMs": {
+          "p50": 0.1,
+          "p95": 0.4,
+          "p99": 0.4,
+          "max": 0.4
+        },
+        "simulationMs": {
+          "p50": 4.9,
+          "p95": 7.2,
+          "p99": 7.2,
+          "max": 7.2
+        },
+        "terrainUpdateMs": {
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "shadowPreparationMs": {
+          "p50": 0.7,
+          "p95": 4.8,
+          "p99": 4.8,
+          "max": 4.8
+        },
+        "albedoMs": {
+          "p50": 0.3,
+          "p95": 0.5,
+          "p99": 0.5,
+          "max": 0.5
+        },
+        "lightingMs": {
+          "p50": 19,
+          "p95": 116.3,
+          "p99": 116.3,
+          "max": 116.3
+        },
+        "worldEffectsMs": {
+          "p50": 0.3,
+          "p95": 0.7,
+          "p99": 0.7,
+          "max": 0.7
+        },
+        "combatEffectsMs": {
+          "p50": 0.5,
+          "p95": 0.6,
+          "p99": 0.6,
+          "max": 0.6
+        },
+        "bloomMs": {
+          "p50": 5.2,
+          "p95": 5.5,
+          "p99": 5.5,
+          "max": 5.5
+        },
+        "fogRenderMs": {
+          "p50": 0.9,
+          "p95": 1,
+          "p99": 1,
+          "max": 1
+        },
+        "blightEdgesMs": {
+          "p50": 0,
+          "p95": 0.1,
+          "p99": 0.1,
+          "max": 0.1
+        },
+        "actorsAndUiMs": {
+          "p50": 0.8,
+          "p95": 0.9,
+          "p99": 0.9,
+          "max": 0.9
+        },
+        "hudAudioMs": {
+          "p50": 0.1,
+          "p95": 0.1,
+          "p99": 0.1,
+          "max": 0.1
+        },
+        "fogUpdateMs": {
+          "p50": 1.5,
+          "p95": 2.2,
+          "p99": 2.2,
+          "max": 2.2
+        },
+        "airMappingMs": {
+          "p50": 0.3,
+          "p95": 1.1,
+          "p99": 1.1,
+          "max": 1.1
+        },
+        "growthUpdateMs": {
+          "p50": 0.2,
+          "p95": 0.3,
+          "p99": 0.3,
+          "max": 0.3
+        },
+        "lightingMaskMs": {
+          "p50": 0,
+          "p95": 0.1,
+          "p99": 0.1,
+          "max": 0.1
+        },
+        "wardenDrawMs": {
+          "p50": 0.1,
+          "p95": 0.1,
+          "p99": 0.1,
+          "max": 0.1
+        },
+        "subPixelDrawMs": {
+          "p50": 0.1,
+          "p95": 0.1,
+          "p99": 0.1,
+          "max": 0.1
+        },
+        "subPixelSimulationMs": {
+          "p50": 0,
+          "p95": 0.1,
+          "p99": 0.1,
+          "max": 0.1
+        }
+      },
+      "counts": {
+        "simulationSteps": {
+          "last": 5,
+          "p50": 5,
+          "p95": 5,
+          "p99": 5,
+          "max": 5
+        },
+        "clampedWallTimeMs": {
+          "last": 100,
+          "p50": 100,
+          "p95": 100,
+          "p99": 100,
+          "max": 100
+        },
+        "discardedSimulationMs": {
+          "last": 16.667,
+          "p50": 16.667,
+          "p95": 16.667,
+          "p99": 16.667,
+          "max": 16.667
+        },
+        "terrainChunksRebuilt": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "terrainChunksPending": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "growthEvents": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "airFloods": {
+          "last": 0,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1,
+          "max": 1
+        },
+        "airCellsVisited": {
+          "last": 0,
+          "p50": 0,
+          "p95": 1430,
+          "p99": 1430,
+          "max": 1430
+        },
+        "mappedAirTiles": {
+          "last": 97,
+          "p50": 97,
+          "p95": 97,
+          "p99": 97,
+          "max": 97
+        },
+        "fixtureRetraces": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "maskFullRebuilds": {
+          "last": 0,
+          "p50": 0,
+          "p95": 1,
+          "p99": 1,
+          "max": 1
+        },
+        "maskPartialRegions": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "maskScrolls": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "maskReuses": {
+          "last": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "max": 1
+        },
+        "maskRepaintPixels": {
+          "last": 0,
+          "p50": 0,
+          "p95": 848514,
+          "p99": 848514,
+          "max": 848514
+        },
+        "candidateRoomLights": {
+          "last": 17,
+          "p50": 17,
+          "p95": 17,
+          "p99": 17,
+          "max": 17
+        },
+        "softLights": {
+          "last": 2,
+          "p50": 2,
+          "p95": 2,
+          "p99": 2,
+          "max": 2
+        },
+        "muzzleFlashes": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "shadowRays": {
+          "last": 106,
+          "p50": 106,
+          "p95": 106,
+          "p99": 106,
+          "max": 106
+        },
+        "shadowedMuzzleLights": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "soldiers": {
+          "last": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "max": 1
+        },
+        "bullets": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "particles": {
+          "last": 0,
+          "p50": 14,
+          "p95": 14,
+          "p99": 14,
+          "max": 14
+        },
+        "fireParticles": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "loot": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "damageNumbers": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "movingSubPixels": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "creatures": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "wardens": {
+          "last": 34,
+          "p50": 34,
+          "p95": 34,
+          "p99": 34,
+          "max": 34
+        },
+        "cameraTravelWorld": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "cameraZoom": {
+          "last": 2.5,
+          "p50": 2.5,
+          "p95": 2.5,
+          "p99": 2.5,
+          "max": 2.5
+        },
+        "backingPixels": {
+          "last": 848514,
+          "p50": 848514,
+          "p95": 848514,
+          "p99": 848514,
+          "max": 848514
+        },
+        "renderDensity": {
+          "last": 1.5,
+          "p50": 1.5,
+          "p95": 1.5,
+          "p99": 1.5,
+          "max": 1.5
+        },
+        "bloomEnabled": {
+          "last": 1,
+          "p50": 1,
+          "p95": 1,
+          "p99": 1,
+          "max": 1
+        },
+        "softShadowsEnabled": {
+          "last": 0,
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "max": 0
+        },
+        "lightingQualityLevel": {
+          "last": 2,
+          "p50": 2,
+          "p95": 2,
+          "p99": 2,
+          "max": 2
+        }
+      },
+      "slowestWorkFrames": [
+        {
+          "startMs": 8682.5,
+          "intervalMs": 200,
+          "workMs": 127.2,
+          "outsideCallbackMs": 176.3,
+          "phasesMs": {
+            "simulationMs": 3.1,
+            "shadowPreparationMs": 0.3,
+            "albedoMs": 0.2,
+            "lightingMs": 116.3,
+            "worldEffectsMs": 0.7,
+            "combatEffectsMs": 0.3,
+            "bloomMs": 5.2,
+            "fogRenderMs": 0.1,
+            "blightEdgesMs": 0.1,
+            "actorsAndUiMs": 0.7,
+            "hudAudioMs": 0.1,
+            "fogUpdateMs": 1.2,
+            "growthUpdateMs": 0.2,
+            "wardenDrawMs": 0.1,
+            "subPixelDrawMs": 0.1
+          },
+          "counts": {
+            "simulationSteps": 5,
+            "clampedWallTimeMs": 100,
+            "discardedSimulationMs": 16.667,
+            "mappedAirTiles": 97,
+            "maskReuses": 1,
+            "candidateRoomLights": 17,
+            "softLights": 2,
+            "shadowRays": 106,
+            "soldiers": 1,
+            "wardens": 34,
+            "cameraZoom": 2.5,
+            "backingPixels": 848514,
+            "renderDensity": 1.5,
+            "bloomEnabled": 1,
+            "lightingQualityLevel": 2
+          }
+        },
+        {
+          "startMs": 8626,
+          "intervalMs": 200,
+          "workMs": 32.8,
+          "outsideCallbackMs": 170.2,
+          "phasesMs": {
+            "preFrameMs": 0.1,
+            "simulationMs": 4.9,
+            "shadowPreparationMs": 4.8,
+            "albedoMs": 0.3,
+            "lightingMs": 19,
+            "worldEffectsMs": 0.2,
+            "combatEffectsMs": 0.3,
+            "bloomMs": 1.3,
+            "fogRenderMs": 0.9,
+            "actorsAndUiMs": 0.7,
+            "fogUpdateMs": 2.2,
+            "airMappingMs": 1.1,
+            "growthUpdateMs": 0.2,
+            "lightingMaskMs": 0.1,
+            "wardenDrawMs": 0.1
+          },
+          "counts": {
+            "simulationSteps": 5,
+            "clampedWallTimeMs": 100,
+            "discardedSimulationMs": 16.667,
+            "airFloods": 1,
+            "airCellsVisited": 1430,
+            "mappedAirTiles": 97,
+            "maskFullRebuilds": 1,
+            "maskRepaintPixels": 848514,
+            "candidateRoomLights": 17,
+            "softLights": 2,
+            "shadowRays": 106,
+            "soldiers": 1,
+            "particles": 14,
+            "wardens": 34,
+            "cameraZoom": 2.5,
+            "backingPixels": 848514,
+            "renderDensity": 1.5,
+            "bloomEnabled": 1,
+            "lightingQualityLevel": 2
+          }
+        },
+        {
+          "startMs": 8596.2,
+          "intervalMs": 200,
+          "workMs": 29.8,
+          "outsideCallbackMs": 151.3,
+          "phasesMs": {
+            "preFrameMs": 0.4,
+            "simulationMs": 7.2,
+            "shadowPreparationMs": 0.3,
+            "albedoMs": 0.2,
+            "lightingMs": 13,
+            "worldEffectsMs": 0.3,
+            "combatEffectsMs": 0.6,
+            "bloomMs": 5.5,
+            "fogRenderMs": 1,
+            "actorsAndUiMs": 0.9,
+            "fogUpdateMs": 0.8,
+            "airMappingMs": 0.1,
+            "growthUpdateMs": 0.2,
+            "subPixelSimulationMs": 0.1
+          },
+          "counts": {
+            "simulationSteps": 5,
+            "clampedWallTimeMs": 100,
+            "discardedSimulationMs": 16.667,
+            "mappedAirTiles": 97,
+            "maskReuses": 1,
+            "candidateRoomLights": 17,
+            "softLights": 2,
+            "shadowRays": 106,
+            "soldiers": 1,
+            "particles": 14,
+            "wardens": 34,
+            "cameraZoom": 2.5,
+            "backingPixels": 848514,
+            "renderDensity": 1.5,
+            "bloomEnabled": 1,
+            "lightingQualityLevel": 2
+          }
+        }
+      ],
+      "longestIntervalFrames": [
+        {
+          "startMs": 8596.2,
+          "intervalMs": 200,
+          "workMs": 29.8,
+          "outsideCallbackMs": 151.3,
+          "phasesMs": {
+            "preFrameMs": 0.4,
+            "simulationMs": 7.2,
+            "shadowPreparationMs": 0.3,
+            "albedoMs": 0.2,
+            "lightingMs": 13,
+            "worldEffectsMs": 0.3,
+            "combatEffectsMs": 0.6,
+            "bloomMs": 5.5,
+            "fogRenderMs": 1,
+            "actorsAndUiMs": 0.9,
+            "fogUpdateMs": 0.8,
+            "airMappingMs": 0.1,
+            "growthUpdateMs": 0.2,
+            "subPixelSimulationMs": 0.1
+          },
+          "counts": {
+            "simulationSteps": 5,
+            "clampedWallTimeMs": 100,
+            "discardedSimulationMs": 16.667,
+            "mappedAirTiles": 97,
+            "maskReuses": 1,
+            "candidateRoomLights": 17,
+            "softLights": 2,
+            "shadowRays": 106,
+            "soldiers": 1,
+            "particles": 14,
+            "wardens": 34,
+            "cameraZoom": 2.5,
+            "backingPixels": 848514,
+            "renderDensity": 1.5,
+            "bloomEnabled": 1,
+            "lightingQualityLevel": 2
+          }
+        },
+        {
+          "startMs": 8626,
+          "intervalMs": 200,
+          "workMs": 32.8,
+          "outsideCallbackMs": 170.2,
+          "phasesMs": {
+            "preFrameMs": 0.1,
+            "simulationMs": 4.9,
+            "shadowPreparationMs": 4.8,
+            "albedoMs": 0.3,
+            "lightingMs": 19,
+            "worldEffectsMs": 0.2,
+            "combatEffectsMs": 0.3,
+            "bloomMs": 1.3,
+            "fogRenderMs": 0.9,
+            "actorsAndUiMs": 0.7,
+            "fogUpdateMs": 2.2,
+            "airMappingMs": 1.1,
+            "growthUpdateMs": 0.2,
+            "lightingMaskMs": 0.1,
+            "wardenDrawMs": 0.1
+          },
+          "counts": {
+            "simulationSteps": 5,
+            "clampedWallTimeMs": 100,
+            "discardedSimulationMs": 16.667,
+            "airFloods": 1,
+            "airCellsVisited": 1430,
+            "mappedAirTiles": 97,
+            "maskFullRebuilds": 1,
+            "maskRepaintPixels": 848514,
+            "candidateRoomLights": 17,
+            "softLights": 2,
+            "shadowRays": 106,
+            "soldiers": 1,
+            "particles": 14,
+            "wardens": 34,
+            "cameraZoom": 2.5,
+            "backingPixels": 848514,
+            "renderDensity": 1.5,
+            "bloomEnabled": 1,
+            "lightingQualityLevel": 2
+          }
+        },
+        {
+          "startMs": 8658.8,
+          "intervalMs": 200,
+          "workMs": 23.7,
+          "outsideCallbackMs": 167.2,
+          "phasesMs": {
+            "simulationMs": 3.9,
+            "shadowPreparationMs": 0.7,
+            "albedoMs": 0.5,
+            "lightingMs": 12.6,
+            "worldEffectsMs": 0.3,
+            "combatEffectsMs": 0.5,
+            "bloomMs": 3.4,
+            "fogRenderMs": 0.9,
+            "actorsAndUiMs": 0.8,
+            "hudAudioMs": 0.1,
+            "fogUpdateMs": 1.5,
+            "airMappingMs": 0.3,
+            "growthUpdateMs": 0.3,
+            "subPixelDrawMs": 0.1
+          },
+          "counts": {
+            "simulationSteps": 5,
+            "clampedWallTimeMs": 100,
+            "discardedSimulationMs": 16.667,
+            "mappedAirTiles": 97,
+            "maskReuses": 1,
+            "candidateRoomLights": 17,
+            "softLights": 2,
+            "shadowRays": 106,
+            "soldiers": 1,
+            "particles": 14,
+            "wardens": 34,
+            "cameraZoom": 2.5,
+            "backingPixels": 848514,
+            "renderDensity": 1.5,
+            "bloomEnabled": 1,
+            "lightingQualityLevel": 2
+          }
+        }
+      ]
+    },
+    "rendering": {
+      "quality": "auto",
+      "density": 1.5,
+      "devicePixelRatio": 2.625,
+      "cssSize": [
+        412,
+        915
+      ],
+      "backingSize": [
+        618,
+        1373
+      ],
+      "softShadows": false,
+      "bloom": true,
+      "lightingQuality": "high",
+      "reducedMotion": false,
+      "camera": {
+        "x": 1064,
+        "y": 1064,
+        "zoom": 2.5
+      },
+      "contextAttributes": {
+        "alpha": false,
+        "colorSpace": "srgb",
+        "colorType": "unorm8",
+        "desynchronized": false,
+        "toneMapping": {
+          "mode": "standard"
+        },
+        "willReadFrequently": false
+      },
+      "auto": {
+        "step": 1,
+        "cap": 1.5,
+        "locked": false,
+        "typicalIntervalMs": 0
+      }
+    },
+    "pausePreservesHistory": true,
+    "resumeResetsHistory": true
+  },
+  "sourceSha256": {
+    "src/core/FrameTimings.ts": "a39d4ce82ba278552bcac36573c816cbdfddb55fa42e0de41eaaecbbaa14ae19",
+    "src/core/BrowserFrameEvents.ts": "c502fae2118fc8a2d3f37b660978cb79e1e6e7d86069c7e9aea5d6c4ce3d00c9",
+    "src/Game.ts": "919f85e35d16738104a23cf4dd526c186b0d0707898a55019049728f307a19b4",
+    "src/rendering/Renderer.ts": "2a40b863bcabebfbd993a4096b61b0491bcdb24131eb6df7fe57e67a1132fbf0",
+    "src/rendering/LightRenderer.ts": "6119c6c9c6c25a29288945c0b193ce213c46a8eff02ed57c9144f83c70361234"
+  }
+}

@@ -3,6 +3,8 @@ import type { SightQuery, SightSource } from "./FogOfWar";
 /** Cached four-connected air on the fine collision grid, never a diagonal shortcut. */
 export class ConnectedAir {
   readonly tiles: number[] = [];
+  rebuiltLastUpdate = false;
+  visitedLastUpdate = 0;
   private readonly visited: Uint32Array;
   private readonly queue: Int32Array;
   private readonly marked: Uint8Array;
@@ -24,6 +26,8 @@ export class ConnectedAir {
   reset(): void { this.tiles.length = 0; this.elapsed = 1; }
 
   update(dt: number, sources: readonly SightSource[]): readonly number[] {
+    this.rebuiltLastUpdate = false;
+    this.visitedLastUpdate = 0;
     this.elapsed += dt;
     if (!sources.some((s) => s.airSeed)) { this.reset(); return this.tiles; }
     // Refresh frequently enough for opening doors, breaking rubble and regrowth,
@@ -53,6 +57,8 @@ export class ConnectedAir {
       if (!this.marked[tile]) { this.marked[tile] = 1; this.tiles.push(tile); }
       enter(x - 1, y); enter(x + 1, y); enter(x, y - 1); enter(x, y + 1);
     }
+    this.rebuiltLastUpdate = true;
+    this.visitedLastUpdate = tail;
     return this.tiles;
   }
 }

@@ -1,3 +1,4 @@
+import { visibleRoomLightIndices } from "./RoomLightIndex";
 import { DamageNumberRenderer } from "./DamageNumberRenderer";
 import { drawMapBoundary } from "./MapBoundaryRenderer";
 import { drawWeaponExpansion } from "./WeaponExpansionRenderer";
@@ -100,6 +101,10 @@ export class Renderer {
       backingSize: [this.canvas.width, this.canvas.height],
       softShadows: this.game.save.data.settings.softShadows,
       bloom: this.game.bloom,
+      lightingQuality: this.game.lighting.quality,
+      reducedMotion: this.motion.matches,
+      camera: { x: this.game.camera.x, y: this.game.camera.y, zoom: this.game.camera.zoom },
+      contextAttributes: this.ctx.getContextAttributes?.() ?? null,
       auto: this.governor ? {
         step: this.governor.step, cap: this.governor.cap,
         locked: this.governor.locked, typicalIntervalMs: this.governor.lastTypical,
@@ -164,6 +169,8 @@ export class Renderer {
 
   draw(): void {
     const { ctx, game } = this;
+    const metrics = game.frameTimings?.current;
+    let passStart = performance.now();
     const cam = game.camera;
     const w = cam.viewW;
     const h = cam.viewH;
@@ -188,7 +195,7 @@ export class Renderer {
 
     game.terrain.drawFloor(ctx, cam);
     game.terrain.draw(ctx, cam, game.showChunkBorders);
-    this.drawSubPixels();
+    { const start = performance.now(); this.drawSubPixels(); if (metrics) metrics.subPixelDrawMs = performance.now() - start; }
     this.drawDoors();
     drawSpecialPlinths(ctx, cam, game.world);
     this.lateAtmosphere.drawFloorProps(ctx, cam, game.world, this.motion.matches ? 0 : performance.now() / 1000);
@@ -204,15 +211,17 @@ export class Renderer {
 
     this.drawCasings();
     this.drawOpaqueParticles();
+    { const end = performance.now(); if (metrics) metrics.albedoMs = end - passStart; passStart = end; }
 
     // 2) Dynamic lighting pass: multiply shadow-clipped lightmap over the albedo
     //    scene + additive air-scatter cone so shadows behind walls & soldiers pop.
     this.lightRenderer.renderLighting(ctx, game, this.dpr);
+    { const end = performance.now(); if (metrics) metrics.lightingMs = end - passStart; passStart = end; }
     this.lateAtmosphere.drawAtmosphere(ctx, cam, game.world, atmosphere, this.motion.matches ? 0 : performance.now() / 1000);
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
     game.terrain.drawPanels(ctx, cam, performance.now() / 1000);
     game.terrain.drawLabLights(ctx, cam, performance.now() / 1000, this.motion.matches);
-    this.drawSubPixelLights(performance.now() / 1000, this.motion.matches);
+    { const start = performance.now(); this.drawSubPixelLights(performance.now() / 1000, this.motion.matches); if (metrics) metrics.subPixelDrawMs += performance.now() - start; }
     this.drawSentries();
     game.late.draw(ctx, cam);
     this.creatureRenderer.draw(ctx, cam, game.creatures, this.motion.matches ? 0 : performance.now() / 1000);
@@ -220,7 +229,8 @@ export class Renderer {
     const still = this.motion.matches;
     game.terrain.drawSurfaceOutlines(ctx, cam);
     drawSpecialBlocks(ctx, cam, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
-    this.wardenRenderer.draw(ctx, cam, game.wardens, game.specials, this.motion.matches ? 0 : performance.now() / 1000);
+    { const start = performance.now(); this.wardenRenderer.draw(ctx, cam, game.wardens, game.specials, this.motion.matches ? 0 : performance.now() / 1000); if (metrics) metrics.wardenDrawMs = performance.now() - start; }
+    { const end = performance.now(); if (metrics) metrics.worldEffectsMs = end - passStart; passStart = end; }
 
     // 3) Emissive / post-light pass: cell hit highlights, crimson growth pulses,
     //    directional muzzle flares, bullet tracers, sparks, aim indicator, vignette.
@@ -250,7 +260,9 @@ export class Renderer {
     this.drawAdditiveParticles();
     ctx.restore();
 
+    { const end = performance.now(); if (metrics) metrics.combatEffectsMs = end - passStart; passStart = end; }
     this.bloomRenderer.render(ctx, game, this.fireRenderer, still, wallClockMs / 1000);
+    { const end = performance.now(); if (metrics) metrics.bloomMs = end - passStart; passStart = end; }
 
     drawMapBoundary(ctx, game.world, cam);
 
@@ -259,7 +271,9 @@ export class Renderer {
       this.fogRenderer.draw(ctx, cam);
       game.terrain.drawBlightThroughFog(ctx, cam);
     }
+    { const end = performance.now(); if (metrics) metrics.fogRenderMs = end - passStart; passStart = end; }
     game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);
+    { const end = performance.now(); if (metrics) metrics.blightEdgesMs = end - passStart; passStart = end; }
     // Generator tier rims sit on top of the Blight's own edges (Blight shows through fog).
     drawGeneratorRims(ctx, cam, game.world, still ? 0 : wallClockMs / 1000);
     // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
@@ -276,6 +290,30 @@ export class Renderer {
     this.drawAimIndicator();
     this.drawGateNotice();
     drawSpecialNotice(ctx, cam, game.specialNotice, game.runStats.time);
+    if (metrics) {
+      metrics.actorsAndUiMs = performance.now() - passStart;
+      metrics.candidateRoomLights = visibleRoomLightIndices(game.world, cam).length;
+      metrics.softLights = game.lighting.softCount;
+      metrics.muzzleFlashes = game.flashes.length;
+      metrics.shadowRays = game.lighting.lastRaysCast;
+      metrics.shadowedMuzzleLights = game.lighting.lastShadowLights;
+      metrics.soldiers = 0;
+      for (const soldier of game.soldiers) if (soldier.alive) metrics.soldiers++;
+      metrics.bullets = game.combat.bullets.activeCount;
+      metrics.particles = game.particles.count;
+      metrics.fireParticles = game.fire.count;
+      metrics.loot = game.loot.count;
+      metrics.damageNumbers = game.damageNumbers.items.length;
+      metrics.movingSubPixels = game.subPixels.count;
+      metrics.creatures = game.creatures.flowers.length + game.creatures.worms.length;
+      for (const specimen of game.creatures.specimens) if (specimen.free) metrics.creatures++;
+      metrics.wardens = game.wardens.aliveCount;
+      metrics.backingPixels = this.canvas.width * this.canvas.height;
+      metrics.renderDensity = this.dpr;
+      metrics.bloomEnabled = game.bloom ? 1 : 0;
+      metrics.softShadowsEnabled = game.softShadows ? 1 : 0;
+      metrics.lightingQualityLevel = game.lighting.quality === "high" ? 2 : game.lighting.quality === "medium" ? 1 : 0;
+    }
     this.needsDraw = false;
   }
 

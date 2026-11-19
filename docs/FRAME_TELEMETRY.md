@@ -1,5 +1,7 @@
 # Investigating the Pixel 9a report
 
+For the subsequent pass timings, correlated workload history and optional browser events, see [render diagnostics schema 3](RENDER_DIAGNOSTICS.md).
+
 The supplied run reports 10 FPS, a last callback work time of 16.2 ms, simulation 5.5 ms, and lighting preparation 0.5 ms. It enables connected-air mapping and has deployed eight soldiers. Its run time is 25.68 seconds; the last growth sample is 38.69 at 25 seconds, below the current overdrive threshold of 70. This is not evidence of maximum-rate replication.
 
 ## Confirmed reporting defect
