@@ -344,7 +344,8 @@ export class LabMap {
     const facility = region && col >= region.col0 && col <= region.col1 && row >= region.row0 && row <= region.row1;
     const name = `W${this.def.id} ${sectorName(s, this.def.sectors)} · ZONE ${tier}${facility ? ` · ${region.name}` : ""}${this.def.teleporter?.sector === s ? " · TELEPORTER → WORLD 5" : ""}`;
     let status: string;
-    if (this.game.devMapAccess) status = "DEV — DEPLOY ANYWHERE";
+    if (this.game.sectorGuarded(s) && (this.game.devMapAccess || progress.discovered.has(s))) status = "BLIGHT WARDENS HOLD THIS ZONE - NO DEPLOYMENT";
+    else if (this.game.devMapAccess) status = "DEV — DEPLOY ANYWHERE";
     else if (!progress.discovered.has(s)) status = "UNEXPLORED";
     else if (progress.conquered.has(s)) status = s === this.def.start ? (this.def.id === 1 ? "STAGING AREA - SECURE" : "GATEWAY - SECURE") : "CONQUERED - SAFE TO DEPLOY";
     else {

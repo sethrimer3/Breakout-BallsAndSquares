@@ -1,6 +1,7 @@
 import { tierHealth } from "../config";
 import type { Soldier } from "../entities/Soldier";
 import { CAMPAIGN, campaignTier } from "../world/campaignBalance";
+import { sectorAtCell } from "../world/labMap";
 import type { PixelWorld } from "../world/PixelWorld";
 import type { BulletTargets } from "./CombatSystem";
 import { cellOverlapsCircle, hasLineOfSight } from "./PhysicsSystem";
@@ -152,6 +153,27 @@ export class BlightWardenSystem implements BulletTargets {
     private events: WardenEvents = {},
     private rand: () => number = Math.random,
   ) {}
+
+  /**
+   * True when living Wardens hold the zone around world point (x, y), so no
+   * squad may be deployed there. In the hand-made lab the zone is the whole
+   * sector holding their gold block; in small test worlds it is the ground
+   * within a few cells past their leash.
+   */
+  guardsZoneAt(x: number, y: number): boolean {
+    const cs = this.world.cellSize;
+    const frame = this.world.labLayout?.frame;
+    const here = frame ? sectorAtCell(frame, Math.floor(x / cs), Math.floor(y / cs)) : -1;
+    for (const w of this.wardens) {
+      if (!w.alive) continue;
+      if (frame && here >= 0) {
+        if (sectorAtCell(frame, Math.floor(w.homeX / cs), Math.floor(w.homeY / cs)) === here) return true;
+      } else if (Math.hypot(x - w.homeX, y - w.homeY) <= (WARDEN.leashCells + 4) * cs) {
+        return true;
+      }
+    }
+    return false;
+  }
 
   /** A pair of wardens round every gold block still standing. */
   reset(blocks: readonly SpecialBlock[]): void {
