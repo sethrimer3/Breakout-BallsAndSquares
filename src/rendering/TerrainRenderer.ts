@@ -14,7 +14,7 @@ import { paintPortal } from "./portalNoise";
 import type { CameraSystem } from "../systems/CameraSystem";
 import { hash2 } from "../core/math";
 import { DECOR } from "../world/LabDetails";
-import { lateMaterial, materialColor, subPixelColor, TEX, TIER_PAINT, crackTexelAt, materialShade, type LateFeature } from "./materials";
+import { lateMaterial, materialColor, subPixelColor, subPixelTexelShade, TEX, TIER_PAINT, crackTexelAt, materialShade, type LateFeature } from "./materials";
 import { CHAR_CELLS, SECTOR_CELLS, type LabFrame } from "../world/labMap";
 import { roomLightPosition, LIGHT_KIND, MAT, SUB, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 import { TerrainChunks } from "../world/TerrainChunks";
@@ -133,7 +133,7 @@ function hash01(n: number): number {
 }
 
 /** Brightness (0..1) of a status light with rhythm `r` (0..63) at `time`. */
-function ledLevel(r: number, time: number): number {
+export function ledLevel(r: number, time: number): number {
   const rate = 0.5 + (r & 7) * 0.22;
   const phase = (r >> 3) / 8;
   const f = (time * rate + phase) % 1;
@@ -567,6 +567,28 @@ export class TerrainRenderer {
     this.lightIndex = new SortedGridIndex(this.lights, this.world.subWidth, this.world.subHeight);
   }
 
+  /** Register a newly settled LED or Core subcell so its blinking/pulsing light stays active. */
+  addLabLight(sx: number, sy: number): void {
+    const si = sy * this.world.subWidth + sx;
+    const k = this.world.subKind[si];
+    if (this.world.subHealth[si] === 0 || (k !== SUB.led && k !== SUB.core)) return;
+    // Binary search for insertion point in sorted `lights`.
+    let lo = 0;
+    let hi = this.lights.length;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (this.lights[mid] < si) lo = mid + 1;
+      else hi = mid;
+    }
+    if (lo < this.lights.length && this.lights[lo] === si) return;
+    const next = new Int32Array(this.lights.length + 1);
+    next.set(this.lights.subarray(0, lo), 0);
+    next[lo] = si;
+    next.set(this.lights.subarray(lo), lo + 1);
+    this.lights = next;
+    this.lightIndex = new SortedGridIndex(this.lights, this.world.subWidth, this.world.subHeight);
+  }
+
   /**
    * Blinking status lights and pulsing machine cores, drawn additively after the
    * lighting pass so they shine in the dark. `still` (reduced motion) holds them steady.
@@ -823,19 +845,11 @@ export class TerrainRenderer {
               const subDown = sy < world.subHeight - 1 && !world.subSolidAt(sx, sy + 1);
               const subRight = sx < world.subWidth - 1 && !world.subSolidAt(sx + 1, sy);
               const sk = world.subKind[si];
-              const flat = sk === SUB.screen || sk === SUB.led || sk === SUB.core;
+              const shaded = [0, 0, 0];
               for (let oy = 0; oy < 2; oy++) {
                 for (let ox = 0; ox < 2; ox++) {
-                  let m = flat ? 1 : 0.92 + hash2(sx * 2 + ox, sy * 2 + oy, 5) * 0.16;
-                  let add = 0;
-                  // A lit lip on the faces toward the upper left, a shadow on the others.
-                  if ((subUp && oy === 0) || (subLeft && ox === 0)) {
-                    m *= 1.4;
-                    add = 8;
-                  } else if ((subDown && oy === 1) || (subRight && ox === 1)) {
-                    m *= 0.7;
-                  }
-                  put(bx + ox, by + oy, col[0] * m + add, col[1] * m + add, col[2] * m + add, 255);
+                  subPixelTexelShade(sk, sx, sy, ox, oy, subUp, subLeft, subDown, subRight, col, shaded);
+                  put(bx + ox, by + oy, shaded[0], shaded[1], shaded[2], 255);
                 }
               }
             }

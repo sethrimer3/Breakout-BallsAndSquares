@@ -4,6 +4,7 @@ import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Soldier } from "../entities/Soldier";
 import { SOLDIER_SHAPES, rayPolygonDistance, shapeOccluder, soldierShapeIndex } from "../entities/soldierShapes";
 import type { CameraSystem } from "./CameraSystem";
+import type { SubPixelPhysics } from "./SubPixelPhysics";
 import { roomLightPosition, LIGHT_KIND, type PixelWorld, type RoomLight } from "../world/PixelWorld";
 
 export type LightQuality = "high" | "medium" | "low";
@@ -151,6 +152,30 @@ interface CornerCand {
  * Polygons stop at wall faces and describe light in open air. Light on walls is
  * resolved per cell (see `markLitCells`) so it can never cut across the grid.
  */
+const MAX_SUB_OCCLUDERS = 32;
+
+function rayAabbDistance(
+  ox: number,
+  oy: number,
+  rdx: number,
+  rdy: number,
+  minX: number,
+  minY: number,
+  maxX: number,
+  maxY: number,
+): number {
+  const invX = rdx !== 0 ? 1 / rdx : 1e12;
+  const invY = rdy !== 0 ? 1 / rdy : 1e12;
+  const t1 = (minX - ox) * invX;
+  const t2 = (maxX - ox) * invX;
+  const t3 = (minY - oy) * invY;
+  const t4 = (maxY - oy) * invY;
+  const tmin = Math.max(Math.min(t1, t2), Math.min(t3, t4));
+  const tmax = Math.min(Math.max(t1, t2), Math.max(t3, t4));
+  if (tmax < 0 || tmin > tmax) return Infinity;
+  return tmin >= 0 ? tmin : tmax;
+}
+
 export class LightingSystem {
   quality: LightQuality = "high";
   /** Telemetry from the most recent frame. */
@@ -178,6 +203,11 @@ export class LightingSystem {
   private readonly fixtureBucketCells = 32;
   private scratchPoly = new Float32Array(LIGHT.maxRays * 2);
   private scratchLit = makeLitCells();
+  subPixels: SubPixelPhysics | null = null;
+  private readonly subOccX = new Float32Array(MAX_SUB_OCCLUDERS);
+  private readonly subOccY = new Float32Array(MAX_SUB_OCCLUDERS);
+  private readonly subOccMinA = new Float32Array(MAX_SUB_OCCLUDERS);
+  private readonly subOccMaxA = new Float32Array(MAX_SUB_OCCLUDERS);
 
   constructor(private world: PixelWorld) {
     this.litStamps = new Uint32Array(world.width * world.height);
@@ -197,6 +227,29 @@ export class LightingSystem {
       if (f.dirty) continue;
       const r = f.radius + cs;
       if (Math.abs(f.x - x) < r && Math.abs(f.y - y) < r) f.dirty = true;
+    }
+  }
+
+  /** Mark any ceiling fixtures overlapping active moving 0.5 pixels dirty so their shadows update. */
+  invalidateMovingSubPixels(): void {
+    const sp = this.subPixels;
+    if (!sp || sp.count === 0 || this.fixtureBuckets.length === 0) return;
+    const cs = this.world.cellSize;
+    const bucketUnits = this.fixtureBucketCells * cs;
+    const columns = Math.ceil(this.world.width / this.fixtureBucketCells);
+    for (let i = 0; i < sp.count; i++) {
+      const px = sp.x[i];
+      const py = sp.y[i];
+      const bx = Math.floor(px / bucketUnits);
+      const by = Math.floor(py / bucketUnits);
+      const bucket = this.fixtureBuckets[by * columns + bx];
+      if (!bucket) continue;
+      for (let k = 0; k < bucket.length; k++) {
+        const f = bucket[k];
+        if (f.dirty) continue;
+        const r = f.radius + cs;
+        if (Math.abs(f.x - px) < r && Math.abs(f.y - py) < r) f.dirty = true;
+      }
     }
   }
 
@@ -502,6 +555,38 @@ export class LightingSystem {
       angles[n++] = normalizeAngle(hi + eps);
     }
 
+    // 4b) Silhouette rays for active moving 0.5 pixels within light radius.
+    let subOccN = 0;
+    const hs = ss * 0.5;
+    const sp = this.subPixels;
+    if (sp && sp.count > 0) {
+      const maxR = radius + ss;
+      const maxR2 = maxR * maxR;
+      const minD = hs * 1.45;
+      for (let i = 0; i < sp.count && subOccN < MAX_SUB_OCCLUDERS; i++) {
+        const px = sp.x[i];
+        const py = sp.y[i];
+        const dx = px - ox;
+        const dy = py - oy;
+        const d2 = dx * dx + dy * dy;
+        if (d2 > maxR2 || d2 <= minD * minD) continue;
+        const dist = Math.sqrt(d2);
+        const centerAng = Math.atan2(dy, dx);
+        const half = Math.asin(Math.min(0.9999, (hs * 1.414) / dist));
+        const lo = normalizeAngle(centerAng - half - eps);
+        const hi = normalizeAngle(centerAng + half + eps);
+        const idx = subOccN++;
+        this.subOccX[idx] = px;
+        this.subOccY[idx] = py;
+        this.subOccMinA[idx] = lo;
+        this.subOccMaxA[idx] = hi;
+        if (n + 2 <= maxVerts) {
+          angles[n++] = lo;
+          angles[n++] = hi;
+        }
+      }
+    }
+
     // Sort ray angles in ascending order.
     angles.subarray(0, n).sort();
 
@@ -528,6 +613,18 @@ export class LightingSystem {
         if (ct < bestT) {
           bestT = ct;
           hitTerrain = false;
+        }
+      }
+
+      // Check active moving 0.5-pixel occluders.
+      for (let j = 0; j < subOccN; j++) {
+        if (!angleInShadowSpan(ang, this.subOccMinA[j], this.subOccMaxA[j])) continue;
+        const px = this.subOccX[j];
+        const py = this.subOccY[j];
+        const bt = rayAabbDistance(ox, oy, rdx, rdy, px - hs, py - hs, px + hs, py + hs);
+        if (bt < bestT) {
+          bestT = bt;
+          hitTerrain = true;
         }
       }
 

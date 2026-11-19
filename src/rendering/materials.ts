@@ -479,3 +479,34 @@ export function subPixelColor(
     out[2] += (255 - out[2]) * lighten;
   }
 }
+
+/**
+ * Apply the 2×2 micro-grain and bevel relief shading for one texel `(ox, oy)`
+ * of a half-size pixel originating at `(origSx, origSy)`.
+ */
+export function subPixelTexelShade(
+  kind: number,
+  origSx: number,
+  origSy: number,
+  ox: number,
+  oy: number,
+  subUp: boolean,
+  subLeft: boolean,
+  subDown: boolean,
+  subRight: boolean,
+  col: readonly number[],
+  out: number[],
+): void {
+  const flat = kind === SUB.screen || kind === SUB.led || kind === SUB.core;
+  let m = flat ? 1 : 0.92 + hash2(origSx * 2 + ox, origSy * 2 + oy, 5) * 0.16;
+  let add = 0;
+  if ((subUp && oy === 0) || (subLeft && ox === 0)) {
+    m *= 1.4;
+    add = 8;
+  } else if ((subDown && oy === 1) || (subRight && ox === 1)) {
+    m *= 0.7;
+  }
+  out[0] = Math.min(255, Math.max(0, Math.round(col[0] * m + add)));
+  out[1] = Math.min(255, Math.max(0, Math.round(col[1] * m + add)));
+  out[2] = Math.min(255, Math.max(0, Math.round(col[2] * m + add)));
+}

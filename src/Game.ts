@@ -381,11 +381,13 @@ export class Game {
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.camera.following = this.camera.defaultFollow;
     this.subPixels = new SubPixelPhysics(this.world);
+    this.lighting.subPixels = this.subPixels;
     // When a non-Blight 0.5 pixel breaks, push nearby 0.5 pixels away with physics.
     this.world.onSubBreakPush = (sx, sy) => this.subPixels.pushFromBreak(sx, sy);
     this.loadLabProgress();
     this.generateLab();
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
+    this.subPixels.onSubLightSettled = (sx, sy) => this.terrain.addLabLight(sx, sy);
     this.terrain.dormantAt = (si) => this.growth.colonies.isDormantSub(si);
     this.growth.colonies.onVisualChange = (sx, sy) => this.terrain.chunks.markCell(sx >> 1, sy >> 1);
     this.terrain.rebuildAll();
@@ -2014,6 +2016,7 @@ export class Game {
     this.damageNumbers.update(dt);
     this.casings.update(dt, this.world);
     this.subPixels.update(dt, this.soldiers);
+    this.lighting.invalidateMovingSubPixels();
     const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
     if (collected > 0) {
       this.runStats.currency += this.loot.collectedGold;

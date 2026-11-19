@@ -138,6 +138,41 @@ describe("half-size physics push", () => {
     expect(settledBeforeWall).toBe(true);
   });
 
+  it("casts real-time shadows and preserves active LED/core light tracking while moving", () => {
+    const { w, phys } = makeWorld();
+    const light = new LightingSystem(w);
+    light.subPixels = phys;
+
+    // Place a break trigger at (10, 20) and an LED + rubble neighbor at (12, 20) / (11, 20).
+    put(w, 10, 20, SUB.rubble, 1);
+    const led = put(w, 11, 20, SUB.led, 4);
+    w.damageSub(10, 20, 1, true);
+    expect(w.subHealth[led]).toBe(0);
+    expect(phys.count).toBe(1);
+    expect(phys.activeLightCount).toBe(1);
+
+    // Light at x=30, y=82 looking right toward the moving LED at ~(46, 82) should be occluded by it.
+    const poly = new Float32Array(4096 * 2);
+    const n = light.computeVisibilityPolygon(30, 82, 1, 0, 120, -1, [], poly);
+    expect(n).toBeGreaterThan(0);
+    let minHitX = Infinity;
+    for (let i = 0; i < n; i++) {
+      const x = poly[i * 2];
+      const y = poly[i * 2 + 1];
+      if (Math.abs(y - 82) < 1 && x > 30) minHitX = Math.min(minHitX, x);
+    }
+    expect(minHitX).toBeLessThan(60);
+
+    let settledAt: [number, number] | null = null;
+    phys.onSubLightSettled = (sx, sy) => {
+      settledAt = [sx, sy];
+    };
+    for (let step = 0; step < 120; step++) phys.update(1 / 60);
+    expect(phys.count).toBe(0);
+    expect(phys.activeLightCount).toBe(0);
+    expect(settledAt).not.toBeNull();
+  });
+
   it("caps active physics bodies cleanly on a dense heap without errors", () => {
     const { w, phys } = makeWorld();
     for (let y = 10; y < 40; y++) for (let x = 10; x < 40; x++) put(w, x, y, SUB.rubble, 2);

@@ -21,6 +21,8 @@ function hashSub(sx: number, sy: number): number {
 export class SubPixelPhysics {
   readonly cap: number;
   count = 0;
+  /** Number of active moving `SUB.led` / `SUB.core` pixels (for O(1) light-pass skip when 0). */
+  activeLightCount = 0;
 
   readonly x: Float32Array;
   readonly y: Float32Array;
@@ -31,6 +33,11 @@ export class SubPixelPhysics {
   readonly maxHp: Uint32Array;
   readonly kind: Uint8Array;
   readonly tint: Uint8Array;
+  readonly origSx: Uint16Array;
+  readonly origSy: Uint16Array;
+
+  /** Called when a moving `SUB.led` or `SUB.core` settles back into `(sx, sy)` on the grid. */
+  onSubLightSettled: ((sx: number, sy: number) => void) | null = null;
 
   private readonly head = new Int32Array(HASH_SIZE);
   private readonly next: Int32Array;
@@ -49,11 +56,14 @@ export class SubPixelPhysics {
     this.maxHp = new Uint32Array(cap);
     this.kind = new Uint8Array(cap);
     this.tint = new Uint8Array(cap);
+    this.origSx = new Uint16Array(cap);
+    this.origSy = new Uint16Array(cap);
     this.next = new Int32Array(cap);
   }
 
   clear(): void {
     this.count = 0;
+    this.activeLightCount = 0;
   }
 
   /**
@@ -137,6 +147,9 @@ export class SubPixelPhysics {
         this.maxHp[idx] = maxHp;
         this.kind[idx] = kind;
         this.tint[idx] = tint;
+        this.origSx[idx] = nx;
+        this.origSy[idx] = ny;
+        if (kind === SUB.led || kind === SUB.core) this.activeLightCount++;
       }
     }
   }
@@ -327,11 +340,18 @@ export class SubPixelPhysics {
     const tint = this.tint[i];
     const hp = this.hp[i];
     for (let k = 0; k < 5; k++) {
-      if (w.placeSub(sx + ORTHO_DX[k], sy + ORTHO_DY[k], kind, tint, hp)) return;
+      const tx = sx + ORTHO_DX[k];
+      const ty = sy + ORTHO_DY[k];
+      if (w.placeSub(tx, ty, kind, tint, hp)) {
+        if (kind === SUB.led || kind === SUB.core) this.onSubLightSettled?.(tx, ty);
+        return;
+      }
     }
   }
 
   private removeAt(i: number): void {
+    const rk = this.kind[i];
+    if (rk === SUB.led || rk === SUB.core) this.activeLightCount--;
     const j = --this.count;
     if (i === j) return;
     this.x[i] = this.x[j];
@@ -343,5 +363,7 @@ export class SubPixelPhysics {
     this.maxHp[i] = this.maxHp[j];
     this.kind[i] = this.kind[j];
     this.tint[i] = this.tint[j];
+    this.origSx[i] = this.origSx[j];
+    this.origSy[i] = this.origSy[j];
   }
 }

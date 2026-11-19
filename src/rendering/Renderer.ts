@@ -20,7 +20,9 @@ import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
 import { createSprites, soldierShapeSprite, type Sprites } from "./sprites";
 import { soldierShapeIndex } from "../entities/soldierShapes";
-import { CRACK_PATTERNS, subPixelColor, TIER_PAINT } from "./materials";
+import { CRACK_PATTERNS, subPixelColor, subPixelTexelShade, TIER_PAINT } from "./materials";
+import { ledLevel } from "./TerrainRenderer";
+import { SUB } from "../world/PixelWorld";
 import { FACILITY } from "../config";
 import { paletteColor, SPRITES } from "../ui/pixelArt";
 import type { Door } from "../world/PixelWorld";
@@ -187,6 +189,7 @@ export class Renderer {
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
     game.terrain.drawPanels(ctx, cam, performance.now() / 1000);
     game.terrain.drawLabLights(ctx, cam, performance.now() / 1000, this.motion.matches);
+    this.drawSubPixelLights(performance.now() / 1000, this.motion.matches);
     this.drawSentries();
     game.late.draw(ctx, cam);
     this.creatureRenderer.draw(ctx, cam, game.creatures, this.motion.matches ? 0 : performance.now() / 1000);
@@ -326,6 +329,7 @@ export class Renderer {
   }
 
   private readonly subColorScratch = [0, 0, 0];
+  private readonly subTexelScratch = [0, 0, 0];
 
   private drawSubPixels(): void {
     const { ctx, game } = this;
@@ -336,14 +340,63 @@ export class Renderer {
     const sz = Math.max(1, ss * cam.zoom);
     const half = sz * 0.5;
     const col = this.subColorScratch;
+    const tex = this.subTexelScratch;
     for (let i = 0; i < sp.count; i++) {
       const sx = cam.worldToScreenX(sp.x[i]);
       const sy = cam.worldToScreenY(sp.y[i]);
       if (sx + half < 0 || sy + half < 0 || sx - half > cam.viewW || sy - half > cam.viewH) continue;
-      subPixelColor(sp.kind[i], sp.tint[i], Math.floor(sp.y[i] / ss), sp.hp[i], sp.maxHp[i], false, col);
-      ctx.fillStyle = `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`;
-      ctx.fillRect(sx - half, sy - half, sz, sz);
+      const origSx = sp.origSx[i];
+      const origSy = sp.origSy[i];
+      const kind = sp.kind[i];
+      subPixelColor(kind, sp.tint[i], origSy, sp.hp[i], sp.maxHp[i], false, col);
+      const x0 = sx - half;
+      const y0 = sy - half;
+      for (let oy = 0; oy < 2; oy++) {
+        for (let ox = 0; ox < 2; ox++) {
+          subPixelTexelShade(kind, origSx, origSy, ox, oy, true, true, true, true, col, tex);
+          ctx.fillStyle = `rgb(${tex[0]},${tex[1]},${tex[2]})`;
+          ctx.fillRect(x0 + ox * half, y0 + oy * half, half, half);
+        }
+      }
     }
+  }
+
+  private drawSubPixelLights(time: number, still: boolean): void {
+    const { ctx, game } = this;
+    const sp = game.subPixels;
+    if (sp.activeLightCount === 0) return;
+    const cam = game.camera;
+    const ss = game.world.subCellSize;
+    const px = ss * cam.zoom;
+    const half = px * 0.5;
+    const t = still ? 0 : time;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < sp.count; i++) {
+      const k = sp.kind[i];
+      if (k !== SUB.led && k !== SUB.core) continue;
+      const tint = sp.tint[i];
+      const r = tint & 63;
+      let level: number;
+      let c: readonly [number, number, number];
+      if (k === SUB.led) {
+        c = COLORS.labLed[tint >> 6];
+        level = still ? 0.8 : ledLevel(r, t);
+      } else {
+        c = COLORS.labCore[tint >> 6];
+        level = still ? 0.7 : 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * (1.2 + (r & 7) * 0.15) + (sp.origSx[i] + sp.origSy[i]) * 0.45 + (r >> 3)));
+      }
+      if (level <= 0.02) continue;
+      const lx = cam.worldToScreenX(sp.x[i]) - half;
+      const ly = cam.worldToScreenY(sp.y[i]) - half;
+      if (lx + px * 2 < 0 || ly + px * 2 < 0 || lx - px > cam.viewW || ly - px > cam.viewH) continue;
+      ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+      ctx.globalAlpha = level * (k === SUB.core ? 0.16 : 0.12);
+      ctx.fillRect(lx - px, ly - px, px * 3, px * 3);
+      ctx.globalAlpha = level;
+      ctx.fillRect(lx, ly, px, px);
+    }
+    ctx.restore();
   }
 
   private drawCasings(): void {
