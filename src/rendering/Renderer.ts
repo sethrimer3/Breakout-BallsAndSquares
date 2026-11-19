@@ -99,6 +99,7 @@ export class Renderer {
       cssSize: [window.innerWidth, window.innerHeight],
       backingSize: [this.canvas.width, this.canvas.height],
       softShadows: this.game.save.data.settings.softShadows,
+      bloom: this.game.bloom,
       auto: this.governor ? {
         step: this.governor.step, cap: this.governor.cap,
         locked: this.governor.locked, typicalIntervalMs: this.governor.lastTypical,

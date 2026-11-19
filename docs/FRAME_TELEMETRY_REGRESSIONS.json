@@ -12,10 +12,10 @@
       "max": 200
     },
     "workMs": {
-      "p50": 15.700000000186265,
-      "p95": 66.90000000037253,
-      "p99": 66.90000000037253,
-      "max": 66.90000000037253
+      "p50": 36.799999999813735,
+      "p95": 132.40000000037253,
+      "p99": 132.40000000037253,
+      "max": 132.40000000037253
     }
   },
   "rendering": {
@@ -31,6 +31,7 @@
       1373
     ],
     "softShadows": false,
+    "bloom": true,
     "auto": {
       "step": 1,
       "cap": 1.5,
@@ -39,5 +40,9 @@
     }
   },
   "pausePreservesHistory": true,
-  "resumeResetsHistory": true
+  "resumeResetsHistory": true,
+  "integratedMain": "4167a5c",
+  "tests": 696,
+  "testFiles": 95,
+  "productionBuild": true
 }
