@@ -50,8 +50,8 @@ describe("tree fit", () => {
       homes.push(nodePos(0, 0)); // the center hub or unlock node
       const b = treeBounds(homes);
       const v = fitView(b);
-      const expanded = branch === "core" || branch === "pistol" || branch === "sniper_rifle";
-      expect(v.s, branch).toBe(branch === "squelch" ? 0.875 : expanded ? 0.625 : 1);
+      const expanded = branch === "pistol" || branch === "sniper_rifle";
+      expect(v.s, branch).toBe(branch === "core" ? 0.5 : branch === "squelch" ? 0.875 : expanded ? 0.625 : 1);
       expect(shows(v, b), branch).toBe(true);
     }
   });

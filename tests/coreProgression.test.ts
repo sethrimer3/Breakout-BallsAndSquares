@@ -41,21 +41,23 @@ describe("Core progression", () => {
       if (id.startsWith("unlock_") && id !== "unlock_map") opened.push(id);
     }
     expect(opened).toEqual(["unlock_resources", "unlock_primary", "unlock_blight", "unlock_formations", "unlock_facility", "unlock_secondary"]);
+    expect(CORE_PATH.indexOf("unlock_formations")).toBeGreaterThan(CORE_PATH.indexOf("keycard_t3"));
     expect(CORE_PATH.indexOf("unlock_secondary")).toBeGreaterThan(CORE_PATH.indexOf("keycard_t3"));
     expect(upg.canBuy("fire_rate")).toBe(true);
     expect(upg.getSoldierStats().keycardTier).toBe(9);
+    expect(upg.getSoldierStats().maxSoldiers).toBe(8);
   });
 
-  it("snakes through six centered columns and continues onto a fourth row", () => {
+  it("snakes through six centered columns and continues onto a fifth row", () => {
     const positions = [CORE_HUB_GRID, ...CORE_PATH.map((id) => UPGRADE_BY_ID[id].grid)];
-    expect(positions[0]).toEqual({ col: -2.5, row: -1.5 });
-    expect(positions[5]).toEqual({ col: 2.5, row: -1.5 });
-    expect(positions[6]).toEqual({ col: 2.5, row: -0.5 });
-    expect(positions[11]).toEqual({ col: -2.5, row: -0.5 });
-    expect(positions[12]).toEqual({ col: -2.5, row: 0.5 });
-    expect(positions[17]).toEqual({ col: 2.5, row: 0.5 });
-    expect(positions[18]).toEqual({ col: 2.5, row: 1.5 });
-    expect(positions[21]).toEqual({ col: -0.5, row: 1.5 });
+    expect(positions[0]).toEqual({ col: -2.5, row: -2 });
+    expect(positions[5]).toEqual({ col: 2.5, row: -2 });
+    expect(positions[6]).toEqual({ col: 2.5, row: -1 });
+    expect(positions[11]).toEqual({ col: -2.5, row: -1 });
+    expect(positions[12]).toEqual({ col: -2.5, row: 0 });
+    expect(positions[17]).toEqual({ col: 2.5, row: 0 });
+    expect(positions[18]).toEqual({ col: 2.5, row: 1 });
+    expect(positions[24]).toEqual({ col: -2.5, row: 2 });
     expect(UPGRADE_BY_ID.keycard_t1.grid).toEqual(positions[1]);
     expect(UPGRADE_BY_ID.keycard_t1.icon).toBe("keycard");
     expect(UPGRADE_BY_ID.keycard_t1.parent).toBeNull();

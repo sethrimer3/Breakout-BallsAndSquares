@@ -22,6 +22,7 @@ import {
 } from "../progression/UpgradeDefinitions";
 import { essenceIcon } from "./essenceIcon";
 import { paletteColor, sprite, UI_COLORS, type SpriteName } from "./pixelArt";
+import { attachScrollArrows, type ScrollArrowsHandle } from "./scrollArrows";
 import {
   pathLength,
   pointAt,
@@ -221,6 +222,8 @@ export class UpgradeTree {
   private marketRoot: UpgradeId | null = null;
   private collapsing: Collapse[] = [];
   private loadoutWrap: HTMLDivElement;
+  private tabsScroll!: ScrollArrowsHandle;
+  private loadoutScroll!: ScrollArrowsHandle;
   private linksEl: HTMLCanvasElement;
   private nodesWrap: HTMLDivElement;
   private coreHubEl: HTMLDivElement;
@@ -411,6 +414,8 @@ export class UpgradeTree {
     this.legendEl = this.root.querySelector(".tree-legend") as HTMLDivElement;
     this.backBtnEl = this.root.querySelector('[data-act="back-matrix"]') as HTMLButtonElement;
     this.primaryBtnEl = this.root.querySelector('[data-act="primary"]') as HTMLButtonElement;
+    this.tabsScroll = attachScrollArrows(this.tabsEl, { wrapClass: "tree-nav-wrap" });
+    this.loadoutScroll = attachScrollArrows(this.loadoutWrap, { wrapClass: "loadout-scroll-wrap" });
 
     this.coreHubEl = document.createElement("div");
     this.coreHubEl.className = "tree-core";
@@ -1718,6 +1723,8 @@ export class UpgradeTree {
     this.refresh();
     this.root.classList.remove("hidden");
     this.fitToScreen();
+    this.tabsScroll.update();
+    this.loadoutScroll.update();
     if (!this.raf) {
       this.lastFrame = 0;
       this.raf = requestAnimationFrame(this.frame);

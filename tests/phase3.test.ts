@@ -23,29 +23,29 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const s1 = new SaveManager(store);
     s1.data.bank = 250;
     s1.data.lifetimePixels = 120;
-    s1.data.upgrades.extra_soldier = 3;
+    s1.data.upgrades.extra_soldier_1 = 1;
     s1.save();
 
     const s2 = new SaveManager(store);
     expect(s2.data.bank).toBe(250);
     expect(s2.data.lifetimePixels).toBe(120);
-    expect(s2.data.upgrades.extra_soldier).toBe(3);
+    expect(s2.data.upgrades.extra_soldier_1).toBe(1);
 
     // Corrupted JSON -> defaults without throwing.
     store.setItem(SAVE_KEY, "{not-valid-json");
     const s3 = new SaveManager(store);
     expect(s3.data.bank).toBe(0);
-    expect(s3.data.upgrades.extra_soldier).toBe(0);
+    expect(s3.data.upgrades.extra_soldier_1).toBe(0);
 
     // Out-of-range / NaN fields -> clamped.
     store.setItem(
       SAVE_KEY,
-      JSON.stringify({ bank: -50, lifetimePixels: "bad", upgrades: { extra_soldier: 999 } }),
+      JSON.stringify({ bank: -50, lifetimePixels: "bad", upgrades: { extra_soldier_1: 999 } }),
     );
     const s4 = new SaveManager(store);
     expect(s4.data.bank).toBe(0);
     expect(s4.data.lifetimePixels).toBe(0);
-    expect(s4.data.upgrades.extra_soldier).toBe(UPGRADE_BY_ID.extra_soldier.maxLevel);
+    expect(s4.data.upgrades.extra_soldier_1).toBe(UPGRADE_BY_ID.extra_soldier_1.maxLevel);
   });
 
   it("unlocks Multishot without lifetime pixels and gates Additional Soldier behind its golden block", () => {
@@ -54,7 +54,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const upg = new UpgradeManager(save);
     save.data.bank = 10_000; save.data.crystals = 10_000;
 
-    expect(upg.isUnlocked("extra_soldier")).toBe(false);
+    expect(upg.isUnlocked("extra_soldier_1")).toBe(false);
     findAllSpecials(save.data);
 
     expect(upg.isUnlocked("keycard_t1")).toBe(true);
@@ -64,8 +64,8 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     expect(upg.isUnlocked("multishot")).toBe(true);
     expect(upg.buy("multishot")).toBe(true);
 
-    expect(upg.isUnlocked("extra_soldier")).toBe(true);
-    expect(upg.buy("extra_soldier")).toBe(true);
+    expect(upg.isUnlocked("extra_soldier_1")).toBe(true);
+    expect(upg.buy("extra_soldier_1")).toBe(true);
     expect(upg.getSoldierStats().maxSoldiers).toBe(2);
   });
 
@@ -254,7 +254,7 @@ describe("Phase 3 — SaveManager & UpgradeManager", () => {
     const blightIds = UPGRADE_DEFS.filter((d) => d.branch === "blight").map((d) => d.id);
 
     expect(coreIds).toEqual(
-      expect.arrayContaining(["keycard_t1", "unlock_map", "extra_soldier", "unlock_primary"]),
+      expect.arrayContaining(["keycard_t1", "unlock_map", "extra_soldier_1", "unlock_primary"]),
     );
     expect(resourceIds).toEqual(
       expect.arrayContaining([

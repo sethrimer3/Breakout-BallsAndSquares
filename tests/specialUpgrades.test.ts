@@ -85,15 +85,27 @@ describe("special upgrade unlocks", () => {
     expect(new Set(Object.values(SPECIAL_UNLOCKS)).size).toBe(Object.keys(SPECIAL_UNLOCKS).length);
   });
 
-  it("places all core upgrades (except keycard_t1) on the map and puts secondary weapons in Tier 4 after Tier 4 keycard", () => {
+  it("places all core upgrades (except keycard_t1) on the map, puts secondary weapons in Tier 4, formations in Tier 3, and extra soldiers in Tiers 2-8", () => {
     expect(specialSpotFor("keycard_t1")).toBeUndefined();
     expect(UPGRADE_BY_ID.keycard_t1.baseCost).toBe(5);
     expect(UPGRADE_BY_ID.keycard_t1.currency ?? "gold").toBe("gold");
     for (const id of CORE_PATH) {
-      if (id !== "keycard_t1" && id !== "better_flashlight" && id !== "cartography_uplink" && !UPGRADE_BY_ID[id].placeholder) {
+      if (id !== "keycard_t1" && !UPGRADE_BY_ID[id].placeholder) {
         expect(specialSpotFor(id), `core upgrade ${id} must have a golden block`).toBeDefined();
       }
     }
+    // Better Flashlight and Cartography Uplink are in Tier 1 right next to spawn.
+    for (const id of ["better_flashlight", "cartography_uplink"] as const) {
+      const spotId = specialSpotFor(id)!;
+      expect(specialWorld(spotId)).toBe(1);
+      const spot = LAB_WORLDS[1].upgrades.find((u) => u.id === spotId)!;
+      expect(sectorTier(LAB_WORLDS[1], upgradeSpotSector(LAB_WORLDS[1], spot))).toBe(1);
+    }
+    // Tactical Command is in Zone 3, after Tier 3 keycard.
+    expect(CORE_PATH.indexOf("unlock_formations")).toBeGreaterThan(CORE_PATH.indexOf("keycard_t3"));
+    const formSpot = LAB_WORLDS[1].upgrades.find((u) => u.id === specialSpotFor("unlock_formations")!)!;
+    expect(sectorTier(LAB_WORLDS[1], upgradeSpotSector(LAB_WORLDS[1], formSpot))).toBe(3);
+
     expect(CORE_PATH.indexOf("unlock_secondary")).toBeGreaterThan(CORE_PATH.indexOf("keycard_t4"));
     for (const id of ["unlock_secondary", "grenade_unlock", "turret_unlock"] as const) {
       const spotId = specialSpotFor(id)!;

@@ -370,6 +370,11 @@ export function sanitizeSaveData(raw: unknown): SaveData {
       const lvl = Math.floor(finiteNonNeg(u[d.id], 0, d.maxLevel));
       def.upgrades[d.id] = clamp(lvl, 0, d.maxLevel);
     }
+    // Migrate legacy stacked `extra_soldier` level into individual `extra_soldier_1..7` nodes.
+    const legacySoldiers = Math.floor(finiteNonNeg(u.extra_soldier, 0, 7));
+    if (legacySoldiers > 0 && ![1, 2, 3, 4, 5, 6, 7].some((i) => def.upgrades[`extra_soldier_${i}` as UpgradeId] > 0)) {
+      for (let i = 1; i <= legacySoldiers; i++) def.upgrades[`extra_soldier_${i}` as UpgradeId] = 1;
+    }
   }
 
   if (obj.upgradeSpent && typeof obj.upgradeSpent === "object") {

@@ -53,7 +53,8 @@ export type UpgradeId =
   | "unlock_formations" | "unlock_secondary" | "unlock_facility"
   | `core_placeholder_${number}`
   // Core progression milestones
-  | "extra_soldier"
+  | "extra_soldier_1" | "extra_soldier_2" | "extra_soldier_3" | "extra_soldier_4"
+  | "extra_soldier_5" | "extra_soldier_6" | "extra_soldier_7"
   // Formations & Tactical Behaviors (#38d6ff)
   | "formation_line"
   | "formation_triangle"
@@ -218,25 +219,34 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
   // =========================================================================
   // 1) SQUAD CAPACITY, FORMATIONS AND BEHAVIORS
   // =========================================================================
-  {
-    id: "extra_soldier",
+  ...[
+    { id: "extra_soldier_1" as const, roman: "I", baseCost: 85 },
+    { id: "extra_soldier_2" as const, roman: "II", baseCost: 180 },
+    { id: "extra_soldier_3" as const, roman: "III", currency: "crystals" as const, baseCost: 45 },
+    { id: "extra_soldier_4" as const, roman: "IV", currency: "crystals" as const, baseCost: 120 },
+    { id: "extra_soldier_5" as const, roman: "V", currency: "crystals" as const, baseCost: 400 },
+    { id: "extra_soldier_6" as const, roman: "VI", currency: "biomass" as const, baseCost: 80 },
+    { id: "extra_soldier_7" as const, roman: "VII", currency: "biomass" as const, baseCost: 180 },
+  ].map((s): UpgradeDef => ({
+    id: s.id,
     branch: "core",
-    name: "Additional Soldier",
+    name: `Additional Soldier ${s.roman}`,
     shortDesc: "+1 deployable soldier per run & +1 Loadout slot",
     color: "#38d6ff",
     grid: { col: 1, row: -1 },
     parent: null,
-    maxLevel: 7,
-    baseCost: 85,
-    costMultiplier: 1.95,
-    valueAt: (lvl) => SOLDIER.maxSoldiers + lvl,
-    formatValue: (v) => `${v} SOLDIERS`,
+    maxLevel: 1,
+    ...(s.currency ? { currency: s.currency } : {}),
+    baseCost: s.baseCost,
+    costMultiplier: 1,
+    valueAt: (lvl) => (lvl > 0 ? 1 : 0),
+    formatValue: (v) => (v > 0 ? "UNLOCKED" : "LOCKED"),
     formatDelta: () => "+1 SOLDIER",
-    apply: (s, lvl) => {
-      s.maxSoldiers = SOLDIER.maxSoldiers + lvl;
+    apply: (stats, lvl) => {
+      if (lvl > 0) stats.maxSoldiers += 1;
     },
     icon: "soldierPlus",
-  },
+  })),
   {
     id: "formation_line",
     branch: "formations",
@@ -1961,12 +1971,14 @@ export const CALIBRATION_DEFS: readonly UpgradeDef[] = CALIBRATION.map((stage, i
 });
 
 /** Milestones run left-to-right, right-to-left, then left-to-right. */
-export const CORE_HUB_GRID = { col: -2.5, row: -1.5 } as const;
+export const CORE_HUB_GRID = { col: -2.5, row: -2 } as const;
 
 export const CORE_PATH: readonly UpgradeId[] = [
-  "keycard_t1", "better_flashlight", "cartography_uplink", "unlock_map", "connected_air_mapping", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
-  "core_placeholder_3", "unlock_blight", "keycard_t2", "core_placeholder_4", "unlock_formations", "core_placeholder_5", "unlock_facility",
-  "core_placeholder_6", "keycard_t3", "keycard_t4", "unlock_secondary", "auto_ability", "keycard_t6", "keycard_t9",
+  "keycard_t1", "better_flashlight", "cartography_uplink", "unlock_map", "connected_air_mapping", "unlock_resources",
+  "extra_soldier_1", "core_placeholder_2", "unlock_primary", "core_placeholder_3", "unlock_blight", "keycard_t2",
+  "core_placeholder_4", "core_placeholder_5", "core_placeholder_6", "keycard_t3", "unlock_formations", "unlock_facility",
+  "extra_soldier_2", "keycard_t4", "unlock_secondary", "extra_soldier_3", "extra_soldier_4", "auto_ability",
+  "extra_soldier_5", "keycard_t6", "extra_soldier_6", "extra_soldier_7", "keycard_t9",
 ];
 
 const MILESTONES: Partial<Record<UpgradeId, [string, string, number]>> = {
