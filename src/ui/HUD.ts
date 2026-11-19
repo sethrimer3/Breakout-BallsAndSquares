@@ -101,9 +101,13 @@ export class HUD {
     this.followBtn.title = "Follow soldiers (tap again to cycle in order)";
     this.followBtn.innerHTML = sprite("follow", { color: UI_COLORS.soldier, scale: 3 });
     this.followBtn.addEventListener("click", () => {
-      const cam = this.game.camera;
-      if (cam.following) cam.cycleTarget(this.game.soldiers);
-      else cam.resumeAuto();
+      if (!this.game.autoMove) {
+        this.game.cycleCommander();
+      } else {
+        const cam = this.game.camera;
+        if (cam.following) cam.cycleTarget(this.game.soldiers);
+        else cam.resumeAuto();
+      }
       this.update(this.game, performance.now(), true);
     });
     this.touchBar.append(pauseBtn, this.followBtn);
@@ -131,6 +135,7 @@ export class HUD {
     this.autoMoveCheck = this.tacticalBar.querySelector(".hud-automove") as HTMLInputElement;
     this.autoMoveCheck.addEventListener("change", () => {
       this.game.setAutoMove(this.autoMoveCheck.checked);
+      this.autoMoveCheck.blur();
       this.update(this.game, performance.now(), true);
     });
 

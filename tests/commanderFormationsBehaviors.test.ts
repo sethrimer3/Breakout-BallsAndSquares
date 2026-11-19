@@ -1,6 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Rng } from "../src/core/Rng";
+import { Game } from "../src/Game";
 import { Soldier } from "../src/entities/Soldier";
+import { CameraSystem } from "../src/systems/CameraSystem";
 import { PixelWorld } from "../src/world/PixelWorld";
 import { WORLD } from "../src/config";
 import { PhysicsSystem } from "../src/systems/PhysicsSystem";
@@ -231,5 +233,87 @@ describe("Squad Formations", () => {
     const t1y = commander.y - cdy * row1 * spacing + cdx * side1 * row1 * 14;
     expect(t1x).toBe(84);
     expect(t1y).toBe(114);
+  });
+});
+
+describe("Manual Commander Switching (F / Tab)", () => {
+  function createMockGame(autoMove: boolean) {
+    const world = new PixelWorld(WORLD);
+    const s1 = new Soldier(100, 100, 0, 0, 100, "pistol", "free", 0);
+    const s2 = new Soldier(120, 100, 0, 0, 100, "shotgun", "free", 1);
+    const s3 = new Soldier(140, 100, 0, 0, 100, "sniper_rifle", "free", 2);
+    s1.isManual = !autoMove;
+    const camera = new CameraSystem(world);
+    const gameLike: any = {
+      autoMove,
+      soldiers: [s3, s1, s2], // unsorted to verify deploy-slot ordering
+      commanderId: 0,
+      commanderTrail: [{ x: 100, y: 100 }],
+      rng: new Rng(7),
+      combat: { cancelRailCharge: vi.fn() },
+      camera,
+      labMap: { visible: false },
+      upgradeTree: { visible: false },
+      mainMenu: { visible: false },
+      hud: { update: vi.fn() },
+      getCommander: Game.prototype.getCommander,
+      releaseManualControl: (Game.prototype as any).releaseManualControl,
+      cycleCommander: Game.prototype.cycleCommander,
+      onKey: (Game.prototype as any).onKey,
+    };
+    return { gameLike, s1, s2, s3, camera };
+  }
+
+  it("cycles manual commander control on Tab and KeyF in deploy-slot order", () => {
+    const { gameLike, s1, s2, s3, camera } = createMockGame(false);
+    expect(gameLike.getCommander()).toBe(s1);
+
+    // Tab switches from #1 -> #2
+    gameLike.onKey("Tab");
+    expect(gameLike.getCommander()).toBe(s2);
+    expect(camera.targetId).toBe(s2.id);
+    expect(camera.following).toBe(true);
+    expect(s2.isManual).toBe(true);
+    expect(s1.isManual).toBe(false);
+    expect(Math.hypot(s1.vx, s1.vy)).toBeCloseTo(s1.speed, 4);
+    expect(gameLike.commanderTrail).toHaveLength(0);
+
+    // F switches from #2 -> #3
+    gameLike.onKey("KeyF");
+    expect(gameLike.getCommander()).toBe(s3);
+    expect(camera.targetId).toBe(s3.id);
+    expect(s3.isManual).toBe(true);
+    expect(s2.isManual).toBe(false);
+
+    // Tab wraps around from #3 -> #1
+    gameLike.onKey("Tab");
+    expect(gameLike.getCommander()).toBe(s1);
+    expect(camera.targetId).toBe(s1.id);
+    expect(s1.isManual).toBe(true);
+    expect(s3.isManual).toBe(false);
+  });
+
+  it("falls back to the lowest-numbered survivor when the selected commander dies", () => {
+    const { gameLike, s1, s2 } = createMockGame(false);
+    gameLike.onKey("KeyF");
+    expect(gameLike.getCommander()).toBe(s2);
+
+    s2.alive = false;
+    expect(gameLike.getCommander()).toBe(s1);
+  });
+
+  it("keeps F/Tab camera-only when autoMove is enabled", () => {
+    const { gameLike, s1, s2, camera } = createMockGame(true);
+    expect(gameLike.getCommander()).toBe(s1);
+
+    gameLike.onKey("KeyF");
+    expect(camera.following).toBe(true);
+    camera.update(0.1, gameLike.soldiers);
+    expect(camera.targetId).toBe(s1.id);
+    expect(gameLike.getCommander()).toBe(s1);
+
+    gameLike.onKey("Tab");
+    expect(camera.targetId).toBe(s2.id);
+    expect(gameLike.getCommander()).toBe(s1);
   });
 });

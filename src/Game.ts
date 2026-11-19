@@ -217,6 +217,8 @@ export class Game {
   private lightOverBudgetFrames = 0;
   /** Historical trail of commander positions for obstacle-aware squad navigation. */
   private commanderTrail: { x: number; y: number }[] = [];
+  /** Currently selected commander soldier ID (0 = lowest-numbered living soldier). */
+  private commanderId = 0;
 
   private acc = 0;
   private last = 0;
@@ -624,6 +626,8 @@ export class Game {
     this.growth.explosiveDamage = this.stats.explosiveBlightDamage;
     this.growth.explosiveRadius = this.stats.explosiveBlightRadius;
     this.soldiers = [];
+    this.commanderId = 0;
+    this.commanderTrail.length = 0;
     for (const fl of this.flashes) {
       this.flashPolyPool.push(fl.poly);
       this.flashLitPool.push(fl.lit);
@@ -994,10 +998,12 @@ export class Game {
     }
     switch (code) {
       case "KeyF":
-        this.camera.resumeAuto();
+        if (!this.autoMove) this.cycleCommander();
+        else this.camera.resumeAuto();
         break;
       case "Tab":
-        this.camera.cycleTarget(this.soldiers);
+        if (!this.autoMove) this.cycleCommander();
+        else this.camera.cycleTarget(this.soldiers);
         break;
       case "Space":
         if (!this.runOver && !this.pauseMenu.visible) this.paused = !this.paused;
@@ -1217,27 +1223,52 @@ export class Game {
     return this.stats.grenadeBlocksRequired;
   }
 
+  private releaseManualControl(s: Soldier): void {
+    // Hand the soldier back to autonomous bounce in a fresh random direction
+    // (it may have been standing still or crawling along a wall under manual control).
+    s.isManual = false;
+    s.wasManualShooting = false;
+    this.combat.cancelRailCharge(s);
+    const a = this.rng.range(0, Math.PI * 2);
+    s.vx = Math.cos(a) * s.speed;
+    s.vy = Math.sin(a) * s.speed;
+    s.facingAngle = a;
+  }
+
   setAutoMove(enabled: boolean): void {
     this.autoMove = enabled;
     this.save.data.settings.autoMove = enabled;
     this.save.save();
     if (enabled) {
-      // Hand the commander back to the autonomous bounce in a fresh random direction
-      // (it may have been standing still or crawling along a wall under manual control).
       const cmdr = this.getCommander();
-      if (cmdr) {
-        cmdr.isManual = false;
-        const a = this.rng.range(0, Math.PI * 2);
-        cmdr.vx = Math.cos(a) * cmdr.speed;
-        cmdr.vy = Math.sin(a) * cmdr.speed;
-        cmdr.facingAngle = a;
-      }
+      if (cmdr) this.releaseManualControl(cmdr);
     } else {
       const cmdr = this.getCommander();
       if (cmdr) {
         this.camera.lockOn(cmdr.id);
       }
     }
+  }
+
+  /** Switch manual commander control to the next living soldier in deploy-slot order. */
+  cycleCommander(): void {
+    const living = this.soldiers
+      .filter((s) => s.alive)
+      .sort((a, b) => a.slotIndex - b.slotIndex || a.id - b.id);
+    if (living.length === 0) return;
+
+    const current = this.getCommander();
+    const idx = current ? living.findIndex((s) => s.id === current.id) : -1;
+    const next = living[(idx + 1) % living.length];
+
+    if (current && current !== next) {
+      this.releaseManualControl(current);
+      this.commanderTrail.length = 0;
+    }
+
+    this.commanderId = next.id;
+    next.isManual = true;
+    this.camera.lockOn(next.id);
   }
 
   toggleFormation(formation: "line" | "triangle"): void {
@@ -1255,7 +1286,9 @@ export class Game {
     const living = this.soldiers.filter((s) => s.alive);
     if (living.length === 0) return null;
     living.sort((a, b) => a.slotIndex - b.slotIndex || a.id - b.id);
-    return living[0];
+    const chosen = living.find((s) => s.id === this.commanderId) ?? living[0];
+    this.commanderId = chosen.id;
+    return chosen;
   }
 
   isBehaviorUnlocked(b: SoldierBehavior): boolean {
