@@ -19,8 +19,7 @@ import { FogRenderer } from "./FogRenderer";
 import { LightRenderer } from "./LightRenderer";
 import { createSprites, soldierShapeSprite, type Sprites } from "./sprites";
 import { soldierShapeIndex } from "../entities/soldierShapes";
-import { CRACK_PATTERNS } from "./materials";
-import { TIER_PAINT } from "./materials";
+import { CRACK_PATTERNS, subPixelColor, TIER_PAINT } from "./materials";
 import { FACILITY } from "../config";
 import { paletteColor, SPRITES } from "../ui/pixelArt";
 import type { Door } from "../world/PixelWorld";
@@ -162,6 +161,7 @@ export class Renderer {
 
     game.terrain.drawFloor(ctx, cam);
     game.terrain.draw(ctx, cam, game.showChunkBorders);
+    this.drawSubPixels();
     this.drawDoors();
     drawSpecialPlinths(ctx, cam, game.world);
     this.lateAtmosphere.drawFloorProps(ctx, cam, game.world, this.motion.matches ? 0 : performance.now() / 1000);
@@ -319,6 +319,27 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = smoothing;
+  }
+
+  private readonly subColorScratch = [0, 0, 0];
+
+  private drawSubPixels(): void {
+    const { ctx, game } = this;
+    const sp = game.subPixels;
+    if (sp.count === 0) return;
+    const cam = game.camera;
+    const ss = game.world.subCellSize;
+    const sz = Math.max(1, ss * cam.zoom);
+    const half = sz * 0.5;
+    const col = this.subColorScratch;
+    for (let i = 0; i < sp.count; i++) {
+      const sx = cam.worldToScreenX(sp.x[i]);
+      const sy = cam.worldToScreenY(sp.y[i]);
+      if (sx + half < 0 || sy + half < 0 || sx - half > cam.viewW || sy - half > cam.viewH) continue;
+      subPixelColor(sp.kind[i], sp.tint[i], Math.floor(sp.y[i] / ss), sp.hp[i], sp.maxHp[i], false, col);
+      ctx.fillStyle = `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`;
+      ctx.fillRect(sx - half, sy - half, sz, sz);
+    }
   }
 
   private drawCasings(): void {

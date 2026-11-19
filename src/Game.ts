@@ -8,6 +8,7 @@ import { labWorldSeed } from "./core/WorldSeed";
 import { SpeedrunTimer } from "./core/SpeedrunTimer";
 import { Rng } from "./core/Rng";
 import { CasingSystem } from "./entities/CasingSystem";
+import { SubPixelPhysics } from "./systems/SubPixelPhysics";
 import { SentrySystem } from "./entities/Sentry";
 import { CreatureSystem, type Creature } from "./entities/Creatures";
 import { LootKind, lootKindForZone, LootSystem } from "./entities/LootSystem";
@@ -100,6 +101,7 @@ export class Game {
   readonly damageNumbers: DamageNumbers;
   readonly particles = new ParticleSystem(3000);
   readonly casings = new CasingSystem();
+  readonly subPixels: SubPixelPhysics;
   readonly loot = new LootSystem();
   readonly runStats = new RunStats();
   readonly save: SaveManager;
@@ -378,13 +380,9 @@ export class Game {
     this.audio.setCamera(this.camera);
     this.camera.defaultFollow = this.save.data.settings.autoFollowCamera;
     this.camera.following = this.camera.defaultFollow;
-    // Knock-on rubble breaks puff a little grit.
-    this.world.onRubbleCrumble = (sx, sy) => {
-      const ss = this.world.subCellSize;
-      const a = this.rng.range(0, Math.PI * 2);
-      const sp = this.rng.range(10, 40);
-      this.particles.spawn(PKind.Debris, (sx + 0.5) * ss, (sy + 0.5) * ss, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.25, 0.5), 1, 0x5a544c, 4);
-    };
+    this.subPixels = new SubPixelPhysics(this.world);
+    // When a non-Blight 0.5 pixel breaks, push nearby 0.5 pixels away with physics.
+    this.world.onSubBreakPush = (sx, sy) => this.subPixels.pushFromBreak(sx, sy);
     this.loadLabProgress();
     this.generateLab();
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
@@ -595,6 +593,7 @@ export class Game {
     this.fire.clear();
     this.fire.burnMult = this.stats.flameBurnMult;
     this.casings.clear();
+    this.subPixels.clear();
     this.loot.clear();
     this.runStats.reset();
     this.acc = 0;
@@ -784,6 +783,7 @@ export class Game {
       this.damageNumbers.clear();
       this.fire.clear();
       this.casings.clear();
+    this.subPixels.clear();
       this.loot.clear();
       // Arrive in a loose huddle in the gateway room.
       const cs = this.world.cellSize;
@@ -2008,6 +2008,7 @@ export class Game {
     this.particles.update(dt);
     this.damageNumbers.update(dt);
     this.casings.update(dt, this.world);
+    this.subPixels.update(dt, this.soldiers);
     const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
     if (collected > 0) {
       this.runStats.currency += this.loot.collectedGold;
