@@ -41,10 +41,16 @@ export const QUALITY_PRESETS: Record<LightQuality, QualityPreset> = {
 export interface LitCells {
   cells: Int32Array;
   count: number;
+  /** Optional per-cell illumination weight in [0..1] (e.g. wall depth attenuation). */
+  weights?: Float32Array;
 }
 
-export function makeLitCells(): LitCells {
-  return { cells: new Int32Array(LIGHT.maxLitCells), count: 0 };
+export function makeLitCells(withWeights = false): LitCells {
+  return {
+    cells: new Int32Array(LIGHT.maxLitCells),
+    count: 0,
+    ...(withWeights ? { weights: new Float32Array(LIGHT.maxLitCells) } : {}),
+  };
 }
 
 export interface MuzzleLight {
@@ -90,7 +96,7 @@ function makeSoftLight(): SoftLight {
     soldier: false,
     poly: new Float32Array(LIGHT.maxRays * 2),
     polyCount: 0,
-    lit: makeLitCells(),
+    lit: makeLitCells(true),
   };
 }
 
@@ -186,6 +192,10 @@ export class LightingSystem {
   /** Soldier / room glows for the current frame (index 0 is the room). */
   softLights: SoftLight[] = [];
   softCount = 0;
+  /** Active soldier flashlight radius, strength, and wall penetration depth. */
+  soldierLightRadius = LIGHT.soldierLightRadius;
+  soldierLightStrength = LIGHT.soldierLightStrength;
+  soldierWallDepth = 1;
 
   private angles = new Float64Array(LIGHT.maxRays);
   private corners: CornerCand[] = [];
@@ -352,7 +362,7 @@ export class LightingSystem {
       const s = soldiers[i];
       if (!s.alive) continue;
       this.addSoftLight(
-        s.x, s.y, LIGHT.soldierLightRadius, LIGHT.soldierLightStrength, s.id, soldiers, cam,
+        s.x, s.y, this.soldierLightRadius, this.soldierLightStrength, s.id, soldiers, cam,
       );
     }
     if (extraLights) {
@@ -391,6 +401,7 @@ export class LightingSystem {
     l.polyCount = this.trace(
       x, y, 1, 0, radius, ownerId, soldiers, l.poly, l.lit,
       LIGHT.softBaseRays, 0, this.preset.maxCornerRays,
+      ownerId >= 0 ? this.soldierWallDepth : 1,
     );
   }
 
@@ -407,6 +418,7 @@ export class LightingSystem {
     baseN: number,
     coneN: number,
     maxCornerRays: number,
+    wallDepth = 1,
   ): number {
     const angles = this.angles;
     const cs = this.world.cellSize;
@@ -634,7 +646,7 @@ export class LightingSystem {
       outPoly[k * 2 + 1] = oy + rdy * finalT;
     }
 
-    if (outLit) this.markLitCells(ox, oy, outPoly, n, outLit);
+    if (outLit) this.markLitCells(ox, oy, outPoly, n, outLit, radius, wallDepth);
     this.lastRaysCast += n;
     return n;
   }
@@ -644,7 +656,15 @@ export class LightingSystem {
    * runs just inside every visible wall face and crosses only air everywhere else.
    * Wall light is applied to whole cells, so it follows the grid, not the polygon.
    */
-  private markLitCells(ox: number, oy: number, poly: Float32Array, n: number, out: LitCells): void {
+  private markLitCells(
+    ox: number,
+    oy: number,
+    poly: Float32Array,
+    n: number,
+    out: LitCells,
+    radius: number,
+    wallDepth = 1,
+  ): void {
     const cs = this.world.cellSize;
     const step = cs * 0.5;
     if (++this.litStamp === 0xffffffff) {
@@ -673,6 +693,60 @@ export class LightingSystem {
       ax = bx;
       ay = by;
     }
+    if (wallDepth > 1 && out.weights) {
+      this.expandLitWallDepth(ox, oy, radius, out, wallDepth);
+    }
+  }
+
+  /**
+   * Expand wall illumination inward from exposed surface cells (depth 1 = 100%)
+   * by `maxDepth - 1` additional solid-block layers with decreasing weights.
+   */
+  private expandLitWallDepth(
+    ox: number,
+    oy: number,
+    radius: number,
+    out: LitCells,
+    maxDepth: number,
+  ): void {
+    const w = this.world;
+    const W = w.width;
+    const cs = w.cellSize;
+    const weights = out.weights!;
+    const depthWeights = LIGHT.betterFlashlightWallWeights;
+    const r2 = radius * radius;
+    let layerStart = 0;
+    let layerEnd = out.count;
+    for (let depth = 2; depth <= maxDepth; depth++) {
+      const weight = depth - 1 < depthWeights.length
+        ? depthWeights[depth - 1]
+        : depthWeights[depthWeights.length - 1];
+      for (let i = layerStart; i < layerEnd; i++) {
+        const cell = out.cells[i];
+        const cx = cell % W;
+        const cy = (cell - cx) / W;
+        for (let d = 0; d < 4; d++) {
+          const nx = d === 0 ? cx + 1 : d === 1 ? cx - 1 : cx;
+          const ny = d === 2 ? cy + 1 : d === 3 ? cy - 1 : cy;
+          if (!w.inBounds(nx, ny)) continue;
+          const ni = ny * W + nx;
+          if (this.litStamps[ni] === this.litStamp) continue;
+          if (w.health[ni] === 0 && !w.anySolidInCell(nx, ny)) continue;
+          const dx = (nx + 0.5) * cs - ox;
+          const dy = (ny + 0.5) * cs - oy;
+          if (dx * dx + dy * dy >= r2) continue;
+          this.litStamps[ni] = this.litStamp;
+          if (out.count < out.cells.length) {
+            out.cells[out.count] = ni;
+            weights[out.count] = weight;
+            out.count++;
+          }
+        }
+      }
+      layerStart = layerEnd;
+      layerEnd = out.count;
+      if (layerStart === layerEnd) break;
+    }
   }
 
   private markCell(cx: number, cy: number, out: LitCells): void {
@@ -683,7 +757,10 @@ export class LightingSystem {
     // Empty cells are also stable for the duration of this synchronous trace.
     this.litStamps[i] = this.litStamp;
     if (w.health[i] === 0 && !w.anySolidInCell(cx, cy)) return;
-    if (out.count < out.cells.length) out.cells[out.count++] = i;
+    if (out.count < out.cells.length) {
+      if (out.weights) out.weights[out.count] = 1;
+      out.cells[out.count++] = i;
+    }
   }
 }
 

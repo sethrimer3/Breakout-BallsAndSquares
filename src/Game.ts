@@ -531,6 +531,15 @@ export class Game {
     this.stats = this.upgrades.getSoldierStats();
     this.fog.permanent = this.stats.permanentMapping;
     this.fog.connectedAir = this.stats.connectedAirMapping;
+    this.lighting.soldierLightRadius = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightRadius
+      : LIGHT.soldierLightRadius;
+    this.lighting.soldierLightStrength = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightStrength
+      : LIGHT.soldierLightStrength;
+    this.lighting.soldierWallDepth = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightWallWeights.length
+      : 1;
     this.applyFacilityStats();
     this.combat.stats = this.stats;
     this.world.playerDamageMult = this.stats.terrainDamageMult;
@@ -1844,6 +1853,15 @@ export class Game {
     this.fog.reset(this.rng.int(1 << 30));
     this.fog.permanent = this.stats.permanentMapping;
     this.fog.connectedAir = this.stats.connectedAirMapping;
+    this.lighting.soldierLightRadius = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightRadius
+      : LIGHT.soldierLightRadius;
+    this.lighting.soldierLightStrength = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightStrength
+      : LIGHT.soldierLightStrength;
+    this.lighting.soldierWallDepth = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightWallWeights.length
+      : 1;
     for (let i = 0; i < 40; i++) this.updateFog(0.1, true);
   }
 

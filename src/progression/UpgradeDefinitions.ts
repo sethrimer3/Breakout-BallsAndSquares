@@ -48,6 +48,7 @@ export type UpgradeId =
   | "keycard_t6" | "keycard_t9"
   | "calibration_1" | "calibration_2" | "calibration_3" | "calibration_4" | "calibration_5"
   | "connected_air_mapping"
+  | "better_flashlight"
   | "unlock_map" | "unlock_resources" | "unlock_primary" | "unlock_blight"
   | "unlock_formations" | "unlock_secondary" | "unlock_facility"
   | `core_placeholder_${number}`
@@ -1963,7 +1964,7 @@ export const CALIBRATION_DEFS: readonly UpgradeDef[] = CALIBRATION.map((stage, i
 export const CORE_HUB_GRID = { col: -2.5, row: -1.5 } as const;
 
 export const CORE_PATH: readonly UpgradeId[] = [
-  "keycard_t1", "unlock_map", "connected_air_mapping", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
+  "keycard_t1", "better_flashlight", "unlock_map", "connected_air_mapping", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
   "core_placeholder_3", "unlock_blight", "keycard_t2", "core_placeholder_4", "unlock_formations", "core_placeholder_5", "unlock_facility",
   "core_placeholder_6", "keycard_t3", "keycard_t4", "unlock_secondary", "auto_ability", "keycard_t6", "keycard_t9",
 ];
@@ -1971,6 +1972,7 @@ export const CORE_PATH: readonly UpgradeId[] = [
 const MILESTONES: Partial<Record<UpgradeId, [string, string, number]>> = {
   keycard_t6: ["Tier 6 Keycard", "Opens the gate from the Blighted Wards to the forest.", 150],
   keycard_t9: ["Tier 9 Keycard", "Opens the dark forest exit into the Fallen City.", 250],
+  better_flashlight: ["Better Flashlight", "Soldiers illuminate more space around them and shine deeper into solid walls.", 10],
   connected_air_mapping: ["Airspace Mapping", "Smoothly reveals air connected to living soldiers, around corners and through opened doors or breached walls.", 30],
   unlock_map: ["Lab Map", "Choose a conquered sector to deploy into. Before this, runs begin at A1.", 15],
   unlock_resources: ["Resource Extraction", "Unlock the Resources upgrade tab.", 25],
@@ -1982,6 +1984,7 @@ const MILESTONES: Partial<Record<UpgradeId, [string, string, number]>> = {
 };
 
 const MILESTONE_ICONS: Partial<Record<UpgradeId, SpriteName>> = {
+  better_flashlight: "flashlight",
   connected_air_mapping: "mapGrid",
   unlock_map: "behaviorGrid", unlock_resources: "goldDrop", unlock_primary: "rifle", unlock_blight: "blightCrack",
   unlock_formations: "formationLine", unlock_secondary: "grenade", unlock_facility: "gear",
@@ -2012,6 +2015,7 @@ export const UPGRADE_DEFS: readonly UpgradeDef[] = [
       ...(id === "keycard_t9" ? { currency: "biomass" as const, essenceCost: 2000, icon: "keycard" as const,
         apply: (s: SoldierStats, level: number) => { if (level>0) s.keycardTier=Math.max(s.keycardTier,9); } } : {}),
       ...(id === "keycard_t1" ? { baseCost: 5, icon: "keycard" as const } : {}),
+      ...(id === "better_flashlight" ? { apply: (s: SoldierStats, level: number) => { s.betterFlashlight = level > 0; } } : {}),
       ...(id === "connected_air_mapping" ? { apply: (s: SoldierStats, level: number) => { s.connectedAirMapping = level > 0; } } : {}),
     };
   }),

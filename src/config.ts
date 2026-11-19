@@ -657,6 +657,12 @@ export const LIGHT = {
   soldierLightRadius: 64,
   /** Steady baseline independent of gunfire, upgrades and muzzle-flash settings. */
   soldierLightStrength: 0.9,
+  /** Better Flashlight upgrade: wider soldier visibility pool (twelve cells). */
+  betterFlashlightRadius: 96,
+  /** Better Flashlight upgrade: slightly stronger soldier glow. */
+  betterFlashlightStrength: 1.0,
+  /** Better Flashlight upgrade: per-depth wall illumination weights (depth 1 = exposed face). */
+  betterFlashlightWallWeights: [1, 0.75, 0.5, 0.25] as const,
   /** Faint glow radius at the center of the spawn room (world units). */
   roomLightRadius: 54,
   /** Spawn-room glow strength. */
