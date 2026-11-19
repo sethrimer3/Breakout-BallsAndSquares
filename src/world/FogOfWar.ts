@@ -62,6 +62,8 @@ export class FogOfWar {
   /** Explored areas keep a dim memory instead of going black. */
   permanent = false;
   connectedAir = false;
+  /** How many solid terrain cells sight rays penetrate into walls (Better Flashlight). */
+  wallPenetrationCells = 0;
   private air: ConnectedAir | null = null;
 
   constructor(
@@ -189,6 +191,7 @@ export class FogOfWar {
     this.grow(stx - pad, sty - pad, stx + pad, sty + pad);
     const step = 0.5;
     const sub = world.subSolidAt;
+    const wallDepth = src.airSeed !== false ? this.wallPenetrationCells : 0;
     for (let k = 0; k < rays; k++) {
       const a = (k / rays) * Math.PI * 2;
       const dx = Math.cos(a) * step;
@@ -201,19 +204,28 @@ export class FogOfWar {
       let px = cx0;
       let py = cy0;
       let lastTile = -1;
+      let inWall = false;
+      let wallDist = 0;
       for (let s = 0; s < steps; s++) {
         px += dx;
         py += dy;
         const cx = Math.floor(px);
         const cy = Math.floor(py);
         if (cx < 0 || cy < 0 || cx >= world.width || cy >= world.height) break;
+        const solid = sub ? sub.call(world, Math.floor(px * 2), Math.floor(py * 2)) : world.solidAt(cx, cy);
+        if (!solid && inWall) break;
         const ti = Math.floor(cy / tileCells) * tw + Math.floor(cx / tileCells);
         if (ti !== lastTile) {
           this.revealBoost[ti] = seenStamp[ti] === stamp ? Math.max(this.revealBoost[ti], boost) : boost;
           seenStamp[ti] = stamp;
           lastTile = ti;
         }
-        if (sub ? sub.call(world, Math.floor(px * 2), Math.floor(py * 2)) : world.solidAt(cx, cy)) break;
+        if (solid) {
+          if (wallDepth <= 0) break;
+          inWall = true;
+          wallDist += step;
+          if (wallDist >= wallDepth) break;
+        }
       }
     }
   }

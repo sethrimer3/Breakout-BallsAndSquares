@@ -144,7 +144,7 @@ describe("fog of war", () => {
 
   it("Recon Optics widens soldier sight in the fog", () => {
     const def = UPGRADE_BY_ID.recon_optics;
-    expect(def.parent).toBe("cartography_uplink");
+    expect(def.parent).toBeNull();
     const s = baseSoldierStats();
     expect(s.sightCells).toBe(FOG.soldierSightCells);
     def.apply(s, 3);
@@ -160,5 +160,36 @@ describe("fog of war", () => {
     run(b, 6, [far]);
     expect(a.lightAt(probeX, near.y)).toBe(0);
     expect(b.lightAt(probeX, near.y)).toBeGreaterThan(0.5);
+  });
+
+  it("chases fog 4 cells deep into walls without leaking into air behind a thin wall", () => {
+    const solid = new Set<string>();
+    // 6-cell-thick wall at x = 22..27, and a 1-cell-thick wall at x = 14
+    for (let y = 10; y <= 30; y++) {
+      for (let x = 22; x <= 27; x++) solid.add(`${x},${y}`);
+      solid.add(`14,${y}`);
+    }
+    const world = {
+      width: 60,
+      height: 40,
+      cellSize: 8,
+      solidAt: (cx: number, cy: number) => solid.has(`${cx},${cy}`),
+    };
+    const eye = { x: 18 * 8 + 4, y: 20 * 8 + 4, radiusCells: FOG.soldierSightCells, airSeed: true };
+
+    const base = new FogOfWar(world);
+    run(base, 4, [eye]);
+    // Without wall penetration, cell x=24 (3 cells into the wall) stays in fog.
+    expect(base.lightAt(24 * 8 + 4, eye.y)).toBe(0);
+
+    const flash = new FogOfWar(world);
+    flash.wallPenetrationCells = 4;
+    run(flash, 4, [eye]);
+    // With Better Flashlight, 4 cells into the wall (x=22..25) are cleared of fog,
+    // while deeper wall cells (x=26..27) and air behind the 1-cell wall (x=12) stay hidden.
+    expect(flash.lightAt(23 * 8 + 4, eye.y)).toBeGreaterThan(0.5);
+    expect(flash.lightAt(25 * 8 + 4, eye.y)).toBeGreaterThan(0.5);
+    expect(flash.lightAt(27 * 8 + 4, eye.y)).toBe(0);
+    expect(flash.lightAt(12 * 8 + 4, eye.y)).toBe(0);
   });
 });

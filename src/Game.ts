@@ -531,6 +531,9 @@ export class Game {
     this.stats = this.upgrades.getSoldierStats();
     this.fog.permanent = this.stats.permanentMapping;
     this.fog.connectedAir = this.stats.connectedAirMapping;
+    this.fog.wallPenetrationCells = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightWallWeights.length
+      : 0;
     this.lighting.soldierLightRadius = this.stats.betterFlashlight
       ? LIGHT.betterFlashlightRadius
       : LIGHT.soldierLightRadius;
@@ -1853,6 +1856,9 @@ export class Game {
     this.fog.reset(this.rng.int(1 << 30));
     this.fog.permanent = this.stats.permanentMapping;
     this.fog.connectedAir = this.stats.connectedAirMapping;
+    this.fog.wallPenetrationCells = this.stats.betterFlashlight
+      ? LIGHT.betterFlashlightWallWeights.length
+      : 0;
     this.lighting.soldierLightRadius = this.stats.betterFlashlight
       ? LIGHT.betterFlashlightRadius
       : LIGHT.soldierLightRadius;

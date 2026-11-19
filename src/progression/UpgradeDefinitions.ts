@@ -1885,7 +1885,7 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     grid: { col: 1, row: 0 },
     parent: null,
     maxLevel: 1,
-    baseCost: 120,
+    baseCost: 12,
     costMultiplier: 1,
     valueAt: (lvl) => lvl,
     formatValue: (v) => (v > 0 ? "MAPPED" : "FADES"),
@@ -1901,8 +1901,8 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     name: "Recon Optics",
     shortDesc: `Soldiers see farther in the fog of war: +${FOG.sightPerLevel} cells of sight radius per level`,
     color: "#7fffd4",
-    grid: { col: 2, row: 0 },
-    parent: "cartography_uplink",
+    grid: { col: 1, row: 0 },
+    parent: null,
     maxLevel: 5,
     baseCost: 45,
     costMultiplier: 1.6,
@@ -1964,7 +1964,7 @@ export const CALIBRATION_DEFS: readonly UpgradeDef[] = CALIBRATION.map((stage, i
 export const CORE_HUB_GRID = { col: -2.5, row: -1.5 } as const;
 
 export const CORE_PATH: readonly UpgradeId[] = [
-  "keycard_t1", "better_flashlight", "unlock_map", "connected_air_mapping", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
+  "keycard_t1", "better_flashlight", "cartography_uplink", "unlock_map", "connected_air_mapping", "unlock_resources", "extra_soldier", "core_placeholder_2", "unlock_primary",
   "core_placeholder_3", "unlock_blight", "keycard_t2", "core_placeholder_4", "unlock_formations", "core_placeholder_5", "unlock_facility",
   "core_placeholder_6", "keycard_t3", "keycard_t4", "unlock_secondary", "auto_ability", "keycard_t6", "keycard_t9",
 ];

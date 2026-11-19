@@ -90,7 +90,7 @@ describe("special upgrade unlocks", () => {
     expect(UPGRADE_BY_ID.keycard_t1.baseCost).toBe(5);
     expect(UPGRADE_BY_ID.keycard_t1.currency ?? "gold").toBe("gold");
     for (const id of CORE_PATH) {
-      if (id !== "keycard_t1" && id !== "better_flashlight" && !UPGRADE_BY_ID[id].placeholder) {
+      if (id !== "keycard_t1" && id !== "better_flashlight" && id !== "cartography_uplink" && !UPGRADE_BY_ID[id].placeholder) {
         expect(specialSpotFor(id), `core upgrade ${id} must have a golden block`).toBeDefined();
       }
     }
