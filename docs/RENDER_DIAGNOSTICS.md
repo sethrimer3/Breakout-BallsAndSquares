@@ -33,7 +33,7 @@ The following stages cover the callback sequentially:
 - `bloomMs`: Bloom rendering and compositing (near-zero call overhead when disabled).
 - `fogRenderMs`: map boundary, fog and Blight albedo through fog.
 - `blightEdgesMs`: the post-fog Blight edge pass. Blight work inside Bloom belongs to `bloomMs`.
-- `actorsAndUiMs`: generator rims, weapon expansion, portal, soldiers, grenades, goo, turrets and canvas notices/aim indicators.
+- `actorsAndUiMs`: generator rims, deployment annotations, weapon expansion, portal, soldiers, grenades, goo, turrets and canvas notices/aim indicators.
 - `hudAudioMs`: fire ambience mixing, audio updates and DOM HUD/debug updates.
 
 Nested probes overlap those parents: `fogUpdateMs`, `airMappingMs`, `growthUpdateMs` and `subPixelSimulationMs` are inside simulation; `lightingMaskMs` is inside lighting; `wardenDrawMs` is inside world effects. `subPixelDrawMs` combines moving-subpixel drawing in albedo with its light pass in world effects. **Do not add nested timings to parent timings.** Quantization and bookkeeping mean stage totals need not exactly equal callback work.

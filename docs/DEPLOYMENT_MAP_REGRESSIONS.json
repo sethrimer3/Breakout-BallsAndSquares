@@ -1,0 +1,90 @@
+{
+  "rows": [
+    {
+      "size": {
+        "width": 1200,
+        "height": 900,
+        "dpr": 1,
+        "name": "desktop"
+      },
+      "states": {
+        "available": 0,
+        "guarded": 21,
+        "unsecured": 1,
+        "unknown": 40
+      },
+      "legendVisible": true,
+      "guardedLabel": true,
+      "readyPoint": true,
+      "solidGroundReason": true,
+      "legendClearsHud": true,
+      "liveUnlocks": true,
+      "selectionRetainsGoldRequirement": true,
+      "selectionUnlocks": true,
+      "reservesHideGuide": true,
+      "horizontalOverflow": false
+    },
+    {
+      "size": {
+        "width": 412,
+        "height": 915,
+        "dpr": 2.625,
+        "name": "mobile"
+      },
+      "states": {
+        "available": 0,
+        "guarded": 21,
+        "unsecured": 1,
+        "unknown": 40
+      },
+      "legendVisible": true,
+      "guardedLabel": true,
+      "readyPoint": true,
+      "solidGroundReason": true,
+      "legendClearsHud": true,
+      "liveUnlocks": true,
+      "selectionRetainsGoldRequirement": true,
+      "selectionUnlocks": true,
+      "reservesHideGuide": true,
+      "horizontalOverflow": false
+    },
+    {
+      "size": {
+        "width": 915,
+        "height": 412,
+        "dpr": 2.625,
+        "name": "landscape"
+      },
+      "states": {
+        "available": 0,
+        "guarded": 21,
+        "unsecured": 1,
+        "unknown": 40
+      },
+      "legendVisible": true,
+      "guardedLabel": true,
+      "readyPoint": true,
+      "solidGroundReason": true,
+      "legendClearsHud": true,
+      "liveUnlocks": true,
+      "selectionRetainsGoldRequirement": true,
+      "selectionUnlocks": true,
+      "reservesHideGuide": true,
+      "horizontalOverflow": false
+    }
+  ],
+  "baseline": "ce8e3b5",
+  "tests": 711,
+  "testFiles": 97,
+  "typeCheck": true,
+  "productionBuild": true,
+  "sourceSha256": {
+    "src/rendering/DeploymentOverlay.ts": "4503eaf23781e3151073c25c9abfb60fa728624aa787a87d8873952da2c480c2",
+    "src/ui/deploymentStatus.ts": "57e67662c55fcea9ebaa7e963f4a825236416e0d3e3ebb896171c526d3ff6b13",
+    "src/ui/LabMap.ts": "aa108e0f631d2384735a6abab4828c4208880bd5286996e0762d261145357ab1",
+    "src/ui/HUD.ts": "3af057c64235c5f82e42887a92929b0b4e52adeb4b3143107b552975e5bdc717",
+    "src/rendering/Renderer.ts": "4e1c2ac15463ef31ddee09e8220e8f0bbf959c6dfaa9ae99f2c7a4c887fe1946",
+    "src/rendering/PortalRenderer.ts": "6536f893f56c4877ebc5e693f2a2042eeab6f68c293819df9f53be4f94f91bab",
+    "src/styles/main.css": "49ef05222e4c376013ee87c1f6fdbae8ad42666d0433469e69a33d0fc921a47d"
+  }
+}

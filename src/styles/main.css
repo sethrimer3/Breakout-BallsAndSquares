@@ -2440,3 +2440,106 @@ button {
 /* Black Market trees: the camera glides to the new shape when a path folds away. */
 .tree-view.view-glide { transition: transform 0.42s cubic-bezier(0.3, 0, 0.2, 1); }
 @media (prefers-reduced-motion: reduce) { .tree-view.view-glide { transition: none; } }
+
+/* Deployment survey: shape + texture + text, never color alone. */
+.deployment-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px 16px;
+  font: var(--f8) var(--font-small);
+  line-height: 1.5;
+}
+.deploy-key { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.deploy-key svg, .labmap-deploy-status svg { width: 12px; height: 12px; flex: none; }
+.deploy-available { color: #79dfd2; }
+.deploy-blocked { color: #edb565; }
+.deploy-unknown { color: #8694a6; }
+.labmap-panel { --tile: max(14px, min(calc((100vw - 96px) / (var(--sectors, 9) + 0.6)), calc((100dvh - 320px) / (var(--rows, var(--sectors, 9)) + 0.6)), 64px)); }
+.labmap-panel > .deployment-legend { margin: 12px 0 4px; }
+.labmap-deploy-overlay { position: absolute; inset: 1px; pointer-events: none; }
+.labmap-tile[data-deployment="available"] .labmap-deploy-overlay {
+  background: rgba(121, 223, 210, 0.055);
+  box-shadow: inset 0 -2px 0 rgba(121, 223, 210, 0.7);
+}
+.labmap-tile[data-deployment="guarded"] .labmap-deploy-overlay,
+.labmap-tile[data-deployment="unsecured"] .labmap-deploy-overlay {
+  background: repeating-linear-gradient(135deg, transparent 0 7px, rgba(237, 181, 101, 0.22) 7px 8px);
+  box-shadow: inset 0 -2px 0 rgba(237, 181, 101, 0.7);
+}
+.labmap-deploy-mark {
+  position: absolute;
+  right: 2px;
+  bottom: 3px;
+  width: clamp(8px, calc(var(--tile) * 0.32), 16px);
+  height: clamp(8px, calc(var(--tile) * 0.32), 16px);
+  background: #08121d;
+  color: #8694a6;
+  pointer-events: none;
+}
+.labmap-deploy-mark svg { display: block; width: 100%; height: 100%; }
+.labmap-tile[data-deployment="available"] .labmap-deploy-mark { color: #79dfd2; }
+.labmap-tile[data-deployment="guarded"] .labmap-deploy-mark,
+.labmap-tile[data-deployment="unsecured"] .labmap-deploy-mark { color: #edb565; }
+.labmap-tile:focus-visible { outline: 2px solid #fff3cf; outline-offset: -2px; z-index: 2; }
+.labmap-info { min-height: 78px; line-height: 1.65; }
+.labmap-deploy-status { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 7px; color: #8694a6; }
+.labmap-deploy-status[data-deployment="available"] { color: #79dfd2; }
+.labmap-deploy-status[data-deployment="guarded"],
+.labmap-deploy-status[data-deployment="unsecured"] { color: #edb565; }
+.labmap-deploy-reason { max-width: 510px; margin: 5px auto 0; color: #c7d4df; }
+.labmap-detail { margin-top: 3px; font-size: 7px; color: #8b9aaa; }
+.deployment-guide {
+  position: absolute;
+  top: 100px;
+  left: 12px;
+  max-width: calc(100% - 24px);
+  padding: 9px 11px;
+  border: 1px solid #36505c;
+  background: rgba(7, 17, 27, 0.95);
+  font: var(--f8) var(--font-small);
+  line-height: 1.5;
+  pointer-events: none;
+}
+.deployment-guide-title { color: #d9e8ee; letter-spacing: 1px; margin-bottom: 6px; }
+.deployment-guide .deployment-legend { justify-content: flex-start; gap: 6px 12px; }
+.deployment-guide-note { margin-top: 6px; color: #9eafbc; font: 10px monospace; }
+@media (max-height: 500px) {
+  .deployment-guide { top: 82px; padding: 6px 9px; }
+  .deployment-guide-title, .deployment-guide-note { display: none; }
+}
+/* Let the stat bar wrap naturally before the deployment legend. */
+.hud-top-stack {
+  position: absolute;
+  top: 12px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+.hud-top-stack > .hud-bar { position: static; margin: 0 auto; max-width: 100%; }
+.hud-top-stack > .deployment-guide { position: static; align-self: flex-start; margin-left: 4px; max-width: calc(100% - 4px); }
+@media (max-width: 700px), (max-height: 500px) {
+  .hud-top-stack { top: 6px; }
+}
+/* Use landscape width for the explanation instead of shrinking the survey. */
+@media (max-height: 500px) and (min-width: 600px) {
+  .labmap-panel {
+    --tile: max(14px, min(calc((100vw - 400px) / (var(--sectors, 9) + 0.6)), calc((100dvh - 150px) / (var(--rows, var(--sectors, 9)) + 0.6)), 64px));
+    display: grid;
+    grid-template-columns: max-content minmax(240px, 360px);
+    grid-template-areas: "title title" "tabs tabs" "legend legend" "map info" "map actions";
+    gap: 6px 18px;
+    max-width: calc(100vw - 24px);
+  }
+  .labmap-panel > .panel-title { grid-area: title; }
+  .labmap-panel > .labmap-tabs { grid-area: tabs; }
+  .labmap-panel > .deployment-legend { grid-area: legend; margin: 0; }
+  .labmap-panel > .labmap-grid { grid-area: map; margin: 0; }
+  .labmap-panel > .labmap-info { grid-area: info; align-self: center; margin: 0; min-height: 0; }
+  .labmap-panel > .panel-actions { grid-area: actions; margin: 0; align-self: end; }
+}

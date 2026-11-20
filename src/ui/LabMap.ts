@@ -1,3 +1,4 @@
+import { deploymentState, deploymentIcon, deploymentLegend, DEPLOYMENT_LABELS } from "./deploymentStatus";
 import type { Game } from "../Game";
 import { SPECIAL_UNLOCKS } from "../progression/specialUnlocks";
 import { UPGRADE_BY_ID } from "../progression/UpgradeDefinitions";
@@ -72,8 +73,9 @@ export class LabMap {
       <div class="panel labmap-panel">
         <div class="panel-title">SELECT SECTOR</div>
         <div class="labmap-tabs"></div>
+        <div class="deployment-legend" aria-label="Deployment legend">${deploymentLegend()}</div>
         <div class="labmap-grid"></div>
-        <div class="labmap-info"></div>
+        <div class="labmap-info" role="status" aria-live="polite" aria-atomic="true"></div>
         <div class="panel-actions">
           <button class="btn" data-act="back">BACK <span class="kbd">ESC</span></button>
           <button class="btn btn-primary" data-act="deploy">DEPLOY <span class="kbd">SPACE</span></button>
@@ -205,7 +207,13 @@ export class LabMap {
         const canvas = document.createElement("canvas");
         canvas.width = THUMB_SIZE;
         canvas.height = THUMB_SIZE;
-        tile.append(canvas);
+        const overlay = document.createElement("span");
+        overlay.className = "labmap-deploy-overlay";
+        overlay.setAttribute("aria-hidden", "true");
+        const mark = document.createElement("span");
+        mark.className = "labmap-deploy-mark";
+        mark.setAttribute("aria-hidden", "true");
+        tile.append(canvas, overlay, mark);
         tile.addEventListener("click", () => {
           if (this.selected === s && this.game.canDeployInto(s)) this.deploy();
           else this.select(s);
@@ -335,6 +343,12 @@ export class LabMap {
       tile.classList.toggle("conquered", conquered);
       tile.classList.toggle("selected", s === this.selected);
       tile.dataset.tier = String(tier);
+      const state = deploymentState(discovered, this.game.sectorGuarded(s), this.game.canDeployInto(s));
+      if (tile.dataset.deployment !== state) tile.querySelector(".labmap-deploy-mark")!.innerHTML = deploymentIcon(state);
+      tile.dataset.deployment = state;
+      tile.title = `Sector ${sectorName(s, this.def.sectors)} — ${DEPLOYMENT_LABELS[state]}`;
+      tile.setAttribute("aria-label", tile.title);
+      tile.setAttribute("aria-pressed", String(s === this.selected));
       this.drawTile(s, discovered, conquered);
     }
     const s = this.selected;
@@ -347,13 +361,20 @@ export class LabMap {
     if (this.game.sectorGuarded(s) && (this.game.devMapAccess || progress.discovered.has(s))) status = "BLIGHT WARDENS HOLD THIS ZONE - NO DEPLOYMENT";
     else if (this.game.devMapAccess) status = "DEV — DEPLOY ANYWHERE";
     else if (!progress.discovered.has(s)) status = "UNEXPLORED";
-    else if (progress.conquered.has(s)) status = s === this.def.start ? (this.def.id === 1 ? "STAGING AREA - SECURE" : "GATEWAY - SECURE") : "CONQUERED - SAFE TO DEPLOY";
+    else if (progress.conquered.has(s)) status = s === this.def.start ? (this.def.id === 1 ? "STAGING AREA - SECURED" : "GATEWAY - SECURED") : "CONQUERED - DEPLOYMENT OPEN";
     else {
       const left = progress.generatorsLeft(s);
       const label = this.def.framework ? "THREAT" : "BLIGHT GENERATOR";
       status = `${left} ${label}${left === 1 ? "" : "S"} ACTIVE`;
     }
-    this.info.innerHTML = `<b>${name}</b> <span class="labmap-tier t${tier}">TIER ${tier}</span> ${status}`;
+    const state = deploymentState(this.game.devMapAccess || progress.discovered.has(s), this.game.sectorGuarded(s), this.game.canDeployInto(s));
+    const reason = state === "guarded" ? "Defeat the Wardens and collect this sector’s gold block."
+      : state === "available" ? "Choose this sector to begin deployment. Clear ground is still required."
+      : state === "unknown" ? "Explore this sector to assess its deployment status."
+      : "Eliminate the remaining threats to secure this sector.";
+    this.info.innerHTML = `<div><b>${name}</b> <span class="labmap-tier t${tier}">TIER ${tier}</span></div>
+      <div class="labmap-deploy-status" data-deployment="${state}">${deploymentIcon(state)} ${DEPLOYMENT_LABELS[state]}</div>
+      <div class="labmap-deploy-reason">${reason}</div><div class="labmap-detail">${state === "available" || state === "unsecured" ? status : ""}</div>`;
     this.deployBtn.disabled = !this.game.canDeployInto(s);
   }
 }

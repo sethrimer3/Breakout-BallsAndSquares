@@ -1,3 +1,4 @@
+import { DEPLOYMENT_COLORS } from "../ui/deploymentStatus";
 import { ART_PIXEL } from "../config";
 import type { CameraSystem } from "../systems/CameraSystem";
 import { PORTAL, type SpawnPortal } from "../systems/SpawnPortal";
@@ -16,8 +17,8 @@ const RIM = "#a9f1ff";
 const RIM_HOT = "#ffffff";
 const RIM_DIM = "#3fb4e6";
 const OUTLINE = "#02060d";
-const DENY = "#ff4a6e";
-const DENY_DARK = "#4a0718";
+const DENY = DEPLOYMENT_COLORS.blocked;
+const DENY_DARK = "#422b13";
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -90,7 +91,7 @@ export function drawSpawnPortal(ctx: Ctx, cam: CameraSystem, p: SpawnPortal, tim
 
 /**
  * Ghost ring where a tap would open the portal: dotted cyan, slowly turning,
- * or red with a cross where the Blight Wardens forbid it.
+ * or amber with a cross where the Blight Wardens forbid it.
  */
 export function drawPortalPreview(ctx: Ctx, cam: CameraSystem, wx: number, wy: number, time: number, guarded: boolean, alpha = 0.7): void {
   const cx = wx / ART_PIXEL;
@@ -117,7 +118,7 @@ export function drawPortalPreview(ctx: Ctx, cam: CameraSystem, wx: number, wy: n
   ctx.restore();
 }
 
-/** A refused tap: a red cross and ring that fade out, with a short reason. */
+/** A refused tap: an amber cross and ring that fade out, with a short reason. */
 export function drawSpawnDenied(ctx: Ctx, cam: CameraSystem, wx: number, wy: number, age: number, guarded: boolean): void {
   const life = 1.4;
   if (age < 0 || age > life) return;
@@ -147,7 +148,7 @@ export function drawSpawnDenied(ctx: Ctx, cam: CameraSystem, wx: number, wy: num
   const y = Math.round(cam.worldToScreenY(wy - (R + 3) * ART_PIXEL));
   ctx.fillStyle = "#05070d";
   ctx.fillText(text, x + 1, y + 1);
-  ctx.fillStyle = "#ffd6de";
+  ctx.fillStyle = "#ffe4b7";
   ctx.fillText(text, x, y);
   ctx.restore();
 }

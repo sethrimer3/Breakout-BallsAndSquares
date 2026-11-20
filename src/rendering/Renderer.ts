@@ -1,3 +1,5 @@
+import { circleIsClear } from "../systems/PhysicsSystem";
+import { DeploymentOverlay } from "./DeploymentOverlay";
 import { visibleRoomLightIndices } from "./RoomLightIndex";
 import { DamageNumberRenderer } from "./DamageNumberRenderer";
 import { drawMapBoundary } from "./MapBoundaryRenderer";
@@ -70,6 +72,7 @@ export class Renderer {
   private fireRenderer = new FireRenderer();
   private lateAtmosphere = new LateAtmosphere();
   private fogRenderer: FogRenderer;
+  private readonly deploymentOverlay = new DeploymentOverlay();
 
   constructor(
     private canvas: HTMLCanvasElement,
@@ -274,6 +277,7 @@ export class Renderer {
     { const end = performance.now(); if (metrics) metrics.fogRenderMs = end - passStart; passStart = end; }
     game.terrain.drawBlightEdges(ctx, cam, still ? 0 : wallClockMs / 1000);
     { const end = performance.now(); if (metrics) metrics.blightEdgesMs = end - passStart; passStart = end; }
+    this.deploymentOverlay.draw(ctx, game);
     // Generator tier rims sit on top of the Blight's own edges (Blight shows through fog).
     drawGeneratorRims(ctx, cam, game.world, still ? 0 : wallClockMs / 1000);
     // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
@@ -1376,12 +1380,18 @@ export class Renderer {
       // Pressing: the portal will open here when the press lets go.
       const wx = game.aimState.startWx;
       const wy = game.aimState.startWy;
-      drawPortalPreview(ctx, cam, wx, wy, now, game.spawnGuardedAt(wx, wy), 0.95);
+      const guarded = game.spawnGuardedAt(wx, wy);
+      const clear = circleIsClear(game.world, wx, wy, SOLDIER.collisionRadius + SOLDIER.deployClearance);
+      drawPortalPreview(ctx, cam, wx, wy, now, guarded || !clear, 0.95);
+      this.deploymentOverlay.drawTargetLabel(ctx, game, wx, wy, guarded, clear);
     } else if (game.input.mouseInside && game.canPlaceSoldier()) {
       // Hovering with the squad still in reserve: where the portal would open.
       const wx = cam.screenToWorldX(game.input.mouseX);
       const wy = cam.screenToWorldY(game.input.mouseY);
-      drawPortalPreview(ctx, cam, wx, wy, now, game.spawnGuardedAt(wx, wy), 0.6);
+      const guarded = game.spawnGuardedAt(wx, wy);
+      const clear = circleIsClear(game.world, wx, wy, SOLDIER.collisionRadius + SOLDIER.deployClearance);
+      drawPortalPreview(ctx, cam, wx, wy, now, guarded || !clear, 0.6);
+      this.deploymentOverlay.drawTargetLabel(ctx, game, wx, wy, guarded, clear);
     } else if (game.input.mouseInside && !game.canPlaceSoldier() && !game.paused && !game.runOver) {
       const sx = game.input.mouseX;
       const sy = game.input.mouseY;

@@ -1,3 +1,4 @@
+import { deploymentLegend } from "./deploymentStatus";
 import { formatSpeedrunTime } from "../core/SpeedrunTimer";
 import { essenceIcon } from "./essenceIcon";
 import { damageRange, GROWTH, TERRAIN } from "../config";
@@ -24,6 +25,7 @@ export class HUD {
   private statsEl: HTMLDivElement;
   private launchBtn: HTMLButtonElement;
   private launchCountEl: HTMLSpanElement;
+  private deploymentGuide: HTMLDivElement;
   private growthMeterEl: HTMLDivElement;
   private growthFillEl: HTMLDivElement;
   /** Animated overlay riding on the fill while in overdrive. */
@@ -48,6 +50,9 @@ export class HUD {
   constructor(parent: HTMLElement, private game: Game) {
     this.root = document.createElement("div");
     this.root.className = "hud";
+    this.deploymentGuide = document.createElement("div");
+    this.deploymentGuide.className = "deployment-guide hidden";
+    this.deploymentGuide.innerHTML = `<div class="deployment-guide-title">DEPLOYMENT ZONES</div><div class="deployment-legend">${deploymentLegend()}</div><div class="deployment-guide-note">Choose clear ground in an open zone.</div>`;
     const bar = document.createElement("div");
     bar.className = "hud-bar";
     const items: [string, string, SpriteName, string][] = [
@@ -218,8 +223,11 @@ export class HUD {
     this.abilityBar = document.createElement("div");
     this.abilityBar.className = "hud-abilities hidden";
 
+    const topStack = document.createElement("div");
+    topStack.className = "hud-top-stack";
+    topStack.append(bar, this.deploymentGuide);
     this.root.append(
-      bar,
+      topStack,
       this.tacticalBar,
       this.launchBtn,
       this.touchBar,
@@ -235,6 +243,7 @@ export class HUD {
   update(game: Game, now: number, force = false): void {
     if (!force && now - this.lastUpdate < 80) return;
     this.lastUpdate = now;
+    this.deploymentGuide.classList.toggle("hidden", !game.canPlaceSoldier());
     const s = game.runStats;
     const alive = game.soldiers.filter((x) => x.alive).length;
     this.fields.time.textContent = fmtTime(s.time);
