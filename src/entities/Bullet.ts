@@ -1,4 +1,5 @@
 import type { ReverseShot } from "../systems/ReverseRevolver";
+import type { Soldier } from "./Soldier";
 
 export class Bullet {
   homing = false;
@@ -41,6 +42,16 @@ export class Bullet {
   slashWidth = 0;
   /** Arc tilt/curvature angle (for katana slashes). */
   slashAngle = 0;
+  /** Forward reach in world units for stationary melee slashes / circular swipe radius. */
+  slashRange = 0;
+  /** Forward offset from owner soldier center so the stationary slash sits right in front of the player. */
+  slashOffset = 0;
+  /** Whether a stationary melee slash has already applied its hit sweep. */
+  slashHitDone = false;
+  /** True for a 360-degree circular katana swipe triggered on wall bounce. */
+  slashCircular = false;
+  /** Owner soldier reference used to keep stationary slashes anchored in front of the player. */
+  ownerSoldier: Soldier | null = null;
   /** Initial max lifetime for alpha/animation scaling. */
   maxLife = 0;
   /** Distance since launch or last reflection, used to clamp the straight tracer. */
@@ -136,6 +147,11 @@ export function resetBulletFields(b: Bullet): void {
   b.blightMultiplier = 1;
   b.slashWidth = 0;
   b.slashAngle = 0;
+  b.slashRange = 0;
+  b.slashOffset = 0;
+  b.slashHitDone = false;
+  b.slashCircular = false;
+  b.ownerSoldier = null;
   b.maxLife = 0;
   b.traveled = 0;
   b.totalTraveled = 0;

@@ -1104,11 +1104,19 @@ export class Renderer {
     if (sx < -pad || sy < -pad || sx > cam.viewW + pad || sy > cam.viewH + pad) return;
 
     const lifePct = b.maxLife > 0 ? Math.max(0, b.life / b.maxLife) : 1;
+    const progress = 1 - lifePct;
     const alpha = Math.min(1, lifePct * 1.5);
     if (alpha <= 0.01) return;
+
+    if (b.slashCircular) {
+      this.drawCircularSlash(b, progress, alpha);
+      return;
+    }
+
     // Local crescent frame in world units: +u is the cutting direction.
     const w = b.slashWidth || 16;
-    const bulge = w * (b.gale ? 0.65 : 0.42);
+    const rangeScale = !b.gale && b.slashRange > 0 ? b.slashRange / 24 : 1;
+    const bulge = w * (b.gale ? 0.65 : 0.42 * rangeScale);
     const ang = Math.atan2(b.dy, b.dx) + b.slashAngle;
     const cos = Math.cos(ang);
     const sin = Math.sin(ang);
@@ -1117,10 +1125,18 @@ export class Renderer {
     const outerC = bulge * 1.15;
     const innerC = bulge * 0.28;
     const trail = Math.min(8, b.traveled * 0.5);
+    // Stationary melee slice animates by sweeping across the arc from one tip to the other.
+    const sweepT = b.gale || this.motion.matches ? 1 : Math.min(1, progress / 0.45);
+    const sweepEased = 1 - (1 - sweepT) * (1 - sweepT);
+    const swingDir = b.slashAngle >= 0 ? 1 : -1;
     // Streak curves as [x0, control, halfHeight]: the air-cut trail, then Gale echoes.
     const streaks: [number, number, number][] = [];
     if (trail > 1) streaks.push([tipX - trail, (bulge - trail) * 0.8, tipY * 0.7]);
     if (b.gale && !this.motion.matches) for (const off of [6, 12]) streaks.push([tipX - off, bulge - off, tipY * 0.8]);
+    if (!b.gale && !this.motion.matches && sweepEased > 0.15) {
+      const animOff = 2 + sweepEased * 4;
+      streaks.push([tipX - animOff, bulge - animOff, tipY * 0.78]);
+    }
     const blade = b.gale ? "#aaffd7" : "#a8f5ff";
     const bladeDim = b.gale ? "#4fc79a" : "#3fb6d8";
 
@@ -1148,6 +1164,10 @@ export class Renderer {
         const u = dx * cos + dy * sin;
         const v = -dx * sin + dy * cos;
         if (Math.abs(v) > tipY + 1) continue;
+        if (sweepEased < 1) {
+          const arcPos = ((v * swingDir) / tipY + 1) * 0.5;
+          if (arcPos > sweepEased) continue;
+        }
         const xo = curveX(v, tipX, outerC, tipY);
         const xi = curveX(v, tipX, innerC, tipY);
         if (u <= xo && u >= xi) {
@@ -1178,6 +1198,56 @@ export class Renderer {
         const xa = curveX(v, tipX - 2, bulge * 1.25, tipY);
         const xai = curveX(v, tipX - 2, bulge * 0.1, tipY);
         if (u <= xa && u >= xai && bayer(gx, gy) < 0.5) {
+          ctx.fillStyle = "#38d6ff";
+          ctx.globalAlpha = alpha * 0.35;
+          fillArtPixel(ctx, cam, gx, gy);
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /** Animated 360-degree circular katana swipe centered on the player. */
+  private drawCircularSlash(b: Bullet, progress: number, alpha: number): void {
+    const { ctx, game } = this;
+    const cam = game.camera;
+    const radius = 5.2 + (b.slashRange || 24);
+    const sweepT = this.motion.matches ? 1 : Math.min(1, progress / 0.5);
+    const sweepEased = 1 - (1 - sweepT) * (1 - sweepT);
+    const maxAngle = sweepEased * Math.PI * 2;
+    const startAngle = Math.atan2(b.dy, b.dx);
+    const bandHalf = Math.max(2.5, (b.slashWidth || 16) * 0.22);
+    const outerR = radius * (0.7 + 0.3 * sweepEased);
+    const innerR = Math.max(2, outerR - bandHalf * 2);
+
+    const reach = outerR + 4;
+    const gx0 = Math.floor((b.x - reach) / ART_PIXEL);
+    const gx1 = Math.floor((b.x + reach) / ART_PIXEL);
+    const gy0 = Math.floor((b.y - reach) / ART_PIXEL);
+    const gy1 = Math.floor((b.y + reach) / ART_PIXEL);
+    for (let gy = gy0; gy <= gy1; gy++) {
+      for (let gx = gx0; gx <= gx1; gx++) {
+        const dx = (gx + 0.5) * ART_PIXEL - b.x;
+        const dy = (gy + 0.5) * ART_PIXEL - b.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < innerR - 2 || dist > outerR + 2) continue;
+
+        let rel = Math.atan2(dy, dx) - startAngle;
+        while (rel < 0) rel += Math.PI * 2;
+        while (rel >= Math.PI * 2) rel -= Math.PI * 2;
+        if (sweepEased < 1 && rel > maxAngle) continue;
+
+        if (dist <= outerR && dist >= innerR) {
+          if (dist > outerR - 1.2) {
+            ctx.fillStyle = "#ffffff";
+            ctx.globalAlpha = alpha;
+          } else {
+            const depth = (dist - innerR) / Math.max(1e-4, outerR - innerR);
+            ctx.fillStyle = depth > 0.45 ? "#a8f5ff" : "#3fb6d8";
+            ctx.globalAlpha = alpha * 0.9;
+          }
+          fillArtPixel(ctx, cam, gx, gy);
+        } else if (bayer(gx, gy) < 0.45) {
           ctx.fillStyle = "#38d6ff";
           ctx.globalAlpha = alpha * 0.35;
           fillArtPixel(ctx, cam, gx, gy);

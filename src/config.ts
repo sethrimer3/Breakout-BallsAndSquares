@@ -437,12 +437,14 @@ export const KATANA = {
   damage: 3,
   /** Damage multiplier that ONLY affects blight blocks. */
   blightMultiplier: 3.0,
-  /** Slash wave velocity (units/s). */
+  /** Slash wave velocity (units/s) — used by Gale Edge flying crescents. */
   bulletSpeed: 420,
   /** Base pierce count (blocks penetrated per slash). */
   pierce: 3,
   /** Slash arc width in world units (perpendicular to slash cut). */
   slashWidth: 16,
+  /** Base forward reach of a stationary melee slash in world units. */
+  slashRange: 24,
   /** Slash lifetime (seconds). */
   lifetime: 0.28,
 };

@@ -753,6 +753,52 @@ export class CombatSystem {
     b.replay=null; b.gale=this.shooter?.mutation === "gale_edge";
     b.galeCells.clear();
     b.distanceLeft=b.gale?this.stats.galeDistance:Infinity;
+    b.ownerSoldier = this.shooter;
+    b.slashCircular = false;
+    b.slashHitDone = false;
+    b.slashRange = b.gale ? 0 : this.stats.katanaSlashRange;
+    if (!b.gale) {
+      // Stationary melee slash: does not move forward; sits right in front of the player.
+      b.speed = 0;
+      b.pendingAdvance = 0;
+      b.slashOffset = pendingAdvance + b.slashRange * 0.45;
+      b.x = x + dx * b.slashOffset;
+      b.y = y + dy * b.slashOffset;
+    }
+  }
+
+  /** Spawn a 360-degree circular katana swipe centered on the soldier (triggered on wall bounce). */
+  private spawnCircularSwipe(s: Soldier, nx: number, ny: number): void {
+    const b = this.bullets.acquire();
+    if (!b) return;
+    resetBulletFields(b);
+    const len = Math.hypot(nx, ny) || 1;
+    b.dx = nx / len;
+    b.dy = ny / len;
+    b.x = s.x;
+    b.y = s.y;
+    const mods = s.mods;
+    b.speed = 0;
+    b.terrainDamageBonus = mods?.terrainDamageBonus ?? 0;
+    const baseDmg = this.stats.katanaDamage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0);
+    const boost = slashMomentum(s, this.stats);
+    b.damage = Math.max(1, Math.round(baseDmg * boost.damage));
+    b.life = KATANA.lifetime;
+    b.maxLife = KATANA.lifetime;
+    b.ownerId = s.id;
+    b.ownerSoldier = s;
+    b.pierceLeft = this.stats.katanaPierce + (mods?.pierce ?? 0);
+    b.style = 3;
+    b.blightMultiplier = this.stats.katanaBlightMultiplier * (mods?.blightMult ?? 1);
+    b.slashWidth = this.stats.katanaSlashWidth * boost.width;
+    b.slashRange = this.stats.katanaSlashRange;
+    b.slashOffset = 0;
+    b.slashAngle = 0;
+    b.slashCircular = true;
+    b.slashHitDone = false;
+    b.momentumBoosted = boost.damage > 1;
+    b.afterimage = s.dashAfterimage;
+    s.dashAfterimage = false;
   }
 
   /**
@@ -841,6 +887,10 @@ export class CombatSystem {
 
   /** Called by PhysicsSystem on a real reflected-wall collision (not sliding/rescue/sentry). */
   onSoldierBounce(s: Soldier, nx: number, ny: number): void {
+    if (s.weapon === "katana" && this.stats.katanaWallSwipe) {
+      this.spawnCircularSwipe(s, nx, ny);
+      this.events.onShot?.(s, nx, ny, s.x, s.y);
+    }
     if (s.weapon === "pistol" && s.mutation === "orbit_cylinder") {
       this.orbit.releaseOnBounce(s, nx, ny, (x, y, dx, dy, speed, damage, life, ownerId, bounces, terrainDamageBonus, blightMultiplier, pierce) => {
         const b = this.bullets.acquire();
@@ -999,6 +1049,11 @@ export class CombatSystem {
         this.detonateRocket(b, b.x, b.y, -b.dx, -b.dy, Math.floor(b.x / this.world.cellSize), Math.floor(b.y / this.world.cellSize));
       }
       this.finishBullet(b);
+      return;
+    }
+
+    if (b.style === 3 && !b.gale) {
+      this.updateStationarySlash(b);
       return;
     }
 
@@ -1651,6 +1706,188 @@ export class CombatSystem {
       const ey=Math.abs(dy)>1e-9?(((dy>0?gy+1:gy)*size)-oy)/dy:Infinity;
       const advance=Math.min(remaining,Math.max(hit.t+1e-3,Math.min(ex,ey)+1e-3));
       ox+=dx*advance;oy+=dy*advance;remaining-=advance;
+    }
+  }
+
+  /** Keep stationary katana slash anchored to the player and apply its melee hit once. */
+  private updateStationarySlash(b: Bullet): void {
+    if (b.ownerSoldier && b.ownerSoldier.alive) {
+      b.x = b.ownerSoldier.x + b.dx * b.slashOffset;
+      b.y = b.ownerSoldier.y + b.dy * b.slashOffset;
+    }
+    if (b.slashHitDone) return;
+    b.slashHitDone = true;
+    if (b.slashCircular) {
+      this.applyCircularSlash(b);
+    } else {
+      this.applyMeleeSlash(b);
+    }
+  }
+
+  /** Sweep a stationary directional katana slash right in front of the player. */
+  private applyMeleeSlash(b: Bullet): void {
+    const w = this.world;
+    const cs = w.cellSize;
+    const ss = w.subCellSize;
+    const originX = b.ownerSoldier ? b.ownerSoldier.x : b.x - b.dx * b.slashOffset;
+    const originY = b.ownerSoldier ? b.ownerSoldier.y : b.y - b.dy * b.slashOffset;
+    const reach = (b.ownerSoldier?.radius ?? 3.2) + BULLET.muzzleGap + b.slashRange;
+
+    let curX = originX;
+    let curY = originY;
+    let remDist = reach;
+    let pierceLeft = b.pierceLeft;
+    let guard = 0;
+
+    while (remDist > 1e-4 && guard++ < 16) {
+      const hit = raycastSub(w, curX, curY, b.dx, b.dy, remDist);
+      const terrainHit = hit.hit && hit.t <= remDist;
+
+      if (this.targets) {
+        const ct = this.targets.raycast(curX, curY, b.dx, b.dy, terrainHit ? hit.t : remDist);
+        if (ct >= 0) {
+          const ix = curX + b.dx * ct;
+          const iy = curY + b.dy * ct;
+          this.targets.applyHit(b.damage, ix, iy);
+          this.napalm.igniteAt(ix, iy, 4, b.ownerId);
+          this.events.onCreatureHit?.(ix, iy, -b.dx, -b.dy);
+          if (pierceLeft <= 0) return;
+          pierceLeft--;
+          remDist -= ct + 1;
+          curX = ix + b.dx;
+          curY = iy + b.dy;
+          continue;
+        }
+      }
+
+      if (!terrainHit) break;
+
+      const hcx = hit.cx >> 1;
+      const hcy = hit.cy >> 1;
+      const inside = w.inBounds(hcx, hcy);
+      if (inside && w.boundary[hcy * w.width + hcx] !== 0) break;
+
+      const cellIdx = hcy * w.width + hcx;
+      const isSub = inside && w.health[cellIdx] === 0;
+      const isCore = inside && !isSub && w.coreId[cellIdx] > 0;
+      const isBlight = isSub ? w.isBlightSubAt(hit.cx, hit.cy) : w.isBlightAt(hcx, hcy);
+      let hitDmg = b.damage + w.breachBonusSub(hit.cx, hit.cy, b.terrainDamageBonus) + (isCore ? this.stats.coreDamageBonus : 0);
+      if (isBlight && b.blightMultiplier > 1) {
+        hitDmg = Math.round(hitDmg * b.blightMultiplier);
+      }
+      const beforeHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
+      this.currentOwnerId = b.ownerId;
+      const result = w.damageSub(hit.cx, hit.cy, hitDmg, true, b.dx, b.dy);
+      this.currentOwnerId = 0;
+      if (result > 0) this.napalm.igniteAt(hit.x, hit.y, 4, b.ownerId);
+      const afterHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
+      if (b.momentumBoosted) this.telemetry.katanaBoostedDamage += Math.max(0, beforeHp - afterHp);
+      this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, result, isSub, b.ownerId);
+
+      if (b.slashWidth > 0) {
+        this.cleaveSlashSides(b, hit.cx, hit.cy, hit.nx, hit.ny);
+      }
+
+      if (result === 0 || pierceLeft <= 0) break;
+      pierceLeft--;
+
+      const S = isSub ? ss : cs;
+      const targetX = isSub ? hit.cx : hcx;
+      const targetY = isSub ? hit.cy : hcy;
+      let distToExit = hit.t + S * 1.05;
+      if (Math.abs(b.dx) > 1e-6) {
+        const exitX = (b.dx > 0 ? targetX + 1 : targetX) * S;
+        const tx = (exitX - curX) / b.dx;
+        if (tx > hit.t) distToExit = Math.min(distToExit, tx + 0.5);
+      }
+      if (Math.abs(b.dy) > 1e-6) {
+        const exitY = (b.dy > 0 ? targetY + 1 : targetY) * S;
+        const ty = (exitY - curY) / b.dy;
+        if (ty > hit.t) distToExit = Math.min(distToExit, ty + 0.5);
+      }
+      const stepPast = Math.max(0.5, distToExit);
+      remDist -= stepPast;
+      curX += b.dx * stepPast;
+      curY += b.dy * stepPast;
+      if (!w.inBounds(Math.floor(curX / cs), Math.floor(curY / cs))) break;
+    }
+  }
+
+  /** Sweep a 360-degree circular katana swipe centered on the soldier. */
+  private applyCircularSlash(b: Bullet): void {
+    const w = this.world;
+    const ss = w.subCellSize;
+    const cx = b.x;
+    const cy = b.y;
+    const radius = (b.ownerSoldier?.radius ?? 3.2) + BULLET.muzzleGap + b.slashRange;
+    const r2 = radius * radius;
+
+    if (this.targets) {
+      const hitTargets = new Set<object>();
+      const rays = 16;
+      for (let i = 0; i < rays; i++) {
+        const ang = (i / rays) * Math.PI * 2;
+        const rdx = Math.cos(ang);
+        const rdy = Math.sin(ang);
+        const ct = this.targets.raycast(cx, cy, rdx, rdy, radius, hitTargets);
+        if (ct >= 0) {
+          const ix = cx + rdx * ct;
+          const iy = cy + rdy * ct;
+          if (this.targets.targetKey) hitTargets.add(this.targets.targetKey);
+          this.targets.applyHit(b.damage, ix, iy);
+          this.napalm.igniteAt(ix, iy, 4, b.ownerId);
+          this.events.onCreatureHit?.(ix, iy, -rdx, -rdy);
+        }
+      }
+    }
+
+    const sx0 = Math.max(0, Math.floor((cx - radius) / ss));
+    const sx1 = Math.min(w.subWidth - 1, Math.floor((cx + radius) / ss));
+    const sy0 = Math.max(0, Math.floor((cy - radius) / ss));
+    const sy1 = Math.min(w.subHeight - 1, Math.floor((cy + radius) / ss));
+    const hitNorm = new Set<number>();
+
+    for (let sy = sy0; sy <= sy1; sy++) {
+      const wy = (sy + 0.5) * ss;
+      const dy = wy - cy;
+      for (let sx = sx0; sx <= sx1; sx++) {
+        const wx = (sx + 0.5) * ss;
+        const dx = wx - cx;
+        if (dx * dx + dy * dy > r2) continue;
+        if (!w.subSolidAt(sx, sy)) continue;
+
+        const hcx = sx >> 1;
+        const hcy = sy >> 1;
+        if (!w.inBounds(hcx, hcy)) continue;
+        const cellIdx = hcy * w.width + hcx;
+        if (w.boundary[cellIdx] !== 0) continue;
+
+        const isSub = w.health[cellIdx] === 0;
+        if (!isSub) {
+          if (hitNorm.has(cellIdx)) continue;
+          hitNorm.add(cellIdx);
+        }
+
+        const isCore = !isSub && w.coreId[cellIdx] > 0;
+        const isBlight = isSub ? w.isBlightSubAt(sx, sy) : w.isBlightAt(hcx, hcy);
+        let dmg = b.damage + w.breachBonusSub(sx, sy, b.terrainDamageBonus) + (isCore ? this.stats.coreDamageBonus : 0);
+        if (isBlight && b.blightMultiplier > 1) {
+          dmg = Math.round(dmg * b.blightMultiplier);
+        }
+        const dist = Math.hypot(dx, dy) || 1;
+        const dirX = dx / dist;
+        const dirY = dy / dist;
+        const beforeHp = isSub ? w.subHealth[sy * w.subWidth + sx] : w.health[cellIdx];
+        this.currentOwnerId = b.ownerId;
+        const res = w.damageSub(sx, sy, dmg, true, dirX, dirY);
+        this.currentOwnerId = 0;
+        if (res > 0) {
+          const afterHp = isSub ? w.subHealth[sy * w.subWidth + sx] : w.health[cellIdx];
+          if (b.momentumBoosted) this.telemetry.katanaBoostedDamage += Math.max(0, beforeHp - afterHp);
+          this.napalm.igniteAt(wx, wy, ss, b.ownerId);
+          this.events.onImpact?.(wx, wy, -dirX, -dirY, hcx, hcy, res, isSub, b.ownerId);
+        }
+      }
     }
   }
 

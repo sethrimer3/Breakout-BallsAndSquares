@@ -123,6 +123,8 @@ export type UpgradeId =
   | "katana_pierce"
   | "katana_fire_rate"
   | "katana_arc"
+  | "katana_range"
+  | "katana_wall_swipe"
   // Flamethrower Tree
   | "flame_unlock"
   | "flame_damage"
@@ -1440,9 +1442,48 @@ const EXISTING_DEFS: readonly UpgradeDef[] = [
     formatValue: (v) => `${v} WIDTH`,
     formatDelta: () => "+3 WIDTH",
     apply: (s, lvl) => {
-      s.katanaSlashWidth = KATANA.slashWidth + 3 * lvl;
+      s.katanaSlashWidth += 3 * lvl;
     },
     icon: "blast",
+  },
+  {
+    id: "katana_range",
+    branch: "katana",
+    name: "Extended Reach",
+    shortDesc: "+3 slash length & +2 slash width per level",
+    color: "#38d6ff",
+    grid: { col: -1, row: -1 },
+    parent: "katana_unlock",
+    maxLevel: 6,
+    baseCost: 40,
+    costMultiplier: 1.62,
+    valueAt: (lvl) => KATANA.slashRange + 3 * lvl,
+    formatValue: (v) => `${v} RANGE`,
+    formatDelta: () => "+3 LEN / +2 WID",
+    apply: (s, lvl) => {
+      s.katanaSlashRange = KATANA.slashRange + 3 * lvl;
+      s.katanaSlashWidth += 2 * lvl;
+    },
+    icon: "blast",
+  },
+  {
+    id: "katana_wall_swipe",
+    branch: "katana",
+    name: "Whirlwind Rebound",
+    shortDesc: "Unleash a 360° circular katana swipe every time you bounce off a wall",
+    color: "#83ecff",
+    grid: { col: -1, row: 1 },
+    parent: "katana_unlock",
+    maxLevel: 1,
+    baseCost: 140,
+    costMultiplier: 1,
+    valueAt: (lvl) => lvl,
+    formatValue: (v) => (v > 0 ? "UNLOCKED" : "LOCKED"),
+    formatDelta: () => "WALL SWIPE",
+    apply: (s, lvl) => {
+      s.katanaWallSwipe = lvl > 0;
+    },
+    icon: "katana",
   },
 
   // =========================================================================

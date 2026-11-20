@@ -154,6 +154,8 @@ export interface SoldierStats {
   katanaBulletSpeed: number;
   katanaPierce: number;
   katanaSlashWidth: number;
+  katanaSlashRange: number;
+  katanaWallSwipe: boolean;
   katanaDash: boolean;
   katanaDashPeak: number;
   katanaDashDuration: number;
@@ -307,6 +309,8 @@ export function baseSoldierStats(): SoldierStats {
     katanaBulletSpeed: KATANA.bulletSpeed,
     katanaPierce: KATANA.pierce,
     katanaSlashWidth: KATANA.slashWidth,
+    katanaSlashRange: KATANA.slashRange,
+    katanaWallSwipe: false,
     katanaDash: false,
     katanaDashPeak: 2.25,
     katanaDashDuration: 0.7,
