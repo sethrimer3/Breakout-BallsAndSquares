@@ -1738,10 +1738,10 @@ export class CombatSystem {
     let remDist = reach;
     let pierceLeft = b.pierceLeft;
     let guard = 0;
+    const hit = makeRayHit();
 
     while (remDist > 1e-4 && guard++ < 16) {
-      const hit = raycastSub(w, curX, curY, b.dx, b.dy, remDist);
-      const terrainHit = hit.hit && hit.t <= remDist;
+      const terrainHit = gridRaycast(w.subSolidQuery, ss, curX, curY, b.dx, b.dy, remDist, hit);
 
       if (this.targets) {
         const ct = this.targets.raycast(curX, curY, b.dx, b.dy, terrainHit ? hit.t : remDist);

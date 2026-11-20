@@ -137,7 +137,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
 
     // 1. Attack normal block at (10, 5) with Katana slash
     // Normal damage = 3 -> cell should have 9 - 3 = 6 HP remaining (multiplier NOT applied!)
-    const s1 = new Soldier(70, 55, 1, 0, stats.speed, "katana");
+    const s1 = new Soldier(80, 55, 1, 0, stats.speed, "katana");
     s1.fireCooldown = 0;
     combat.fire(s1);
     combat.updateBullets(0.15);
@@ -148,7 +148,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
 
     // 2. Attack Grown Blight block at (15, 5) with Katana slash
     // Multiplier 3x * 3 dmg = 9 damage -> completely destroys the 9 HP blight block!
-    const s2 = new Soldier(120, 55, 1, 0, stats.speed, "katana");
+    const s2 = new Soldier(130, 55, 1, 0, stats.speed, "katana");
     s2.fireCooldown = 0;
     combat.fire(s2);
     combat.updateBullets(0.15);
@@ -159,7 +159,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
 
     // 3. Attack Blight Core block at (20, 5) with Katana slash
     // Multiplier 3x * 3 dmg = 9 damage -> destroys the 9 HP core block!
-    const s3 = new Soldier(170, 55, 1, 0, stats.speed, "katana");
+    const s3 = new Soldier(180, 55, 1, 0, stats.speed, "katana");
     s3.fireCooldown = 0;
     combat.fire(s3);
     combat.updateBullets(0.15);
@@ -170,7 +170,7 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
 
     // 4. Attack Blight decor block at (25, 5) with Katana slash
     // Multiplier 3x * 3 dmg = 9 damage -> destroys the 9 HP decor block!
-    const s4 = new Soldier(220, 55, 1, 0, stats.speed, "katana");
+    const s4 = new Soldier(230, 55, 1, 0, stats.speed, "katana");
     s4.fireCooldown = 0;
     combat.fire(s4);
     combat.updateBullets(0.15);
@@ -249,9 +249,9 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
     w.setCell(10, 6, 5, "set", true);
 
     const combat = new CombatSystem(w, new Rng(1), stats);
-    // Soldier at x = 70, y = 55 aiming right (dx = 1, dy = 0)
+    // Soldier at x = 80, y = 55 aiming right (dx = 1, dy = 0)
     // Directly hits row 5, and the side cleave reaches row 6!
-    const s = new Soldier(70, 55, 1, 0, stats.speed, "katana");
+    const s = new Soldier(80, 55, 1, 0, stats.speed, "katana");
     s.fireCooldown = 0;
     combat.fire(s);
     combat.updateBullets(0.15);
@@ -283,5 +283,99 @@ describe("Katana Weapon & Blight Damage Multiplier", () => {
     expect(active[0].style).toBe(3);
     expect(active[1].style).toBe(3);
     expect(active[0].slashAngle).toBe(-active[1].slashAngle);
+  });
+
+  it("keeps normal katana slashes stationary in front of the player without moving forward", () => {
+    const save = new SaveManager(new MemStorage());
+    unlockTabs(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
+    const stats = upg.getSoldierStats();
+    stats.katanaUnlocked = true;
+
+    const w = new PixelWorld({ width: 30, height: 30, cellSize: 10, roomSize: 6 });
+    // Distant block at x = 150..160 (50 units ahead of soldier at x = 100)
+    w.setCell(15, 10, 9, "set", true);
+
+    const combat = new CombatSystem(w, new Rng(7), stats);
+    const s = new Soldier(100, 105, 1, 0, stats.speed, "katana");
+    s.fireCooldown = 0;
+    combat.fire(s);
+
+    const slash = combat.bullets.items.find((b) => b.active)!;
+    expect(slash.speed).toBe(0);
+    const startX = slash.x;
+    const startY = slash.y;
+    expect(startX).toBeGreaterThan(s.x);
+
+    combat.updateBullets(0.1);
+    expect(slash.active).toBe(true);
+    expect(slash.x).toBe(startX);
+    expect(slash.y).toBe(startY);
+    // Distant block was NOT hit because normal slashes do not travel forward
+    expect(w.health[10 * w.width + 15]).toBe(9);
+  });
+
+  it("scales slash length and width with Extended Reach (katana_range)", () => {
+    const save = new SaveManager(new MemStorage());
+    unlockTabs(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
+    save.data.bank = 100_000;
+    expect(upg.buy("katana_unlock")).toBe(true);
+    expect(upg.isUnlocked("katana_range")).toBe(true);
+    expect(upg.buy("katana_range")).toBe(true);
+    expect(upg.buy("katana_range")).toBe(true);
+
+    const stats = upg.getSoldierStats();
+    expect(stats.katanaSlashRange).toBe(KATANA.slashRange + 6);
+    expect(stats.katanaSlashWidth).toBe(KATANA.slashWidth + 4);
+
+    // Also composes with katana_arc
+    expect(upg.buy("katana_arc")).toBe(true);
+    const statsWithArc = upg.getSoldierStats();
+    expect(statsWithArc.katanaSlashWidth).toBe(KATANA.slashWidth + 4 + 3);
+
+    // Verify increased range hits a block 32 units ahead (which base range 24 misses)
+    const w = new PixelWorld({ width: 30, height: 30, cellSize: 10, roomSize: 6 });
+    w.setCell(13, 10, 9, "set", true); // x = 130..140, 30 units from x=100
+    const combat = new CombatSystem(w, new Rng(9), statsWithArc);
+    const s = new Soldier(100, 105, 1, 0, statsWithArc.speed, "katana");
+    s.fireCooldown = 0;
+    combat.fire(s);
+    combat.updateBullets(0.05);
+    expect(w.health[10 * w.width + 13]).toBeLessThan(9);
+  });
+
+  it("triggers a 360-degree circular swipe on wall bounce with Whirlwind Rebound (katana_wall_swipe)", () => {
+    const save = new SaveManager(new MemStorage());
+    unlockTabs(save);
+    const upg = new UpgradeManager(save); findAllSpecials(save.data);
+    save.data.bank = 100_000;
+    expect(upg.buy("katana_unlock")).toBe(true);
+    expect(upg.isUnlocked("katana_wall_swipe")).toBe(true);
+    expect(upg.buy("katana_wall_swipe")).toBe(true);
+
+    const stats = upg.getSoldierStats();
+    expect(stats.katanaWallSwipe).toBe(true);
+
+    const w = new PixelWorld({ width: 30, height: 30, cellSize: 10, roomSize: 6 });
+    // Place blocks on opposite sides of the soldier at (105, 105)
+    w.setCell(8, 10, 9, "set", true);  // x = 80..90 (to the left)
+    w.setCell(12, 10, 9, "set", true); // x = 120..130 (to the right)
+
+    const combat = new CombatSystem(w, new Rng(11), stats);
+    const s = new Soldier(105, 105, 1, 0, stats.speed, "katana");
+
+    // Simulate a wall bounce
+    combat.onSoldierBounce(s, -1, 0);
+    const swipe = combat.bullets.items.find((b) => b.active)!;
+    expect(swipe).toBeDefined();
+    expect(swipe.style).toBe(3);
+    expect(swipe.slashCircular).toBe(true);
+    expect(swipe.x).toBe(s.x);
+    expect(swipe.y).toBe(s.y);
+
+    combat.updateBullets(0.05);
+    expect(w.health[10 * w.width + 8]).toBeLessThan(9);
+    expect(w.health[10 * w.width + 12]).toBeLessThan(9);
   });
 });
