@@ -140,6 +140,13 @@ function gridToCanvas(grid: string[]): HTMLCanvasElement {
 /** Rotation steps cached per shape (11.25 degrees each). */
 export const SOLDIER_ANGLE_STEPS = 32;
 const shapeSpriteCache = new Map<string, HTMLCanvasElement>();
+const shapeSpriteBounds = new WeakMap<HTMLCanvasElement, {left:number;top:number;right:number;bottom:number}>();
+const FULL_SPRITE_BOUNDS = {left:0,top:0,right:1,bottom:1};
+/** Opaque bounds are recorded while baking, without any canvas pixel readback. */
+export function soldierSpriteBounds(sprite: HTMLCanvasElement) {
+  return shapeSpriteBounds.get(sprite) ?? FULL_SPRITE_BOUNDS;
+}
+
 
 /**
  * Cached pixel-art sprite for a soldier shape facing `angle`. The sphere ignores
@@ -162,6 +169,11 @@ export function soldierShapeSprite(shapeIndex: number, angle: number, withRing: 
       withRing,
     );
     c = gridToCanvas(grid);
+    let left=grid.length,top=grid.length,right=0,bottom=0;
+    for(let y=0;y<grid.length;y++)for(let x=0;x<grid[y].length;x++)if(grid[y][x]!=="."){
+      left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+1);bottom=Math.max(bottom,y+1);
+    }
+    shapeSpriteBounds.set(c,{left:left/grid.length,top:top/grid.length,right:right/grid.length,bottom:bottom/grid.length});
     shapeSpriteCache.set(key, c);
   }
   return c;

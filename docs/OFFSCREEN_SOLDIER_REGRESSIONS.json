@@ -1,0 +1,287 @@
+{
+  "rows": [
+    {
+      "device": {
+        "name": "desktop",
+        "width": 1200,
+        "height": 900,
+        "dpr": 1
+      },
+      "markers": [
+        {
+          "slot": 5,
+          "x": 238,
+          "y": 90,
+          "edge": 0
+        },
+        {
+          "slot": 6,
+          "x": 600,
+          "y": 90,
+          "edge": 0
+        },
+        {
+          "slot": 7,
+          "x": 962,
+          "y": 90,
+          "edge": 0
+        },
+        {
+          "slot": 0,
+          "x": 1180,
+          "y": 452,
+          "edge": 1
+        },
+        {
+          "slot": 3,
+          "x": 235,
+          "y": 817,
+          "edge": 2
+        },
+        {
+          "slot": 2,
+          "x": 600,
+          "y": 817,
+          "edge": 2
+        },
+        {
+          "slot": 1,
+          "x": 965,
+          "y": 817,
+          "edge": 2
+        },
+        {
+          "slot": 4,
+          "x": 20,
+          "y": 452,
+          "edge": 3
+        }
+      ],
+      "partlyVisibleHidden": true,
+      "individualSprites": true,
+      "allEightDirections": true,
+      "crowdedEdge": true,
+      "noHudOverlap": true,
+      "deadAndOnscreenHidden": true,
+      "clearOnReturn": true
+    },
+    {
+      "device": {
+        "name": "phone",
+        "width": 412,
+        "height": 915,
+        "dpr": 2.625
+      },
+      "markers": [
+        {
+          "slot": 6,
+          "x": 206,
+          "y": 128,
+          "edge": 0
+        },
+        {
+          "slot": 7,
+          "x": 392,
+          "y": 292,
+          "edge": 1
+        },
+        {
+          "slot": 0,
+          "x": 392,
+          "y": 480,
+          "edge": 1
+        },
+        {
+          "slot": 1,
+          "x": 392,
+          "y": 664,
+          "edge": 1
+        },
+        {
+          "slot": 2,
+          "x": 206,
+          "y": 840,
+          "edge": 2
+        },
+        {
+          "slot": 5,
+          "x": 20,
+          "y": 292,
+          "edge": 3
+        },
+        {
+          "slot": 4,
+          "x": 20,
+          "y": 552,
+          "edge": 3
+        },
+        {
+          "slot": 3,
+          "x": 20,
+          "y": 664,
+          "edge": 3
+        }
+      ],
+      "partlyVisibleHidden": true,
+      "individualSprites": true,
+      "allEightDirections": true,
+      "crowdedEdge": true,
+      "noHudOverlap": true,
+      "deadAndOnscreenHidden": true,
+      "clearOnReturn": true
+    },
+    {
+      "device": {
+        "name": "landscape",
+        "width": 915,
+        "height": 412,
+        "dpr": 2.625
+      },
+      "markers": [
+        {
+          "slot": 5,
+          "x": 324,
+          "y": 70,
+          "edge": 0
+        },
+        {
+          "slot": 6,
+          "x": 458,
+          "y": 70,
+          "edge": 0
+        },
+        {
+          "slot": 7,
+          "x": 591,
+          "y": 70,
+          "edge": 0
+        },
+        {
+          "slot": 0,
+          "x": 895,
+          "y": 204,
+          "edge": 1
+        },
+        {
+          "slot": 3,
+          "x": 324,
+          "y": 337,
+          "edge": 2
+        },
+        {
+          "slot": 2,
+          "x": 458,
+          "y": 337,
+          "edge": 2
+        },
+        {
+          "slot": 1,
+          "x": 591,
+          "y": 337,
+          "edge": 2
+        },
+        {
+          "slot": 4,
+          "x": 20,
+          "y": 276,
+          "edge": 3
+        }
+      ],
+      "partlyVisibleHidden": true,
+      "individualSprites": true,
+      "allEightDirections": true,
+      "crowdedEdge": true,
+      "noHudOverlap": true,
+      "deadAndOnscreenHidden": true,
+      "clearOnReturn": true
+    }
+  ],
+  "baseline": "2587565",
+  "tests": 720,
+  "testFiles": 98,
+  "typeCheck": true,
+  "productionBuild": true,
+  "deploymentMapChecks": {
+    "rows": [
+      {
+        "size": {
+          "width": 1200,
+          "height": 900,
+          "dpr": 1,
+          "name": "desktop"
+        },
+        "states": {
+          "available": 0,
+          "guarded": 21,
+          "unsecured": 1,
+          "unknown": 40
+        },
+        "legendVisible": true,
+        "guardedLabel": true,
+        "readyPoint": true,
+        "solidGroundReason": true,
+        "legendClearsHud": true,
+        "liveUnlocks": true,
+        "selectionRetainsGoldRequirement": true,
+        "selectionUnlocks": true,
+        "reservesHideGuide": true,
+        "horizontalOverflow": false
+      },
+      {
+        "size": {
+          "width": 412,
+          "height": 915,
+          "dpr": 2.625,
+          "name": "mobile"
+        },
+        "states": {
+          "available": 0,
+          "guarded": 21,
+          "unsecured": 1,
+          "unknown": 40
+        },
+        "legendVisible": true,
+        "guardedLabel": true,
+        "readyPoint": true,
+        "solidGroundReason": true,
+        "legendClearsHud": true,
+        "liveUnlocks": true,
+        "selectionRetainsGoldRequirement": true,
+        "selectionUnlocks": true,
+        "reservesHideGuide": true,
+        "horizontalOverflow": false
+      },
+      {
+        "size": {
+          "width": 915,
+          "height": 412,
+          "dpr": 2.625,
+          "name": "landscape"
+        },
+        "states": {
+          "available": 0,
+          "guarded": 21,
+          "unsecured": 1,
+          "unknown": 40
+        },
+        "legendVisible": true,
+        "guardedLabel": true,
+        "readyPoint": true,
+        "solidGroundReason": true,
+        "legendClearsHud": true,
+        "liveUnlocks": true,
+        "selectionRetainsGoldRequirement": true,
+        "selectionUnlocks": true,
+        "reservesHideGuide": true,
+        "horizontalOverflow": false
+      }
+    ]
+  },
+  "sourceSha256": {
+    "src/rendering/OffscreenSoldierRenderer.ts": "a8a10554a91d45ee5409eac6752ab5d137824d1de3399295a4ef4c4fc750bc11",
+    "src/rendering/SoldierIndicatorLayout.ts": "b5c91fea00fd8ec246c4a64b7c81c9ae2d62038ef264a00b4e737d41b13edb03",
+    "src/rendering/sprites.ts": "b1e12f361b8394b4471c246d9170ce663c69649f2f03caaa695338cf3bc45203",
+    "src/rendering/Renderer.ts": "392f0b0cb162ac99e1d71042f65ea3accc669cd5c9a74e7ac26d07060ee307b2",
+    "src/ui/HUD.ts": "2f9a3f884f5a9b1da7daaed6f3a04c8a62e7488ce344cf0710227b2a27542f83"
+  }
+}

@@ -1,3 +1,4 @@
+import type { IndicatorRect } from "../rendering/SoldierIndicatorLayout";
 import { deploymentLegend } from "./deploymentStatus";
 import { formatSpeedrunTime } from "../core/SpeedrunTimer";
 import { essenceIcon } from "./essenceIcon";
@@ -46,6 +47,8 @@ export class HUD {
   private abilityBtns = new Map<number, HTMLButtonElement>();
   private helpOpen = false;
   private lastUpdate = 0;
+  /** Updated only after HUD layout/viewport changes, never queried during canvas drawing. */
+  readonly soldierIndicatorLayout: {left:number;right:number;top:number;bottom:number;obstacles:IndicatorRect[]} = {left:20,right:Infinity,top:20,bottom:Infinity,obstacles:[]};
 
   constructor(parent: HTMLElement, private game: Game) {
     this.root = document.createElement("div");
@@ -238,6 +241,24 @@ export class HUD {
       this.helpBtn,
     );
     parent.append(this.root);
+    const obstacles=[bar,this.tacticalBar,this.launchBtn,this.touchBar,this.abilityBar,this.statsEl,this.growthMeterEl,this.helpBtn,this.helpPopoverEl,this.deploymentGuide];
+    const refresh=()=>{
+      const visible: IndicatorRect[]=[];
+      for(const element of obstacles){const r=element.getBoundingClientRect();if(r.width>0&&r.height>0)visible.push({x:r.left,y:r.top,width:r.width,height:r.height});}
+      const top=bar.getBoundingClientRect(),bottom=this.growthMeterEl.getBoundingClientRect(),abilities=this.abilityBar.getBoundingClientRect();
+      const safe=parent.getBoundingClientRect();
+      this.soldierIndicatorLayout.left=safe.left+20;
+      this.soldierIndicatorLayout.right=safe.right-20;
+      this.soldierIndicatorLayout.top=Math.max(safe.top+20,top.height?top.bottom+20:20);
+      this.soldierIndicatorLayout.bottom=Math.min(safe.bottom-20,bottom.height?bottom.top-20:Infinity,abilities.height?abilities.top-20:Infinity);
+      this.soldierIndicatorLayout.obstacles=visible;
+    };
+    if(typeof ResizeObserver!=="undefined"){
+      const observer=new ResizeObserver(refresh);
+      for(const element of [parent,...obstacles])observer.observe(element);
+    }
+    requestAnimationFrame(refresh);
+    window.addEventListener("resize",()=>requestAnimationFrame(refresh));
   }
 
   update(game: Game, now: number, force = false): void {

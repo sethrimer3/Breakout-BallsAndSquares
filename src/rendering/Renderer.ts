@@ -1,3 +1,4 @@
+import { OffscreenSoldierRenderer } from "./OffscreenSoldierRenderer";
 import { circleIsClear } from "../systems/PhysicsSystem";
 import { DeploymentOverlay } from "./DeploymentOverlay";
 import { visibleRoomLightIndices } from "./RoomLightIndex";
@@ -72,6 +73,7 @@ export class Renderer {
   private fireRenderer = new FireRenderer();
   private lateAtmosphere = new LateAtmosphere();
   private fogRenderer: FogRenderer;
+  private readonly offscreenSoldiers = new OffscreenSoldierRenderer();
   private readonly deploymentOverlay = new DeploymentOverlay();
 
   constructor(
@@ -294,6 +296,7 @@ export class Renderer {
     this.drawAimIndicator();
     this.drawGateNotice();
     drawSpecialNotice(ctx, cam, game.specialNotice, game.runStats.time);
+    this.offscreenSoldiers.draw(ctx, game);
     if (metrics) {
       metrics.actorsAndUiMs = performance.now() - passStart;
       metrics.candidateRoomLights = visibleRoomLightIndices(game.world, cam).length;
