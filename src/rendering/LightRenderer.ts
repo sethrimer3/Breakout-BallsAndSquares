@@ -166,11 +166,22 @@ export class LightRenderer {
   private dirtyX1 = -1;
   private dirtyY1 = -1;
 
+  private readonly coarsePointer = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)") : null;
+
   constructor(private sprites: Sprites) {
     [this.lmCanvas, this.lmCtx] = makeLayer(false);
     [this.layerCanvas, this.layerCtx] = makeLayer(true);
     [this.maskCanvas, this.maskCtx] = makeLayer(true);
     [this.wallCanvas, this.wallCtx] = makeLayer(true);
+  }
+
+  /**
+   * On mobile/coarse-pointer screens, cap the lightmap/mask density at 1x CSS
+   * resolution while keeping albedo terrain & sprites at full `dpr`. This cuts
+   * lightmap/mask fill rate by 2.25x-4x and keeps scroll-mask offsets integer.
+   */
+  private lightDensity(dpr: number): number {
+    return this.coarsePointer?.matches ? Math.min(dpr, 1) : dpr;
   }
 
   /** Copy into a separate backing store: self-copying a canvas requires a
@@ -204,10 +215,13 @@ export class LightRenderer {
     const viewH = Math.max(1, Math.round(cam.viewH));
     const devW = ctx.canvas.width;
     const devH = ctx.canvas.height;
+    const lmDpr = this.lightDensity(dpr);
+    const lmW = lmDpr === dpr ? devW : Math.max(1, Math.round(cam.viewW * lmDpr));
+    const lmH = lmDpr === dpr ? devH : Math.max(1, Math.round(cam.viewH * lmDpr));
     for (const c of [this.lmCanvas, this.layerCanvas, this.maskCanvas, this.maskBackCanvas]) {
-      if (c && (c.width !== devW || c.height !== devH)) {
-        c.width = devW;
-        c.height = devH;
+      if (c && (c.width !== lmW || c.height !== lmH)) {
+        c.width = lmW;
+        c.height = lmH;
       }
     }
 
@@ -222,33 +236,33 @@ export class LightRenderer {
     const m = this.maskState, terrain = game.terrain;
     const revision = terrain.visibleOpacityRevision(cam);
     const compatible = m && m.terrain === terrain && m.zoom === cam.zoom &&
-      m.viewW === cam.viewW && m.viewH === cam.viewH && m.dpr === dpr &&
-      m.width === devW && m.height === devH && m.ambient === ambient;
+      m.viewW === cam.viewW && m.viewH === cam.viewH && m.dpr === lmDpr &&
+      m.width === lmW && m.height === lmH && m.ambient === ambient;
     const sameView = compatible && m.x === cam.x && m.y === cam.y;
     if (!sameView || m.revision !== revision) {
       let regions: ScreenRect[] | null = null;
       let scroll: { dx: number; dy: number } | null = null;
       if (compatible) {
-        const dirty = terrain.opacityUpdateBounds(cam, m.opacityVersion, devW, devH, dpr);
+        const dirty = terrain.opacityUpdateBounds(cam, m.opacityVersion, lmW, lmH, lmDpr);
         if (sameView) regions = dirty ? [dirty] : [];
         else {
-          const offset = terrain.opacityScrollOffset(cam, m.x, m.y, dpr);
+          const offset = terrain.opacityScrollOffset(cam, m.x, m.y, lmDpr);
           if (offset) {
             regions = offset.dx === 0 && offset.dy === 0 && offset.sameChunks
               ? dirty ? [dirty] : []
-              : maskScrollRegions(devW, devH, offset.dx, offset.dy, dpr, dirty);
+              : maskScrollRegions(lmW, lmH, offset.dx, offset.dy, lmDpr, dirty);
             if (regions) scroll = offset;
           }
         }
       }
-      if (regions === null) regions = [{ x: 0, y: 0, width: devW, height: devH }];
+      if (regions === null) regions = [{ x: 0, y: 0, width: lmW, height: lmH }];
       if (scroll && (scroll.dx !== 0 || scroll.dy !== 0)) {
-        this.scrollMask(scroll.dx, scroll.dy, devW, devH);
+        this.scrollMask(scroll.dx, scroll.dy, lmW, lmH);
         if (metrics) metrics.maskScrolls++;
       }
       for (const bounds of regions) {
         const mask = this.maskCtx;
-        const partial = bounds.x !== 0 || bounds.y !== 0 || bounds.width !== devW || bounds.height !== devH;
+        const partial = bounds.x !== 0 || bounds.y !== 0 || bounds.width !== lmW || bounds.height !== lmH;
         repainted = true;
         if (metrics) {
           if (partial) metrics.maskPartialRegions++;
@@ -265,9 +279,9 @@ export class LightRenderer {
         }
         mask.globalCompositeOperation = "source-over";
         mask.clearRect(bounds.x, bounds.y, bounds.width, bounds.height);
-        mask.setTransform(dpr, 0, 0, dpr, 0, 0);
-        terrain.draw(mask, cam, false, partial ? { x: bounds.x / dpr, y: bounds.y / dpr,
-          width: bounds.width / dpr, height: bounds.height / dpr } : undefined);
+        mask.setTransform(lmDpr, 0, 0, lmDpr, 0, 0);
+        terrain.draw(mask, cam, false, partial ? { x: bounds.x / lmDpr, y: bounds.y / lmDpr,
+          width: bounds.width / lmDpr, height: bounds.height / lmDpr } : undefined);
         mask.setTransform(1, 0, 0, 1, 0, 0);
         mask.globalCompositeOperation = "source-in";
         mask.fillStyle = ambient;
@@ -276,7 +290,7 @@ export class LightRenderer {
         if (partial) mask.restore();
       }
       this.maskState = { terrain, revision, opacityVersion: terrain.opacityRevision, x: cam.x, y: cam.y,
-        zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: devW, height: devH, dpr, ambient };
+        zoom: cam.zoom, viewW: cam.viewW, viewH: cam.viewH, width: lmW, height: lmH, dpr: lmDpr, ambient };
     }
 
     if (metrics) {
@@ -289,7 +303,7 @@ export class LightRenderer {
     // repeating the full-screen primary pass. Any possible light disables it.
     // Partially covered backing pixels can retain color from earlier fills.
     // Preserve the full-render history path there instead of freezing that fringe.
-    const growthCacheSafe = game.growth.glowCount === 0 || (devW <= viewW * dpr && devH <= viewH * dpr);
+    const growthCacheSafe = game.growth.glowCount === 0 || (lmW <= viewW * lmDpr && lmH <= viewH * lmDpr);
     let empty = growthCacheSafe && game.world.roomLights.length === 0 && game.flashes.length === 0;
     for (let i = 0; empty && i < game.lighting.softCount; i++) {
       const light = game.lighting.softLights[i];
@@ -301,14 +315,15 @@ export class LightRenderer {
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalCompositeOperation = "multiply";
-      ctx.drawImage(this.lmCanvas, 0, 0);
+      ctx.imageSmoothingEnabled = lmW !== devW || lmH !== devH;
+      ctx.drawImage(this.lmCanvas, 0, 0, lmW, lmH, 0, 0, devW, devH);
       ctx.restore();
       return;
     }
     this.emptyLightmap = null;
 
     const g = this.lmCtx;
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.setTransform(lmDpr, 0, 0, lmDpr, 0, 0);
 
     // 1) Fill with dark ambient illumination.
     g.globalCompositeOperation = "source-over";
@@ -382,11 +397,11 @@ export class LightRenderer {
       if (path) air.fill(path);
       else air.fill();
     }
-    if (this.softShadows) this.softener.soften(g, devW, devH);
+    if (this.softShadows) this.softener.soften(g, lmW, lmH);
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.globalCompositeOperation = "source-over";
-    g.drawImage(this.maskCanvas, 0, 0, devW, devH);
-    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.drawImage(this.maskCanvas, 0, 0, lmW, lmH);
+    g.setTransform(lmDpr, 0, 0, lmDpr, 0, 0);
 
     g.globalCompositeOperation = "lighter";
 
@@ -430,7 +445,8 @@ export class LightRenderer {
     ctx.save();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalCompositeOperation = "multiply";
-    ctx.drawImage(this.lmCanvas, 0, 0);
+    ctx.imageSmoothingEnabled = lmW !== devW || lmH !== devH;
+    ctx.drawImage(this.lmCanvas, 0, 0, lmW, lmH, 0, 0, devW, devH);
     ctx.restore();
 
     // 6) Air-scatter pass: the light polygons at low alpha with additive blending,
@@ -445,7 +461,7 @@ export class LightRenderer {
         const sy = cam.worldToScreenY(fl.y);
         const rad = fl.radius * cam.zoom;
         if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
-        scatter ??= this.beginLayer(devW, devH, dpr);
+        scatter ??= this.beginLayer(lmW, lmH, lmDpr);
         this.layerRegion.include(sx, sy, rad);
         this.tracePolygonPath(scatter, game, fl.poly, fl.polyCount);
         scatter.fillStyle = gradientFor(scatter, sx, sy, rad, scatterStops, intensity);
@@ -454,7 +470,7 @@ export class LightRenderer {
     }
     if (scatter) {
       ctx.save();
-      this.finishAirLayer(ctx, "lighter", devW, devH, dpr);
+      this.finishAirLayer(ctx, "lighter", lmW, lmH, lmDpr, devW, devH, dpr);
       ctx.restore();
     }
 
@@ -482,10 +498,13 @@ export class LightRenderer {
     return l;
   }
 
-  /** Cut the terrain out of the light layer and composite it 1:1 onto `target`. */
+  /** Cut the terrain out of the light layer and composite it onto `target`. */
   private finishAirLayer(
     target: CanvasRenderingContext2D,
     op: GlobalCompositeOperation,
+    lmW: number,
+    lmH: number,
+    lmDpr: number,
     devW: number,
     devH: number,
     dpr: number,
@@ -494,22 +513,29 @@ export class LightRenderer {
     // Align every operation to the original full-canvas sampling grid. Clipping
     // rather than resizing/cropping preserves fractional-DPR blur and mask pixels.
     const padding = this.softShadows ? Math.ceil((SOFT_SHADOWS.blur * 6 + 3) / SOFT_SHADOWS.scale) + 2 : 2;
-    const region = this.layerRegion.resolve(devW, devH, dpr, padding);
+    const region = this.layerRegion.resolve(lmW, lmH, lmDpr, padding);
     this.previousLayerRegion = region;
     if (!region) return;
-    const bounded = region.width !== devW || region.height !== devH;
-    if (this.softShadows) this.softener.soften(l, devW, devH, bounded ? region : undefined);
+    const bounded = region.width !== lmW || region.height !== lmH;
+    if (this.softShadows) this.softener.soften(l, lmW, lmH, bounded ? region : undefined);
     l.save();
     l.setTransform(1, 0, 0, 1, 0, 0);
     if (bounded) { l.beginPath(); l.rect(region.x, region.y, region.width, region.height); l.clip(); }
     l.globalCompositeOperation = "destination-out";
-    l.drawImage(this.maskCanvas, 0, 0, devW, devH);
+    l.drawImage(this.maskCanvas, 0, 0, lmW, lmH);
     l.restore();
     target.setTransform(1, 0, 0, 1, 0, 0);
     target.globalCompositeOperation = op;
     target.save();
-    if (bounded) { target.beginPath(); target.rect(region.x, region.y, region.width, region.height); target.clip(); }
-    target.drawImage(this.layerCanvas, 0, 0, devW, devH);
+    if (bounded) {
+      const sx = lmW === devW ? region.x : Math.floor(region.x * devW / lmW);
+      const sy = lmH === devH ? region.y : Math.floor(region.y * devH / lmH);
+      const sw = lmW === devW ? region.width : Math.ceil((region.x + region.width) * devW / lmW) - sx;
+      const sh = lmH === devH ? region.height : Math.ceil((region.y + region.height) * devH / lmH) - sy;
+      target.beginPath(); target.rect(sx, sy, sw, sh); target.clip();
+    }
+    target.imageSmoothingEnabled = lmW !== devW || lmH !== devH;
+    target.drawImage(this.layerCanvas, 0, 0, lmW, lmH, 0, 0, devW, devH);
     target.restore();
     target.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
@@ -559,7 +585,8 @@ export class LightRenderer {
     const cam = game.camera;
     const vx0 = cam.screenToWorldX(0), vy0 = cam.screenToWorldY(0);
     const vx1 = cam.screenToWorldX(cam.viewW), vy1 = cam.screenToWorldY(cam.viewH);
-    for (const f of lighting.fixtures) {
+    for (const n of visibleRoomLightIndices(world, cam)) {
+      const f = lighting.fixtures[n];
       if (!f || !f.poly || f.lit.count === 0) continue;
       if (f.x + f.radius < vx0 || f.y + f.radius < vy0 || f.x - f.radius > vx1 || f.y - f.radius > vy1) continue;
       const level = game.terrain.lightLevel(f.light, now);

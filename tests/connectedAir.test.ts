@@ -63,4 +63,32 @@ describe("connected-air fog mapping", () => {
     const stats = baseSoldierStats(); expect(stats.connectedAirMapping).toBe(false);
     def.apply(stats, 1); expect(stats.connectedAirMapping).toBe(true);
   });
+
+  it("skips redundant floods when terrain listener reports no geometry changes", () => {
+    let closed = true;
+    const listeners: ((cx: number, cy: number, kind: string) => void)[] = [];
+    const world = {
+      width: 24,
+      height: 12,
+      cellSize: cs,
+      solidAt: (x: number, y: number) => y !== 4 || x < 4 || x > 18 || (closed && x === 10),
+      addListener: (fn: (cx: number, cy: number, kind: string) => void) => listeners.push(fn),
+    };
+    const air = new ConnectedAir(world, 1);
+    air.update(1, [source]);
+    expect(air.rebuiltLastUpdate).toBe(true);
+    // Moving within the same flooded component with no terrain change skips BFS.
+    air.update(0.25, [{ ...source, x: 5.5 * cs }]);
+    expect(air.rebuiltLastUpdate).toBe(false);
+    // Damage-only event does not trigger a re-flood.
+    for (const fn of listeners) fn(10, 4, "damaged");
+    air.update(0.25, [{ ...source, x: 5.5 * cs }]);
+    expect(air.rebuiltLastUpdate).toBe(false);
+    // Opening the barrier notifies listeners and triggers a re-flood.
+    closed = false;
+    for (const fn of listeners) fn(10, 4, "destroyed");
+    const tiles = air.update(0.25, [{ ...source, x: 5.5 * cs }]);
+    expect(air.rebuiltLastUpdate).toBe(true);
+    expect(tiles).toContain(4 * 24 + 16);
+  });
 });

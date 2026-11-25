@@ -1330,6 +1330,16 @@ export class Game {
     return findSpawnPoint(this.world, SOLDIER.collisionRadius);
   }
 
+  /** True when world point (wx, wy) is within `marginWorld` of the camera view (or viewport is uninitialized). */
+  private nearView(wx: number, wy: number, marginWorld = 48): boolean {
+    const cam = this.camera;
+    if (cam.viewW <= 0 || cam.viewH <= 0) return true;
+    const sx = cam.worldToScreenX(wx);
+    const sy = cam.worldToScreenY(wy);
+    const pad = marginWorld * cam.zoom;
+    return sx + pad >= 0 && sy + pad >= 0 && sx - pad <= cam.viewW && sy - pad <= cam.viewH;
+  }
+
   private onShot(s: Soldier, dx: number, dy: number, mx: number, my: number): void {
     this.runStats.shotsFired++;
     if (s.weapon === "sniper_rifle" && s.mutation === "chromatic_prism") { this.audio.playPrism(mx, my); return; }
@@ -1347,24 +1357,27 @@ export class Game {
     }
     if (s.weapon === "katana") {
       this.audio.playSlash(mx, my);
-      for (let i = 0; i < 4; i++) {
-        const a = Math.atan2(dy, dx) + this.rng.range(-0.7, 0.7);
-        const sp = this.rng.range(50, 130);
-        this.particles.spawn(
-          PKind.Spark,
-          mx,
-          my,
-          Math.cos(a) * sp,
-          Math.sin(a) * sp,
-          this.rng.range(0.06, 0.12),
-          1,
-          0xa0f4ff,
-          8,
-        );
+      if (this.nearView(mx, my, 48)) {
+        for (let i = 0; i < 4; i++) {
+          const a = Math.atan2(dy, dx) + this.rng.range(-0.7, 0.7);
+          const sp = this.rng.range(50, 130);
+          this.particles.spawn(
+            PKind.Spark,
+            mx,
+            my,
+            Math.cos(a) * sp,
+            Math.sin(a) * sp,
+            this.rng.range(0.06, 0.12),
+            1,
+            0xa0f4ff,
+            8,
+          );
+        }
       }
       return;
     }
     this.audio.playShot(mx, my);
+    if (!this.nearView(mx, my, LIGHT.radius + 24)) return;
     const poly = this.flashPolyPool.pop() ?? new Float32Array(LIGHT.maxRays * 2);
     const lit = this.flashLitPool.pop() ?? makeLitCells();
     this.flashes.push({
@@ -1426,23 +1439,28 @@ export class Game {
     const destroyed = result === 2;
     if (destroyed) this.audio.playDestroy(x, y);
     else if (result === 1) this.audio.playImpact(x, y);
-    const n = destroyed ? 10 : 4;
-    for (let i = 0; i < n; i++) {
-      const a = Math.atan2(ny, nx) + this.rng.range(-1.1, 1.1);
-      const sp = this.rng.range(40, destroyed ? 150 : 110);
-      this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.08, 0.2), 1, sub ? 0xff6ab8 : 0xffc070, 8);
+    const visible = this.nearView(x, y, 48);
+    if (visible) {
+      const n = destroyed ? 10 : 4;
+      for (let i = 0; i < n; i++) {
+        const a = Math.atan2(ny, nx) + this.rng.range(-1.1, 1.1);
+        const sp = this.rng.range(40, destroyed ? 150 : 110);
+        this.particles.spawn(PKind.Spark, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.08, 0.2), 1, sub ? 0xff6ab8 : 0xffc070, 8);
+      }
     }
     if (sub) {
       // A 50% sub-pixel (pink core blight or rubble): debris, quarter-cell loot odds, no normal terrain stats.
       if (destroyed) {
-        const ss = this.world.subCellSize;
-        const si = Math.floor(y / ss) * this.world.subWidth + Math.floor(x / ss);
-        const sk = this.world.subKind[si];
-        const rubble = sk !== SUB.blight;
-        for (let i = 0; i < 3; i++) {
-          const a = Math.atan2(ny, nx) + this.rng.range(-1.3, 1.3);
-          const sp = this.rng.range(20, 70);
-          this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, sk === SUB.pipe ? 0xac7646 : sk === SUB.wreck ? 0x3a3640 : sk === SUB.core ? 0x9a6ae0 : sk >= SUB.metal ? 0x60708a : rubble ? 0x6a625a : 0xd8267a, 4);
+        if (visible) {
+          const ss = this.world.subCellSize;
+          const si = Math.floor(y / ss) * this.world.subWidth + Math.floor(x / ss);
+          const sk = this.world.subKind[si];
+          const rubble = sk !== SUB.blight;
+          for (let i = 0; i < 3; i++) {
+            const a = Math.atan2(ny, nx) + this.rng.range(-1.3, 1.3);
+            const sp = this.rng.range(20, 70);
+            this.particles.spawn(PKind.Debris, x, y, Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.3, 0.6), 1, sk === SUB.pipe ? 0xac7646 : sk === SUB.wreck ? 0x3a3640 : sk === SUB.core ? 0x9a6ae0 : sk >= SUB.metal ? 0x60708a : rubble ? 0x6a625a : 0xd8267a, 4);
+          }
         }
         const subZone = this.world.zoneAt(cx, cy);
         const subLoot = this.terrainLoot(cx, cy, subZone);
@@ -1451,18 +1469,20 @@ export class Game {
       }
       return;
     }
-    if (result > 0) {
+    if (result > 0 && visible) {
       this.cellFlashes.push({ cx, cy, life: TERRAIN.hitFlashTime * (destroyed ? 2 : 1), maxLife: TERRAIN.hitFlashTime * (destroyed ? 2 : 1), destroyed });
     }
     if (destroyed) {
       const cs = this.world.cellSize;
       const ccx = (cx + 0.5) * cs;
       const ccy = (cy + 0.5) * cs;
-      for (let i = 0; i < 6; i++) {
-        const a = Math.atan2(ny, nx) + this.rng.range(-1.3, 1.3);
-        const sp = this.rng.range(20, 80);
-        const col = this.world.tint[cy * this.world.width + cx] > 128 ? 0x5a4a78 : 0x4a5674;
-        this.particles.spawn(PKind.Debris, ccx + this.rng.range(-3, 3), ccy + this.rng.range(-3, 3), Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.4, 0.8), this.rng.range(1, 2), col, 4);
+      if (visible) {
+        for (let i = 0; i < 6; i++) {
+          const a = Math.atan2(ny, nx) + this.rng.range(-1.3, 1.3);
+          const sp = this.rng.range(20, 80);
+          const col = this.world.tint[cy * this.world.width + cx] > 128 ? 0x5a4a78 : 0x4a5674;
+          this.particles.spawn(PKind.Debris, ccx + this.rng.range(-3, 3), ccy + this.rng.range(-3, 3), Math.cos(a) * sp, Math.sin(a) * sp, this.rng.range(0.4, 0.8), this.rng.range(1, 2), col, 4);
+        }
       }
       this.runStats.pixelsDestroyed++;
       this.checkSecondaryCharge(ownerId);

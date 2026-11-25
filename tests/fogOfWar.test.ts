@@ -192,4 +192,31 @@ describe("fog of war", () => {
     expect(flash.lightAt(27 * 8 + 4, eye.y)).toBe(0);
     expect(flash.lightAt(12 * 8 + 4, eye.y)).toBe(0);
   });
+
+  it("handles widely separated soldiers sleeping/waking blocks and permanent-mapping toggles", () => {
+    const big = {
+      width: 672,
+      height: 672,
+      cellSize: CS,
+      solidAt: () => false,
+    };
+    const fog = new FogOfWar(big);
+    const s1 = { x: 40 * CS, y: 40 * CS, radiusCells: FOG.soldierSightCells };
+    const s2 = { x: 620 * CS, y: 620 * CS, radiusCells: FOG.soldierSightCells };
+    // Light up opposite corners of the full 672×672 world.
+    run(fog, 4, [s1, s2]);
+    expect(fog.lightAt(s1.x, s1.y)).toBeGreaterThan(0.9);
+    expect(fog.lightAt(s2.x, s2.y)).toBeGreaterThan(0.9);
+    // Middle of the map stays untouched.
+    expect(fog.lightAt(336 * CS, 336 * CS)).toBe(0);
+    // Turn on permanent mapping, let s2 go unseen and settle at mappedLevel.
+    fog.permanent = true;
+    run(fog, 40, [s1]);
+    expect(fog.lightAt(s1.x, s1.y)).toBeGreaterThan(0.9);
+    expect(fog.lightAt(s2.x, s2.y)).toBeCloseTo(FOG.mappedLevel, 5);
+    // Turning permanent mapping back off wakes settled blocks so they decay to 0.
+    fog.permanent = false;
+    run(fog, 40, [s1]);
+    expect(fog.lightAt(s2.x, s2.y)).toBe(0);
+  });
 });

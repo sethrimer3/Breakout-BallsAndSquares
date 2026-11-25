@@ -117,9 +117,14 @@ export interface SoftLightBufferOptions {
 
 let filterSupport: boolean | null = null;
 
-/** True when `ctx.filter = "blur(...)"` is honoured (not on older Safari). */
+/** True when `ctx.filter = "blur(...)"` is honoured and fast (skip on mobile/coarse-pointer GPUs where bilinear downsample is much cheaper). */
 function supportsCanvasFilter(ctx: CanvasRenderingContext2D): boolean {
   if (filterSupport === null) {
+    const mobile = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+    if (mobile) {
+      filterSupport = false;
+      return false;
+    }
     filterSupport = typeof ctx.filter === "string";
     if (filterSupport) {
       ctx.filter = "blur(1px)";

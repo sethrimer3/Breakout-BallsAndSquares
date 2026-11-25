@@ -179,6 +179,7 @@ export class TerrainRenderer {
   private surfaceGeometry: (SurfaceOutlineCache | null)[];
   /** One pixel per world cell: what the lab's emergency power keeps lit. */
   private glowCanvas: HTMLCanvasElement;
+  private glowMask: Uint8Array;
   private image: ImageData;
   private scratch: number[] = [];
   private col: [number, number, number] = [0, 0, 0];
@@ -223,6 +224,7 @@ export class TerrainRenderer {
   private readonly floorRegions: FloorRegions;
   private floorView = document.createElement("canvas");
   private floorViewKey = "";
+  private lastFloorKey = "";
   /** Soft round light sprites (white and Blight pink) for the room lights. */
   private panelGlow: HTMLCanvasElement;
   private blightGlow: HTMLCanvasElement;
@@ -268,6 +270,7 @@ export class TerrainRenderer {
     this.glowCanvas = document.createElement("canvas");
     this.glowCanvas.width = world.width;
     this.glowCanvas.height = world.height;
+    this.glowMask = new Uint8Array(world.width * world.height);
     this.floorCanvas = document.createElement("canvas");
     this.floorCanvas.width = world.width * TEX;
     this.floorCanvas.height = world.height * TEX;
@@ -276,7 +279,11 @@ export class TerrainRenderer {
     // Broken or overgrown machinery goes dark.
     world.addListener((cx, cy, kind, sx) => {
       if (kind === "destroyed" || kind === "grown") {
-        this.glowCanvas.getContext("2d")!.clearRect(cx, cy, 1, 1);
+        const idx = cy * world.width + cx;
+        if (this.glowMask[idx]) {
+          this.glowMask[idx] = 0;
+          this.glowCanvas.getContext("2d")!.clearRect(cx, cy, 1, 1);
+        }
       }
       // Walls coming down (or Blight filling in) move the floor's contact shadows.
       // Floor contact shadows depend on full-size health, not subcell occupancy.
@@ -404,6 +411,13 @@ export class TerrainRenderer {
     if (!cacheable) { direct(ctx); return; }
     const key = [this.floorRevision, cam.x, cam.y, cam.zoom, cam.viewW, cam.viewH, scale].join(":");
     if (key !== this.floorViewKey) {
+      // Avoid clearing/redrawing a full offscreen canvas on every moving-camera frame.
+      // Populate the cache only once the view stays unchanged for two consecutive frames.
+      if (key !== this.lastFloorKey) {
+        this.lastFloorKey = key;
+        direct(ctx);
+        return;
+      }
       const width = Math.max(1, Math.ceil(cam.viewW * scale));
       const height = Math.max(1, Math.ceil(cam.viewH * scale));
       if (this.floorView.width !== width) this.floorView.width = width;
@@ -648,6 +662,7 @@ export class TerrainRenderer {
     const { world } = this;
     const g = this.glowCanvas.getContext("2d")!;
     const image = g.createImageData(world.width, world.height);
+    this.glowMask.fill(0);
     for (let i = 0; i < world.decor.length; i++) {
       if (world.health[i] === 0) {
         // Half-size screens and status LEDs cast a soft monitor glow over their cell.
@@ -659,6 +674,7 @@ export class TerrainRenderer {
           image.data[p + 1] = c[1] * 0.4;
           image.data[p + 2] = c[2] * 0.4;
           image.data[p + 3] = 255;
+          this.glowMask[i] = 1;
         }
         continue;
       }
@@ -669,6 +685,7 @@ export class TerrainRenderer {
       image.data[p + 1] = c[1];
       image.data[p + 2] = c[2];
       image.data[p + 3] = 255;
+      this.glowMask[i] = 1;
     }
     g.putImageData(image, 0, 0);
   }
