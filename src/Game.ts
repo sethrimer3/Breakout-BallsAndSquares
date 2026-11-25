@@ -2417,7 +2417,7 @@ export class Game {
     const fireLights = this.fire.collectLights(performance.now() / 1000);
     for (let i = 0; i < fireLights.length; i++) grenadeLights.push(fireLights[i]);
     this.lighting.updateSoftLights(this.soldiers, this.world.roomCenterX, this.world.roomCenterY, cam, grenadeLights);
-    this.lighting.updateFixtures(cam);
+    this.lighting.updateFixtures(cam, this.devMapAccess ? undefined : this.fog);
     const elapsed = performance.now() - t0;
     this.lighting.lastComputeMs = elapsed;
     this.debugInfo.lightMs = elapsed;

@@ -1,5 +1,6 @@
 import { maskScrollRegions } from "./MaskScrollRegions";
 import { hasVisibleGrowthGlows } from "./GrowthGlowVisibility";
+import { fogRegionVisible } from "./fogRegionVisible";
 import { LightRegion, type ScreenRect } from "./LightRegion";
 import { visibleRoomLightIndices } from "./RoomLightIndex";
 import { ChunkRegions } from "./ChunkRegions";
@@ -379,13 +380,15 @@ export class LightRenderer {
     }
     // Ceiling panels: cached shadow-traced pools, so lab equipment and walls cast shadows.
     const now = performance.now() / 1000;
+    const fog = game.devMapAccess ? undefined : game.fog;
     for (const n of visibleRoomLightIndices(game.world, cam)) {
       const f = game.lighting.fixtures[n];
       if (!f || !f.poly) continue;
       const sx = cam.worldToScreenX(f.x);
       const sy = cam.worldToScreenY(f.y);
       const rad = f.radius * cam.zoom;
-      if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW || sy - rad > viewH) continue;
+      if (sx + rad < 0 || sy + rad < 0 || sx - rad > viewW + 0 || sy - rad > viewH + 0) continue;
+      if (fog && !fogRegionVisible(fog, f.x - f.radius, f.y - f.radius, f.x + f.radius, f.y + f.radius)) continue;
       const level = game.terrain.lightLevel(f.light, now);
       if (level <= 0.02) continue;
       // Moving views keep the original path submission: rebuilding hundreds of
@@ -435,7 +438,7 @@ export class LightRenderer {
     }
 
     // The lab's own ceiling panels and Blight glows, kept inside their rooms.
-    game.terrain.drawRoomLight(g, cam, performance.now() / 1000, game.lighting.fixtures);
+    game.terrain.drawRoomLight(g, cam, performance.now() / 1000, game.lighting.fixtures, fog);
 
     // 4) Light on walls, whole cells at a time.
     const wallsLit = this.updateWallLight(game);
@@ -587,10 +590,12 @@ export class LightRenderer {
     const cam = game.camera;
     const vx0 = cam.screenToWorldX(0), vy0 = cam.screenToWorldY(0);
     const vx1 = cam.screenToWorldX(cam.viewW), vy1 = cam.screenToWorldY(cam.viewH);
+    const fog = game.devMapAccess ? undefined : game.fog;
     for (const n of visibleRoomLightIndices(world, cam)) {
       const f = lighting.fixtures[n];
       if (!f || !f.poly || f.lit.count === 0) continue;
       if (f.x + f.radius < vx0 || f.y + f.radius < vy0 || f.x - f.radius > vx1 || f.y - f.radius > vy1) continue;
+      if (fog && !fogRegionVisible(fog, f.x - f.radius, f.y - f.radius, f.x + f.radius, f.y + f.radius)) continue;
       const level = game.terrain.lightLevel(f.light, now);
       if (level <= 0.02) continue;
       this.addWallLight(game, f.lit, f.x, f.y, f.radius, level, PANEL_LUTS[panelIndex(f.light.kind)], true);

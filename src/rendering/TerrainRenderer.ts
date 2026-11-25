@@ -178,6 +178,7 @@ export class TerrainRenderer {
   private canvases: HTMLCanvasElement[] = [];
   private canvasCtxs: CanvasRenderingContext2D[] = [];
   private blightCanvases: (HTMLCanvasElement | null)[] = [];
+  private blightCanvasCount = 0;
   /** Four classification bits per terrain cell, allocated only in Blight chunks. */
   private blightCells: (Uint8Array | null)[] = [];
   private blightCellCounts: Uint32Array;
@@ -198,6 +199,8 @@ export class TerrainRenderer {
   private edgeValues: (BinaryMask | null)[] = [];
   private dormantValues: (BinaryMask | null)[] = [];
   private edgeLive: Uint8Array;
+  private edgeLiveCount = 0;
+  private dormantLiveCount = 0;
   private edgeVisibility: Uint8Array;
   private edgeBits: Uint8Array;
   private edgeSolid: Uint8Array;
@@ -480,6 +483,7 @@ export class TerrainRenderer {
     cam: CameraSystem,
     time: number,
     shadowed?: readonly ({ poly: Float32Array | null } | null)[],
+    fog?: FogOfWar,
   ): void {
     const w = this.world;
     const lights = w.roomLights;
@@ -498,6 +502,7 @@ export class TerrainRenderer {
       // Panels already drawn with shadows (LightRenderer) skip the flat pool.
       if (shadowed?.[n]?.poly) continue;
       if (l.cx1 < vx0 || l.cy1 < vy0 || l.cx0 > vx1 || l.cy0 > vy1) continue;
+      if (fog && !fogRegionVisible(fog, l.cx0 * cs, l.cy0 * cs, (l.cx1 + 1) * cs, (l.cy1 + 1) * cs)) continue;
       const level = this.lightLevel(l, time, still);
       if (level <= 0.02) continue;
       const rx = cam.worldToScreenX(l.cx0 * cs);
@@ -535,7 +540,7 @@ export class TerrainRenderer {
   }
 
   /** The lit tubes themselves, drawn additively after the lighting pass. */
-  drawPanels(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number, bloomOnly = false): void {
+  drawPanels(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number, bloomOnly = false, fog?: FogOfWar): void {
     const w = this.world;
     const still = this.reducedMotion?.matches ?? false;
     const cs = w.cellSize;
@@ -550,6 +555,7 @@ export class TerrainRenderer {
       const l = w.roomLights[n];
       if (l.kind === LIGHT_KIND.wash || l.kind === LIGHT_KIND.blight) continue;
       if (l.x1 < vx0 || l.y1 < vy0 || l.x0 > vx1 || l.y0 > vy1) continue;
+      if (fog && !fogRegionVisible(fog, l.x0 * cs - cs, l.y0 * cs - cs, (l.x1 + 1) * cs + cs, (l.y1 + 1) * cs + cs)) continue;
       const level = this.lightLevel(l, time, still);
       if (level <= 0.02) continue;
       const x = cam.worldToScreenX(l.x0 * cs);
@@ -621,7 +627,7 @@ export class TerrainRenderer {
    * Blinking status lights and pulsing machine cores, drawn additively after the
    * lighting pass so they shine in the dark. `still` (reduced motion) holds them steady.
    */
-  drawLabLights(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number, still: boolean): void {
+  drawLabLights(ctx: CanvasRenderingContext2D, cam: CameraSystem, time: number, still: boolean, fog?: FogOfWar): void {
     const w = this.world;
     const lights = this.lights;
     if (lights.length === 0) return;
@@ -645,6 +651,7 @@ export class TerrainRenderer {
         const si = lights[n];
         const sy = row, sx = si - row * sw;
         if (w.subHealth[si] === 0) continue;
+        if (fog && !fogRegionVisible(fog, (sx - 1) * ss, (sy - 1) * ss, (sx + 2) * ss, (sy + 2) * ss)) continue;
         const k = w.subKind[si];
         const tint = w.subTint[si];
         const r = tint & 63;
@@ -1070,10 +1077,16 @@ export class TerrainRenderer {
     this.blightCellCounts[k] = count;
     if (count) {
       const canvas = this.blightCanvases[k] ?? document.createElement("canvas");
-      if (!this.blightCanvases[k]) canvas.width = canvas.height = texCs;
+      if (!this.blightCanvases[k]) {
+        canvas.width = canvas.height = texCs;
+        this.blightCanvasCount++;
+      }
       canvas.getContext("2d")!.putImageData(this.image, 0, 0, tx0, ty0, tw, th);
       this.blightCanvases[k] = canvas;
-    } else this.blightCanvases[k] = null;
+    } else if (this.blightCanvases[k]) {
+      this.blightCanvases[k] = null;
+      this.blightCanvasCount--;
+    }
   }
 
   /** Albedo of a live half-size pixel, before relief shading. */
@@ -1230,7 +1243,13 @@ export class TerrainRenderer {
     const width = (region.x1 - region.x0 + 1) * scale, height = (region.y1 - region.y0 + 1) * scale;
     if (!value.update(this.edgeBits, x, y, x + width - 1, y + height - 1)) return;
     revisions[k] = frozen ? ++this.dormantVersion : ++this.edgeVersion;
-    live[k] = value.count ? 1 : 0;
+    const prevLive = live[k];
+    const nextLive = value.count ? 1 : 0;
+    if (nextLive !== prevLive) {
+      live[k] = nextLive;
+      if (frozen) this.dormantLiveCount += nextLive - prevLive;
+      else this.edgeLiveCount += nextLive - prevLive;
+    }
     if (!value.count) {
       values[k] = null;
       masks[k] = null;
@@ -1256,6 +1275,7 @@ export class TerrainRenderer {
 
   /** Cached Blight albedo, drawn after fog without exposing other terrain. */
   drawBlightThroughFog(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
+    if (this.blightCanvasCount === 0) return;
     const smoothing = ctx.imageSmoothingEnabled;
     ctx.imageSmoothingEnabled = false;
     this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
@@ -1272,6 +1292,7 @@ export class TerrainRenderer {
    * world and emissive, so draw it after the lighting pass. `seconds` is wall clock.
    */
   drawBlightEdges(ctx: CanvasRenderingContext2D, cam: CameraSystem, seconds: number, fog?: FogOfWar): void {
+    if (this.edgeLiveCount === 0 && this.dormantLiveCount === 0) return;
     let visible: Uint8Array | undefined;
     if (fog) {
       visible = this.edgeVisibility;
@@ -1283,8 +1304,12 @@ export class TerrainRenderer {
       });
     }
     const shrink = this.coarsePointer?.matches || cam.zoom < EDGE_FIRE_FULL_ZOOM ? 2 : 1;
-    this.drawEdgeLayer(ctx, cam, this.edgeMasks, this.edgeLive, this.edgeUnion, this.edgeFire, seconds, shrink, false, visible);
-    this.drawEdgeLayer(ctx, cam, this.dormantMasks, this.dormantLive, this.dormantUnion, this.dormantFire, seconds, shrink, true, visible);
+    if (this.edgeLiveCount > 0) {
+      this.drawEdgeLayer(ctx, cam, this.edgeMasks, this.edgeLive, this.edgeUnion, this.edgeFire, seconds, shrink, false, visible);
+    }
+    if (this.dormantLiveCount > 0) {
+      this.drawEdgeLayer(ctx, cam, this.dormantMasks, this.dormantLive, this.dormantUnion, this.dormantFire, seconds, shrink, true, visible);
+    }
   }
 
   /**
@@ -1515,17 +1540,24 @@ export class TerrainRenderer {
 
   /** Thin exposed-surface rims stay readable after lighting, but underneath fog. */
   drawSurfaceOutlines(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
+    const size = this.chunks.chunkSize;
+    const t = ctx.getTransform();
+    const axisAligned = t.b === 0 && t.c === 0;
     ctx.save();
     ctx.fillStyle = "#000000";
-    const size = this.chunks.chunkSize;
     this.forEachVisibleChunk(cam, (kx, ky, sx, sy, sw, sh) => {
       const outline = this.surfaceOutlines[ky * this.chunks.cols + kx];
       if (!outline) return;
-      ctx.save();
-      ctx.translate(sx, sy);
-      ctx.scale(sw / size, sh / size);
-      ctx.fill(outline);
-      ctx.restore();
+      if (axisAligned) {
+        ctx.setTransform(t.a * (sw / size), 0, 0, t.d * (sh / size), t.e + sx * t.a, t.f + sy * t.d);
+        ctx.fill(outline);
+      } else {
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.scale(sw / size, sh / size);
+        ctx.fill(outline);
+        ctx.restore();
+      }
     });
     ctx.restore();
   }

@@ -232,9 +232,10 @@ export class Renderer {
     this.lightRenderer.renderLighting(ctx, game, this.dpr);
     { const end = performance.now(); if (metrics) metrics.lightingMs = end - passStart; passStart = end; }
     this.lateAtmosphere.drawAtmosphere(ctx, cam, game.world, atmosphere, this.motion.matches ? 0 : performance.now() / 1000);
+    const fog = game.devMapAccess ? undefined : game.fog;
     game.terrain.drawLabGlow(ctx, cam, game.runStats.time);
-    game.terrain.drawPanels(ctx, cam, performance.now() / 1000);
-    game.terrain.drawLabLights(ctx, cam, performance.now() / 1000, this.motion.matches);
+    game.terrain.drawPanels(ctx, cam, performance.now() / 1000, false, fog);
+    game.terrain.drawLabLights(ctx, cam, performance.now() / 1000, this.motion.matches, fog);
     { const start = performance.now(); this.drawSubPixelLights(performance.now() / 1000, this.motion.matches); if (metrics) metrics.subPixelDrawMs += performance.now() - start; }
     this.drawSentries();
     game.late.draw(ctx, cam);
@@ -363,6 +364,7 @@ export class Renderer {
 
     ctx.globalAlpha = 1;
     let lastAlpha = 1;
+    let fontSet = false;
     for (let i = 0; i < n; i++) {
       if (kinds[i] === LootKind.Essence) continue;
       const sx = (xs[i] - camX) * zoom + halfW;
@@ -379,7 +381,11 @@ export class Renderer {
       const size = sz * (loot.value[i] > 1 ? 1.7 : 1);
       if(kinds[i] === LootKind.Biomass) {ctx.fillStyle="#7fe39a";ctx.fillRect(sx-size/2,sy-size/2,size,size);}
       else ctx.drawImage(sprite, sx-size/2, sy-size/2, size, size);
-      if(loot.value[i]>1){ctx.fillStyle="#e4f4e9";ctx.font="9px monospace";ctx.fillText(`×${loot.value[i]}`,sx+size/2,sy);}
+      if(loot.value[i]>1){
+        if(!fontSet){ctx.font="9px monospace";fontSet=true;}
+        ctx.fillStyle="#e4f4e9";
+        ctx.fillText(`×${loot.value[i]}`,sx+size/2,sy);
+      }
     }
     if (lastAlpha !== 1) ctx.globalAlpha = 1;
   }

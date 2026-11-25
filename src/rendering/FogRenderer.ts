@@ -49,11 +49,13 @@ export class FogRenderer {
     const px = this.img.data;
     const tw = fog.tw;
     let dirtyX0 = fog.tw, dirtyY0 = fog.th, dirtyX1 = -1, dirtyY1 = -1;
+    let anyFog = false;
     for (let y = ty0; y <= ty1; y++) {
       let i = y * tw + tx0;
       let p = i * 4 + 3;
       for (let x = 0; x < w; x++, i++, p += 4) {
         const alpha = fogAlpha(light[i]);
+        if (alpha > 0) anyFog = true;
         if (px[p] === alpha) continue;
         px[p] = alpha;
         const tx = tx0 + x;
@@ -66,6 +68,7 @@ export class FogRenderer {
     if (dirtyX1 >= dirtyX0) {
       this.ctx.putImageData(this.img, 0, 0, dirtyX0, dirtyY0, dirtyX1 - dirtyX0 + 1, dirtyY1 - dirtyY0 + 1);
     }
+    if (!anyFog) return;
 
     const sx = cam.worldToScreenX(tx0 * ts);
     const sy = cam.worldToScreenY(ty0 * ts);

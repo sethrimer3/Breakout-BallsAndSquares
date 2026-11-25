@@ -1,4 +1,6 @@
 import { visibleRoomLightIndices } from "../rendering/RoomLightIndex";
+import { fogRegionVisible } from "../rendering/fogRegionVisible";
+import type { FogOfWar } from "../world/FogOfWar";
 import { FACILITY, LIGHT, SOLDIER } from "../config";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
 import type { Soldier } from "../entities/Soldier";
@@ -282,7 +284,7 @@ export class LightingSystem {
    */
   retracedLastUpdate = 0;
 
-  updateFixtures(cam: CameraSystem): void {
+  updateFixtures(cam: CameraSystem, fog?: FogOfWar): void {
     this.retracedLastUpdate = 0;
     const w = this.world;
     if (w.roomLights !== this.fixtureSource) {
@@ -321,6 +323,7 @@ export class LightingSystem {
       const f = this.fixtures[fixtureId];
       if (budget <= 0) break;
       if (!f || f.light.destroyed || !f.dirty || f.x < x0 || f.x > x1 || f.y < y0 || f.y > y1) continue;
+      if (fog && !fogRegionVisible(fog, f.x - f.radius, f.y - f.radius, f.x + f.radius, f.y + f.radius)) continue;
       budget--;
       f.dirty = false;
       this.retracedLastUpdate++;

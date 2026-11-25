@@ -3,6 +3,7 @@ import { GROWTH } from "../config";
 import { LIGHT_KIND } from "../world/PixelWorld";
 import type { FireRenderer } from "./FireRenderer";
 import { visibleRoomLightIndices } from "./RoomLightIndex";
+import { fogRegionVisible } from "./fogRegionVisible";
 import { bakeSoftGlow, SoftLightBuffer, type SoftStop } from "./SoftLight";
 import { drawSpecialGlow } from "./SpecialUpgradeRenderer";
 import type { Sprites } from "./sprites";
@@ -105,9 +106,14 @@ export class BloomRenderer {
     const cs = w.cellSize;
     const z = cam.zoom;
     const unit = cs * z;
+    const fog = game.devMapAccess ? undefined : game.fog;
     for (const n of visibleRoomLightIndices(w, cam)) {
       const l = w.roomLights[n];
       if (l.kind === LIGHT_KIND.wash || l.kind === LIGHT_KIND.blight) continue;
+      if (fog) {
+        const pad = 3 * cs;
+        if (!fogRegionVisible(fog, l.x0 * cs - pad, l.y0 * cs - pad, (l.x1 + 1) * cs + pad, (l.y1 + 1) * cs + pad)) continue;
+      }
       const level = game.terrain.lightLevel(l, nowSec);
       if (level <= 0.02) continue;
 
