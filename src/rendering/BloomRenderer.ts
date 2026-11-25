@@ -64,6 +64,8 @@ export class BloomRenderer {
   private panelMint = bakeSoftGlow(64, MINT_STOPS, GLOW_OPTS);
   private cyanGlow = bakeSoftGlow(64, CYAN_STOPS, GLOW_OPTS);
 
+  private readonly coarsePointer = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)") : null;
+
   constructor(private sprites: Sprites) {}
 
   /** Render light emitters into the low-res buffer and screen-composite onto `ctx`. */
@@ -81,7 +83,9 @@ export class BloomRenderer {
 
     this.drawPanelBlooms(b, game, nowSec);
     game.terrain.drawLabGlow(b, cam, game.runStats.time);
-    game.terrain.drawLabLights(b, cam, nowSec, still);
+    // Tiny 1-subcell LEDs already draw their own 3x3 additive halos in the main pass;
+    // skip their extra per-LED fillRects inside the quarter-res bloom buffer on phones.
+    if (!this.coarsePointer?.matches) game.terrain.drawLabLights(b, cam, nowSec, still);
     this.drawBlightBlooms(b, game, animTime);
     this.drawBulletBlooms(b, game);
     this.drawFlashBlooms(b, game);

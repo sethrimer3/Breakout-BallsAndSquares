@@ -58,8 +58,12 @@ function lateCellFeature(frame: LabFrame, cx: number, cy: number): LateFeature {
 const EDGE_FIRE_RATIO = 0.7;
 /** Steps a second the edge fire redraws at (motion, not camera, drives this). */
 const EDGE_FIRE_FPS = 15;
+const EDGE_FIRE_FPS_MOBILE = 10;
 /** Below this zoom the edges are so thin the fire paints at half size, then scales up. */
 const EDGE_FIRE_FULL_ZOOM = 1.5;
+/** Precomputed CSS color strings for blinking lab LEDs and pulsing machine cores. */
+const LAB_LED_CSS = COLORS.labLed.map((c) => `rgb(${c[0]},${c[1]},${c[2]})`);
+const LAB_CORE_CSS = COLORS.labCore.map((c) => `rgb(${c[0]},${c[1]},${c[2]})`);
 /** The moment dormant Blight's edge fire is stopped at (any fixed time works). */
 const FROZEN_FIRE_TIME = 7.25;
 /** Edge canvases grow in steps this size, so a moving view doesn't reallocate them. */
@@ -230,6 +234,8 @@ export class TerrainRenderer {
   private blightGlow: HTMLCanvasElement;
   private reducedMotion: MediaQueryList | null =
     typeof matchMedia === "function" ? matchMedia("(prefers-reduced-motion: reduce)") : null;
+  private coarsePointer: MediaQueryList | null =
+    typeof matchMedia === "function" ? matchMedia("(pointer: coarse)") : null;
 
   constructor(private world: PixelWorld, chunkSize: number) {
     this.chunks = new TerrainChunks(world, chunkSize);
@@ -636,18 +642,18 @@ export class TerrainRenderer {
         const tint = w.subTint[si];
         const r = tint & 63;
         let level: number;
-        let c: RGB;
+        let css: string;
         if (k === SUB.led) {
-          c = COLORS.labLed[tint >> 6];
+          css = LAB_LED_CSS[tint >> 6];
           level = still ? 0.8 : ledLevel(r, t);
         } else if (k === SUB.core) {
-          c = COLORS.labCore[tint >> 6];
+          css = LAB_CORE_CSS[tint >> 6];
           level = still ? 0.7 : 0.45 + 0.55 * (0.5 + 0.5 * Math.sin(t * (1.2 + (r & 7) * 0.15) + (sx + sy) * 0.45 + (r >> 3)));
         } else continue;
         if (level <= 0.02) continue;
         const lx = cam.worldToScreenX(sx * ss);
         const ly = cam.worldToScreenY(sy * ss);
-        ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+        ctx.fillStyle = css;
         // Soft halo, then the lit pixel itself.
         ctx.globalAlpha = level * (k === SUB.core ? 0.16 : 0.12);
         ctx.fillRect(lx - px, ly - px, px * 3, px * 3);
@@ -1258,7 +1264,7 @@ export class TerrainRenderer {
         if ((this.edgeLive[k] || this.dormantLive[k]) && fogRegionVisible(fog,kx*unit,ky*unit,(kx+1)*unit,(ky+1)*unit)) visible![k] = 1;
       });
     }
-    const shrink = cam.zoom < EDGE_FIRE_FULL_ZOOM ? 2 : 1;
+    const shrink = this.coarsePointer?.matches || cam.zoom < EDGE_FIRE_FULL_ZOOM ? 2 : 1;
     this.drawEdgeLayer(ctx, cam, this.edgeMasks, this.edgeLive, this.edgeUnion, this.edgeFire, seconds, shrink, false, visible);
     this.drawEdgeLayer(ctx, cam, this.dormantMasks, this.dormantLive, this.dormantUnion, this.dormantFire, seconds, shrink, true, visible);
   }
@@ -1299,7 +1305,8 @@ export class TerrainRenderer {
     const revisions = frozen ? this.dormantChunkVersion : this.edgeChunkVersion;
     let version = "";
     for (let ky = ky0; ky <= ky1; ky++) for (let kx = kx0; kx <= kx1; kx++) version += revisions[ky * cols + kx] + ",";
-    const tick = frozen ? "frozen" : `${Math.floor(seconds * EDGE_FIRE_FPS)}`;
+    const fps = this.coarsePointer?.matches ? EDGE_FIRE_FPS_MOBILE : EDGE_FIRE_FPS;
+    const tick = frozen ? "frozen" : `${Math.floor(seconds * fps)}`;
     const key = `${tick}:${version}:${kx0}:${ky0}:${kx1}:${ky1}:${shrink}`;
     if (key !== (frozen ? this.dormantFireKey : this.edgeFireKey)) {
       if (frozen) this.dormantFireKey = key;

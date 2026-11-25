@@ -101,6 +101,8 @@ function patternsFor(c: Ctx) {
   const made = { noise, hot }; patterns.set(c, made); return made;
 }
 
+const patternMatrix = typeof DOMMatrix !== "undefined" ? new DOMMatrix() : null;
+
 /** Fill a device-pixel box of `c` (identity transform) with the burning
  * dimension at `seconds`; the caller masks it to the contour. */
 export function paintPortal(c: Ctx, box: { x: number; y: number; w: number; h: number }, seconds: number, ratio = 1) {
@@ -115,7 +117,10 @@ export function paintPortal(c: Ctx, box: { x: number; y: number; w: number; h: n
       c.globalCompositeOperation = op;
       PORTAL_LAYERS.forEach((L, i) => {
         const drawn = PORTAL_TILE_PX * ratio * L.scale * shrink, off = (seconds * L.speed + i * 40) * ratio * push;
-        pattern.setTransform(new DOMMatrix().translate(-L.dx * off, -L.dy * off).scale(drawn / TILE));
+        const s = drawn / TILE;
+        const m = patternMatrix ?? new DOMMatrix();
+        m.a = s; m.b = 0; m.c = 0; m.d = s; m.e = -L.dx * off; m.f = -L.dy * off;
+        pattern.setTransform(m);
         c.fillStyle = pattern;
         c.globalAlpha = alpha(i, L.alpha);
         c.fillRect(box.x, box.y, box.w, box.h);

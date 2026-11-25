@@ -183,7 +183,7 @@ function rayAabbDistance(
 }
 
 export class LightingSystem {
-  quality: LightQuality = "high";
+  quality: LightQuality = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches ? "medium" : "high";
   /** Telemetry from the most recent frame. */
   lastRaysCast = 0;
   lastShadowLights = 0;
@@ -198,7 +198,10 @@ export class LightingSystem {
   soldierWallDepth = 1;
 
   private angles = new Float64Array(LIGHT.maxRays);
-  private corners: CornerCand[] = [];
+  /** Reusable typed buffers for silhouette corners (avoids thousands of per-frame object allocations). */
+  private cornerAngles = new Float64Array(2048);
+  private cornerDist2 = new Float64Array(2048);
+  private cornerOrder = new Int32Array(2048);
   /** Soldier occluders gathered for the current trace. */
   private occluders: { x: number; y: number; n: number; poly: Float32Array; minAngle: number; maxAngle: number }[] = [];
   /** Per-cell stamp so `markLitCells` lists each cell once per light. */
@@ -460,8 +463,9 @@ export class LightingSystem {
     const gx1 = Math.min(this.world.width - 1, Math.ceil((ox + radius) / cs));
     const gy1 = Math.min(this.world.height - 1, Math.ceil((oy + radius) / cs));
     const r2 = radius * radius;
-    const corners = this.corners;
-    corners.length = 0;
+    let cornerAngles = this.cornerAngles;
+    let cornerDist2 = this.cornerDist2;
+    let cornerCount = 0;
 
     // Corners are found on the half-size grid, so half-size blocks (Blight
     // sub-pixels, rubble, lab equipment) cast their own shadows. Whole-cell
@@ -481,7 +485,19 @@ export class LightingSystem {
       const dy = vy * ss - oy;
       const d2 = dx * dx + dy * dy;
       if (d2 > r2 || d2 < 1e-6) return;
-      corners.push({ angle: Math.atan2(dy, dx), dist2: d2 });
+      if (cornerCount >= cornerAngles.length) {
+        const nextLen = cornerAngles.length * 2;
+        const na = new Float64Array(nextLen);
+        const nd = new Float64Array(nextLen);
+        na.set(cornerAngles);
+        nd.set(cornerDist2);
+        this.cornerAngles = cornerAngles = na;
+        this.cornerDist2 = cornerDist2 = nd;
+        this.cornerOrder = new Int32Array(nextLen);
+      }
+      cornerAngles[cornerCount] = Math.atan2(dy, dx);
+      cornerDist2[cornerCount] = d2;
+      cornerCount++;
     };
     for (let gy = gy0; gy <= gy1; gy++) {
       const dy = gy * cs - oy;
@@ -508,15 +524,22 @@ export class LightingSystem {
     // sorted ray fan is never truncated.
     const soldierRays = Math.min(soldiers.length * 4, maxVerts >>> 2);
     const maxCorners = Math.floor(Math.min(maxCornerRays, maxVerts - n - soldierRays) / 2);
-    if (corners.length > maxCorners) {
-      corners.sort((a, b) => a.dist2 - b.dist2);
-      corners.length = maxCorners;
-    }
     const eps = LIGHT.cornerEpsilon;
-    for (let i = 0; i < corners.length; i++) {
-      const a = corners[i].angle;
-      angles[n++] = normalizeAngle(a - eps);
-      angles[n++] = normalizeAngle(a + eps);
+    if (cornerCount > maxCorners) {
+      const order = this.cornerOrder;
+      for (let i = 0; i < cornerCount; i++) order[i] = i;
+      order.subarray(0, cornerCount).sort((a, b) => cornerDist2[a] - cornerDist2[b]);
+      for (let i = 0; i < maxCorners; i++) {
+        const a = cornerAngles[order[i]];
+        angles[n++] = normalizeAngle(a - eps);
+        angles[n++] = normalizeAngle(a + eps);
+      }
+    } else {
+      for (let i = 0; i < cornerCount; i++) {
+        const a = cornerAngles[i];
+        angles[n++] = normalizeAngle(a - eps);
+        angles[n++] = normalizeAngle(a + eps);
+      }
     }
 
     // 4) Silhouette rays to nearby soldiers (excluding the shooter). Round soldiers

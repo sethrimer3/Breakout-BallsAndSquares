@@ -26,6 +26,8 @@ export function lootKindForZone(zone: number): LootKind {
 export class LootSystem {
   readonly cap: number;
   count = 0;
+  /** Active `LootKind.Essence` items, for O(1) skip in `Renderer.drawEssence`. */
+  essenceCount = 0;
   readonly x: Float32Array;
   readonly y: Float32Array;
   readonly vx: Float32Array;
@@ -93,7 +95,9 @@ export class LootSystem {
       i = this.count++;
     } else {
       i = rng.int(this.cap);
+      if (this.kind[i] === LootKind.Essence) this.essenceCount--;
     }
+    if (kind === LootKind.Essence) this.essenceCount++;
     const a = rng.range(0, Math.PI * 2);
     const sp = rng.range(LOOT.minPopSpeed, LOOT.maxPopSpeed);
     this.x[i] = x + rng.range(-2.5, 2.5);
@@ -242,6 +246,7 @@ export class LootSystem {
   }
 
   private removeAt(i: number): void {
+    if (this.kind[i] === LootKind.Essence) this.essenceCount--;
     const j = --this.count;
     if (i === j) return;
     this.x[i] = this.x[j];
@@ -257,6 +262,7 @@ export class LootSystem {
 
   clear(): void {
     this.count = 0;
+    this.essenceCount = 0;
     this.collectedGold = 0;
     this.collectedCrystals = 0;
     this.collectedGreenCrystals = 0;
