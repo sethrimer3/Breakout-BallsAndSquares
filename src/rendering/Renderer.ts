@@ -1586,7 +1586,6 @@ export class Renderer {
   /** Draw temporary deployable autoturrets with crisp pixel-art geometry. */
   private drawTurrets(): void {
     const { ctx, game } = this;
-    if (game.combat.turrets.activeCount === 0) return;
     const cam = game.camera;
     const items = game.combat.turrets.items;
     const z = cam.zoom;
