@@ -41,9 +41,9 @@ export function marketNode(id: string): {market: WeaponMarket; path: MarketPath}
   }
 }
 export const BLACK_MARKET_DEFS: readonly UpgradeDef[] = WEAPON_MARKETS.map(m=>({
-  id:accessId(m.weapon),branch:m.weapon,name:"Black Market",
-  shortDesc:"Open this weapon's Black Market tree. Choose one mutation path; pay again to switch sides.",
-  color:"#ff4b8b",grid:{col:2,row:-1},parent:m.unlock,maxLevel:1,baseCost:20,costMultiplier:1,
-  currency:"essence",icon:m.icon,
-  apply:()=>{},valueAt:l=>l,formatValue:l=>l?"OPEN":"LOCKED",formatDelta:()=>"OPEN BLACK MARKET",
+  id:accessId(m.weapon),branch:m.weapon,name:"Symbiosis",
+  shortDesc:"Open this weapon's Symbiosis tree. Choose one mutation path; pay again to switch sides.",
+  color:"#ff4b8b",grid:{col:2,row:-1},parent:m.unlock,maxLevel:1,baseCost:1,costMultiplier:1,
+  currency:"exoticMatter",icon:m.icon,
+  apply:()=>{},valueAt:l=>l,formatValue:l=>l?"OPEN":"LOCKED",formatDelta:()=>"OPEN SYMBIOSIS",
 }));

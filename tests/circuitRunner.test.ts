@@ -51,19 +51,19 @@ function stepCombat(combat: CombatSystem, steps = 40, dt = 1 / 60): void {
 }
 
 describe("Circuit Runner — Assault Rifle branch 2", () => {
-  it("supports Essence unlock, refundBlackMarket, SaveManager sanitation, and compatibility", () => {
+  it("supports Exotic Matter unlock, refundBlackMarket, SaveManager sanitation, and compatibility", () => {
     const storage = new MemoryStorage();
     const save = new SaveManager(storage);
     unlockTabs(save); openBlackMarkets(save);
     save.data.lifetimePixels = 10000;
     save.data.bank = 5000;
-    save.data.essence = 100;
+    save.data.exoticMatter = 1;
     const upg = new UpgradeManager(save); findAllSpecials(save.data);
 
     expect(upg.buy("ar_unlock")).toBe(true);
     const res = upg.buy("circuit_unlock");
     expect(res).toBe(true);
-    expect(save.data.essence).toBe(65);
+    expect(save.data.exoticMatter).toBe(0);
     expect(upg.levelOf("circuit_unlock")).toBe(1);
 
     const stats = upg.getSoldierStats();
@@ -87,12 +87,12 @@ describe("Circuit Runner — Assault Rifle branch 2", () => {
     reloaded2.load();
     expect(reloaded2.data.loadouts[0].mutation).toBeNull();
 
-    // Refund returns exact Essence
+    // Refund returns the original unlock currency
     const refund = upg.refundBlackMarket(false);
     expect(refund.ok).toBe(true);
-    if (refund.ok) expect(refund.refunded.essence).toBe(35);
+    if (refund.ok) expect(refund.refunded.exoticMatter).toBe(1);
     expect(upg.levelOf("circuit_unlock")).toBe(0);
-    expect(save.data.essence).toBe(100);
+    expect(save.data.exoticMatter).toBe(1);
   });
 
   it("deals ordinary AR direct damage and uses ordinary AR spread (not Overcharge 0-DMG or ±10.5°)", () => {

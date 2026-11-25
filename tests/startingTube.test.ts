@@ -1,3 +1,4 @@
+import { generatorKey } from "../src/world/ExoticMatter";
 import { describe, expect, it } from "vitest";
 import { WORLD } from "../src/config";
 import { GlassSystem } from "../src/world/GlassSystem";
@@ -53,8 +54,19 @@ describe("starting containment tube", () => {
     expect(g.isCoreExposed(core.id)).toBe(false);
   });
 
-  it("does not install the opening encounter into other deployment sectors", () => {
-    const w = new PixelWorld(WORLD); generateWorld(w, 303, {spawn: 1});
-    expect(w.startingTube).toBeNull();
+  it("keeps generator identities across landings and never restores a destroyed generator", () => {
+    const w = new PixelWorld(WORLD);
+    generateWorld(w, 303);
+    const key = generatorKey(w.blightCores[w.startingTube!.coreId - 1]);
+    const another = w.blightCores.find(core => core.alive && core.size === 2)!;
+    const otherKey = generatorKey(another);
+    generateWorld(w, 303, { spawn: 1, destroyedGenerators: { [key]: false, [otherKey]: true } });
+    expect(generatorKey(w.blightCores[w.startingTube!.coreId - 1])).toBe(key);
+    for (const id of [key, otherKey]) {
+      const core = w.blightCores.find(candidate => generatorKey(candidate) === id)!;
+      expect(core.alive).toBe(false);
+      expect(core.cells.every(i => w.health[i] === 0 && w.coreId[i] === 0)).toBe(true);
+    }
+    expect(w.roomX0).toBeGreaterThan(w.startingTube!.x0);
   });
 });

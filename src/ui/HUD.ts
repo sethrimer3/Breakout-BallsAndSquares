@@ -1,3 +1,4 @@
+import { exoticMatterIcon } from "./exoticMatterIcon";
 import type { IndicatorRect } from "../rendering/SoldierIndicatorLayout";
 import { deploymentLegend } from "./deploymentStatus";
 import { formatSpeedrunTime } from "../core/SpeedrunTimer";
@@ -55,7 +56,7 @@ export class HUD {
     this.root.className = "hud";
     this.deploymentGuide = document.createElement("div");
     this.deploymentGuide.className = "deployment-guide hidden";
-    this.deploymentGuide.innerHTML = `<div class="deployment-guide-title">DEPLOYMENT ZONES</div><div class="deployment-legend">${deploymentLegend()}</div><div class="deployment-guide-note">Choose clear ground in an open zone.</div>`;
+    this.deploymentGuide.innerHTML = `<div class="deployment-guide-title">DEPLOYMENT ZONES</div><div class="deployment-legend">${deploymentLegend(false)}</div><div class="deployment-guide-note">Choose clear ground in an open zone.</div>`;
     const bar = document.createElement("div");
     bar.className = "hud-bar";
     const items: [string, string, SpriteName, string][] = [
@@ -67,6 +68,7 @@ export class HUD {
       ["crystals", "CRYS", "crystal", UI_COLORS.crystal],
       ["greenCrystals", "GREEN", "crystal", UI_COLORS.greenCrystal],
       ["biomass", "BIOMASS", "crystal", "#7fe39a"],
+      ["exotic", "EXOTIC", "gold", "#ff90c9"],
       ["essence", "ESSENCE", "gold", UI_COLORS.essence],
       ["bank", "BANK", "gold", UI_COLORS.gold],
       ["depth", "DEPTH", "depth", UI_COLORS.neutral],
@@ -77,9 +79,10 @@ export class HUD {
       box.className = `hud-item hud-${key}`;
       const l = document.createElement("span");
       l.className = "hud-label";
-      l.innerHTML = key === "essence" ? `${essenceIcon(1)} ${label}` : `${sprite(icon, { color })} ${label}`;
+      l.innerHTML = key === "exotic" ? `${exoticMatterIcon()} ${label}` : key === "essence" ? `${essenceIcon(1)} ${label}` : `${sprite(icon, { color })} ${label}`;
       const v = document.createElement("span");
       v.className = "hud-value";
+      if (key === "exotic") box.title = "Exotic Matter";
       box.append(l, v);
       bar.append(box);
       this.fields[key] = v;
@@ -288,6 +291,8 @@ export class HUD {
     this.boxes.essence.classList.toggle("hidden", game.essence + s.essence <= 0);
     this.boxes.biomass.classList.toggle("hidden", game.biomass + s.biomass <= 0);
     this.fields.biomass.textContent = `${s.biomass} (${game.biomass})`;
+    this.fields.exotic.textContent = String(game.save.data.exoticMatter);
+    this.boxes.exotic.classList.toggle("hidden", game.save.data.exoticMatter === 0);
     this.fields.essence.textContent = `${s.essence} (${game.essence})`;
 
     this.fields.bank.textContent = game.bank.toLocaleString();

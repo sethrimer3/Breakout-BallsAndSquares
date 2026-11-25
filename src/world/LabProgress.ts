@@ -39,13 +39,7 @@ export class LabProgress {
       let list = this.generators.get(s);
       if (!list) this.generators.set(s, (list = []));
       list.push(core);
-    }
-  }
-
-  attachThreats(actors: readonly {sector:number;alive:boolean;kind:string}[]): void {
-    for(const a of actors) { if(a.kind === "grove") continue;
-      const list=this.generators.get(a.sector) ?? []; list.push(a); this.generators.set(a.sector,list);
-      if(a.alive) this.conquered.delete(a.sector);
+      if (core.alive) this.conquered.delete(s);
     }
   }
 

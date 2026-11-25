@@ -21,11 +21,12 @@ import {
 } from "./UpgradeDefinitions";
 
 /** Where each currency is banked in the save. */
-const WALLET: Record<Currency, keyof Pick<SaveData, "bank" | "crystals" | "greenCrystals" | "essence" | "biomass">> = {
+const WALLET: Record<Currency, keyof Pick<SaveData, "bank" | "crystals" | "greenCrystals" | "essence" | "biomass" | "exoticMatter">> = {
   gold: "bank",
   crystals: "crystals",
   greenCrystals: "greenCrystals",
   essence: "essence",
+  exoticMatter: "exoticMatter",
   biomass: "biomass",
 };
 
@@ -124,13 +125,13 @@ export class UpgradeManager {
 
   /** The next level's cost in the node's main currency. */
   costOf(id: UpgradeId): number {
-    const def = UPGRADE_BY_ID[id];
-    return this.pricesOf(id).find(p => p.currency === (marketNode(id)?.path.root === id ? "essence" : def.currency ?? "gold"))?.amount ?? 0;
+    return this.pricesOf(id)[0]?.amount ?? 0;
   }
 
   pricesOf(id: UpgradeId): Price[] {
     const node = marketNode(id);
     if (node?.path.root === id) {
+      if (this.levelOf(id) === 0) return [{ currency: "exoticMatter", amount: 1 }];
       const cost = id === "katana_dash" ? 30 : id === "prism_unlock" ? 40 : id === "drone_unlock" ? 35 : UPGRADE_BY_ID[id].baseCost;
       return [{currency:"essence",amount:cost}];
     }
@@ -237,7 +238,7 @@ export class UpgradeManager {
       if (lvl <= 0) continue;
       const recorded = spentMap[id];
       if (recorded) {
-        for (const c of ["gold", "crystals", "greenCrystals", "essence", "biomass"] as const) {
+        for (const c of ["gold", "crystals", "greenCrystals", "essence", "biomass", "exoticMatter"] as const) {
           const amt = recorded[c] ?? 0;
           if (amt > 0) {
             this.save.data[WALLET[c]] += amt;
@@ -248,7 +249,7 @@ export class UpgradeManager {
       } else {
         const def = UPGRADE_BY_ID[id];
         for (let l = 0; l < lvl; l++) {
-          for (const p of upgradePrices(def, l)) {
+          for (const p of id.startsWith("black_market_") ? [{ currency: "essence", amount: 20 } as const] : upgradePrices(def, l)) {
             this.save.data[WALLET[p.currency]] += p.amount;
             refunded[p.currency] = (refunded[p.currency] ?? 0) + p.amount;
           }

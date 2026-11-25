@@ -21,8 +21,8 @@ export function deploymentIcon(state: DeploymentState): string {
   return `<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="square" stroke-linejoin="miter">${shape}</svg>`;
 }
 
-export function deploymentLegend(): string {
+export function deploymentLegend(showCleared = true): string {
   return `<span class="deploy-key deploy-available">${deploymentIcon("available")} Available</span>
-    <span class="deploy-key deploy-blocked">${deploymentIcon("guarded")} Restricted</span>
+    ${showCleared ? '<span class="deploy-key deploy-available"><i class="deploy-cleared-chip" aria-hidden="true"></i> Cleared</span>' : ""}
     <span class="deploy-key deploy-unknown">${deploymentIcon("unknown")} Unsurveyed</span>`;
 }

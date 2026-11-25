@@ -1,3 +1,4 @@
+import { exoticMatterPixels } from "./exoticMatterSprite";
 import { OffscreenSoldierRenderer } from "./OffscreenSoldierRenderer";
 import { circleIsClear } from "../systems/PhysicsSystem";
 import { DeploymentOverlay } from "./DeploymentOverlay";
@@ -54,6 +55,8 @@ export class Renderer {
   /** The one living frame every Blight Essence drop shares. */
   private essenceCanvas = document.createElement("canvas");
   private essenceShown = -1;
+  private exoticCanvas: HTMLCanvasElement | null = null;
+  private exoticFrame = -1;
   private ctx: CanvasRenderingContext2D;
   private dpr = 1;
   /** Adjusts the canvas density in "auto" render quality; null when pinned. */
@@ -189,7 +192,7 @@ export class Renderer {
     // The spawn room's bare concrete slab.
     {
       const cs = game.world.cellSize;
-      const tube = game.world.startingTube;
+      const tube = game.labSave.spawn === game.labDef.start ? game.world.startingTube : null;
       const sx = cam.worldToScreenX((tube?.x0 ?? game.world.roomX0) * cs);
       const sy = cam.worldToScreenY((tube?.y0 ?? game.world.roomY0) * cs);
       const sw = (tube ? tube.x1 - tube.x0 + 1 : game.world.roomSize) * cs * cam.zoom;
@@ -282,6 +285,7 @@ export class Renderer {
     this.deploymentOverlay.draw(ctx, game);
     // Generator tier rims sit on top of the Blight's own edges (Blight shows through fog).
     drawGeneratorRims(ctx, cam, game.world, still ? 0 : wallClockMs / 1000);
+    this.drawExoticMatter(wallClockMs, still);
     // Soldiers are drawn after lighting and fog so the pixel-art sprite keeps
     // its full palette even when it outruns the light creeping after it.
     drawWeaponExpansion(ctx, game, still);
@@ -375,6 +379,29 @@ export class Renderer {
   }
 
   /** Blight Essence drops: the living glob, on whole screen pixels so it stays crisp. */
+  private drawExoticMatter(now: number, still: boolean): void {
+    const { game, ctx } = this;
+    if (!game.exoticDrops.length) return;
+    const cam = game.camera;
+    const frame = essenceFrame(now, still);
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    for (const drop of game.exoticDrops) {
+      const x = cam.worldToScreenX(drop.x), y = cam.worldToScreenY(drop.y);
+      if (x < -32 || y < -32 || x > cam.viewW + 32 || y > cam.viewH + 32) continue;
+      if (!game.devMapAccess && game.fog.lightAt(drop.x, drop.y) <= 0) continue;
+      const canvas = this.exoticCanvas ??= document.createElement("canvas");
+      if (frame !== this.exoticFrame) {
+        paintPixels(canvas, exoticMatterPixels(frame * 0.09));
+        this.exoticFrame = frame;
+      }
+      const scale = Math.max(1, Math.min(3, Math.round(cam.zoom)));
+      const bob = still ? 0 : Math.sin(now / 350) * 3;
+      ctx.drawImage(canvas, Math.round(x - canvas.width * scale / 2), Math.round(y - canvas.height * scale / 2 + bob), canvas.width * scale, canvas.height * scale);
+    }
+    ctx.restore();
+  }
+
   private drawEssence(nowMs: number, still: boolean): void {
     const { ctx, game } = this;
     const loot = game.loot;
@@ -1377,24 +1404,24 @@ export class Renderer {
 
     const now = performance.now() / 1000;
     const denied = game.spawnDenied;
-    if (denied) drawSpawnDenied(ctx, cam, denied.x, denied.y, now - denied.t0, denied.guarded);
+    if (denied) drawSpawnDenied(ctx, cam, denied.x, denied.y, now - denied.t0, denied.unsurveyed);
 
     if (game.aimState.active) {
       // Pressing: the portal will open here when the press lets go.
       const wx = game.aimState.startWx;
       const wy = game.aimState.startWy;
-      const guarded = game.spawnGuardedAt(wx, wy);
+      const unsurveyed = game.spawnUnsurveyedAt(wx, wy);
       const clear = circleIsClear(game.world, wx, wy, SOLDIER.collisionRadius + SOLDIER.deployClearance);
-      drawPortalPreview(ctx, cam, wx, wy, now, guarded || !clear, 0.95);
-      this.deploymentOverlay.drawTargetLabel(ctx, game, wx, wy, guarded, clear);
+      drawPortalPreview(ctx, cam, wx, wy, now, unsurveyed || !clear, 0.95);
+      this.deploymentOverlay.drawTargetLabel(ctx, game, wx, wy, unsurveyed, clear);
     } else if (game.input.mouseInside && game.canPlaceSoldier()) {
       // Hovering with the squad still in reserve: where the portal would open.
       const wx = cam.screenToWorldX(game.input.mouseX);
       const wy = cam.screenToWorldY(game.input.mouseY);
-      const guarded = game.spawnGuardedAt(wx, wy);
+      const unsurveyed = game.spawnUnsurveyedAt(wx, wy);
       const clear = circleIsClear(game.world, wx, wy, SOLDIER.collisionRadius + SOLDIER.deployClearance);
-      drawPortalPreview(ctx, cam, wx, wy, now, guarded || !clear, 0.6);
-      this.deploymentOverlay.drawTargetLabel(ctx, game, wx, wy, guarded, clear);
+      drawPortalPreview(ctx, cam, wx, wy, now, unsurveyed || !clear, 0.6);
+      this.deploymentOverlay.drawTargetLabel(ctx, game, wx, wy, unsurveyed, clear);
     } else if (game.input.mouseInside && !game.canPlaceSoldier() && !game.paused && !game.runOver) {
       const sx = game.input.mouseX;
       const sy = game.input.mouseY;

@@ -113,11 +113,12 @@ export interface SaveData {
   greenCrystals: number;
   /** Blight Essence, dropped by Blight Cores. */
   essence: number;
+  exoticMatter: number;
   biomass: number;
   lifetimePixels: number;
   upgrades: Record<UpgradeId, number>;
   blackMarketPaths: Partial<Record<WeaponType, UpgradeId>>;
-  upgradeSpent?: Partial<Record<UpgradeId, Partial<Record<"gold" | "crystals" | "greenCrystals" | "essence" | "biomass", number>>>>;
+  upgradeSpent?: Partial<Record<UpgradeId, Partial<Record<"gold" | "crystals" | "greenCrystals" | "essence" | "biomass" | "exoticMatter", number>>>>;
   loadouts: SoldierLoadout[];
   bests: {
     time: number;
@@ -175,6 +176,8 @@ export interface LabWorldProgress {
   gathered: string[];
   /** Special-upgrade blocks shattered and absorbed in this world. */
   specials: string[];
+  /** Generator identity → whether its one-time drop was collected. */
+  destroyedGenerators?: Record<string, boolean>;
 }
 
 /** Fresh progress for lab world `id`: only its starting sector is known and safe. */
@@ -203,6 +206,7 @@ export function defaultSaveData(): SaveData {
     crystals: 0,
     greenCrystals: 0,
     essence: 0,
+    exoticMatter: 0,
     biomass: 0,
     lifetimePixels: 0,
     upgrades,
@@ -253,9 +257,15 @@ function sanitizeLabWorld(v: unknown, id: number): LabWorldProgress {
   const w = v as Record<string, unknown>;
   const discovered = sectorList(w.discovered, id);
   const conquered = sectorList(w.conquered, id).filter((s) => discovered.includes(s));
-  const spawn = typeof w.spawn === "number" && conquered.includes(w.spawn) ? w.spawn : LAB_WORLDS[id].start;
+  const spawn = typeof w.spawn === "number" && discovered.includes(w.spawn) ? w.spawn : LAB_WORLDS[id].start;
   const ids = (v: unknown): string[] => Array.isArray(v) ? [...new Set(v.filter((x): x is string => typeof x === "string" && x.length < 80))].slice(0,5000) : [];
-  return { discovered, conquered, spawn, cleared: ids(w.cleared), gathered: ids(w.gathered), specials: ids(w.specials) };
+  const destroyedGenerators: Record<string, boolean> = {};
+  if (w.destroyedGenerators && typeof w.destroyedGenerators === "object") {
+    for (const [key, claimed] of Object.entries(w.destroyedGenerators).slice(0, 2048)) {
+      if (/^\d{1,4},\d{1,4},[12],(?:lab|tube)$/.test(key) && typeof claimed === "boolean") destroyedGenerators[key] = claimed;
+    }
+  }
+  return { discovered, conquered, spawn, destroyedGenerators, cleared: ids(w.cleared), gathered: ids(w.gathered), specials: ids(w.specials) };
 }
 
 function finiteNonNeg(v: unknown, fallback = 0, max = 1e12): number {
@@ -351,6 +361,7 @@ export function sanitizeSaveData(raw: unknown): SaveData {
   def.bank = Math.floor(finiteNonNeg(obj.bank, 0));
   def.crystals = Math.floor(finiteNonNeg(obj.crystals, 0));
   def.greenCrystals = Math.floor(finiteNonNeg(obj.greenCrystals, 0));
+  def.exoticMatter = Math.floor(finiteNonNeg(obj.exoticMatter, 0));
   def.essence = Math.floor(finiteNonNeg(obj.essence, 0));
   def.biomass = Math.floor(finiteNonNeg(obj.biomass, 0));
   def.lifetimePixels = Math.floor(finiteNonNeg(obj.lifetimePixels, 0));
@@ -383,8 +394,8 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     for (const d of UPGRADE_DEFS) {
       const entry = rawSpent[d.id];
       if (!entry || typeof entry !== "object") continue;
-      const curMap: Partial<Record<"gold" | "crystals" | "greenCrystals" | "essence" | "biomass", number>> = {};
-      for (const c of ["gold", "crystals", "greenCrystals", "essence", "biomass"] as const) {
+      const curMap: Partial<Record<"gold" | "crystals" | "greenCrystals" | "essence" | "biomass" | "exoticMatter", number>> = {};
+      for (const c of ["gold", "crystals", "greenCrystals", "essence", "biomass", "exoticMatter"] as const) {
         const val = Math.floor(finiteNonNeg((entry as Record<string, unknown>)[c], 0));
         if (val > 0) curMap[c] = val;
       }

@@ -1,3 +1,4 @@
+import { exoticMatterIcon } from "./exoticMatterIcon";
 import { marketFor, marketNode, WEAPON_MARKETS } from "../progression/BlackMarket";
 import { marketLayout } from "./marketLayout";
 import { damageRange, TERRAIN } from "../config";
@@ -61,9 +62,9 @@ const HUB_ID = "hub";
 const DRAG_THRESHOLD = 5;
 /** Outward push (CSS px/s) on a node's children when it is bought. */
 const BUY_KICK = 420;
-/** How long (ms) a Black Market path takes to fold back into its root. */
+/** How long (ms) a Symbiosis path takes to fold back into its root. */
 const COLLAPSE_MS = 420;
-/** Hub color on Black Market trees. */
+/** Hub color on Symbiosis trees. */
 const MARKET_COLOR = "#ff4b8b";
 
 /** A research node folding back into its path's root after a switch. */
@@ -189,6 +190,7 @@ const TAB_ICONS: Record<UpgradeBranch, { icon: SpriteName; color: string }> = {
 /** An icon for a currency, in tooltips and on the footer. */
 function currencyIcon(c: Currency, scale: 1 | 2 = 2): string {
   if (c === "biomass") return `<span style="color:#7fe39a">◆</span>`;
+  if (c === "exoticMatter") return exoticMatterIcon(scale);
   if (c === "essence") return essenceIcon(scale);
   if (c === "gold") return sprite("gold", { color: UI_COLORS.gold, scale });
   return sprite("crystal", { color: c === "crystals" ? UI_COLORS.crystal : UI_COLORS.greenCrystal, scale });
@@ -218,7 +220,7 @@ export class UpgradeTree {
   readonly root: HTMLDivElement;
   private stageEl: HTMLDivElement;
   private marketView = false;
-  /** The active path root the Black Market tree was laid out for. */
+  /** The active path root the Symbiosis tree was laid out for. */
   private marketRoot: UpgradeId | null = null;
   private collapsing: Collapse[] = [];
   private loadoutWrap: HTMLDivElement;
@@ -325,7 +327,7 @@ export class UpgradeTree {
               <div class="tree-cat-panel hidden" data-cat="primary">
                 ${WEAPON_MARKETS.map(m => `<div class="tree-weapon-tab">
                   <button class="tree-tab" data-tab="${m.weapon}">${tabHtml(m.weapon,m.label.toUpperCase())}</button>
-                  <button class="tree-market-tab" data-market="${m.weapon}" title="Black Market">${essenceIcon(1)}<span>BLACK MARKET</span></button>
+                  <button class="tree-market-tab" data-market="${m.weapon}" title="Symbiosis">${exoticMatterIcon()}<span>SYMBIOSIS</span></button>
                 </div>${m.weapon === "shotgun" ? `<button class="tree-tab" data-tab="squelch">${tabHtml("squelch","SQUELCH")}</button>` : ""}`).join("")}
               </div>
               <div class="tree-cat-panel hidden" data-cat="secondary">
@@ -364,6 +366,7 @@ export class UpgradeTree {
             <span class="crys-wrap wallet-item hidden">${sprite("crystal", { color: UI_COLORS.crystal })} <span class="crys-num">0</span></span>
             <span class="green-wrap wallet-item hidden">${sprite("crystal", { color: UI_COLORS.greenCrystal })} <span class="green-num">0</span></span>
             <span class="biomass-wrap wallet-item" style="color:#7fe39a">◆ <span class="biomass-num">0</span></span>
+            <span class="exotic-wrap wallet-item hidden" title="Exotic Matter" aria-label="Exotic Matter">${exoticMatterIcon()} <span class="exotic-num">0</span></span>
             <span class="essence-wrap wallet-item hidden">${essenceIcon()} <span class="essence-num">0</span></span>
           </div>
           <div class="tree-life">LIFETIME EXCAVATED: <span class="life-num">0</span> PX</div>
@@ -671,7 +674,7 @@ export class UpgradeTree {
         ? sprite("ring", { color: def.color, scale: 3, cls: "node-ring ring-empty" }) +
           sprite("ringFilled", { color: def.color, scale: 3, cls: "node-ring ring-filled" })
         : "";
-      const paidIn = def.currency ?? "gold";
+      const paidIn = marketNode(def.id)?.path.root === def.id ? "exoticMatter" : def.currency ?? "gold";
       btn.innerHTML = `
         ${ring}
         ${sprite(def.icon, { color: def.color, scale: 3, cls: "node-icon" })}
@@ -952,7 +955,7 @@ export class UpgradeTree {
   }
 
   /**
-   * Black Market trees keep their own shape (see marketLayout.ts): path roots
+   * Symbiosis trees keep their own shape (see marketLayout.ts): path roots
    * around the weapon hub, research fanning out of the active root only.
    */
   private layoutMarket(): void {
@@ -968,7 +971,7 @@ export class UpgradeTree {
   }
 
   /**
-   * A different Black Market path was bought: the old path's research shrinks
+   * A different Symbiosis path was bought: the old path's research shrinks
    * back into its root while the new path grows out of its own.
    */
   private switchMarketPath(): void {
@@ -1196,7 +1199,7 @@ export class UpgradeTree {
     return prices
       .map((p) => {
         const short = u.balanceOf(p.currency) < p.amount ? " short" : "";
-        return `<span class="tt-price${short}">${currencyIcon(p.currency)} ${p.amount.toLocaleString()}</span>`;
+        return `<span class="tt-price${short}" title="${p.currency === "exoticMatter" ? "Exotic Matter" : p.currency}">${currencyIcon(p.currency)} ${p.amount.toLocaleString()}</span>`;
       })
       .join("");
   }
@@ -1221,7 +1224,7 @@ export class UpgradeTree {
         <div class="tt-lock tt-find">FIND UPGRADE</div>
       `;
     } else if (unlocked && marketNode(def.id)?.path.root === def.id) {
-      // Black Market path roots: one is active; any other can be bought (again) to switch.
+      // Symbiosis path roots: one is active; any other can be bought (again) to switch.
       const on = this.marketRoot === def.id;
       const status = on
         ? `<div class="tt-compare"><span class="tt-max-tag">ACTIVE PATH</span></div>`
@@ -1381,7 +1384,7 @@ export class UpgradeTree {
       const compatHtml = compat && compat.inactive.length > 0
         ? `<div class="lc-compat">Inactive: ${compat.inactive.join(", ")}</div>`
         : "";
-      const mutationHtml=mutationOptions.length?`<div class="lc-section-lbl">BLACK MARKET — NEXT DEPLOYMENT</div><div class="lc-weapons">${mutationOptions.map(m=>`<button class="btn lc-mbtn ${curM===m.id?"btn-primary":""}" data-slot="${i}" data-mutation="${m.id??""}" ${m.unlocked?"":"disabled"}>${m.label}${m.unlocked?"":" · LOCKED"}</button>`).join("")}</div>${compatHtml}`:"";
+      const mutationHtml=mutationOptions.length?`<div class="lc-section-lbl">SYMBIOSIS — NEXT DEPLOYMENT</div><div class="lc-weapons">${mutationOptions.map(m=>`<button class="btn lc-mbtn ${curM===m.id?"btn-primary":""}" data-slot="${i}" data-mutation="${m.id??""}" ${m.unlocked?"":"disabled"}>${m.label}${m.unlocked?"":" · LOCKED"}</button>`).join("")}</div>${compatHtml}`:"";
       const curB: SoldierBehavior = this.game.isBehaviorUnlocked(ld.behavior) ? ld.behavior : "free";
 
       let wSummary = `1 round · ${damageRange(st.damage)} DMG · ${st.fireRate.toFixed(2)}/s`;
@@ -1491,7 +1494,7 @@ export class UpgradeTree {
 
     this.loadoutWrap.innerHTML = `
       <div class="loadout-actions" style="margin-bottom:8px;display:flex;justify-content:flex-end;">
-        <button class="btn lc-respec-btn" type="button">REFUND BLACK MARKET (LAB ONLY)</button>
+        <button class="btn lc-respec-btn" type="button">REFUND SYMBIOSIS (LAB ONLY)</button>
       </div>
       <div class="loadout-grid">${cardsHtml}</div>
       ${moreHint}
@@ -1575,6 +1578,8 @@ export class UpgradeTree {
     this.crysValEl.textContent = this.game.crystals.toLocaleString();
     this.greenValEl.textContent = this.game.greenCrystals.toLocaleString();
     (this.root.querySelector(".biomass-num") as HTMLElement).textContent = this.game.biomass.toLocaleString();
+    const exotic = this.game.save.data.exoticMatter;
+    this.root.querySelector(".exotic-num")!.textContent = exotic.toLocaleString();
     this.essenceValEl.textContent = this.game.essence.toLocaleString();
     // A currency shows once it's owned, reachable, or priced on this tree.
     const defs = this.activeDefs();
@@ -1585,6 +1590,7 @@ export class UpgradeTree {
     const depth = this.game.bests.depth;
     showIf(".crys-wrap", this.game.crystals > 0 || depth >= TERRAIN.zone2Depth || priced("crystals"));
     showIf(".green-wrap", this.game.greenCrystals > 0 || depth >= TERRAIN.zone3Depth || priced("greenCrystals"));
+    showIf(".exotic-wrap", exotic > 0 || this.marketView || priced("exoticMatter"));
     showIf(".essence-wrap", this.game.essence > 0 || priced("essence"));
 
     this.soldierSlot = Math.min(this.soldierSlot, st.maxSoldiers - 1);
@@ -1627,9 +1633,9 @@ export class UpgradeTree {
       const unknown = !!market.unlock && this.game.upgrades.needsFinding(market.unlock);
       button.disabled = !this.game.upgrades.isBranchUnlocked(weapon) || !this.game.upgrades.marketOpen(weapon);
       button.classList.toggle("active", this.marketView && this.activeTab === weapon);
-      button.innerHTML = unknown ? `${lockIcon()} <span>???</span>` : `${essenceIcon(1)}<span>BLACK MARKET</span>`;
-      button.title = unknown ? "???" : button.disabled ? "Purchase Black Market access on the standard tree" : `${market.label} Black Market`;
-      button.setAttribute("aria-label", unknown ? "???" : `${market.label} Black Market`);
+      button.innerHTML = unknown ? `${lockIcon()} <span>???</span>` : `${exoticMatterIcon()}<span>SYMBIOSIS</span>`;
+      button.title = unknown ? "???" : button.disabled ? "Purchase Symbiosis access on the standard tree" : `${market.label} Symbiosis`;
+      button.setAttribute("aria-label", unknown ? "???" : `${market.label} Symbiosis`);
     }
     for (const button of this.root.querySelectorAll<HTMLButtonElement>(".tree-cat-btn")) {
       const category = CATEGORIES.find((c) => c.id === button.dataset.cat)!;
@@ -1642,7 +1648,7 @@ export class UpgradeTree {
     }
     this.updateHeaderAndScreen();
     if (this.marketView && !this.inLoadoutScreen) {
-      this.titleEl.textContent = "BLACK MARKET";
+      this.titleEl.textContent = "SYMBIOSIS";
       this.subEl.textContent = "ONE ACTIVE PATH — RE-BUY ANOTHER PATH TO SWITCH; RESEARCH IS KEPT";
       const active = this.game.upgrades.activeMarketPath(this.activeTab as WeaponType)?.root ?? null;
       if (active !== this.marketRoot) this.switchMarketPath();
@@ -1667,7 +1673,7 @@ export class UpgradeTree {
       this.activeTab === "turret");
     this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);
     if (this.marketView) {
-      // The weapon itself sits at the heart of its Black Market tree.
+      // The weapon itself sits at the heart of its Symbiosis tree.
       this.coreHubEl.innerHTML =
         sprite("ring", { color: MARKET_COLOR, scale: 3, cls: "node-ring" }) +
         sprite(TAB_ICONS[this.activeTab].icon, { color: MARKET_COLOR, scale: 3 });

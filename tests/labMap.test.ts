@@ -282,7 +282,8 @@ describe("hand-made lab", () => {
     generateWorld(w, 4);
     const p = new LabProgress();
     p.attach(w);
-    expect(p.conquered.has(0)).toBe(true);
+    expect(p.discovered.has(0)).toBe(true);
+    expect(p.conquered.has(0)).toBe(false);
     const frame = w.labLayout!.frame!;
     const core = w.blightCores.find((c) => sectorAtCell(frame, c.cx, c.cy) > 0)!;
     const s = sectorAtCell(frame, core.cx, core.cy);
@@ -292,6 +293,11 @@ describe("hand-made lab", () => {
     for (const c of w.blightCores) if (sectorAtCell(frame, c.cx, c.cy) === s) c.alive = false;
     p.update([]);
     expect(p.conquered.has(s)).toBe(true);
+    const empty = Array.from({ length: p.sectorCount }, (_, i) => i).find(i => !p.discovered.has(i) && p.generatorCount(i) === 0)!;
+    const at = sectorSpawnCell(frame, empty);
+    p.update([at]);
+    expect(p.discovered.has(empty)).toBe(true);
+    expect(p.conquered.has(empty)).toBe(true);
   });
 
   it("keeps lab progress valid in saves, and carries old zone 1 progress over", () => {

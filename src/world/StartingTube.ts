@@ -1,8 +1,9 @@
+import { generatorKey } from "./ExoticMatter";
 import { DECOR } from "./LabDetails";
-import { LIGHT_KIND, MAT, type PixelWorld } from "./PixelWorld";
+import { LIGHT_KIND, MAT, type BlightCore, type PixelWorld } from "./PixelWorld";
 
 /** First lab landing: an eastbound tube with three independent containment shells. */
-export function buildStartingTube(w: PixelWorld): void {
+export function buildStartingTube(w: PixelWorld, destroyed?: Readonly<Record<string, boolean>>): void {
   if (w.blightCores.length >= 255) return;
   const gx = w.roomX0 - 6, gy = Math.floor((w.roomY0 + w.roomY1) / 2);
   const x0 = gx - 6, y0 = w.roomY0 - 2, y1 = w.roomY1 + 2;
@@ -44,8 +45,11 @@ export function buildStartingTube(w: PixelWorld): void {
     core.cells = core.cells.filter(i => w.coreId[i] === core.id);
     if (!core.cells.length) core.alive = false;
   }
+  const id = w.blightCores.length + 1, i = gy * w.width + gx;
+  const core: BlightCore = { id, cx: gx, cy: gy, cells: [i], alive: true, size: 1, zone: 0, roomId: -1 };
+  const crushed = destroyed !== undefined && generatorKey(core) in destroyed;
   // Air gaps prevent the existing glass chain from jumping between shells.
-  for (const r of [1, 3, 5]) {
+  for (const r of crushed ? [] : [1, 3, 5]) {
     for (let y = gy - r; y <= gy + r; y++) for (let x = gx - r; x <= gx + r; x++) {
       if (x !== gx - r && x !== gx + r && y !== gy - r && y !== gy + r) continue;
       const i = y * w.width + x;
@@ -53,11 +57,9 @@ export function buildStartingTube(w: PixelWorld): void {
       w.health[i] = w.maxHealthAt(x, y);
     }
   }
-  const id = w.blightCores.length + 1, i = gy * w.width + gx;
   w.coreId[i] = id; w.blight[i] = 1; w.decor[i] = DECOR.blightCoreHeart;
   w.health[i] = w.maxHealthAt(gx, gy);
-  const cells = [i];
-  w.blightCores.push({ id, cx: gx, cy: gy, cells, alive: true, size: 1, zone: 0, roomId: -1 });
+  w.blightCores.push(core);
   w.startingTube = { x0, y0, x1, y1, coreId: id };
   for (const x of [gx, Math.floor((w.roomX0 + w.roomX1) / 2), x1 - 6]) {
     w.decor[(y0 - 1) * w.width + x] = DECOR.lightPanel;

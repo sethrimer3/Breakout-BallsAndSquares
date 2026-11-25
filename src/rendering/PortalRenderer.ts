@@ -91,7 +91,7 @@ export function drawSpawnPortal(ctx: Ctx, cam: CameraSystem, p: SpawnPortal, tim
 
 /**
  * Ghost ring where a tap would open the portal: dotted cyan, slowly turning,
- * or amber with a cross where the Blight Wardens forbid it.
+ * or amber with a cross where deployment is unavailable.
  */
 export function drawPortalPreview(ctx: Ctx, cam: CameraSystem, wx: number, wy: number, time: number, guarded: boolean, alpha = 0.7): void {
   const cx = wx / ART_PIXEL;
@@ -119,7 +119,7 @@ export function drawPortalPreview(ctx: Ctx, cam: CameraSystem, wx: number, wy: n
 }
 
 /** A refused tap: an amber cross and ring that fade out, with a short reason. */
-export function drawSpawnDenied(ctx: Ctx, cam: CameraSystem, wx: number, wy: number, age: number, guarded: boolean): void {
+export function drawSpawnDenied(ctx: Ctx, cam: CameraSystem, wx: number, wy: number, age: number, unsurveyed: boolean): void {
   const life = 1.4;
   if (age < 0 || age > life) return;
   const fade = age < life - 0.4 ? 1 : (life - age) / 0.4;
@@ -139,7 +139,7 @@ export function drawSpawnDenied(ctx: Ctx, cam: CameraSystem, wx: number, wy: num
     fillArtPixel(ctx, cam, gx, gy);
   }
   drawCross(ctx, cam, cx, cy, 5);
-  const text = guarded ? "BLIGHT WARDENS GUARD THIS ZONE" : "NO ROOM FOR A PORTAL";
+  const text = unsurveyed ? "SECTOR UNSURVEYED" : "NO ROOM FOR A PORTAL";
   const fontPx = 8 * Math.max(1, Math.round(Math.min(2, cam.zoom / 2)));
   ctx.font = `${fontPx}px Silkscreen, "Press Start 2P", monospace`;
   ctx.textAlign = "center";

@@ -20,7 +20,7 @@ function scene() {
   const save = new SaveManager(new MemoryStorage());
   unlockTabs(save);
   findAllSpecials(save.data);
-  save.data.essence = 1e6; save.data.bank = 1e6; save.data.crystals = 1e6; save.data.lifetimePixels = 1e6;
+  save.data.essence = 1e6; save.data.exoticMatter = 10; save.data.bank = 1e6; save.data.crystals = 1e6; save.data.lifetimePixels = 1e6;
   for (const id of ["shotgun_unlock", "ar_unlock", "rocket_unlock", "sniper_unlock", "katana_unlock", "flame_unlock"] as const) save.data.upgrades[id] = 1;
   return { save, u: new UpgradeManager(save) };
 }

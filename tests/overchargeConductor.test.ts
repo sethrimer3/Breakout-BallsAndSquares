@@ -177,7 +177,7 @@ describe("Overcharge Conductor — Assault Rifle branch 1", () => {
     const save = new SaveManager(new MemoryStorage());
     save.data.bank = 100000;
     save.data.crystals = 10000;
-    save.data.essence = 10000;
+    save.data.essence = 10000; save.data.exoticMatter = 1;
     save.data.lifetimePixels = 10000;
     unlockTabs(save); openBlackMarkets(save);
 
@@ -294,11 +294,11 @@ describe("Overcharge Conductor — Assault Rifle branch 1", () => {
     expect(combat.overcharge.totalDischarges).toBe(0);
   });
 
-  it("14: Essence unlock, save/reload, uniqueness, and lab refund preserve exact accounting", () => {
+  it("14: Exotic Matter unlock, save/reload, uniqueness, and lab refund preserve exact accounting", () => {
     const storage = new MemoryStorage();
     const save = new SaveManager(storage);
     save.data.bank = 10000;
-    save.data.essence = 600;
+    save.data.essence = 600; save.data.exoticMatter = 1;
     save.data.lifetimePixels = 10000;
     save.data.lab.worlds[3] = { discovered: [0], conquered: [0], cleared: ["0:soldier:0"], gathered: [], specials: [], spawn: 0 };
     unlockTabs(save); openBlackMarkets(save);
@@ -308,14 +308,15 @@ describe("Overcharge Conductor — Assault Rifle branch 1", () => {
     expect(um.buy("ar_unlock")).toBe(true);
     expect(um.buy("overcharge_unlock")).toBe(true);
     expect(um.buy("overcharge_accuracy")).toBe(true);
-    const spentEssence = 35 + 5;
-    expect(save.data.essence).toBe(560);
+    const spentEssence = 5;
+    expect(save.data.essence).toBe(595);
     expect(um.setLoadoutWeapon(0, "assault_rifle", "overcharge_conductor").ok).toBe(true);
     // Preserves one Assault Rifle owner across squad
     expect(um.setLoadoutWeapon(1, "assault_rifle", "overcharge_conductor").ok).toBe(false);
 
     const reloaded = new SaveManager(storage);
-    expect(reloaded.data.essence).toBe(560);
+    expect(reloaded.data.essence).toBe(595);
+    expect(reloaded.data.exoticMatter).toBe(0);
     expect(reloaded.data.loadouts[0].mutation).toBe("overcharge_conductor");
 
     const um2 = new UpgradeManager(reloaded); findAllSpecials(reloaded.data);
@@ -323,6 +324,7 @@ describe("Overcharge Conductor — Assault Rifle branch 1", () => {
     expect(refund.ok).toBe(true);
     if (refund.ok) expect(refund.refunded.essence).toBe(spentEssence);
     expect(reloaded.data.essence).toBe(600);
+    expect(reloaded.data.exoticMatter).toBe(1);
     expect(reloaded.data.loadouts[0].mutation).toBeNull();
   });
 

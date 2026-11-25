@@ -328,7 +328,7 @@ describe("Canonical Black Market integration & lab-only refund", () => {
     save.data.lifetimePixels = 10000;
     save.data.bank = 100000;
     save.data.crystals = 10000;
-    save.data.essence = 500;
+    save.data.essence = 500; save.data.exoticMatter = 4;
 
     expect(u.buy("shotgun_unlock")).toBe(true);
     expect(u.buy("vacuum_unlock")).toBe(true);
@@ -350,11 +350,11 @@ describe("Canonical Black Market integration & lab-only refund", () => {
     expect(mutationCompatibility("rail_lance").inactive.length).toBeGreaterThan(0);
 
     // Refund is lab-only: blocked during an active run, succeeds in lab and restores exact currencies.
-    const essenceBeforeRefund = save.data.essence;
+    expect(save.data.exoticMatter).toBe(0);
     expect(u.refundBlackMarket(true).ok).toBe(false);
     const res = u.refundBlackMarket(false);
     expect(res.ok).toBe(true);
-    expect(save.data.essence).toBeGreaterThan(essenceBeforeRefund);
+    expect(save.data.exoticMatter).toBe(4);
     expect(save.data.upgrades.vacuum_unlock).toBe(0);
     expect(save.data.upgrades.reverse_unlock).toBe(0);
     expect(save.data.loadouts[2].mutation).toBeNull();

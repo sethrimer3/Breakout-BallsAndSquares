@@ -1,3 +1,4 @@
+import { suppressDestroyedGenerators } from "./ExoticMatter";
 import { buildStartingTube } from "./StartingTube";
 import { installMapBoundary } from "./MapBoundary";
 import { carveLateBlueprint, installLateLights } from "./LateWorldLayouts";
@@ -71,6 +72,7 @@ export interface LabLayout {
 export interface GenerateOptions {
   /** Sectors whose generators were all destroyed in earlier runs: they start cleared. */
   conquered?: ReadonlySet<number>;
+  destroyedGenerators?: Readonly<Record<string, boolean>>;
   /** Force the old procedural maze even when the world fits the hand-made lab. */
   procedural?: boolean;
   /** Which hand-made lab world to build (zone 1 by default). */
@@ -141,8 +143,7 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     world.originX = o.cx;
     world.originY = o.cy;
     world.tierBase = def.tierBase;
-    const at = sectorSpawnCell(frame, options.spawn ?? def.start);
-    world.setStartRoom(at.cx, at.cy);
+    world.setStartRoom(o.cx, o.cy);
   } else {
     world.originX = world.centerX;
     world.originY = world.centerY;
@@ -168,6 +169,8 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
         else health[i] = 65000;
       }
     }
+    const landing = sectorSpawnCell(frame, options.spawn ?? def.start);
+    world.setStartRoom(landing.cx, landing.cy);
     forRect(world, world.roomX0, world.roomY0, world.roomX1, world.roomY1, clear);
     let specialIdx = 0;
     const mid = (CHAR_CELLS - 1) >> 1;
@@ -260,10 +263,16 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     }
   }
 
-  // Carve the empty starting room.
+  // Move the landing room after placing authored generators, so their identities
+  // never depend on which surveyed sector the squad deploys into.
+  if (frame) {
+    const landing = sectorSpawnCell(frame, options.spawn ?? def.start);
+    world.setStartRoom(landing.cx, landing.cy);
+  }
   for (let cy = world.roomY0; cy <= world.roomY1; cy++) {
     for (let cx = world.roomX0; cx <= world.roomX1; cx++) {
       const i = cy * width + cx;
+      if (world.coreId[i]) continue;
       wall[i] = 0;
       health[i] = 0;
       world.blight[i] = 0;
@@ -302,9 +311,14 @@ export function generateWorld(world: PixelWorld, seed: number, options: Generate
     placeCrystalVeins(world, frame, runSeed);
     if (options.conquered) clearConqueredSectors(world, frame, options.conquered);
   }
-  // The opening encounter is live even though A1 is unlocked/conquered by
-  // default in both new and existing saves.
-  if (frame?.def.id === 1 && (options.spawn ?? def.start) === def.start) buildStartingTube(world);
+  if (frame?.def.id === 1) {
+    const start = sectorSpawnCell(frame, def.start);
+    const landing = sectorSpawnCell(frame, options.spawn ?? def.start);
+    world.setStartRoom(start.cx, start.cy);
+    buildStartingTube(world, options.destroyedGenerators);
+    world.setStartRoom(landing.cx, landing.cy);
+  }
+  if (options.destroyedGenerators) suppressDestroyedGenerators(world, options.destroyedGenerators);
   ensureRoomFixtures(world, layout);
   installMapBoundary(world);
 }

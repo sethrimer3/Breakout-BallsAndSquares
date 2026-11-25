@@ -19,7 +19,7 @@ class MemoryStorage implements StorageLike {
 function progression(){
   const storage=new MemoryStorage(),save=new SaveManager(storage);
   unlockTabs(save);findAllSpecials(save.data);
-  save.data.bank=10000;save.data.crystals=10000;save.data.essence=1000;save.data.lifetimePixels=10000;
+  save.data.bank=10000;save.data.crystals=10000;save.data.essence=1000; save.data.exoticMatter=10;save.data.lifetimePixels=10000;
   return{save,storage,u:new UpgradeManager(save)};
 }
 function flight(){
@@ -76,7 +76,7 @@ describe("SQUELCH as a base weapon",()=>{
     expect(u.buy("homing_shotgun_unlock")).toBe(false);
     expect(u.buy("black_market_shotgun")).toBe(true);
     expect(u.buy("homing_shotgun_unlock")).toBe(true);
-    expect(save.data.essence).toBe(950);
+    expect(save.data.exoticMatter).toBe(8);
     expect(u.getSoldierStats().homingShotgunUnlocked).toBe(true);
     expect(u.setLoadoutWeapon(0,"shotgun","homing_shotgun").ok).toBe(true);
     expect(u.buy("vacuum_unlock")).toBe(true);

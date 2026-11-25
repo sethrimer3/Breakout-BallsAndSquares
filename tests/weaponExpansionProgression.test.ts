@@ -23,7 +23,7 @@ describe("weapon expansion release progression",()=>{
  });
  it("purchases and caps every new upgrade, then restores their exact levels",()=>{
   const{storage,save,u}=scene();unlockTabs(save);save.data.lifetimePixels=10000;
-  for(const currency of ["bank","crystals","greenCrystals","essence","biomass"]as const)save.data[currency]=1e9;
+  for(const currency of ["bank","crystals","greenCrystals","essence","biomass","exoticMatter"]as const)save.data[currency]=1e9;
   for(const def of UPGRADE_DEFS)save.data.upgrades[def.id]=def.maxLevel;
   for(const def of EXPANSION_DEFS){
    save.data.upgrades[def.id]=0;

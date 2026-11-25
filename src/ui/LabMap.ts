@@ -261,7 +261,7 @@ export class LabMap {
         if (sides[3]) g.fillRect(o, 0, step, THUMB_SIZE);
       }
     }
-    this.drawMarkers(g, s);
+    if (discovered) this.drawMarkers(g, s);
     // A deploy beacon where the squad would land.
     const frame = this.game.world.labLayout?.frame;
     if (s === this.selected && frame && this.game.canDeployInto(s)) {
@@ -336,17 +336,17 @@ export class LabMap {
     const progress = this.game.labProgress;
     for (let s = 0; s < this.tiles.length; s++) {
       const discovered = this.game.devMapAccess || progress.discovered.has(s);
-      const conquered = progress.conquered.has(s);
+      const conquered = discovered && progress.conquered.has(s);
       const tier = sectorTier(this.def, s);
       const tile = this.tiles[s];
       tile.classList.toggle("discovered", discovered);
       tile.classList.toggle("conquered", conquered);
       tile.classList.toggle("selected", s === this.selected);
       tile.dataset.tier = String(tier);
-      const state = deploymentState(discovered, this.game.sectorGuarded(s), this.game.canDeployInto(s));
+      const state = deploymentState(discovered, false, this.game.canDeployInto(s));
       if (tile.dataset.deployment !== state) tile.querySelector(".labmap-deploy-mark")!.innerHTML = deploymentIcon(state);
       tile.dataset.deployment = state;
-      tile.title = `Sector ${sectorName(s, this.def.sectors)} — ${DEPLOYMENT_LABELS[state]}`;
+      tile.title = `Sector ${sectorName(s, this.def.sectors)} — ${DEPLOYMENT_LABELS[state]}${discovered ? conquered ? " · Cleared" : " · Uncleared" : ""}`;
       tile.setAttribute("aria-label", tile.title);
       tile.setAttribute("aria-pressed", String(s === this.selected));
       this.drawTile(s, discovered, conquered);
@@ -358,20 +358,17 @@ export class LabMap {
     const facility = region && col >= region.col0 && col <= region.col1 && row >= region.row0 && row <= region.row1;
     const name = `W${this.def.id} ${sectorName(s, this.def.sectors)} · ZONE ${tier}${facility ? ` · ${region.name}` : ""}${this.def.teleporter?.sector === s ? " · TELEPORTER → WORLD 5" : ""}`;
     let status: string;
-    if (this.game.sectorGuarded(s) && (this.game.devMapAccess || progress.discovered.has(s))) status = "BLIGHT WARDENS HOLD THIS ZONE - NO DEPLOYMENT";
-    else if (this.game.devMapAccess) status = "DEV — DEPLOY ANYWHERE";
+    if (this.game.devMapAccess) status = "DEV — DEPLOY ANYWHERE";
     else if (!progress.discovered.has(s)) status = "UNEXPLORED";
     else if (progress.conquered.has(s)) status = s === this.def.start ? (this.def.id === 1 ? "STAGING AREA - SECURED" : "GATEWAY - SECURED") : "CONQUERED - DEPLOYMENT OPEN";
     else {
       const left = progress.generatorsLeft(s);
-      const label = this.def.framework ? "THREAT" : "BLIGHT GENERATOR";
-      status = `${left} ${label}${left === 1 ? "" : "S"} ACTIVE`;
+      status = `${left} BLIGHT GENERATOR${left === 1 ? "" : "S"} ACTIVE`;
     }
-    const state = deploymentState(this.game.devMapAccess || progress.discovered.has(s), this.game.sectorGuarded(s), this.game.canDeployInto(s));
-    const reason = state === "guarded" ? "Defeat the Wardens and collect this sector’s gold block."
-      : state === "available" ? "Choose this sector to begin deployment. Clear ground is still required."
-      : state === "unknown" ? "Explore this sector to assess its deployment status."
-      : "Eliminate the remaining threats to secure this sector.";
+    const state = deploymentState(this.game.devMapAccess || progress.discovered.has(s), false, this.game.canDeployInto(s));
+    const reason = state === "available"
+      ? progress.conquered.has(s) ? "Deploy here." : "Deploy here while the sector is still active."
+      : "Explore this sector to unlock deployment.";
     this.info.innerHTML = `<div><b>${name}</b> <span class="labmap-tier t${tier}">TIER ${tier}</span></div>
       <div class="labmap-deploy-status" data-deployment="${state}">${deploymentIcon(state)} ${DEPLOYMENT_LABELS[state]}</div>
       <div class="labmap-deploy-reason">${reason}</div><div class="labmap-detail">${state === "available" || state === "unsecured" ? status : ""}</div>`;

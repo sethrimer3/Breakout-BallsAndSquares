@@ -157,7 +157,7 @@ export type UpgradeId =
   | "necrosis_protocol";
 
 /** Resources used to buy upgrades. */
-export type Currency = "gold" | "crystals" | "greenCrystals" | "essence" | "biomass";
+export type Currency = "gold" | "crystals" | "greenCrystals" | "essence" | "biomass" | "exoticMatter";
 
 export interface Price {
   currency: Currency;

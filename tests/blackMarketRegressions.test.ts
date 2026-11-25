@@ -79,23 +79,25 @@ describe("Bug 2: Reload does not restore spent Black Market Essence", () => {
     // Simulate a legitimately cleared late-world encounter in world 3 (tier 8).
     const tier8Essence = CAMPAIGN[campaignTier(8)].essence;
     save.data.lab.worlds[3] = { discovered: [0], conquered: [0], cleared: ["0:soldier:0"], gathered: [], specials: [], spawn: 0 };
-    save.data.essence = tier8Essence;
+    save.data.essence = tier8Essence; save.data.exoticMatter = 1;
     save.save();
 
-    // Purchase Reverse-Playback Revolver (20 Essence).
+    // Purchase Reverse-Playback Revolver with one Exotic Matter.
     expect(u.buy("reverse_unlock")).toBe(true);
-    expect(save.data.essence).toBe(tier8Essence - 20);
+    expect(save.data.exoticMatter).toBe(0);
     save.save();
 
-    // Reload: wallet MUST stay at (tier8Essence - 20), not restore to tier8Essence.
+    // Reload preserves both wallets.
     const reloaded = new SaveManager(storage);
     expect(reloaded.data.upgrades.reverse_unlock).toBe(1);
-    expect(reloaded.data.essence).toBe(tier8Essence - 20);
+    expect(reloaded.data.essence).toBe(tier8Essence);
+    expect(reloaded.data.exoticMatter).toBe(0);
 
-    // Refund in lab: returns exact 20 Essence once and clears purchase.
+    // Refund in lab returns the Exotic Matter once.
     const ru = new UpgradeManager(reloaded);
     const res = ru.refundBlackMarket(false);
     expect(res.ok).toBe(true);
+    expect(reloaded.data.exoticMatter).toBe(1);
     expect(reloaded.data.essence).toBe(tier8Essence);
     expect(reloaded.data.upgrades.reverse_unlock).toBe(0);
     expect(reloaded.data.upgradeSpent?.reverse_unlock).toBeUndefined();

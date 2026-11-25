@@ -1,3 +1,4 @@
+import { exoticDrop, generatorKey, type ExoticDrop } from "./world/ExoticMatter";
 import { BrowserFrameEvents } from "./core/BrowserFrameEvents";
 import { FrameTimings } from "./core/FrameTimings";
 import { DamageNumbers } from "./entities/DamageNumbers";
@@ -53,7 +54,7 @@ import { generateWorld } from "./world/WorldGenerator";
 import { LabMap } from "./ui/LabMap";
 import { renderSectorThumbs } from "./rendering/SectorThumbs";
 import { LabProgress } from "./world/LabProgress";
-import { gateGeometry, labWorld, LAB_WORLD_COUNT, sectorCount, sectorSpawnCell, upgradeSpotSector, type LabWorldDef } from "./world/labMap";
+import { gateGeometry, labWorld, LAB_WORLD_COUNT, sectorCount, sectorSpawnCell, sectorAtCell, type LabWorldDef } from "./world/labMap";
 import type { Door } from "./world/PixelWorld";
 import type { LabWorldProgress } from "./progression/SaveManager";
 
@@ -136,7 +137,7 @@ export class Game {
   /** The squad's deployment portal while it is open (see SpawnPortal). */
   portal: SpawnPortal | null = null;
   /** Last refused portal tap (wall-clock seconds), shown as a red mark. */
-  spawnDenied: { x: number; y: number; t0: number; guarded: boolean } | null = null;
+  spawnDenied: { x: number; y: number; t0: number; unsurveyed: boolean } | null = null;
   growthRate = 0;
   private readonly speedrunClock = new SpeedrunTimer();
   private speedrunSavedAt = 0;
@@ -187,6 +188,7 @@ export class Game {
   private bankedThisRun = false;
   /** Discovered / conquered sectors of the hand-made lab (mirrors `save.data.lab`). */
   labProgress = new LabProgress();
+  exoticDrops: ExoticDrop[] = [];
   labMap!: LabMap;
   private labCheckT = 0;
   /** The "access needed" notice over a locked world gate (run seconds it started), or null. */
@@ -419,6 +421,7 @@ export class Game {
     this.world.onSubBreakPush = (sx, sy) => this.subPixels.pushFromBreak(sx, sy);
     this.loadLabProgress();
     this.generateLab();
+    this.world.addDestroyListener((cx, cy, sub) => { if (!sub) this.onGeneratorDestroyed(cx, cy); });
     this.terrain = new TerrainRenderer(this.world, WORLD.chunkSize);
     this.subPixels.onSubLightSettled = (sx, sy) => this.terrain.addLabLight(sx, sy);
     this.terrain.dormantAt = (si) => this.growth.colonies.isDormantSub(si);
@@ -708,8 +711,9 @@ export class Game {
     const def = this.labDef;
     const lab = this.labSave;
     if (!this.canDeployInto(lab.spawn)) lab.spawn = def.start;
-    generateWorld(this.world, labWorldSeed(def.id), { conquered: this.labProgress.conquered, labWorld: def, spawn: lab.spawn });
+    generateWorld(this.world, labWorldSeed(def.id), { conquered: this.labProgress.conquered, destroyedGenerators: lab.destroyedGenerators, labWorld: def, spawn: lab.spawn });
     this.labProgress.attach(this.world);
+    this.exoticDrops = Object.entries(lab.destroyedGenerators ?? {}).flatMap(([id, claimed]) => claimed ? [] : [exoticDrop(id, this.world.cellSize)]);
     this.creatures.flowerMult = def.alien ? FACILITY.alienFlowerMult : 1;
     this.gateNotice = null;
     this.gateHits.length = 0;
@@ -721,22 +725,10 @@ export class Game {
     if (frame && this.labMap) this.labMap.setThumbs(renderSectorThumbs(this.world, this.terrain, frame));
   }
 
-  /**
-   * Normal deployments require conquest; the dev override allows any valid
-   * sector. Either way, a sector whose gold block is still uncollected is
-   * held by its Blight Wardens and cannot be deployed into.
-   */
+  /** Surveyed sectors are available as starting locations. */
   canDeployInto(sector: number): boolean {
     return Number.isInteger(sector) && sector >= 0 && sector < sectorCount(this.labDef)
-      && (this.devMapAccess || this.labProgress.conquered.has(sector))
-      && !this.sectorGuarded(sector);
-  }
-
-  /** True while Blight Wardens hold `sector`: it has a gold block not yet collected. */
-  sectorGuarded(sector: number): boolean {
-    const def = this.labDef;
-    const collected = this.labSave.specials;
-    return def.upgrades.some((spot) => upgradeSpotSector(def, spot) === sector && !collected.includes(spot.id));
+      && (this.devMapAccess || this.labProgress.discovered.has(sector));
   }
 
   /**
@@ -760,7 +752,7 @@ export class Game {
     this.labMap.show();
   }
 
-  /** Start a run deployed into a conquered `sector`. */
+  /** Start a run deployed into a surveyed `sector`. */
   deployInto(sector: number): void {
     if (!this.canDeployInto(sector)) return;
     this.labSave.spawn = sector;
@@ -1090,20 +1082,23 @@ export class Game {
    * in the hand-made lab, any sector whose gold block has a living Warden; in
    * small test worlds, the ground within a Warden's leash of its block.
    */
-  spawnGuardedAt(wx: number, wy: number): boolean {
-    return this.wardens.guardsZoneAt(wx, wy);
+  spawnUnsurveyedAt(wx: number, wy: number): boolean {
+    const frame = this.world.labLayout?.frame;
+    if (!frame) return false;
+    return !this.canDeployInto(sectorAtCell(frame, Math.floor(wx / this.world.cellSize), Math.floor(wy / this.world.cellSize)));
   }
 
   /**
    * Open a portal at world point (wx, wy) and send the whole reserve through
-   * it. Refused (with a red mark on the spot) inside a Warden-guarded zone or
-   * where no clear ground is near. Returns the portal, or null if refused.
+   * it. A portal needs a surveyed sector and nearby clear ground.
    */
   openPortal(wx: number, wy: number): SpawnPortal | null {
     if (!this.canPlaceSoldier()) return null;
-    const spot = this.clearDeploySpot(wx, wy);
-    if (!spot || this.spawnGuardedAt(spot.x, spot.y)) {
-      this.spawnDenied = { x: spot?.x ?? wx, y: spot?.y ?? wy, t0: performance.now() / 1000, guarded: !!spot };
+    const unknownTarget = this.spawnUnsurveyedAt(wx, wy);
+    const spot = unknownTarget ? null : this.clearDeploySpot(wx, wy);
+    const unsurveyed = unknownTarget || (!!spot && this.spawnUnsurveyedAt(spot.x, spot.y));
+    if (!spot || unsurveyed) {
+      this.spawnDenied = { x: wx, y: wy, t0: performance.now() / 1000, unsurveyed };
       return null;
     }
     this.spawnDenied = null;
@@ -1505,44 +1500,71 @@ export class Game {
           blockLoot.value,
         );
       }
-      const destroyedCore = this.world.checkCoreDestroyedAt(cx, cy);
-      if (destroyedCore) {
-        const small = destroyedCore.size === 1;
-        this.growth.reduceBlightTimer(
-          this.runStats.time,
-          this.stats.coreTimeReduction * (small ? FACILITY.smallCoreTimeMult : 1),
-        );
-        this.growthRate = this.growth.rate;
-        // Center of the core: the shared corner of a 2×2 core, the middle of a 1×1 generator.
-        const coreWx = (destroyedCore.cx + destroyedCore.size / 2) * cs;
-        const coreWy = (destroyedCore.cy + destroyedCore.size / 2) * cs;
-        const burst = small ? Math.ceil(this.stats.coreLootBurst / 2) : this.stats.coreLootBurst;
-        for (let i = 0; i < burst; i++) {
-          this.loot.spawnOne(coreWx, coreWy, this.stats.pickupLifetime, this.rng, lootKind, blockLoot.value);
-        }
-        const essenceLife = this.stats.pickupLifetime * LOOT.essenceLifetimeMult;
-        const essence = small ? Math.ceil(LOOT.coreEssence[destroyedCore.zone] / 3) : LOOT.coreEssence[destroyedCore.zone];
-        for (let i = 0; i < essence; i++) {
-          this.loot.spawnOne(coreWx, coreWy, essenceLife, this.rng, LootKind.Essence);
-        }
-        this.particles.spawn(PKind.Burst, coreWx, coreWy, 0, 0, 0.45, 28, 0xff48a4, 1);
-        for (let i = 0; i < 36; i++) {
-          const a = this.rng.range(0, Math.PI * 2);
-          const sp = this.rng.range(45, 220);
-          const col = i % 2 === 0 ? 0xff48a4 : 0xff9ad5;
-          this.particles.spawn(
-            PKind.Spark,
-            coreWx,
-            coreWy,
-            Math.cos(a) * sp,
-            Math.sin(a) * sp,
-            this.rng.range(0.22, 0.5),
-            this.rng.range(1.4, 2.4),
-            col,
-            5,
-          );
-        }
-      }
+    }
+  }
+
+  private onGeneratorDestroyed(cx: number, cy: number): void {
+    const destroyedCore = this.world.checkCoreDestroyedAt(cx, cy);
+    if (!destroyedCore) return;
+    const id = generatorKey(destroyedCore);
+    const destroyed = this.labSave.destroyedGenerators ??= {};
+    if (id in destroyed) return;
+    destroyed[id] = false;
+    this.exoticDrops.push(exoticDrop(id, this.world.cellSize));
+    this.labCheckT = 0;
+    this.updateLabProgress(0);
+    this.save.save();
+
+    const cs = this.world.cellSize;
+    const blockLoot = this.terrainLoot(cx, cy, this.world.zoneAt(cx, cy));
+    const lootKind = blockLoot.kind;
+    const small = destroyedCore.size === 1;
+    this.growth.reduceBlightTimer(
+      this.runStats.time,
+      this.stats.coreTimeReduction * (small ? FACILITY.smallCoreTimeMult : 1),
+    );
+    this.growthRate = this.growth.rate;
+    // Center of the core: the shared corner of a 2×2 core, the middle of a 1×1 generator.
+    const coreWx = (destroyedCore.cx + destroyedCore.size / 2) * cs;
+    const coreWy = (destroyedCore.cy + destroyedCore.size / 2) * cs;
+    const burst = small ? Math.ceil(this.stats.coreLootBurst / 2) : this.stats.coreLootBurst;
+    for (let i = 0; i < burst; i++) {
+      this.loot.spawnOne(coreWx, coreWy, this.stats.pickupLifetime, this.rng, lootKind, blockLoot.value);
+    }
+    const essenceLife = this.stats.pickupLifetime * LOOT.essenceLifetimeMult;
+    const essence = small ? Math.ceil(LOOT.coreEssence[destroyedCore.zone] / 3) : LOOT.coreEssence[destroyedCore.zone];
+    for (let i = 0; i < essence; i++) {
+      this.loot.spawnOne(coreWx, coreWy, essenceLife, this.rng, LootKind.Essence);
+    }
+    this.particles.spawn(PKind.Burst, coreWx, coreWy, 0, 0, 0.45, 28, 0xff48a4, 1);
+    for (let i = 0; i < 36; i++) {
+      const a = this.rng.range(0, Math.PI * 2);
+      const sp = this.rng.range(45, 220);
+      const col = i % 2 === 0 ? 0xff48a4 : 0xff9ad5;
+      this.particles.spawn(
+        PKind.Spark,
+        coreWx,
+        coreWy,
+        Math.cos(a) * sp,
+        Math.sin(a) * sp,
+        this.rng.range(0.22, 0.5),
+        this.rng.range(1.4, 2.4),
+        col,
+        5,
+      );
+    }
+  }
+
+  private collectExoticMatter(): void {
+    const radiusSquared = (2 * this.world.cellSize) ** 2;
+    for (let i = this.exoticDrops.length - 1; i >= 0; i--) {
+      const drop = this.exoticDrops[i];
+      if (!this.soldiers.some(s => s.alive && (s.x - drop.x) ** 2 + (s.y - drop.y) ** 2 <= radiusSquared)) continue;
+      this.labSave.destroyedGenerators![drop.id] = true;
+      this.exoticDrops.splice(i, 1);
+      this.save.data.exoticMatter++;
+      this.audio.playPickup(drop.x, drop.y);
+      this.save.save();
     }
   }
 
@@ -1846,7 +1868,6 @@ export class Game {
   /** Fresh doors, glass and dormant sentries for a newly generated facility. */
   private resetFacility(): void {
     this.late.reset(this.labSave.cleared, this.labSave.gathered);
-    this.labProgress.attachThreats(this.late.actors);
     this.fixtures.reset();
     this.specials.reset(this.labSave.specials);
     this.wardens.reset(this.specials.blocks);
@@ -1939,7 +1960,7 @@ export class Game {
     room.x = w.roomCenterX;
     room.y = w.roomCenterY;
     room.radiusCells = w.roomSize * 0.5 + 2;
-    if (w.startingTube) {
+    if (w.startingTube && this.labSave.spawn === this.labDef.start) {
       const core = w.blightCores[w.startingTube.coreId - 1];
       const containment = take();
       containment.x = (core.cx + 0.5) * w.cellSize;
@@ -2146,6 +2167,7 @@ export class Game {
     this.subPixels.update(dt, this.soldiers);
     this.lighting.invalidateMovingSubPixels();
     metrics.subPixelSimulationMs += performance.now() - subStart;
+    if (this.exoticDrops.length) this.collectExoticMatter();
     const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
     if (collected > 0) {
       this.runStats.currency += this.loot.collectedGold;
@@ -2489,6 +2511,7 @@ export class Game {
         crystals: r.crystals,
         greenCrystals: r.greenCrystals,
         essence: r.essence,
+        exoticMatter: this.save.data.exoticMatter,
         maxDepth: r.maxDepth,
         soldiersDeployed: r.soldiersDeployed,
         nearSoldierGrowthPct: +this.growth.nearSoldierPercent(r.time).toFixed(1),

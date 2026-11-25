@@ -13,12 +13,12 @@ class MemoryStorage implements StorageLike {
 function scene() {
   const storage = new MemoryStorage(), save = new SaveManager(storage);
   unlockTabs(save);
-  save.data.essence=1000;save.data.bank=10000;save.data.crystals=10000;save.data.lifetimePixels=10000;
+  save.data.essence=1000; save.data.exoticMatter=10;save.data.bank=10000;save.data.crystals=10000;save.data.lifetimePixels=10000;
   return {storage,save,u:new UpgradeManager(save)};
 }
 
 describe("separate Black Market trees",()=>{
-  it("offers one essence access upgrade per weapon and three Pistol paths",()=>{
+  it("offers one Exotic Matter access upgrade per weapon and three Pistol paths",()=>{
     for(const market of WEAPON_MARKETS) {
       const standard=UPGRADE_DEFS.filter(d=>d.branch===market.weapon&&!marketNode(d.id));
       expect(standard.filter(d=>d.id.startsWith("black_market_")).map(d=>d.id)).toEqual([accessId(market.weapon)]);
@@ -29,21 +29,25 @@ describe("separate Black Market trees",()=>{
   it("requires access and charges again every time a purchased path is reactivated",()=>{
     const {save,u}=scene();
     expect(u.buy("reverse_unlock")).toBe(false);
+    expect(u.pricesOf("black_market_pistol")).toEqual([{currency:"exoticMatter",amount:1}]);
+    save.data.exoticMatter = 0;
+    expect(u.buy("black_market_pistol")).toBe(false);
+    save.data.exoticMatter = 10;
     expect(u.buy("black_market_pistol")).toBe(true);
-    expect(save.data.essence).toBe(980);
+    expect(save.data.exoticMatter).toBe(9);
     expect(u.buy("reverse_unlock")).toBe(true);
-    expect(save.data.essence).toBe(960);
+    expect(save.data.exoticMatter).toBe(8);
     expect(u.buy("reverse_unlock")).toBe(false); // active, already maxed
     expect(u.getSoldierStats()).toMatchObject({reverseUnlocked:true,orbitUnlocked:false});
     expect(u.buy("orbit_unlock")).toBe(true);
-    expect(save.data.essence).toBe(935);
+    expect(save.data.exoticMatter).toBe(7);
     expect(u.getSoldierStats()).toMatchObject({reverseUnlocked:false,orbitUnlocked:true});
     expect(u.isMaxed("reverse_unlock")).toBe(false);
     expect(u.pricesOf("reverse_unlock")).toEqual([{currency:"essence",amount:20}]);
     expect(u.buy("reverse_unlock")).toBe(true);
-    expect(save.data.essence).toBe(915);
+    expect(save.data.essence).toBe(980);
     expect(save.data.upgrades.reverse_unlock).toBe(1);
-    expect(save.data.upgradeSpent?.reverse_unlock?.essence).toBe(40);
+    expect(save.data.upgradeSpent?.reverse_unlock?.essence).toBe(20);
     expect(u.getSoldierStats()).toMatchObject({reverseUnlocked:true,orbitUnlocked:false});
     expect(u.setLoadoutWeapon(1,"pistol","orbit_cylinder").ok).toBe(false);
     save.data.essence=0;
@@ -70,7 +74,11 @@ describe("separate Black Market trees",()=>{
     const before=loaded.data.essence, spent=1000-before;
     const refund=lu.refundBlackMarket();
     expect(refund.ok).toBe(true);
-    if(refund.ok)expect(refund.refunded.essence).toBe(spent);
+    if(refund.ok) {
+      expect(refund.refunded.essence).toBe(spent);
+      expect(refund.refunded.exoticMatter).toBe(3);
+    }
+    expect(loaded.data.exoticMatter).toBe(10);
     expect(loaded.data.essence).toBe(1000);
     expect(lu.marketOpen("pistol")).toBe(false);
     expect(loaded.data.blackMarketPaths).toEqual({});

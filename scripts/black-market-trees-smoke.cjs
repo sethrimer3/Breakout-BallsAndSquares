@@ -24,7 +24,7 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
    await page.locator('[data-act="play"]').click();
    const initial=await page.evaluate(()=>{
     const g=window.__game;g.transition.update(10);g.save.data.upgrades.unlock_primary=1;g.save.data.lifetimePixels=10000;
-    g.save.data.essence=10000;g.save.data.bank=10000;g.save.data.crystals=10000;
+    g.save.data.essence=10000;g.save.data.exoticMatter=10;g.save.data.bank=10000;g.save.data.crystals=10000;
     g.openUpgrades();g.upgradeTree.switchTab('pistol');
     const ids=()=>[...g.upgradeTree.nodeEls].filter(([,el])=>!el.classList.contains('hidden')).map(([id])=>id);
     return {ids:ids(),hidden:g.upgradeTree.root.querySelector('[data-tab="shotgun"]').textContent.trim()};
@@ -33,7 +33,7 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
    assert.equal(initial.ids.filter(id=>id.startsWith('black_market_')).length,1);
    assert(!initial.ids.some(id=>['reverse_unlock','orbit_unlock','drone_unlock'].includes(id)));
    assert(await page.locator('[data-market="pistol"]').isDisabled());
-   await page.locator('.tree-node[aria-label="Black Market"]:visible').click();
+   await page.locator('.tree-node[aria-label="Symbiosis"]:visible').click();
    assert(!(await page.locator('[data-market="pistol"]').isDisabled()));
    const after=await page.evaluate(()=>[...window.__game.upgradeTree.nodeEls].filter(([,el])=>!el.classList.contains('hidden')).map(([id])=>id));
    assert.deepEqual(after,initial.ids); // access never sprouts mutation nodes onto the ordinary tree
@@ -43,6 +43,7 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
    assert(await page.locator('.tree-core:not(.hidden)').isVisible());
    await buy('reverse_unlock');
    await buy('orbit_unlock');
+   assert.equal(await page.evaluate(()=>window.__game.save.data.exoticMatter),7);
    const before=await page.evaluate(()=>window.__game.save.data.essence);
    await buy('reverse_unlock');
    assert.equal(await page.evaluate(()=>window.__game.save.data.essence),before-20);
