@@ -11,6 +11,8 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     if (!s.alive || s.dashLeft <= 0) continue;
     const speed = Math.hypot(s.vx,s.vy); if (speed < 1e-6) continue;
     const x = cam.worldToScreenX(s.x); const y = cam.worldToScreenY(s.y);
+    const pad = 24 * cam.zoom + 4;
+    if (x < -pad || y < -pad || x > cam.viewW + pad || y > cam.viewH + pad) continue;
     ctx.strokeStyle = "rgba(115,235,255,0.65)"; ctx.lineWidth = Math.max(1,cam.zoom*2);
     ctx.beginPath(); ctx.moveTo(x,y);
     ctx.lineTo(x-s.vx/speed*16*cam.zoom,y-s.vy/speed*16*cam.zoom); ctx.stroke();
@@ -61,9 +63,11 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
   // Perfect Rebound is a visual echo, not an additional damage actor.
   if (!reduced) for (const b of game.combat.bullets.items) {
     if (!b.active || !b.afterimage || b.style!==3) continue;
-    ctx.globalAlpha=0.3;ctx.strokeStyle="#aff7ff";ctx.lineWidth=Math.max(1,cam.zoom);
     const x=cam.worldToScreenX(b.x-b.dx*5);const y=cam.worldToScreenY(b.y-b.dy*5);
-    ctx.beginPath();ctx.arc(x,y,Math.max(2,b.slashWidth*cam.zoom*0.5),Math.atan2(b.dy,b.dx)-0.9,Math.atan2(b.dy,b.dx)+0.9);ctx.stroke();
+    const rad=Math.max(2,b.slashWidth*cam.zoom*0.5);
+    if(x+rad+2<0||y+rad+2<0||x-rad-2>cam.viewW||y-rad-2>cam.viewH)continue;
+    ctx.globalAlpha=0.3;ctx.strokeStyle="#aff7ff";ctx.lineWidth=Math.max(1,cam.zoom);
+    ctx.beginPath();ctx.arc(x,y,rad,Math.atan2(b.dy,b.dx)-0.9,Math.atan2(b.dy,b.dx)+0.9);ctx.stroke();
   }
 
   // Orbit Cylinder: orbiting rounds + full-magazine ring indicator.
@@ -74,10 +78,12 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     if (count > 0) {
       const sx = cam.worldToScreenX(s.x);
       const sy = cam.worldToScreenY(s.y);
+      const r = ORBIT.radius * cam.zoom;
+      if (sx + r + 4 < 0 || sy + r + 4 < 0 || sx - r - 4 > cam.viewW || sy - r - 4 > cam.viewH) continue;
       ctx.strokeStyle = count >= ORBIT.maxRounds ? "rgba(255,220,110,0.75)" : "rgba(130,220,255,0.3)";
       ctx.lineWidth = Math.max(1, cam.zoom * 0.6);
       ctx.beginPath();
-      ctx.arc(sx, sy, ORBIT.radius * cam.zoom, 0, Math.PI * 2);
+      ctx.arc(sx, sy, r, 0, Math.PI * 2);
       ctx.stroke();
     }
   }
@@ -154,13 +160,17 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     const x1 = cam.worldToScreenX(s.x);
     const y1 = cam.worldToScreenY(s.y);
     const len = 80 * cam.zoom;
+    const x2 = x1 + s.railLockDx * len;
+    const y2 = y1 + s.railLockDy * len;
+    if (Math.max(x1, x2) < -4 || Math.min(x1, x2) > cam.viewW + 4 ||
+        Math.max(y1, y2) < -4 || Math.min(y1, y2) > cam.viewH + 4) continue;
     ctx.globalAlpha = locked ? 0.75 : 0.35;
     ctx.strokeStyle = locked ? "#ff6884" : "#8ee8ff";
     ctx.lineWidth = Math.max(1, cam.zoom * (locked ? 0.9 : 0.5));
     ctx.setLineDash(locked ? [] : [4, 4]);
     ctx.beginPath();
     ctx.moveTo(x1, y1);
-    ctx.lineTo(x1 + s.railLockDx * len, y1 + s.railLockDy * len);
+    ctx.lineTo(x2, y2);
     ctx.stroke();
     ctx.setLineDash([]);
   }

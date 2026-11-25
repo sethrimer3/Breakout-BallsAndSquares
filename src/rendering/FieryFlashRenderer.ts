@@ -172,6 +172,8 @@ export class FieryFlashRenderer {
     if (mult <= 0) return;
     const cam = game.camera;
     ctx.fillStyle = "#fff0b0";
+    const vw = cam.viewW;
+    const vh = cam.viewH;
     for (const f of game.flashes) {
       if (f.ownerId < 0) continue;
       const life = f.life / f.maxLife;
@@ -182,6 +184,7 @@ export class FieryFlashRenderer {
       const y0 = Math.round(cam.worldToScreenY(gy * ART_PIXEL));
       const x1 = Math.round(cam.worldToScreenX((gx + 1) * ART_PIXEL));
       const y1 = Math.round(cam.worldToScreenY((gy + 1) * ART_PIXEL));
+      if (x1 < 0 || y1 < 0 || x0 > vw || y0 > vh) continue;
       ctx.globalAlpha = Math.min(1, life * mult);
       ctx.fillRect(x0, y0, Math.max(1, x1 - x0), Math.max(1, y1 - y0));
     }

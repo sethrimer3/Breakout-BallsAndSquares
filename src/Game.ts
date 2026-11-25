@@ -1996,7 +1996,7 @@ export class Game {
     this.fog.update(dt, src);
   }
 
-  step(dt: number): void {
+  step(dt: number, skipFog = false): void {
     this.updatePortal(dt);
     if (this.runStats.soldiersDeployed === 0) return;
     this.runStats.time += dt;
@@ -2147,15 +2147,17 @@ export class Game {
     this.sentries.update(dt, this.soldiers, (x, y, dx, dy, dmg) => this.combat.fireTurretShot(0, x, y, dx, dy, dmg));
     this.wardens.update(dt, this.soldiers);
     this.specials.update(dt);
-    const fogStart = performance.now();
-    this.updateFog(dt);
-    const growthStart = performance.now();
     const metrics = this.frameTimings.current;
-    metrics.fogUpdateMs += growthStart - fogStart;
-    metrics.airMappingMs += this.fog.airMetrics.updateMs;
-    metrics.airFloods += this.fog.airMetrics.floods;
-    metrics.airCellsVisited += this.fog.airMetrics.visitedCells;
-    metrics.mappedAirTiles = this.fog.airMetrics.mappedTiles;
+    if (!skipFog) {
+      const fogStart = performance.now();
+      this.updateFog(dt);
+      metrics.fogUpdateMs += performance.now() - fogStart;
+      metrics.airMappingMs += this.fog.airMetrics.updateMs;
+      metrics.airFloods += this.fog.airMetrics.floods;
+      metrics.airCellsVisited += this.fog.airMetrics.visitedCells;
+      metrics.mappedAirTiles = this.fog.airMetrics.mappedTiles;
+    }
+    const growthStart = performance.now();
     if (!this.labDef.framework) this.growth.update(dt, this.runStats.time, this.soldiers);
     metrics.growthUpdateMs += performance.now() - growthStart;
     this.growthRate = this.growth.rate;
@@ -2572,9 +2574,18 @@ export class Game {
       const maxSteps = SIM.maxStepsPerFrame * Math.max(1, this.timeScale);
       let steps = 0;
       while (this.acc >= SIM.dt && steps < maxSteps) {
-        this.step(SIM.dt);
+        this.step(SIM.dt, true);
         this.acc -= SIM.dt;
         steps++;
+      }
+      if (steps > 0 && this.runStats.soldiersDeployed > 0) {
+        const fogStart = performance.now();
+        this.updateFog(steps * SIM.dt);
+        metrics.fogUpdateMs += performance.now() - fogStart;
+        metrics.airMappingMs += this.fog.airMetrics.updateMs;
+        metrics.airFloods += this.fog.airMetrics.floods;
+        metrics.airCellsVisited += this.fog.airMetrics.visitedCells;
+        metrics.mappedAirTiles = this.fog.airMetrics.mappedTiles;
       }
       metrics.simulationSteps = steps;
       if (steps >= maxSteps) {

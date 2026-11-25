@@ -827,10 +827,13 @@ export class Renderer {
     const cam = game.camera;
     const cs = game.world.cellSize;
     const sz = cs * cam.zoom;
+    const vw = cam.viewW;
+    const vh = cam.viewH;
     for (const f of game.cellFlashes) {
-      const a = Math.max(0, f.life / f.maxLife);
       const sx = cam.worldToScreenX(f.cx * cs);
       const sy = cam.worldToScreenY(f.cy * cs);
+      if (sx + sz < 0 || sy + sz < 0 || sx > vw || sy > vh) continue;
+      const a = Math.max(0, f.life / f.maxLife);
       ctx.fillStyle = f.destroyed
         ? `rgba(255, 195, 115, ${a * 0.42})`
         : `rgba(255, 225, 165, ${a * 0.52})`;
@@ -879,10 +882,15 @@ export class Renderer {
   private drawSoldiers(): void {
     const { ctx, game } = this;
     const cam = game.camera;
+    const commander = game.getCommander();
+    const pad = (SOLDIER.ringRadius + 16) * cam.zoom + 24;
+    const vw = cam.viewW;
+    const vh = cam.viewH;
     for (const s of game.soldiers) {
       if (!s.alive) continue;
       const sx = cam.worldToScreenX(s.x);
       const sy = cam.worldToScreenY(s.y);
+      if (sx + pad < 0 || sy + pad < 0 || sx - pad > vw || sy - pad > vh) continue;
       // The ring marks the soldier the camera is following (auto or Tab-selected).
       const selected = cam.following && cam.targetId === s.id;
       // Each loadout slot has its own body shape, rotated to face where it aims.
@@ -892,7 +900,7 @@ export class Renderer {
       }
       const br = SOLDIER.renderRadius * cam.zoom;
 
-      if (s === game.getCommander()) {
+      if (s === commander) {
         ctx.save();
         ctx.fillStyle = "#ffd84d";
         ctx.strokeStyle = "#fffbe0";
@@ -1041,10 +1049,14 @@ export class Renderer {
     const mult = game.muzzleFlashMultiplier;
     if (mult <= 0) return;
     const cam = game.camera;
+    const reach = 26 * cam.zoom;
+    const vw = cam.viewW;
+    const vh = cam.viewH;
     for (const f of game.flashes) {
-      const a = Math.max(0, f.life / f.maxLife) * mult;
       const sx = cam.worldToScreenX(f.x);
       const sy = cam.worldToScreenY(f.y);
+      if (sx + reach < 0 || sy + reach < 0 || sx - reach > vw || sy - reach > vh) continue;
+      const a = Math.max(0, f.life / f.maxLife) * mult;
       ctx.save();
       // The flare is drawn after the lighting pass, so stop it at walls here.
       if (f.hasPolygon) {

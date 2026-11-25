@@ -9,6 +9,8 @@ export interface SightQuery {
   solidAt(cx: number, cy: number): boolean;
   /** Half-size grid opacity (half-size blocks block sight too), when the terrain has one. */
   subSolidAt?(sx: number, sy: number): boolean;
+  /** Optional terrain change listener so ConnectedAir only re-floods on geometry changes. */
+  addListener?(fn: (cx: number, cy: number, kind: string) => void): void;
 }
 
 /** Something that sees: a soldier, a turret, or the spawn room. */
@@ -66,6 +68,13 @@ export class FogOfWar {
   /** How many solid terrain cells sight rays penetrate into walls (Better Flashlight). */
   wallPenetrationCells = 0;
   private air: ConnectedAir | null = null;
+  /** Active 8×8 fog-tile blocks so settled dark/mapped regions cost zero per-step work. */
+  private readonly blockCols: number;
+  private readonly blockRows: number;
+  private readonly blockActive: Uint8Array;
+  private readonly activeBlocks: Int32Array;
+  private activeBlockCount = 0;
+  private lastPermanent = false;
 
   constructor(
     private readonly world: SightQuery,
@@ -84,6 +93,11 @@ export class FogOfWar {
     this.srcStamp = new Uint32Array(n);
     this.revealBoost = new Float32Array(n);
     this.noise = new Float32Array(n);
+    this.blockCols = (this.tw + 7) >> 3;
+    this.blockRows = (this.th + 7) >> 3;
+    const bn = this.blockCols * this.blockRows;
+    this.blockActive = new Uint8Array(bn);
+    this.activeBlocks = new Int32Array(bn);
     this.reseed(1);
   }
 
@@ -97,6 +111,9 @@ export class FogOfWar {
     this.seenStamp.fill(0);
     this.srcStamp.fill(0);
     this.revealBoost.fill(0);
+    this.blockActive.fill(0);
+    this.activeBlockCount = 0;
+    this.lastPermanent = this.permanent;
     this.stamp = 0;
     this.time = 0;
     this.bx0 = 1;
@@ -104,6 +121,14 @@ export class FogOfWar {
     this.bx1 = 0;
     this.by1 = 0;
     this.reseed(seed);
+  }
+
+  private wakeBlock(tx: number, ty: number): void {
+    const b = (ty >> 3) * this.blockCols + (tx >> 3);
+    if (!this.blockActive[b]) {
+      this.blockActive[b] = 1;
+      this.activeBlocks[this.activeBlockCount++] = b;
+    }
   }
 
   private reseed(seed: number): void {
@@ -187,6 +212,7 @@ export class FogOfWar {
       seenStamp[sty * tw + stx] = stamp;
       srcStamp[sty * tw + stx] = stamp;
       this.revealBoost[sty * tw + stx] = 1;
+      this.wakeBlock(stx, sty);
     }
     const pad = Math.ceil(maxRadius / tileCells) + 2;
     this.grow(stx - pad, sty - pad, stx + pad, sty + pad);
@@ -215,10 +241,13 @@ export class FogOfWar {
         if (cx < 0 || cy < 0 || cx >= world.width || cy >= world.height) break;
         const solid = sub ? sub.call(world, Math.floor(px * 2), Math.floor(py * 2)) : world.solidAt(cx, cy);
         if (!solid && inWall) break;
-        const ti = Math.floor(cy / tileCells) * tw + Math.floor(cx / tileCells);
+        const tx = Math.floor(cx / tileCells);
+        const ty = Math.floor(cy / tileCells);
+        const ti = ty * tw + tx;
         if (ti !== lastTile) {
           this.revealBoost[ti] = seenStamp[ti] === stamp ? Math.max(this.revealBoost[ti], boost) : boost;
           seenStamp[ti] = stamp;
+          this.wakeBlock(tx, ty);
           lastTile = ti;
         }
         if (solid) {
@@ -249,6 +278,7 @@ export class FogOfWar {
         this.seenStamp[tile] = this.stamp;
         const x = tile % this.tw, y = (tile - x) / this.tw;
         this.grow(x, y, x, y);
+        this.wakeBlock(x, y);
       }
       this.airMetrics.updateMs = performance.now() - airStart;
       this.airMetrics.floods = this.air.rebuiltLastUpdate ? 1 : 0;
@@ -256,6 +286,21 @@ export class FogOfWar {
       this.airMetrics.mappedTiles = this.air.tiles.length;
     }
     if (this.bx0 > this.bx1) return;
+    if (this.permanent !== this.lastPermanent) {
+      this.lastPermanent = this.permanent;
+      const b0x = this.bx0 >> 3, b1x = this.bx1 >> 3;
+      const b0y = this.by0 >> 3, b1y = this.by1 >> 3;
+      for (let by = b0y; by <= b1y; by++) {
+        for (let bx = b0x; bx <= b1x; bx++) {
+          const b = by * this.blockCols + bx;
+          if (!this.blockActive[b]) {
+            this.blockActive[b] = 1;
+            this.activeBlocks[this.activeBlockCount++] = b;
+          }
+        }
+      }
+    }
+    if (this.activeBlockCount === 0) return;
 
     const { tw, th, light, next, explored, lastSeen, seenStamp, srcStamp, noise, stamp, time } = this;
     const reveal = FOG.revealRate * dt;
@@ -263,45 +308,64 @@ export class FogOfWar {
     const delay = FOG.staleDelay;
     const floorMapped = this.permanent ? FOG.mappedLevel : 0;
     const thr = FOG.exploredThreshold;
-    for (let y = this.by0; y <= this.by1; y++) {
-      const row = y * tw;
-      for (let x = this.bx0; x <= this.bx1; x++) {
-        const i = row + x;
-        const v = light[i];
-        const l = x > 0 ? light[i - 1] : 0;
-        const r = x < tw - 1 ? light[i + 1] : 0;
-        const u = y > 0 ? light[i - tw] : 0;
-        const d = y < th - 1 ? light[i + tw] : 0;
-        let nv = v;
-        if (seenStamp[i] === stamp) {
-          lastSeen[i] = time;
-          if (v < 1) {
-            if (srcStamp[i] === stamp) {
-              nv = v + reveal * 3;
-            } else {
-              let maxN = l > r ? l : r;
-              if (u > maxN) maxN = u;
-              if (d > maxN) maxN = d;
-              // Light only seeps in from a lit neighbor, so it flows out from the soldier.
-              nv = v + reveal * this.revealBoost[i] * noise[i] * maxN;
+    const blockCols = this.blockCols;
+    const activeBlocks = this.activeBlocks;
+    const blockActive = this.blockActive;
+    let keepCount = 0;
+    for (let bi = 0; bi < this.activeBlockCount; bi++) {
+      const b = activeBlocks[bi];
+      const bx = b % blockCols;
+      const by = (b - bx) / blockCols;
+      const x0 = bx << 3;
+      const y0 = by << 3;
+      const x1 = x0 + 7 < tw ? x0 + 7 : tw - 1;
+      const y1 = y0 + 7 < th ? y0 + 7 : th - 1;
+      let keep = false;
+      for (let y = y0; y <= y1; y++) {
+        const row = y * tw;
+        for (let x = x0; x <= x1; x++) {
+          const i = row + x;
+          const v = light[i];
+          const l = x > 0 ? light[i - 1] : 0;
+          const r = x < tw - 1 ? light[i + 1] : 0;
+          const u = y > 0 ? light[i - tw] : 0;
+          const d = y < th - 1 ? light[i + tw] : 0;
+          let nv = v;
+          const seen = seenStamp[i] === stamp;
+          if (seen) {
+            lastSeen[i] = time;
+            if (v < 1) {
+              if (srcStamp[i] === stamp) {
+                nv = v + reveal * 3;
+              } else {
+                let maxN = l > r ? l : r;
+                if (u > maxN) maxN = u;
+                if (d > maxN) maxN = d;
+                // Light only seeps in from a lit neighbor, so it flows out from the soldier.
+                nv = v + reveal * this.revealBoost[i] * noise[i] * maxN;
+              }
+              if (nv > 1) nv = 1;
             }
-            if (nv > 1) nv = 1;
+          } else if (time - lastSeen[i] > delay || lastSeen[i] === 0) {
+            const floor = explored[i] ? floorMapped : 0;
+            if (v > floor) {
+              let minN = l < r ? l : r;
+              if (u < minN) minN = u;
+              if (d < minN) minN = d;
+              // Darkness seeps in from darker neighbors first.
+              nv = v - stale * noise[i] * (0.25 + 2.5 * (1 - minN));
+              if (nv < floor) nv = floor;
+            }
           }
-        } else if (time - lastSeen[i] > delay || lastSeen[i] === 0) {
-          const floor = explored[i] ? floorMapped : 0;
-          if (v > floor) {
-            let minN = l < r ? l : r;
-            if (u < minN) minN = u;
-            if (d < minN) minN = d;
-            // Darkness seeps in from darker neighbors first.
-            nv = v - stale * noise[i] * (0.25 + 2.5 * (1 - minN));
-            if (nv < floor) nv = floor;
-          }
+          if (nv > thr) explored[i] = 1;
+          next[i] = nv;
+          if (seen || nv !== v || nv > (explored[i] ? floorMapped : 0)) keep = true;
         }
-        if (nv > thr) explored[i] = 1;
-        next[i] = nv;
       }
+      if (keep) activeBlocks[keepCount++] = b;
+      else blockActive[b] = 0;
     }
+    this.activeBlockCount = keepCount;
     this.next = light;
     this.light = next;
   }
