@@ -32,6 +32,11 @@ export class DualStick {
   readonly aim: AimVector = { x: 0, y: 0, angle: 0, active: false };
 
   private readonly maxRadius = 42;
+  private readonly touchMedia =
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(hover: none) and (pointer: coarse)")
+      : null;
+  private shown = false;
 
   constructor(parent: HTMLElement, private game: Game) {
     this.root = document.createElement("div");
@@ -67,8 +72,7 @@ export class DualStick {
    * mouse instead, so they never see the sticks.
    */
   private isTouchDevice(): boolean {
-    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-    return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+    return this.touchMedia?.matches ?? false;
   }
 
   private bindEvents(): void {
@@ -185,6 +189,8 @@ export class DualStick {
       !this.game.paused &&
       !this.game.runOver &&
       this.isTouchDevice();
+    if (shouldShow === this.shown) return;
+    this.shown = shouldShow;
     this.root.classList.toggle("hidden", !shouldShow);
   }
 

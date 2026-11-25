@@ -45,9 +45,11 @@ export class HUD {
   private lineBtn: HTMLButtonElement;
   private triangleBtn: HTMLButtonElement;
   private abilityBar: HTMLDivElement;
-  private abilityBtns = new Map<number, HTMLButtonElement>();
+  private abilityBtns = new Map<number, { btn: HTMLButtonElement; fgPath: SVGPathElement | null; valEl: HTMLElement | null }>();
   private helpOpen = false;
   private lastUpdate = 0;
+  private lastStatsHtml = "";
+  private lastGrowthClass = "";
   /** Updated only after HUD layout/viewport changes, never queried during canvas drawing. */
   readonly soldierIndicatorLayout: {left:number;right:number;top:number;bottom:number;obstacles:IndicatorRect[]} = {left:20,right:Infinity,top:20,bottom:Infinity,obstacles:[]};
 
@@ -341,9 +343,14 @@ export class HUD {
       // Restart the burst animation each time overdrive begins.
       this.growthMeterEl.classList.remove("od-burst");
       void this.growthMeterEl.offsetWidth;
+      this.lastGrowthClass = "";
     }
     this.wasOverdrive = overdrive;
-    this.growthMeterEl.className = `growth-meter ${stageClass}${overdrive ? " od-burst" : ""}`;
+    const growthClass = `growth-meter ${stageClass}${overdrive ? " od-burst" : ""}`;
+    if (growthClass !== this.lastGrowthClass) {
+      this.growthMeterEl.className = growthClass;
+      this.lastGrowthClass = growthClass;
+    }
     this.growthStageEl.textContent = stageLabel;
 
     // Reserve launch button on the right side.
@@ -383,7 +390,10 @@ export class HUD {
       const rate = (turretier.mods?.energyPerBlock ?? 0.1).toFixed(1);
       statsHtml += `<div style="color: #38d6ff"><b>TURRET</b> ${turretier.secondaryEnergy.toFixed(1)}/${st.turretEnergyRequired} (+${rate}/b)</div>`;
     }
-    this.statsEl.innerHTML = statsHtml;
+    if (statsHtml !== this.lastStatsHtml) {
+      this.statsEl.innerHTML = statsHtml;
+      this.lastStatsHtml = statsHtml;
+    }
 
     // Ability buttons at the bottom of the screen
     const equipped = game.soldiers.filter((x) => x.alive && x.secondary);
@@ -393,18 +403,18 @@ export class HUD {
       this.abilityBar.classList.remove("hidden");
       const currentIds = new Set(equipped.map((x) => x.id));
 
-      for (const [id, btn] of this.abilityBtns) {
+      for (const [id, entry] of this.abilityBtns) {
         if (!currentIds.has(id)) {
-          btn.remove();
+          entry.btn.remove();
           this.abilityBtns.delete(id);
         }
       }
 
       for (const soldier of equipped) {
         const req = game.getSecondaryEnergyRequired(soldier.secondary);
-        let btn = this.abilityBtns.get(soldier.id);
-        if (!btn) {
-          btn = document.createElement("button");
+        let entry = this.abilityBtns.get(soldier.id);
+        if (!entry) {
+          const btn = document.createElement("button");
           btn.className = "hud-ability-btn";
           btn.dataset.soldierId = String(soldier.id);
           btn.innerHTML = `
@@ -421,26 +431,29 @@ export class HUD {
             this.update(game, performance.now(), true);
           });
           this.abilityBar.append(btn);
-          this.abilityBtns.set(soldier.id, btn);
+          entry = {
+            btn,
+            fgPath: btn.querySelector(".ability-outline-fg") as SVGPathElement | null,
+            valEl: btn.querySelector(".ability-val") as HTMLElement | null,
+          };
+          this.abilityBtns.set(soldier.id, entry);
         }
 
         const pct = Math.max(0, Math.min(1, soldier.secondaryEnergy / req));
         const isReady = pct >= 1;
-        btn.classList.toggle("ready", isReady);
-        btn.classList.toggle("not-ready", !isReady);
-        btn.title = isReady
+        entry.btn.classList.toggle("ready", isReady);
+        entry.btn.classList.toggle("not-ready", !isReady);
+        entry.btn.title = isReady
           ? `Secondary Ready: Tap to activate (Hotkey: G)`
           : `Secondary Charging: ${soldier.secondaryEnergy.toFixed(1)} / ${req} Energy`;
 
-        const fgPath = btn.querySelector(".ability-outline-fg") as SVGPathElement | null;
-        if (fgPath) {
+        if (entry.fgPath) {
           const perimeter = 165.25;
-          fgPath.style.strokeDasharray = `${perimeter}`;
-          fgPath.style.strokeDashoffset = `${perimeter * (1 - pct)}`;
+          entry.fgPath.style.strokeDasharray = `${perimeter}`;
+          entry.fgPath.style.strokeDashoffset = `${perimeter * (1 - pct)}`;
         }
-        const valEl = btn.querySelector(".ability-val") as HTMLElement | null;
-        if (valEl) {
-          valEl.textContent = isReady ? "READY" : `${Math.floor(soldier.secondaryEnergy)}/${req}`;
+        if (entry.valEl) {
+          entry.valEl.textContent = isReady ? "READY" : `${Math.floor(soldier.secondaryEnergy)}/${req}`;
         }
       }
     }

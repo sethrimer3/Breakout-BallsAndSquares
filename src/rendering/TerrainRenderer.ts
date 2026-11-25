@@ -504,25 +504,26 @@ export class TerrainRenderer {
         g.fillRect(rx, ry, rw, rh);
         continue;
       }
-      g.save();
-      g.beginPath();
-      g.rect(rx, ry, rw, rh);
-      g.clip();
       const source = roomLightPosition(l, cs);
       const mx = cam.worldToScreenX(source.x);
       const my = cam.worldToScreenY(source.y);
-      let rad: number;
+      const rad = l.kind === LIGHT_KIND.blight ? Math.max(rw, rh) * 0.75 : FACILITY.panelRadiusCells * cs * z;
+      const needsClip = mx - rad < rx || mx + rad > rx + rw || my - rad < ry || my + rad > ry + rh;
+      if (needsClip) {
+        g.save();
+        g.beginPath();
+        g.rect(rx, ry, rw, rh);
+        g.clip();
+      }
       if (l.kind === LIGHT_KIND.blight) {
-        rad = Math.max(rw, rh) * 0.75;
         g.globalAlpha = level * FACILITY.blightGlowStrength;
         g.drawImage(this.blightGlow, mx - rad, my - rad, rad * 2, rad * 2);
       } else {
-        rad = FACILITY.panelRadiusCells * cs * z;
         const strength = l.kind === LIGHT_KIND.bright ? 0.55 : l.kind === LIGHT_KIND.dim ? 0.4 : 0.6;
         g.globalAlpha = level * strength;
         g.drawImage(this.panelGlow, mx - rad, my - rad, rad * 2, rad * 2);
       }
-      g.restore();
+      if (needsClip) g.restore();
     }
     g.restore();
   }

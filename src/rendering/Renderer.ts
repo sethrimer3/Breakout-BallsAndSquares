@@ -46,8 +46,14 @@ function doorCoreDamaged(d: number): string {
   return `rgb(${l}, ${l + 6}, ${l + 16})`;
 }
 
+const HEX_CACHE = new Map<number, string>();
 function hexColor(c: number): string {
-  return `#${c.toString(16).padStart(6, "0")}`;
+  let s = HEX_CACHE.get(c);
+  if (s === undefined) {
+    s = `#${c.toString(16).padStart(6, "0")}`;
+    if (HEX_CACHE.size < 256) HEX_CACHE.set(c, s);
+  }
+  return s;
 }
 
 export class Renderer {
@@ -405,6 +411,7 @@ export class Renderer {
   private drawEssence(nowMs: number, still: boolean): void {
     const { ctx, game } = this;
     const loot = game.loot;
+    if (loot.essenceCount === 0) return;
     const frame = essenceFrame(nowMs, still);
     let painted = false;
     const cam = game.camera;
@@ -442,6 +449,7 @@ export class Renderer {
     const half = sz * 0.5;
     const col = this.subColorScratch;
     const tex = this.subTexelScratch;
+    const simple = half <= 1.5;
     for (let i = 0; i < sp.count; i++) {
       const sx = cam.worldToScreenX(sp.x[i]);
       const sy = cam.worldToScreenY(sp.y[i]);
@@ -452,6 +460,11 @@ export class Renderer {
       subPixelColor(kind, sp.tint[i], origSy, sp.hp[i], sp.maxHp[i], false, col);
       const x0 = sx - half;
       const y0 = sy - half;
+      if (simple) {
+        ctx.fillStyle = `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`;
+        ctx.fillRect(x0, y0, sz, sz);
+        continue;
+      }
       for (let oy = 0; oy < 2; oy++) {
         for (let ox = 0; ox < 2; ox++) {
           subPixelTexelShade(kind, origSx, origSy, ox, oy, true, true, true, true, col, tex);
@@ -507,20 +520,31 @@ export class Renderer {
     if (c.count === 0) return;
     const len = Math.max(2, 2.3 * cam.zoom);
     const wid = Math.max(1, 1.0 * cam.zoom);
+    const halfL = len * 0.5;
+    const halfW = wid * 0.5;
+    const dpr = this.dpr;
+    const vw = cam.viewW;
+    const vh = cam.viewH;
+    let drew = false;
     for (let i = 0; i < c.count; i++) {
       const sx = cam.worldToScreenX(c.x[i]);
       const sy = cam.worldToScreenY(c.y[i]);
-      if (sx < -20 || sy < -20 || sx > cam.viewW + 20 || sy > cam.viewH + 20) continue;
+      if (sx < -20 || sy < -20 || sx > vw + 20 || sy > vh + 20) continue;
+      drew = true;
       const a = Math.min(1, (c.life[i] / c.maxLife[i]) * 1.4);
-      ctx.save();
+      const ang = c.angle[i];
+      const cos = Math.cos(ang) * dpr;
+      const sin = Math.sin(ang) * dpr;
       ctx.globalAlpha = a;
-      ctx.translate(sx, sy);
-      ctx.rotate(c.angle[i]);
+      ctx.setTransform(cos, sin, -sin, cos, sx * dpr, sy * dpr);
       ctx.fillStyle = "#e8b85c";
-      ctx.fillRect(-len / 2, -wid / 2, len, wid);
+      ctx.fillRect(-halfL, -halfW, len, wid);
       ctx.fillStyle = "#fff1b8";
-      ctx.fillRect(-len / 2, -wid / 2, len * 0.45, wid * 0.6);
-      ctx.restore();
+      ctx.fillRect(-halfL, -halfW, len * 0.45, wid * 0.6);
+    }
+    if (drew) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -935,10 +959,14 @@ export class Renderer {
     }
   }
 
+  private readonly outlineX = new Float32Array(10);
+  private readonly outlineY = new Float32Array(10);
+  private readonly outlineLen = new Float32Array(9);
+
   /**
    * 1-pixel-thick golden outline around the soldier sprite orthogonally (with cut corners).
    * Starts at 12 o'clock (top/north) and fills clockwise proportional to secondary energy.
-   * Brightest at the leading tip, leaving a trail of dimmer gold behind.
+   * Batched into 3-4 strokes (instead of up to 54 individual segment strokes) for mobile speed.
    */
   private drawSoldierEnergyOutline(s: Soldier, sx: number, sy: number): void {
     const req = this.game.getSecondaryEnergyRequired(s.secondary);
@@ -949,7 +977,6 @@ export class Renderer {
     const { ctx } = this;
     const cam = this.game.camera;
     const br = Math.max(4, SOLDIER.renderRadius * cam.zoom);
-    // Extent of the cut-corner outline around the soldier's sprite:
     const R = Math.round(br + Math.max(2.5, 3.5 * cam.zoom));
     const C = Math.max(2, Math.round(R * 0.35));
 
@@ -957,88 +984,94 @@ export class Renderer {
     const flatHalf = R - C;
     const flatFull = 2 * (R - C);
 
-    const segLens = [flatHalf, diag, flatFull, diag, flatFull, diag, flatFull, diag, flatHalf];
-    const segPoints: [number, number, number, number][] = [
-      [0, -R, flatHalf, -R],
-      [flatHalf, -R, R, -flatHalf],
-      [R, -flatHalf, R, flatHalf],
-      [R, flatHalf, flatHalf, R],
-      [flatHalf, R, -flatHalf, R],
-      [-flatHalf, R, -R, flatHalf],
-      [-R, flatHalf, -R, -flatHalf],
-      [-R, -flatHalf, -flatHalf, -R],
-      [-flatHalf, -R, 0, -R],
-    ];
+    const ox = this.outlineX;
+    const oy = this.outlineY;
+    const ol = this.outlineLen;
+    ox[0] = sx;            oy[0] = sy - R;
+    ox[1] = sx + flatHalf; oy[1] = sy - R;
+    ox[2] = sx + R;        oy[2] = sy - flatHalf;
+    ox[3] = sx + R;        oy[3] = sy + flatHalf;
+    ox[4] = sx + flatHalf; oy[4] = sy + R;
+    ox[5] = sx - flatHalf; oy[5] = sy + R;
+    ox[6] = sx - R;        oy[6] = sy + flatHalf;
+    ox[7] = sx - R;        oy[7] = sy - flatHalf;
+    ox[8] = sx - flatHalf; oy[8] = sy - R;
+    ox[9] = sx;            oy[9] = sy - R;
 
-    let totalPerimeter = 0;
-    for (let i = 0; i < 9; i++) totalPerimeter += segLens[i];
+    ol[0] = flatHalf; ol[1] = diag; ol[2] = flatFull; ol[3] = diag;
+    ol[4] = flatFull; ol[5] = diag; ol[6] = flatFull; ol[7] = diag; ol[8] = flatHalf;
 
+    const totalPerimeter = flatHalf * 2 + flatFull * 3 + diag * 4;
     const targetDist = pct * totalPerimeter;
 
     ctx.save();
     ctx.lineWidth = 1;
 
-    // Faint dark-gold background guide track so the player sees the outline shape
+    // Faint dark-gold background guide track
     ctx.strokeStyle = "rgba(180, 140, 20, 0.2)";
     ctx.beginPath();
-    ctx.moveTo(sx, sy - R);
-    for (let i = 0; i < 9; i++) {
-      ctx.lineTo(sx + segPoints[i][2], sy + segPoints[i][3]);
-    }
+    ctx.moveTo(ox[0], oy[0]);
+    for (let i = 1; i <= 9; i++) ctx.lineTo(ox[i], oy[i]);
     ctx.stroke();
 
-    const getPointAtDist = (d: number): [number, number] => {
-      let cur = d;
+    const strokeRange = (dStart: number, dEnd: number, style: string): void => {
+      if (dEnd <= dStart) return;
+      ctx.strokeStyle = style;
+      ctx.beginPath();
+      let acc = 0;
+      let started = false;
       for (let i = 0; i < 9; i++) {
-        const len = segLens[i];
-        if (cur <= len || i === 8) {
-          const frac = len > 0 ? Math.max(0, Math.min(1, cur / len)) : 0;
-          const [x0, y0, x1, y1] = segPoints[i];
-          return [x0 + (x1 - x0) * frac, y0 + (y1 - y0) * frac];
+        const segLen = ol[i];
+        const segEnd = acc + segLen;
+        if (segEnd > dStart && acc < dEnd) {
+          const t0 = segLen > 0 ? Math.max(0, (dStart - acc) / segLen) : 0;
+          const t1 = segLen > 0 ? Math.min(1, (dEnd - acc) / segLen) : 1;
+          const ax = ox[i] + (ox[i + 1] - ox[i]) * t0;
+          const ay = oy[i] + (oy[i + 1] - oy[i]) * t0;
+          const bx = ox[i] + (ox[i + 1] - ox[i]) * t1;
+          const by = oy[i] + (oy[i + 1] - oy[i]) * t1;
+          if (!started) {
+            ctx.moveTo(ax, ay);
+            started = true;
+          }
+          ctx.lineTo(bx, by);
         }
-        cur -= len;
+        acc = segEnd;
+        if (acc >= dEnd) break;
       }
-      return [0, -R];
+      ctx.stroke();
     };
 
-    // Render trail with fading gradient from dim gold at origin to brightest gold at the tip
-    const numSteps = Math.max(12, Math.min(54, Math.ceil(targetDist * 0.9)));
-    const stepDist = targetDist / numSteps;
-
-    for (let i = 0; i < numSteps; i++) {
-      const d0 = i * stepDist;
-      const d1 = (i + 1) * stepDist;
-      const [x0, y0] = getPointAtDist(d0);
-      const [x1, y1] = getPointAtDist(d1);
-
-      // u goes from 0 (at 12 o'clock) to 1.0 (at leading tip)
-      const u = (i + 1) / numSteps;
-
-      if (pct >= 1) {
-        // Complete ring pulses with brilliant ready glow
-        const shimmer = 0.8 + 0.2 * Math.sin(performance.now() * 0.008 + u * Math.PI * 2);
-        ctx.strokeStyle = `rgba(255, 225, 90, ${shimmer})`;
-      } else {
-        const alpha = 0.25 + 0.75 * Math.pow(u, 1.4);
-        if (u > 0.92) {
-          ctx.strokeStyle = `rgba(255, 255, 220, ${alpha})`;
-        } else if (u > 0.55) {
-          ctx.strokeStyle = `rgba(255, 216, 77, ${alpha})`;
-        } else {
-          ctx.strokeStyle = `rgba(218, 165, 32, ${alpha * 0.75})`;
-        }
-      }
-
+    if (pct >= 1) {
+      const shimmer = 0.8 + 0.2 * Math.sin(performance.now() * 0.008);
+      ctx.strokeStyle = `rgba(255, 225, 90, ${shimmer})`;
       ctx.beginPath();
-      ctx.moveTo(sx + x0, sy + y0);
-      ctx.lineTo(sx + x1, sy + y1);
+      ctx.moveTo(ox[0], oy[0]);
+      for (let i = 1; i <= 9; i++) ctx.lineTo(ox[i], oy[i]);
       ctx.stroke();
+    } else {
+      // Three batched gradient bands: dim tail (0..55%), bright gold (55..92%), hot tip (92..100%)
+      strokeRange(0, targetDist * 0.55, "rgba(218, 165, 32, 0.42)");
+      strokeRange(targetDist * 0.55, targetDist * 0.92, "rgba(255, 216, 77, 0.82)");
+      strokeRange(targetDist * 0.92, targetDist, "rgba(255, 255, 220, 0.98)");
     }
 
     // Bright spark at the leading tip
-    const [tipX, tipY] = getPointAtDist(targetDist);
+    let cur = targetDist;
+    let tipX = ox[0];
+    let tipY = oy[0];
+    for (let i = 0; i < 9; i++) {
+      const len = ol[i];
+      if (cur <= len || i === 8) {
+        const frac = len > 0 ? Math.max(0, Math.min(1, cur / len)) : 0;
+        tipX = ox[i] + (ox[i + 1] - ox[i]) * frac;
+        tipY = oy[i] + (oy[i + 1] - oy[i]) * frac;
+        break;
+      }
+      cur -= len;
+    }
     ctx.fillStyle = pct >= 1 ? "#fffef0" : "#ffffff";
-    ctx.fillRect(Math.round(sx + tipX - 0.5), Math.round(sy + tipY - 0.5), 1.5, 1.5);
+    ctx.fillRect(Math.round(tipX - 0.5), Math.round(tipY - 0.5), 1.5, 1.5);
 
     ctx.restore();
   }
@@ -1122,8 +1155,10 @@ export class Renderer {
       }
 
       ctx.fillStyle = isSniper ? "#d7fcff" : "#fff2c3";
+      // Skip redundant sub-pixel overdraw when zoomed out below 1x.
+      const stride = cam.zoom < 1 ? Math.ceil(1 / cam.zoom) : 1;
       // Trail: tail (k = 0) is faint, the pixel just behind the head is brightest.
-      for (let k = 0; k < steps; k++) {
+      for (let k = 0; k < steps; k += stride) {
         const t = k / steps;
         ctx.globalAlpha = 0.12 + 0.6 * t;
         this.fillArtPixel(Math.round(tx + (hx - tx) * t), Math.round(ty + (hy - ty) * t), 1);
@@ -1344,6 +1379,7 @@ export class Renderer {
     const { ctx, game } = this;
     const cam = game.camera;
     const p = game.particles;
+    let lastFill = "";
     for (let i = 0; i < p.count; i++) {
       const k = p.kind[i];
       if (k !== PKind.Debris && k !== PKind.Smoke) continue;
@@ -1357,7 +1393,8 @@ export class Renderer {
         ctx.drawImage(this.sprites.dot, sx - sz, sy - sz, sz * 2, sz * 2);
       } else {
         ctx.globalAlpha = a;
-        ctx.fillStyle = hexColor(p.color[i]);
+        const fill = hexColor(p.color[i]);
+        if (fill !== lastFill) { ctx.fillStyle = fill; lastFill = fill; }
         ctx.fillRect(sx - sz / 2, sy - sz / 2, sz, sz);
       }
     }
@@ -1368,6 +1405,8 @@ export class Renderer {
     const { ctx, game } = this;
     const cam = game.camera;
     const p = game.particles;
+    const stride = cam.zoom < 1 ? Math.ceil(1 / cam.zoom) : 1;
+    let lastFill = "";
     for (let i = 0; i < p.count; i++) {
       const k = p.kind[i];
       if (k === PKind.Debris || k === PKind.Smoke) continue;
@@ -1383,11 +1422,12 @@ export class Renderer {
         const pad = ART_PIXEL * cam.zoom + 1;
         if (Math.max(sx, tx) < -pad || Math.min(sx, tx) > cam.viewW + pad ||
             Math.max(sy, ty) < -pad || Math.min(sy, ty) > cam.viewH + pad) continue;
-        ctx.fillStyle = hexColor(p.color[i]);
+        const fill = hexColor(p.color[i]);
+        if (fill !== lastFill) { ctx.fillStyle = fill; lastFill = fill; }
         const ax = Math.floor(tailX / ART_PIXEL), ay = Math.floor(tailY / ART_PIXEL);
         const bx = Math.floor(p.x[i] / ART_PIXEL), by = Math.floor(p.y[i] / ART_PIXEL);
         const steps = Math.max(Math.abs(bx - ax), Math.abs(by - ay), 1);
-        for (let s = 0; s <= steps; s++) {
+        for (let s = 0; s <= steps; s += stride) {
           const t = s / steps;
           ctx.globalAlpha = a * (0.35 + 0.65 * t);
           fillArtPixel(ctx, cam, Math.round(ax + (bx - ax) * t), Math.round(ay + (by - ay) * t));
@@ -1395,7 +1435,7 @@ export class Renderer {
         // Larger sparks get a hot head pixel.
         if (p.size[i] >= 1.5) {
           ctx.globalAlpha = a;
-          ctx.fillStyle = "#fff6d8";
+          if (lastFill !== "#fff6d8") { ctx.fillStyle = "#fff6d8"; lastFill = "#fff6d8"; }
           fillArtPixel(ctx, cam, Math.floor(p.x[i] / ART_PIXEL), Math.floor(p.y[i] / ART_PIXEL));
         }
       } else {

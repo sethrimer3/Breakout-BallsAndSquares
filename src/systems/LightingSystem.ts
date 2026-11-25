@@ -145,11 +145,6 @@ export function rayCircleDistance(
   return t > 0 ? t : Infinity;
 }
 
-interface CornerCand {
-  angle: number;
-  dist2: number;
-}
-
 /**
  * Computes 2D visibility polygons for active muzzle flashes.
  * Combines evenly spaced base rays, forward-cone rays, silhouette-corner
@@ -222,10 +217,25 @@ export class LightingSystem {
   private readonly subOccMinA = new Float32Array(MAX_SUB_OCCLUDERS);
   private readonly subOccMaxA = new Float32Array(MAX_SUB_OCCLUDERS);
 
+  /** Monotonic counter bumped on non-damage terrain changes for static-light polygon caching. */
+  private terrainGeoRev = 0;
+  private roomCache: {
+    x: number;
+    y: number;
+    radius: number;
+    quality: LightQuality;
+    rev: number;
+    polyCount: number;
+    litCount: number;
+  } | null = null;
+
   constructor(private world: PixelWorld) {
     this.litStamps = new Uint32Array(world.width * world.height);
     world.addListener((cx, cy, kind) => {
-      if (kind !== "damaged") this.invalidateFixtures(cx, cy);
+      if (kind !== "damaged") {
+        this.terrainGeoRev++;
+        this.invalidateFixtures(cx, cy);
+      }
     });
   }
 
@@ -405,6 +415,34 @@ export class LightingSystem {
     const rad = radius * cam.zoom;
     if (sx + rad < 0 || sy + rad < 0 || sx - rad > cam.viewW || sy - rad > cam.viewH) return;
     if (idx > LIGHT.maxSoftShadowLights) return;
+    // Cache the static spawn-room glow when terrain hasn't changed, no moving
+    // sub-pixels exist, and no living soldier is inside its occlusion radius.
+    if (ownerId === -1 && (!this.subPixels || this.subPixels.count === 0)) {
+      const occBound = radius + SOLDIER.occluderRadius * 1.5;
+      const occBound2 = occBound * occBound;
+      let clearOfSoldiers = true;
+      for (let i = 0; i < soldiers.length; i++) {
+        const s = soldiers[i];
+        if (!s.alive) continue;
+        const dx = s.x - x, dy = s.y - y;
+        if (dx * dx + dy * dy <= occBound2) { clearOfSoldiers = false; break; }
+      }
+      const rc = this.roomCache;
+      if (clearOfSoldiers && rc && rc.x === x && rc.y === y && rc.radius === radius &&
+          rc.quality === this.quality && rc.rev === this.terrainGeoRev) {
+        l.polyCount = rc.polyCount;
+        l.lit.count = rc.litCount;
+        return;
+      }
+      l.polyCount = this.trace(
+        x, y, 1, 0, radius, ownerId, soldiers, l.poly, l.lit,
+        LIGHT.softBaseRays, 0, this.preset.maxCornerRays, 1,
+      );
+      this.roomCache = clearOfSoldiers
+        ? { x, y, radius, quality: this.quality, rev: this.terrainGeoRev, polyCount: l.polyCount, litCount: l.lit.count }
+        : null;
+      return;
+    }
     l.polyCount = this.trace(
       x, y, 1, 0, radius, ownerId, soldiers, l.poly, l.lit,
       LIGHT.softBaseRays, 0, this.preset.maxCornerRays,

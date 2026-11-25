@@ -696,6 +696,16 @@ export class LightRenderer {
   }
 }
 
+const UNIT_STOP_CSS = new WeakMap<readonly Stop[], readonly [number, string][]>();
+function unitStops(stops: readonly Stop[]): readonly [number, string][] {
+  let cached = UNIT_STOP_CSS.get(stops);
+  if (!cached) {
+    cached = stops.map(([o, r, gr, b, a]) => [o, `rgba(${r}, ${gr}, ${b}, ${a})`]);
+    UNIT_STOP_CSS.set(stops, cached);
+  }
+  return cached;
+}
+
 function gradientFor(
   g: CanvasRenderingContext2D,
   x: number,
@@ -705,8 +715,15 @@ function gradientFor(
   strength: number,
 ): CanvasGradient {
   const grad = g.createRadialGradient(x, y, 0, x, y, radius);
-  for (const [o, r, gr, b, a] of stops) {
-    grad.addColorStop(o, `rgba(${r}, ${gr}, ${b}, ${a * strength})`);
+  if (strength <= 1) {
+    g.globalAlpha = strength;
+    const pre = unitStops(stops);
+    for (let i = 0; i < pre.length; i++) grad.addColorStop(pre[i][0], pre[i][1]);
+  } else {
+    g.globalAlpha = 1;
+    for (const [o, r, gr, b, a] of stops) {
+      grad.addColorStop(o, `rgba(${r}, ${gr}, ${b}, ${a * strength})`);
+    }
   }
   return grad;
 }
