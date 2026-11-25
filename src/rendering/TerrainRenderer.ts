@@ -72,6 +72,7 @@ const EDGE_CANVAS_STEP = 256;
 const CRYSTAL_ORANGE = [212, 120, 48] as const;
 const CRYSTAL_GREEN = [70, 182, 118] as const;
 const CRYSTAL_GOLD = [214, 170, 52] as const;
+const ZERO_RGB: RGB = [0, 0, 0];
 
 /** A soft round light falloff in one color, for drawing scaled into the lightmap. */
 function radialSprite(c: RGB): HTMLCanvasElement {
@@ -175,6 +176,7 @@ export class TerrainRenderer {
   readonly chunks: TerrainChunks;
   private readonly paintRegions: ChunkRegions;
   private canvases: HTMLCanvasElement[] = [];
+  private canvasCtxs: CanvasRenderingContext2D[] = [];
   private blightCanvases: (HTMLCanvasElement | null)[] = [];
   /** Four classification bits per terrain cell, allocated only in Blight chunks. */
   private blightCells: (Uint8Array | null)[] = [];
@@ -184,9 +186,11 @@ export class TerrainRenderer {
   /** One pixel per world cell: what the lab's emergency power keeps lit. */
   private glowCanvas: HTMLCanvasElement;
   private glowMask: Uint8Array;
+  private glowChunks: Uint8Array;
   private image: ImageData;
   private scratch: number[] = [];
   private col: [number, number, number] = [0, 0, 0];
+  private shaded: [number, number, number] = [0, 0, 0];
   rebuiltLastFrame = 0;
   visiblePendingLastFrame = 0;
   /** Per chunk: a mask of its Blight edges, made the first time it has any. */
@@ -253,7 +257,9 @@ export class TerrainRenderer {
       c.width = chunkSize * TEX;
       c.height = chunkSize * TEX;
       this.canvases.push(c);
+      this.canvasCtxs.push(c.getContext("2d")!);
     }
+    this.glowChunks = new Uint8Array(n);
     this.blightCanvases = new Array<HTMLCanvasElement | null>(n).fill(null);
     this.blightCells = new Array<Uint8Array | null>(n).fill(null);
     this.blightCellCounts = new Uint32Array(n);
@@ -670,6 +676,15 @@ export class TerrainRenderer {
     const g = this.glowCanvas.getContext("2d")!;
     const image = g.createImageData(world.width, world.height);
     this.glowMask.fill(0);
+    this.glowChunks.fill(0);
+    const cs = this.chunks.chunkSize;
+    const cols = this.chunks.cols;
+    const W = world.width;
+    const markGlowChunk = (i: number): void => {
+      const cx = i % W;
+      const cy = (i - cx) / W;
+      this.glowChunks[Math.floor(cy / cs) * cols + Math.floor(cx / cs)] = 1;
+    };
     for (let i = 0; i < world.decor.length; i++) {
       if (world.health[i] === 0) {
         // Half-size screens and status LEDs cast a soft monitor glow over their cell.
@@ -682,6 +697,7 @@ export class TerrainRenderer {
           image.data[p + 2] = c[2] * 0.4;
           image.data[p + 3] = 255;
           this.glowMask[i] = 1;
+          markGlowChunk(i);
         }
         continue;
       }
@@ -693,6 +709,7 @@ export class TerrainRenderer {
       image.data[p + 2] = c[2];
       image.data[p + 3] = 255;
       this.glowMask[i] = 1;
+      markGlowChunk(i);
     }
     g.putImageData(image, 0, 0);
   }
@@ -715,7 +732,7 @@ export class TerrainRenderer {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = 0.8 + 0.2 * Math.sin(time * 1.6);
-    this.drawCellOverlay(ctx, cam, this.glowCanvas);
+    this.drawCellOverlay(ctx, cam, this.glowCanvas, this.glowChunks);
     ctx.restore();
   }
 
@@ -870,7 +887,7 @@ export class TerrainRenderer {
               const subDown = sy < world.subHeight - 1 && !world.subSolidAt(sx, sy + 1);
               const subRight = sx < world.subWidth - 1 && !world.subSolidAt(sx + 1, sy);
               const sk = world.subKind[si];
-              const shaded = [0, 0, 0];
+              const shaded = this.shaded;
               for (let oy = 0; oy < 2; oy++) {
                 for (let ox = 0; ox < 2; ox++) {
                   subPixelTexelShade(sk, sx, sy, ox, oy, subUp, subLeft, subDown, subRight, col, shaded);
@@ -931,7 +948,7 @@ export class TerrainRenderer {
         const lateEnv = frame?.def.environment;
         const lateTier = lateEnv && frame ? lateBlendedTier(frame, cx, cy) : tier;
         const lateFeature = lateEnv && frame ? lateCellFeature(frame, cx, cy) : "solid";
-        const base = lateEnv ? [0, 0, 0] : materialColor(tier, !!frame?.def.framework);
+        const base = lateEnv ? ZERO_RGB : materialColor(tier, !!frame?.def.framework);
         const tone = 0.88 + t * 0.24;
         const detail = world.decor[i];
         const dc = COLORS.labDecor[detail];
@@ -1016,7 +1033,7 @@ export class TerrainRenderer {
     // The shared image contains valid pixels only inside this edit rectangle.
     const tx0 = x0 * TEX, ty0 = y0 * TEX;
     const tw = (x1 - x0 + 1) * TEX, th = (y1 - y0 + 1) * TEX;
-    this.canvases[k].getContext("2d")!.putImageData(this.image, 0, 0, tx0, ty0, tw, th);
+    this.canvasCtxs[k].putImageData(this.image, 0, 0, tx0, ty0, tw, th);
     // Reuse the albedo pixels, masking everything except living Blight.
     // This cache changes with its terrain chunk, never by scanning the view.
     let cells = this.blightCells[k];
@@ -1478,7 +1495,8 @@ export class TerrainRenderer {
   update(cam?: CameraSystem): void {
     const region = cam && this.visibleChunkBounds(cam);
     this.flushFloor(region);
-    this.visiblePendingLastFrame = this.chunks.take(TERRAIN.chunkRebuildBudget, this.scratch, region);
+    const budget = this.coarsePointer?.matches ? Math.min(8, TERRAIN.chunkRebuildBudget) : TERRAIN.chunkRebuildBudget;
+    this.visiblePendingLastFrame = this.chunks.take(budget, this.scratch, region);
     this.rebuiltLastFrame = this.scratch.length;
     for (const k of this.scratch) this.buildChunk(k);
   }

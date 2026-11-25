@@ -16,6 +16,7 @@ const FLAME_STEPS = [0.82, 0.62, 0.44, 0.28, 0.14, -1] as const;
 export class FireRenderer {
   /** Dark, drifting smoke. Call in normal blend mode. */
   drawSmoke(ctx: CanvasRenderingContext2D, cam: CameraSystem, fire: FireSystem): void {
+    if (fire.count === 0) return;
     // Two artwork pixels plus screen snapping/minimum-size padding retain
     // smoke touching an edge at any zoom without submitting distant particles.
     const pad = ART_PIXEL * 2 + 1 / cam.zoom;
@@ -40,7 +41,9 @@ export class FireRenderer {
 
   /** Embers on burning rubble, then flames and sparks. Call in "lighter" blend mode. */
   drawGlow(ctx: CanvasRenderingContext2D, cam: CameraSystem, fire: FireSystem, world: PixelWorld, now: number): void {
-    this.drawEmbers(ctx, cam, fire, world, now);
+    if (fire.count === 0 && fire.burnCount === 0) return;
+    if (fire.burnCount > 0) this.drawEmbers(ctx, cam, fire, world, now);
+    if (fire.count === 0) return;
     const vw = cam.viewW;
     const vh = cam.viewH;
     for (let i = 0; i < fire.count; i++) {

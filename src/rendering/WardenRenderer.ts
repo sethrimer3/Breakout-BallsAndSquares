@@ -42,11 +42,13 @@ export class WardenRenderer {
     }
     for (const w of sys.wardens) if (w.alive && visible(w.x, w.y)) this.warden(w, time);
     for (const s of sys.spits) if (visible(s.x, s.y)) this.spit(s);
-    this.batch.flush(ctx, cam);
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    this.glow.flush(ctx, cam);
-    ctx.restore();
+    if (this.batch.count > 0) this.batch.flush(ctx, cam);
+    if (this.glow.count > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      this.glow.flush(ctx, cam);
+      ctx.restore();
+    }
     // Health bars over wounded wardens.
     for (const w of sys.wardens) {
       if (!w.alive || w.hp >= w.maxHp || !visible(w.x, w.y)) continue;

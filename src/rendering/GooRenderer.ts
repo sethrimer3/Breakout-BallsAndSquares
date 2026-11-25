@@ -5,7 +5,8 @@ import type { GooOrbSystem } from "../systems/GooOrbSystem";
 
 /** Smooth spring outlines with one center-point collision; no render-time mutation. */
 export function drawGoo(ctx: CanvasRenderingContext2D, cam: CameraSystem, goo: GooOrbSystem, reducedMotion = false, lowEffects = false): void {
-  for (const orb of goo.orbs.items) {
+  if (goo.orbs.activeCount === 0 && goo.mines.activeCount === 0) return;
+  if (goo.orbs.activeCount > 0) for (const orb of goo.orbs.items) {
     if (!orb.active) continue;
     const x = cam.worldToScreenX(orb.x);
     const y = cam.worldToScreenY(orb.y);
@@ -45,7 +46,7 @@ export function drawGoo(ctx: CanvasRenderingContext2D, cam: CameraSystem, goo: G
     ctx.fillRect(highlightX * radius, -radius * 0.4, Math.max(1, cam.zoom), Math.max(1, cam.zoom));
     ctx.restore();
   }
-  for (const mine of goo.mines.items) {
+  if (goo.mines.activeCount > 0) for (const mine of goo.mines.items) {
     if (!mine.active) continue;
     const x = cam.worldToScreenX(mine.x);
     const y = cam.worldToScreenY(mine.y);

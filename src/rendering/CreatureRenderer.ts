@@ -67,6 +67,8 @@ export class PixelBatch {
     }
   }
 
+  get count(): number { return this.xs.length; }
+
   flush(ctx: Ctx, cam: CameraSystem): void {
     const z = cam.zoom;
     const size = Math.max(1, Math.ceil(z));
@@ -101,11 +103,13 @@ export class CreatureRenderer {
     for (const w of sys.worms) if (visible(w.seg[0], w.seg[1])) this.worm(w, time);
     for (const s of sys.specimens) if (visible(s.x, s.y)) this.specimen(s, time);
     for (const s of sys.spores) if (visible(s.x, s.y)) this.spore(s, time);
-    this.batch.flush(ctx, cam);
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    this.glow.flush(ctx, cam);
-    ctx.restore();
+    if (this.batch.count > 0) this.batch.flush(ctx, cam);
+    if (this.glow.count > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      this.glow.flush(ctx, cam);
+      ctx.restore();
+    }
   }
 
   /**

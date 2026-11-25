@@ -179,6 +179,7 @@ export class BloomRenderer {
   }
 
   private drawBulletBlooms(b: CanvasRenderingContext2D, game: Game): void {
+    if (game.combat.bullets.activeCount === 0) return;
     const cam = game.camera;
     const z = cam.zoom;
     const vw = cam.viewW;

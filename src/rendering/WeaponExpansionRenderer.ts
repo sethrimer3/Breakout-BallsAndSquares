@@ -18,7 +18,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     ctx.lineTo(x-s.vx/speed*16*cam.zoom,y-s.vy/speed*16*cam.zoom); ctx.stroke();
     ctx.beginPath(); ctx.ellipse(x,y,Math.max(2,7*cam.zoom),Math.max(1,4*cam.zoom),s.facingAngle,0,Math.PI*2);ctx.stroke();
   }
-  for (const drone of game.combat.drones.pool.items) {
+  if (game.combat.drones.pool.activeCount > 0) for (const drone of game.combat.drones.pool.items) {
     if (!drone.active) continue;
     const x=cam.worldToScreenX(drone.x);const y=cam.worldToScreenY(drone.y);
     if (x < -24 || y < -24 || x > cam.viewW+24 || y > cam.viewH+24) continue;
@@ -29,7 +29,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     ctx.fillStyle="#c5f9ff";ctx.fillRect(x-5*z,y-z,rotor*3*z,z);ctx.fillRect(x+2*z,y-z,rotor*3*z,z);
     if (drone.fireCooldown>1/drone.fireRate-0.06) {ctx.fillStyle="#fff1ae";ctx.fillRect(x+drone.dx*4*z,y+drone.dy*4*z,z,z);}
   }
-  for (const segment of game.combat.laser.segments.items) {
+  if (game.combat.laser.segments.activeCount > 0) for (const segment of game.combat.laser.segments.items) {
     if (!segment.active) continue;
     const x1=cam.worldToScreenX(segment.x1);const y1=cam.worldToScreenY(segment.y1);
     const x2=cam.worldToScreenX(segment.x2);const y2=cam.worldToScreenY(segment.y2);
@@ -46,7 +46,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([]);
     if(segment.reflected){ctx.beginPath();ctx.moveTo(x2-3,y2);ctx.lineTo(x2+3,y2);ctx.moveTo(x2,y2-3);ctx.lineTo(x2,y2+3);ctx.stroke();}
   }
-  for(const shot of game.combat.revolver.pool.items){
+  if (game.combat.revolver.pool.activeCount > 0) for(const shot of game.combat.revolver.pool.items){
     if(!shot.active || shot.phase==="recording")continue;
     const x=cam.worldToScreenX(shot.x);const y=cam.worldToScreenY(shot.y);
     if(x < -24 || y < -24 || x > cam.viewW+24 || y > cam.viewH+24)continue;
@@ -61,7 +61,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     ctx.fillStyle="#f5e8ff";ctx.fillRect(x-1,y-1,Math.max(1,cam.zoom),Math.max(1,cam.zoom));
   }
   // Perfect Rebound is a visual echo, not an additional damage actor.
-  if (!reduced) for (const b of game.combat.bullets.items) {
+  if (!reduced && game.combat.bullets.activeCount > 0) for (const b of game.combat.bullets.items) {
     if (!b.active || !b.afterimage || b.style!==3) continue;
     const x=cam.worldToScreenX(b.x-b.dx*5);const y=cam.worldToScreenY(b.y-b.dy*5);
     const rad=Math.max(2,b.slashWidth*cam.zoom*0.5);
@@ -110,7 +110,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
   }
 
   // Burrower: placed mines along the drilled path.
-  for (const m of game.combat.burrower.mines.items) {
+  if (game.combat.burrower.mines.activeCount > 0) for (const m of game.combat.burrower.mines.items) {
     if (!m.active) continue;
     const x = cam.worldToScreenX(m.x);
     const y = cam.worldToScreenY(m.y);
@@ -174,7 +174,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     ctx.stroke();
     ctx.setLineDash([]);
   }
-  for (const b of game.combat.rail.beams.items) {
+  if (game.combat.rail.beams.activeCount > 0) for (const b of game.combat.rail.beams.items) {
     if (!b.active) continue;
     const x1 = cam.worldToScreenX(b.x1);
     const y1 = cam.worldToScreenY(b.y1);
@@ -202,7 +202,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
   }
 
   // Cryospray & Freeze Rockets: cold mist bullets + frozen creature tint.
-  for (const b of game.combat.bullets.items) {
+  if (game.combat.bullets.activeCount > 0) for (const b of game.combat.bullets.items) {
     if (!b.active || (!b.cryoSpray && !b.freezeRocket)) continue;
     const x = cam.worldToScreenX(b.x);
     const y = cam.worldToScreenY(b.y);

@@ -1117,6 +1117,7 @@ export class Renderer {
    */
   private drawBullets(): void {
     const { ctx, game } = this;
+    if (game.combat.bullets.activeCount === 0) return;
     const cam = game.camera;
     const items = game.combat.bullets.items;
     const px = ART_PIXEL;
@@ -1377,8 +1378,9 @@ export class Renderer {
 
   private drawOpaqueParticles(): void {
     const { ctx, game } = this;
-    const cam = game.camera;
     const p = game.particles;
+    if (p.count === 0) return;
+    const cam = game.camera;
     let lastFill = "";
     for (let i = 0; i < p.count; i++) {
       const k = p.kind[i];
@@ -1403,8 +1405,9 @@ export class Renderer {
 
   private drawAdditiveParticles(): void {
     const { ctx, game } = this;
-    const cam = game.camera;
     const p = game.particles;
+    if (p.count === 0) return;
+    const cam = game.camera;
     const stride = cam.zoom < 1 ? Math.ceil(1 / cam.zoom) : 1;
     let lastFill = "";
     for (let i = 0; i < p.count; i++) {
@@ -1517,6 +1520,7 @@ export class Renderer {
   /** Draw equippable secondary sticky grenades (both flying and stuck to walls). */
   private drawGrenades(): void {
     const { ctx, game } = this;
+    if (game.combat.grenades.activeCount === 0) return;
     const cam = game.camera;
     const items = game.combat.grenades.items;
 
@@ -1582,6 +1586,7 @@ export class Renderer {
   /** Draw temporary deployable autoturrets with crisp pixel-art geometry. */
   private drawTurrets(): void {
     const { ctx, game } = this;
+    if (game.combat.turrets.activeCount === 0) return;
     const cam = game.camera;
     const items = game.combat.turrets.items;
     const z = cam.zoom;
