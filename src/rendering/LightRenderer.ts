@@ -397,6 +397,7 @@ export class LightRenderer {
       if (path) air.fill(path);
       else air.fill();
     }
+    g.globalAlpha = 1;
     if (this.softShadows) this.softener.soften(g, lmW, lmH);
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.globalCompositeOperation = "source-over";
@@ -469,6 +470,7 @@ export class LightRenderer {
       }
     }
     if (scatter) {
+      scatter.globalAlpha = 1;
       ctx.save();
       this.finishAirLayer(ctx, "lighter", lmW, lmH, lmDpr, devW, devH, dpr);
       ctx.restore();

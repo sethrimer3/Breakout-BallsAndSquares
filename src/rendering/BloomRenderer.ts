@@ -58,15 +58,19 @@ const GLOW_OPTS = { layers: 8, baseAlpha: 0.34, spread: 3.0, falloff: 2.2 } as c
  * Composites before fog of war so unexplored areas remain hidden.
  */
 export class BloomRenderer {
-  private buffer = new SoftLightBuffer({ scale: BLOOM.scale, blur: BLOOM.blur });
+  private readonly coarsePointer = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)") : null;
+  private buffer: SoftLightBuffer;
   private panelCool = bakeSoftGlow(64, COOL_STOPS, GLOW_OPTS);
   private panelWarm = bakeSoftGlow(64, WARM_STOPS, GLOW_OPTS);
   private panelMint = bakeSoftGlow(64, MINT_STOPS, GLOW_OPTS);
   private cyanGlow = bakeSoftGlow(64, CYAN_STOPS, GLOW_OPTS);
 
-  private readonly coarsePointer = typeof matchMedia === "function" ? matchMedia("(pointer: coarse)") : null;
-
-  constructor(private sprites: Sprites) {}
+  constructor(private sprites: Sprites) {
+    this.buffer = new SoftLightBuffer({
+      scale: this.coarsePointer?.matches ? 0.18 : BLOOM.scale,
+      blur: BLOOM.blur,
+    });
+  }
 
   /** Render light emitters into the low-res buffer and screen-composite onto `ctx`. */
   render(
