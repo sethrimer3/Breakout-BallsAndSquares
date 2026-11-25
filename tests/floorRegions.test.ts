@@ -19,3 +19,14 @@ describe('batched floor shadow regions',()=>{
     r.mark(9,9,9,9);expect(take(r)).toEqual([[9,9,9,9]]);
   });
 });
+
+it('flushes only rectangles intersecting the sampled cells and preserves off-screen edits', () => {
+  const regions = new FloorRegions(100, 100);
+  regions.mark(7, 7, 8, 8);
+  regions.mark(90, 90, 91, 91);
+  const visible: number[][] = [];
+  regions.flush((...rect) => visible.push(rect), { x0: 8, y0: 8, x1: 15, y1: 15 });
+  expect(visible).toEqual([[8, 8, 8, 8]]);
+  regions.mark(89, 90, 93, 93);
+  expect(take(regions)).toEqual([[7, 7, 7, 7], [8, 7, 8, 7], [7, 8, 7, 8], [89, 90, 93, 93]]);
+});

@@ -45,7 +45,7 @@ All stopwatch timings measure CPU elapsed time, including any synchronous browse
 - `simulationSteps`, `clampedWallTimeMs`, `discardedSimulationMs`: catch-up pressure. Clamped wall time is the raw interval beyond the 100 ms simulation limit; discarded simulation time is leftover scaled accumulator time cleared after hitting the step cap. They are different quantities.
 - `growthEvents`: successful growth events across all simulation steps in the sampled callback.
 - `airFloods`, `airCellsVisited`, `mappedAirTiles`: connected-air rebuild count, open fine-grid cells reached during those rebuilds, and cached coarse fog tiles revealed. A cached update can have zero floods/visited cells while still revealing mapped tiles.
-- `terrainChunksRebuilt`, `terrainChunksPending`: published chunks and remaining backlog.
+- `terrainChunksRebuilt` counts published chunks. `visibleTerrainChunksPending` counts updates the next draw still needs. `terrainChunksPending` includes those plus deferred off-screen edits.
 - `fixtureRetraces`, `shadowRays`, `shadowedMuzzleLights`: shadow preparation workload.
 - `maskFullRebuilds`, `maskPartialRegions`, `maskScrolls`, `maskReuses`, `maskRepaintPixels`: actual opacity-mask painting/copying/reuse, including zero-paint metadata refreshes. Pixel counts use backing-store pixels.
 - `candidateRoomLights`: conservative ordered spatial-query candidates, not an exact count of submitted fixture draws.

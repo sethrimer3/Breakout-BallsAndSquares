@@ -101,7 +101,56 @@ let pw; try { pw = require('playwright'); } catch { pw = require('/opt/codex/cua
         }
         same(...canvases,'composite '+scale+' / '+zoom);
       }
-      return {comparisons,changedChannels:0,hpClassificationQueries,sparseRegionCalls:regionCalls,emptyClassificationReleased:true};
+      const beforeViewportChecks = comparisons;
+      cam.viewW = 156;
+      cam.viewH = 130;
+      cam.x = cam.y = 70;
+      cam.zoom = 2.5;
+      // Distant edits include glass opacity, Blight edges and decor contact shadows.
+      const far = 37 * w.width + 37;
+      w.mat[far] = MAT.glass;
+      w.setCell(37, 37, 30, 'set');
+      w.setGlassCracked(37, 37, true);
+      w.setSubCell(76, 76, 10);
+      const floorBefore = a.floorRevision;
+      a.update(cam);
+      if (!a.chunks.pending || a.rebuiltLastFrame !== 0 || a.floorRevision !== floorBefore) {
+        throw Error('Off-screen edits published early');
+      }
+      b.rebuildAll();
+      for (const [x, y, zoom] of [[70, 70, 2.5], [297.2, 298.7, 1.13], [515, 524, 2.75], [70, 70, .5]]) {
+        cam.x = x; cam.y = y; cam.zoom = zoom;
+        a.update(cam);
+        if (a.visiblePendingLastFrame !== 0) throw Error('Visible artwork not ready after camera movement');
+        for (const scale of [1, 1.5, 2]) {
+          for (const [j, r] of [a, b].entries()) {
+            const c = canvases[j];
+            c.width = cam.viewW * scale; c.height = cam.viewH * scale;
+            const ctx = c.getContext('2d');
+            ctx.setTransform(scale, 0, 0, scale, 0, 0);
+            r.drawFloor(ctx, cam);
+            r.draw(ctx, cam);
+            r.drawSurfaceOutlines(ctx, cam);
+            r.drawBlightThroughFog(ctx, cam);
+            r.drawBlightEdges(ctx, cam, 3.25);
+          }
+          same(...canvases, 'viewport ' + [x, y, zoom, scale].join('/'));
+        }
+      }
+
+      // A thumbnail can sample a region the live viewport has never updated.
+      w.setCell(62, 63, 10, 'grown');
+      a.update(cam);
+      if (!a.chunks.pending) throw Error('Thumbnail fixture did not leave pending chunks');
+      b.rebuildAll();
+      for (const [j, r] of [a, b].entries()) {
+        const c = canvases[j];
+        c.width = c.height = 24;
+        r.drawRegion(c.getContext('2d'), 60, 61, 6, 6);
+      }
+      same(...canvases, 'off-screen thumbnail');
+      const viewportComparisons = comparisons - beforeViewportChecks;
+      return {comparisons,viewportComparisons,changedChannels:0,hpClassificationQueries,sparseRegionCalls:regionCalls,emptyClassificationReleased:true};
     });
     console.log(JSON.stringify(result));
     fs.writeFileSync(process.env.BREACH_REPORT||'/tmp/terrain-partial-repaint-regressions.json',JSON.stringify(result,null,2));

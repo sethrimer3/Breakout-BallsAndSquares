@@ -17,7 +17,7 @@ import { DECOR } from "../world/LabDetails";
 import { lateMaterial, materialColor, subPixelColor, subPixelTexelShade, TEX, TIER_PAINT, crackTexelAt, materialShade, type LateFeature } from "./materials";
 import { CHAR_CELLS, SECTOR_CELLS, type LabFrame } from "../world/labMap";
 import { roomLightPosition, LIGHT_KIND, MAT, SUB, type PixelWorld, type RoomLight } from "../world/PixelWorld";
-import { TerrainChunks } from "../world/TerrainChunks";
+import { TerrainChunks, type ChunkBounds } from "../world/TerrainChunks";
 
 type RGB = readonly [number, number, number];
 
@@ -183,6 +183,7 @@ export class TerrainRenderer {
   private scratch: number[] = [];
   private col: [number, number, number] = [0, 0, 0];
   rebuiltLastFrame = 0;
+  visiblePendingLastFrame = 0;
   /** Per chunk: a mask of its Blight edges, made the first time it has any. */
   private edgeMasks: (HTMLCanvasElement | null)[] = [];
   private edgeValues: (BinaryMask | null)[] = [];
@@ -386,7 +387,7 @@ export class TerrainRenderer {
 
   /** Draw the lab floors. Call before `draw`, in the albedo pass. */
   drawFloor(ctx: CanvasRenderingContext2D, cam: CameraSystem): void {
-    this.flushFloor();
+    this.flushFloor(this.visibleChunkBounds(cam));
     ctx.imageSmoothingEnabled = false;
     const transform = ctx.getTransform();
     // Main gameplay and the menu use an origin-aligned, uniform device scale.
@@ -1421,17 +1422,17 @@ export class TerrainRenderer {
   /**
    * Copy the floors and terrain of cells (x0, y0)..(x0 + w - 1, y0 + h - 1) into
    * `ctx` at full texel resolution (TEX px per cell), top-left at (0, 0). Used
-   * for the lab map's sector pictures; chunks must already be built.
+   * for the lab map's sector pictures.
    */
   drawRegion(ctx: CanvasRenderingContext2D, x0: number, y0: number, w: number, h: number): void {
-    this.flushFloor();
+    const region = this.chunkBounds(x0, y0, x0 + w - 1, y0 + h - 1);
+    this.flushFloor(region);
+    this.chunks.take(Infinity, this.scratch, region);
+    for (const k of this.scratch) this.buildChunk(k);
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(this.floorCanvas, x0 * TEX, y0 * TEX, w * TEX, h * TEX, 0, 0, w * TEX, h * TEX);
     const cs = this.chunks.chunkSize;
-    const kx0 = Math.max(0, Math.floor(x0 / cs));
-    const ky0 = Math.max(0, Math.floor(y0 / cs));
-    const kx1 = Math.min(this.chunks.cols - 1, Math.floor((x0 + w - 1) / cs));
-    const ky1 = Math.min(this.chunks.rows - 1, Math.floor((y0 + h - 1) / cs));
+    const { x0: kx0, y0: ky0, x1: kx1, y1: ky1 } = region;
     for (let ky = ky0; ky <= ky1; ky++) {
       for (let kx = kx0; kx <= kx1; kx++) {
         ctx.drawImage(this.canvases[ky * this.chunks.cols + kx], (kx * cs - x0) * TEX, (ky * cs - y0) * TEX);
@@ -1439,13 +1440,20 @@ export class TerrainRenderer {
     }
   }
 
-  private flushFloor(): void {
-    this.floorRegions.flush((x0, y0, x1, y1) => this.paintFloor(x0, y0, x1, y1));
+  private flushFloor(region?: ChunkBounds): void {
+    const cs = this.chunks.chunkSize;
+    const cells = region && {
+      x0: region.x0 * cs, y0: region.y0 * cs,
+      x1: (region.x1 + 1) * cs - 1, y1: (region.y1 + 1) * cs - 1,
+    };
+    this.floorRegions.flush((x0, y0, x1, y1) => this.paintFloor(x0, y0, x1, y1), cells);
   }
 
-  update(): void {
-    this.flushFloor();
-    this.chunks.take(TERRAIN.chunkRebuildBudget, this.scratch);
+  /** Publish the chunks used by the upcoming frame. Distant edits coalesce until viewed. */
+  update(cam?: CameraSystem): void {
+    const region = cam && this.visibleChunkBounds(cam);
+    this.flushFloor(region);
+    this.visiblePendingLastFrame = this.chunks.take(TERRAIN.chunkRebuildBudget, this.scratch, region);
     this.rebuiltLastFrame = this.scratch.length;
     for (const k of this.scratch) this.buildChunk(k);
   }
@@ -1479,21 +1487,28 @@ export class TerrainRenderer {
     ctx.restore();
   }
 
+  private chunkBounds(x0: number, y0: number, x1: number, y1: number): ChunkBounds {
+    const cs = this.chunks.chunkSize;
+    return {
+      x0: Math.max(0, Math.floor(x0 / cs)),
+      y0: Math.max(0, Math.floor(y0 / cs)),
+      x1: Math.min(this.chunks.cols - 1, Math.floor(x1 / cs)),
+      y1: Math.min(this.chunks.rows - 1, Math.floor(y1 / cs)),
+    };
+  }
+
+  private visibleChunkBounds(cam: CameraSystem): ChunkBounds {
+    const cs = this.world.cellSize;
+    return this.chunkBounds(cam.screenToWorldX(0) / cs, cam.screenToWorldY(0) / cs,
+      cam.screenToWorldX(cam.viewW) / cs, cam.screenToWorldY(cam.viewH) / cs);
+  }
+
   private forEachVisibleChunk(
     cam: CameraSystem,
     fn: (kx: number, ky: number, sx: number, sy: number, sw: number, sh: number) => void,
   ): void {
-    const world = this.world;
-    const cs = this.chunks.chunkSize;
-    const unit = world.cellSize * cs;
-    const x0 = cam.screenToWorldX(0);
-    const y0 = cam.screenToWorldY(0);
-    const x1 = cam.screenToWorldX(cam.viewW);
-    const y1 = cam.screenToWorldY(cam.viewH);
-    const kx0 = Math.max(0, Math.floor(x0 / unit));
-    const ky0 = Math.max(0, Math.floor(y0 / unit));
-    const kx1 = Math.min(this.chunks.cols - 1, Math.floor(x1 / unit));
-    const ky1 = Math.min(this.chunks.rows - 1, Math.floor(y1 / unit));
+    const unit = this.world.cellSize * this.chunks.chunkSize;
+    const { x0: kx0, y0: ky0, x1: kx1, y1: ky1 } = this.visibleChunkBounds(cam);
     for (let ky = ky0; ky <= ky1; ky++) {
       const sy0 = Math.round(cam.worldToScreenY(ky * unit));
       const sy1 = Math.round(cam.worldToScreenY((ky + 1) * unit));

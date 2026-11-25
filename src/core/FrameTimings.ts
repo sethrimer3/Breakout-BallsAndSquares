@@ -8,7 +8,7 @@ export const FRAME_PHASES = [
   "wardenDrawMs", "subPixelDrawMs", "subPixelSimulationMs",
 ] as const;
 export const FRAME_COUNTS = [
-  "simulationSteps", "clampedWallTimeMs", "discardedSimulationMs", "terrainChunksRebuilt", "terrainChunksPending",
+  "simulationSteps", "clampedWallTimeMs", "discardedSimulationMs", "terrainChunksRebuilt", "terrainChunksPending", "visibleTerrainChunksPending",
   "growthEvents", "airFloods", "airCellsVisited", "mappedAirTiles", "fixtureRetraces",
   "maskFullRebuilds", "maskPartialRegions", "maskScrolls", "maskReuses", "maskRepaintPixels",
   "candidateRoomLights", "softLights", "muzzleFlashes", "shadowRays", "shadowedMuzzleLights", "soldiers", "bullets", "particles",

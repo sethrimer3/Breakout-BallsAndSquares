@@ -134,3 +134,22 @@ describe('fine terrain artwork dependencies', () => {
     expect(c.paintTiles[4*stride]).toBe(1);
   });
 });
+
+it('keeps off-screen edits queued and prioritizes visible chunks in their original order', () => {
+  const { chunks } = fixture();
+  chunks.markCell(13, 13); // Oldest, outside the first view.
+  chunks.markCell(1, 1);
+  chunks.markCell(5, 1);
+  const batch: number[] = [];
+  expect(chunks.take(1, batch, { x0: 0, y0: 0, x1: 1, y1: 0 })).toBe(1);
+  expect(batch).toEqual([0]);
+  expect(chunks.pending).toBe(2);
+  chunks.markCell(14, 14);
+  expect(chunks.pending).toBe(2); // Deferred edits still coalesce.
+  expect(chunks.take(24, batch, { x0: 3, y0: 3, x1: 3, y1: 3 })).toBe(0);
+  expect(batch).toEqual([15]);
+  expect(chunks.x0[15]).toBe(0);
+  expect(chunks.x1[15]).toBe(3);
+  chunks.take(24, batch);
+  expect(batch).toEqual([1]);
+});

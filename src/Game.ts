@@ -2596,13 +2596,14 @@ export class Game {
     // The opaque main menu has its own gameplay backdrop. Other full menus
     // retain the upstream last-frame cache, including redraws after resizing.
     if (!this.mainMenu.visible) {
-      const terrainStart = performance.now();
-      this.terrain.update();
-      metrics.terrainUpdateMs = performance.now() - terrainStart;
-      metrics.terrainChunksRebuilt = this.terrain.rebuiltLastFrame;
-      metrics.terrainChunksPending = this.terrain.chunks.pending;
       const covered = this.paused && (this.upgradeTree.visible || this.labMap?.visible || this.resultsScreen.visible);
       if (!covered || this.renderer.needsDraw) {
+        const terrainStart = performance.now();
+        this.terrain.update(this.camera);
+        metrics.terrainUpdateMs = performance.now() - terrainStart;
+        metrics.terrainChunksRebuilt = this.terrain.rebuiltLastFrame;
+        metrics.terrainChunksPending = this.terrain.chunks.pending;
+        metrics.visibleTerrainChunksPending = this.terrain.visiblePendingLastFrame;
         const shadowStart = performance.now();
         this.updateFlashPolygons();
         metrics.shadowPreparationMs = performance.now() - shadowStart;

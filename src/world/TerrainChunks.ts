@@ -1,5 +1,8 @@
 import { MAT, type PixelWorld } from "./PixelWorld";
 
+/** Inclusive rectangle in chunk coordinates. */
+export interface ChunkBounds { x0: number; y0: number; x1: number; y1: number; }
+
 /**
  * Tracks which terrain chunks need re-rendering. Pure bookkeeping (no DOM),
  * so it can be shared by the renderer and unit-tested.
@@ -99,14 +102,28 @@ export class TerrainChunks {
     }
   }
 
-  /** Pop up to `budget` dirty chunk indices. */
-  take(budget: number, out: number[]): void {
+  /** Take dirty chunks in queue order, retaining work outside the requested region. */
+  take(budget: number, out: number[], region?: ChunkBounds): number {
     out.length = 0;
-    while (out.length < budget && this.queue.length > 0) {
-      const k = this.queue.shift()!;
-      this.dirty[k] = 0;
-      out.push(k);
+    let keep = 0, remainingInRegion = 0;
+    for (const k of this.queue) {
+      const selected = !region || this.contains(region, k);
+      if (out.length < budget && selected) {
+        this.dirty[k] = 0;
+        out.push(k);
+      } else {
+        this.queue[keep++] = k;
+        if (selected) remainingInRegion++;
+      }
     }
+    this.queue.length = keep;
+    return remainingInRegion;
+  }
+
+  private contains(region: ChunkBounds, k: number): boolean {
+    const x = k % this.cols;
+    const y = Math.floor(k / this.cols);
+    return x >= region.x0 && x <= region.x1 && y >= region.y0 && y <= region.y1;
   }
 
   get pending(): number {

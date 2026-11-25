@@ -1,5 +1,5 @@
 /** Coalesces local floor-shadow edits without turning sparse hits into a
- * world-sized bounding rectangle. All pending work is flushed before drawing. */
+ * world-sized bounding rectangle. Pending work is flushed in the area a draw will sample. */
 export class FloorRegions {
   private readonly columns: number;
   private readonly dirty: Uint8Array;
@@ -32,13 +32,23 @@ export class FloorRegions {
     }
   }
 
-  flush(paint: (x0: number, y0: number, x1: number, y1: number) => void): void {
+  flush(
+    paint: (x0: number, y0: number, x1: number, y1: number) => void,
+    region?: { x0: number; y0: number; x1: number; y1: number },
+  ): void {
+    let keep = 0;
     for (const k of this.queue) {
       const p = k * 4;
-      paint(this.rects[p], this.rects[p + 1], this.rects[p + 2], this.rects[p + 3]);
+      const x0 = this.rects[p], y0 = this.rects[p + 1];
+      const x1 = this.rects[p + 2], y1 = this.rects[p + 3];
+      if (region && (x1 < region.x0 || x0 > region.x1 || y1 < region.y0 || y0 > region.y1)) {
+        this.queue[keep++] = k;
+        continue;
+      }
+      paint(x0, y0, x1, y1);
       this.dirty[k] = 0;
     }
-    this.queue.length = 0;
+    this.queue.length = keep;
   }
 
   clear(): void { for (const k of this.queue) this.dirty[k] = 0; this.queue.length = 0; }

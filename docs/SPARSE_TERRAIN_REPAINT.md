@@ -82,3 +82,24 @@ node scripts/terrain-partial-repaint-smoke.cjs
 npm test
 npm run build
 ```
+
+## Viewport-scoped updates
+
+The Pixel 9a capture at 35 seconds showed 24 rebuilds per frame and a median 5.6 ms in terrain updates. Gameplay now publishes dirty chunks and floor shadows only when the upcoming camera view samples them. Off-screen changes stay queued and coalesce. Map thumbnails publish their own sampled area on demand. Wide views retain the 24-chunk budget. The exported `visibleTerrainChunksPending` counter separates redraws waiting inside the view from the total dirty queue.
+
+Paired Chromium measurements against `9115d3c` used default zoom 2.5, 60 measured samples per variant, three fixed simulation steps per draw and a staged growth burst averaging 375 updates per frame. Both versions reached identical terrain state at all measured checkpoints.
+
+| View | Terrain CPU p50 / p95 / p99 before → after, ms | Frame CPU p50 / p95 / p99 before → after, ms |
+| --- | --- | --- |
+| Desktop stationary | 9.0 / 22.6 / 33.8 → 1.3 / 6.6 / 7.5 | 27.7 / 50.8 / 83.3 → 17.8 / 43.4 / 82.5 |
+| Desktop moving | 7.1 / 10.2 / 12.1 → 1.1 / 2.5 / 4.8 | 21.0 / 34.7 / 117.2 → 16.5 / 24.8 / 133.8 |
+| Mobile stationary, DPR 2 and 4× CPU throttling | 38.5 / 54.9 / 161.6 → 3.2 / 4.7 / 5.7 | 122.8 / 211.2 / 258.2 → 82.7 / 142.2 / 187.0 |
+
+Median rebuild counts went from 24 to 4 on desktop and 24 to 2 in the stationary mobile case. The visible backlog stayed at zero. Six of nine frame checkpoint hashes differed from the old queue order, which can display stale visible chunks. All 13 viewport and thumbnail pixel comparisons against a forced full repaint matched, including cracked glass, floor shadows, panning, zoom and fractional render density. The moving mobile timing is omitted because other checks were running. These measurements cover CPU work in the benchmark and don't establish a Pixel 9a frame rate.
+
+To reproduce, run Vite on port 5173 and execute:
+
+```bash
+BREACH_BASELINE_REF=9115d3c BREACH_VIEWPORT_UPDATES=1 BREACH_FIXED_STEPS=3 BREACH_RUN_SECONDS=35 BREACH_RATES=2 BREACH_ZOOMS=2.5 BREACH_SAMPLES=60 node scripts/fast-growth-benchmark.cjs
+node scripts/terrain-partial-repaint-smoke.cjs
+```
