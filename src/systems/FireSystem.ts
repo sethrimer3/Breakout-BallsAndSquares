@@ -51,7 +51,7 @@ export class FireSystem {
   readonly maxLife = new Float32Array(this.cap);
   /** 0..1 starting temperature: hotter flames start whiter and burn longer. */
   readonly heat = new Float32Array(this.cap);
-  readonly sizeScale = new Uint8Array(this.cap);
+  readonly sizeScale = new Float32Array(this.cap);
   readonly kind = new Uint8Array(this.cap);
   /** Per-particle phase for the turbulence field. */
   readonly seed = new Float32Array(this.cap);

@@ -495,7 +495,7 @@ export class BlightWardenSystem implements BulletTargets {
   /** Squad damage: Blight rules, so it rolls and takes Arsenal Calibration. */
   damage(w: Warden, amount: number, x: number, y: number): void {
     if (!w.alive) return;
-    w.hp -= this.world.squadBlightDamage(amount);
+    w.hp -= this.world.squadBlightDamage(amount) * this.world.auraDamageMultiplier(w.x, w.y);
     w.hurt = 0.12;
     w.aggro = WARDEN.hurtAggro;
     this.events.onHurt?.(w, x, y);

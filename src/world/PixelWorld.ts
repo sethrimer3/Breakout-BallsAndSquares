@@ -1,3 +1,4 @@
+import type { Soldier } from "../entities/Soldier";
 import { blockHealthForTier, FACILITY, GROWTH, maxHealthForDistance, TERRAIN, tierHealth, tierWallHealth, wallHealthForZone, zoneForDepth } from "../config";
 import { nearestSector, SECTOR_CELLS, sectorZone } from "./labMap";
 import type { SolidQuery } from "../core/gridRaycast";
@@ -221,6 +222,16 @@ export class PixelWorld implements SolidQuery {
   readonly armored: Uint8Array;
   /** Arsenal Calibration: multiplier on squad (`byPlayer`) damage against unarmored terrain. */
   playerDamageMult = 1;
+  damageAuraSoldier: Soldier | null = null;
+
+  auraDamageMultiplier(x: number, y: number): number {
+    const soldier = this.damageAuraSoldier;
+    if (!soldier?.alive) return 1;
+    const dx = soldier.x - x;
+    const dy = soldier.y - y;
+    const radius = soldier.auraRadiusCells * this.cellSize;
+    return dx * dx + dy * dy <= radius * radius ? 1 + soldier.auraDamageBonus : 1;
+  }
   /** Squad hits roll between these multiples of their damage (1..1 = no roll; the game sets DAMAGE_ROLL). */
   damageRollMin = 1;
   damageRollMax = 1;
@@ -717,9 +728,11 @@ export class PixelWorld implements SolidQuery {
         return 1;
       }
     }
-    const damage = this.scaled(i, amount, byPlayer, preserveFraction);
-    const next = Math.max(0, hp - (preserveFraction ? this.damageWithRemainder(i, damage) : damage));
-    if (preserveFraction && next === hp) return 1;
+    const aura = byPlayer && this.damageAuraSoldier ? this.auraDamageMultiplier((cx + 0.5) * this.cellSize, (cy + 0.5) * this.cellSize) : 1;
+    const exact = preserveFraction || aura !== 1;
+    const damage = this.scaled(i, amount, byPlayer, preserveFraction) * aura;
+    const next = Math.max(0, hp - (exact ? this.damageWithRemainder(i, damage) : damage));
+    if (exact && next === hp) return 1;
     this.health[i] = next;
     if (next === 0) {
       this.fractionalDamage.delete(i);
@@ -752,9 +765,11 @@ export class PixelWorld implements SolidQuery {
     const si = sy * this.subWidth + sx;
     const hp = this.subHealth[si];
     if (hp === 0) return 0;
-    const damage = this.scaled(i, amount, byPlayer, preserveFraction);
-    const next = Math.max(0, hp - (preserveFraction ? this.damageWithRemainder(~si, damage) : damage));
-    if (preserveFraction && next === hp) return 1;
+    const aura = byPlayer && this.damageAuraSoldier ? this.auraDamageMultiplier((sx + 0.5) * this.subCellSize, (sy + 0.5) * this.subCellSize) : 1;
+    const exact = preserveFraction || aura !== 1;
+    const damage = this.scaled(i, amount, byPlayer, preserveFraction) * aura;
+    const next = Math.max(0, hp - (exact ? this.damageWithRemainder(~si, damage) : damage));
+    if (exact && next === hp) return 1;
     this.subHealth[si] = next;
     if (next === 0) {
       this.fractionalDamage.delete(~si);

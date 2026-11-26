@@ -26,6 +26,7 @@ import {
   RAIL,
   NAPALM,
 } from "../config";
+import { latentValue, type LatentLevels, type LatentUpgradeId } from "../progression/LatentAbilities";
 import { SOLDIER_SHAPES, soldierShapeIndex } from "./soldierShapes";
 import type { SoldierBehavior } from "../progression/SaveManager";
 import { baseSoldierMods, type SoldierMods } from "../progression/SoldierUpgrades";
@@ -405,18 +406,45 @@ export class Soldier {
   private shapeSlot = 0;
   get slotIndex(): number { return this.shapeSlot; }
   set slotIndex(index: number) {
-    const shape = SOLDIER_SHAPES[soldierShapeIndex(index)].name;
+    if (this.shapeSlot === index) return;
     this.shapeSlot = index;
-    this.fireRateScale = shape === "triangle" ? 1.5 : 1;
-    this.projectileScale = shape === "hexagon" ? 2 : 1;
-    this.damageScale = shape === "rhombus" ? 0.5 : 1;
-    if (shape === "rhombus" && this.wingmen.length === 0) {
-      this.wingmen = [{ side: -1, x: this.x, y: this.y }, { side: 1, x: this.x, y: this.y }];
+    this.applyLatentAbilities();
+  }
+
+  applyLatentAbilities(levels?: LatentLevels): void {
+    const value = (id: LatentUpgradeId) => latentValue(this.slotIndex, levels, id);
+    this.fireRateScale = 1 + value("latent_cadence") / 100;
+    this.projectileScale = 1 + value("latent_size") / 100;
+    this.resourceBonusPct = value("latent_resources");
+    this.pickupRangeScale = 1 + value("latent_magnet") / 100;
+    this.incomingDamageScale = 1 / (1 + value("latent_armor") / 100);
+    this.auraDamageBonus = value("latent_aura_damage") / 100;
+    this.auraRadiusCells = this.auraDamageBonus > 0 ? 4 * (1 + value("latent_aura_range") / 100) : 0;
+    this.reboundSpeedBonus = value("latent_rebound") / 100;
+    this.reboundDamageScale = value("latent_blast_damage") / 100;
+    this.reboundRadiusCells = value("latent_blast_range");
+    this.wingmanTracking = 18 * (1 + value("latent_tracking") / 100);
+    this.wingmanSpacing = 1 - value("latent_wingmen") / 100;
+    const shape = SOLDIER_SHAPES[soldierShapeIndex(this.slotIndex)].name;
+    const count = levels?.latent_unlock && shape === "rhombus" ? 2 : 0;
+    this.damageScale = count > 0 ? 0.5 : 1;
+    if (count !== this.wingmen.length) {
+      this.wingmen = Array.from({ length: count }, (_, i): Wingman => ({ side: i === 0 ? -1 : 1, x: this.x, y: this.y }));
       this.wingmenPositioned = false;
-    } else if (shape !== "rhombus" && this.wingmen.length) {
-      this.wingmen = [];
     }
   }
+
+  resourceBonusPct = 0;
+  pickupRangeScale = 1;
+  incomingDamageScale = 1;
+  auraDamageBonus = 0;
+  auraRadiusCells = 0;
+  reboundSpeedBonus = 0;
+  reboundDamageScale = 0;
+  reboundRadiusCells = 0;
+  reboundLeft = 0;
+  wingmanTracking = 18;
+  wingmanSpacing = 1;
   fireRateScale = 1;
   projectileScale = 1;
   damageScale = 1;

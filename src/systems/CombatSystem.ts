@@ -283,9 +283,9 @@ export class CombatSystem {
     if (s.wingmen.length === 0) return;
     const dx = Math.cos(s.facingAngle);
     const dy = Math.sin(s.facingAngle);
-    const blend = s.wingmenPositioned ? 1 - Math.exp(-18 * dt) : 1;
+    const blend = s.wingmenPositioned ? 1 - Math.exp(-s.wingmanTracking * dt) : 1;
     const rear = SOLDIER.renderRadius * 1.4;
-    const flank = SOLDIER.renderRadius * 2.35;
+    const flank = SOLDIER.renderRadius * 2.35 * s.wingmanSpacing;
     const maxDistance = Math.hypot(rear, flank) * 1.2;
     for (const wing of s.wingmen) {
       const targetX = s.x - dx * rear - dy * flank * wing.side;
@@ -960,8 +960,42 @@ export class CombatSystem {
     }
   }
 
+  /** Base damage of one equipped-weapon hit, before crits, terrain rolls or pellet count. */
+  private reboundWeaponDamage(s: Soldier): number {
+    const stats = this.stats;
+    switch (s.weapon) {
+      case "shotgun": return stats.shotgunDamage;
+      case "squelch": return stats.gooDamage;
+      case "assault_rifle": return stats.arDamage;
+      case "rocket_launcher": return stats.rocketDamage;
+      case "sniper_rifle": return s.mutation === "chromatic_prism" ? stats.prismDamage :
+        s.mutation === "rail_lance" ? stats.sniperDamage * stats.railDamageMult : stats.sniperDamage;
+      case "katana": return stats.katanaDamage;
+      case "flamethrower": return stats.flameDamage;
+      case "pistol": return s.mutation === "drone_shepherd" ? stats.droneDamage : stats.damage;
+    }
+  }
+
+  private explodeOnBounce(s: Soldier, nx: number, ny: number): void {
+    const damage = (this.reboundWeaponDamage(s) + this.stats.globalDamageBonus + s.mods.damageBonus) * s.reboundDamageScale;
+    const x = s.x - nx * s.radius;
+    const y = s.y - ny * s.radius;
+    const radius = s.reboundRadiusCells * this.world.cellSize;
+    const prevOwner = this.currentOwnerId;
+    this.currentOwnerId = s.id;
+    try {
+      this.damageBlast({ damage, ownerId: s.id, terrainDamageBonus: 0, blightMultiplier: 1 },
+        x, y, nx, ny, s.reboundRadiusCells, false, true);
+    } finally {
+      this.currentOwnerId = prevOwner;
+    }
+    this.napalm.igniteAt(x, y, radius, s.id);
+    this.events.onExplosion?.(x, y, radius, damage);
+  }
+
   /** Called by PhysicsSystem on a real reflected-wall collision (not sliding/rescue/sentry). */
   onSoldierBounce(s: Soldier, nx: number, ny: number): void {
+    if (s.reboundDamageScale > 0) this.explodeOnBounce(s, nx, ny);
     if (s.weapon === "katana" && this.stats.katanaWallSwipe) {
       this.spawnCircularSwipe(s, nx, ny);
       this.events.onShot?.(s, nx, ny, s.x, s.y);
@@ -2046,7 +2080,7 @@ export class CombatSystem {
   /** Shared terrain damage/owner pipeline for rockets and independent goo mines. */
   private damageBlast(
     source: Pick<Bullet, "damage" | "terrainDamageBonus" | "blightMultiplier" | "ownerId">,
-    ix: number, iy: number, nx: number, ny: number, radCells: number, halfDamage = false,
+    ix: number, iy: number, nx: number, ny: number, radCells: number, halfDamage = false, rebound = false,
   ): void {
     const w = this.world;
     const cs = w.cellSize;
@@ -2069,13 +2103,14 @@ export class CombatSystem {
         const wasSub = w.health[idx] === 0;
         const isCore = !wasSub && w.coreId[idx] > 0;
         const amount = (source.damage + w.breachBonus(cx, cy, source.terrainDamageBonus)) * falloff;
-        let dmg = halfDamage ? amount : Math.max(1, Math.round(amount));
-        if (isCore) dmg += this.stats.coreDamageBonus * (halfDamage ? 0.5 : 1);
+        const exact = halfDamage || rebound;
+        let dmg = exact ? amount : Math.max(1, Math.round(amount));
+        if (isCore && !rebound) dmg += this.stats.coreDamageBonus * (halfDamage ? 0.5 : 1);
         if (source.blightMultiplier > 1 && w.isBlightAt(cx, cy)) {
           dmg *= source.blightMultiplier;
-          if (!halfDamage) dmg = Math.round(dmg);
+          if (!exact) dmg = Math.round(dmg);
         }
-        const res = w.damage(cx, cy, dmg, true, (cx + 0.5) * cs - ix, (cy + 0.5) * cs - iy, halfDamage);
+        const res = w.damage(cx, cy, dmg, true, (cx + 0.5) * cs - ix, (cy + 0.5) * cs - iy, exact);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
           const wy = (cy + 0.5) * cs;

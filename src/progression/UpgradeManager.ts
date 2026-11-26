@@ -1,3 +1,4 @@
+import { latentTree, type LatentUpgradeId } from "./LatentAbilities";
 import { accessId, marketFor, marketNode, WEAPON_MARKETS, type MarketPath } from "./BlackMarket";
 import { baseSoldierStats, resolvePrimaryMutation, type PrimaryMutation, type SoldierStats, type WeaponType } from "../entities/Soldier";
 import type { SaveData, SaveManager } from "./SaveManager";
@@ -29,6 +30,8 @@ const WALLET: Record<Currency, keyof Pick<SaveData, "bank" | "crystals" | "green
   exoticMatter: "exoticMatter",
   biomass: "biomass",
 };
+
+const SOLDIER_CAPACITY_IDS = UPGRADE_DEFS.filter((def) => def.id.startsWith("extra_soldier_")).map((def) => def.id);
 
 export class UpgradeManager {
   constructor(private save: SaveManager) {}
@@ -305,6 +308,43 @@ export class UpgradeManager {
 
   soldierMods(slot: number): SoldierMods {
     return soldierModsFor(this.save.data.loadouts[slot]?.upgrades);
+  }
+
+  latentLevelOf(slot: number, id: LatentUpgradeId): number {
+    return this.save.data.loadouts[slot]?.latent?.[id] ?? 0;
+  }
+
+  latentIsMaxed(slot: number, id: LatentUpgradeId): boolean {
+    const node = latentTree(slot).find((def) => def.id === id);
+    return !!node && this.latentLevelOf(slot, id) >= node.maxLevel;
+  }
+
+  latentIsUnlocked(slot: number, id: LatentUpgradeId): boolean {
+    return latentTree(slot).some((node) => node.id === id)
+      && (id === "latent_unlock" || this.latentLevelOf(slot, "latent_unlock") > 0);
+  }
+
+  latentPricesOf(slot: number, id: LatentUpgradeId): Price[] {
+    const node = latentTree(slot).find((def) => def.id === id);
+    return node ? upgradePrices(node, this.latentLevelOf(slot, id)) : [];
+  }
+
+  latentCanBuy(slot: number, id: LatentUpgradeId): boolean {
+    if (!Number.isInteger(slot) || slot < 0 || !this.save.data.loadouts[slot]) return false;
+    const unlockedSlots = 1 + SOLDIER_CAPACITY_IDS.filter((id) => this.levelOf(id) > 0).length;
+    return slot < unlockedSlots
+      && this.latentIsUnlocked(slot, id) && !this.latentIsMaxed(slot, id)
+      && this.canAfford(this.latentPricesOf(slot, id));
+  }
+
+  latentBuy(slot: number, id: LatentUpgradeId): boolean {
+    if (!this.latentCanBuy(slot, id)) return false;
+    this.pay(this.latentPricesOf(slot, id));
+    const loadout = this.save.data.loadouts[slot];
+    const latent = (loadout.latent ??= {});
+    latent[id] = this.latentLevelOf(slot, id) + 1;
+    this.save.save();
+    return true;
   }
 
   getSoldierStats(): SoldierStats {

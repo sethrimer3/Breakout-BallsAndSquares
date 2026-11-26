@@ -187,6 +187,7 @@ export class Game {
     isDragging: false,
   };
   private bankedThisRun = false;
+  private pickupBonusCarry = [0, 0, 0, 0, 0];
   /** Discovered / conquered sectors of the hand-made lab (mirrors `save.data.lab`). */
   labProgress = new LabProgress();
   /** Cosmetic DNA strand + pixel burst over destroyed generators (the DNA is granted on the kill). */
@@ -581,17 +582,25 @@ export class Game {
     this.growth.explosiveChance = this.stats.explosiveBlightChance;
     this.growth.explosiveDamage = this.stats.explosiveBlightDamage;
     this.growth.explosiveRadius = this.stats.explosiveBlightRadius;
+    this.world.damageAuraSoldier = null;
     for (const s of this.soldiers) {
       if (!s.alive) continue;
+      this.applySoldierLatentAbilities(s);
       s.mods = this.upgrades.soldierMods(s.slotIndex);
       s.mutation = resolvePrimaryMutation(s.weapon, s.mutation, this.stats);
       const speed = this.stats.speed * s.mods.speedMult;
       const len = Math.hypot(s.vx, s.vy) || 1;
-      s.vx = (s.vx / len) * speed;
-      s.vy = (s.vy / len) * speed;
+      const boostedSpeed = speed * (1 + s.reboundSpeedBonus * s.reboundLeft);
+      s.vx = (s.vx / len) * boostedSpeed;
+      s.vy = (s.vy / len) * boostedSpeed;
       s.speed = speed;
-      s.maxHealth = this.stats.soldierHealth + s.mods.healthBonus;
+      s.maxHealth = Math.max(s.incomingDamageScale < 1 ? 1 : 0, this.stats.soldierHealth + s.mods.healthBonus);
     }
+  }
+
+  private applySoldierLatentAbilities(s: Soldier): void {
+    s.applyLatentAbilities(this.save.data.loadouts[s.slotIndex]?.latent);
+    if (s.auraDamageBonus > 0) this.world.damageAuraSoldier = s;
   }
 
   resize(): void {
@@ -643,6 +652,7 @@ export class Game {
     this.growth.explosiveDamage = this.stats.explosiveBlightDamage;
     this.growth.explosiveRadius = this.stats.explosiveBlightRadius;
     this.soldiers = [];
+    this.world.damageAuraSoldier = null;
     this.commanderId = 0;
     this.commanderTrail.length = 0;
     for (const fl of this.flashes) {
@@ -672,6 +682,7 @@ export class Game {
     this.paused = false;
     this.runOver = false;
     this.bankedThisRun = false;
+    this.pickupBonusCarry = [...this.save.data.resourceBonusCarry];
     this.aimState.active = false;
     this.aimState.isDragging = false;
     this.camera.reset();
@@ -863,7 +874,7 @@ export class Game {
         const r = alive.length > 1 ? cs * 2 : 0;
         s.x = this.world.roomCenterX + Math.cos(a) * r;
         s.y = this.world.roomCenterY + Math.sin(a) * r;
-        s.dashLeft = s.dashCooldown = 0;
+        s.dashLeft = s.dashCooldown = s.reboundLeft = 0;
         s.dashAfterimage = false;
         s.formationAvoidSign = 0;
         const speed = Math.hypot(s.vx, s.vy);
@@ -911,6 +922,7 @@ export class Game {
       this.save.data.greenCrystals += r.greenCrystals;
       this.save.data.essence += r.essence;
       this.save.data.biomass += r.biomass;
+      this.save.data.resourceBonusCarry = [...this.pickupBonusCarry];
       this.save.data.lifetimePixels += r.pixelsDestroyed;
       if (r.time > b.time) b.time = r.time;
       if (r.maxDepth > b.depth) b.depth = r.maxDepth;
@@ -1174,8 +1186,9 @@ export class Game {
     const mods = this.upgrades.soldierMods(slotIdx);
     const s = new Soldier(clampedX, clampedY, ndx, ndy, this.stats.speed * mods.speedMult, weapon, behavior, slotIdx, secondary);
     s.mods = mods;
+    this.applySoldierLatentAbilities(s);
     s.mutation = resolvePrimaryMutation(weapon,this.save.data.loadouts[slotIdx]?.mutation,this.stats);
-    s.maxHealth = this.stats.soldierHealth + mods.healthBonus;
+    s.maxHealth = Math.max(s.incomingDamageScale < 1 ? 1 : 0, this.stats.soldierHealth + mods.healthBonus);
     s.health = s.maxHealth;
     this.combat.updateWingmen(s, 0);
     this.soldiers.push(s);
@@ -1240,8 +1253,9 @@ export class Game {
     s.wasManualShooting = false;
     this.combat.cancelRailCharge(s);
     const a = this.rng.range(0, Math.PI * 2);
-    s.vx = Math.cos(a) * s.speed;
-    s.vy = Math.sin(a) * s.speed;
+    const speed = s.speed * (1 + s.reboundSpeedBonus * s.reboundLeft);
+    s.vx = Math.cos(a) * speed;
+    s.vy = Math.sin(a) * speed;
     s.facingAngle = a;
   }
 
@@ -1807,7 +1821,7 @@ export class Game {
   private hurtSoldier(s: Soldier, damage: number, x: number, y: number): void {
     if (!s.alive) return;
     if (s.health > 0) {
-      s.health = Math.max(0, s.health - damage);
+      s.health = Math.max(0, s.health - damage * s.incomingDamageScale);
       this.audio.playImpact(s.x, s.y);
       for (let i = 0; i < 6; i++) {
         const a = Math.atan2(s.y - y, s.x - x) + this.rng.range(-1, 1);
@@ -2191,7 +2205,7 @@ export class Game {
     this.lighting.invalidateMovingSubPixels();
     metrics.subPixelSimulationMs += performance.now() - subStart;
     this.exoticBursts.update(dt);
-    const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
+    const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y), this.pickupBonusCarry);
     if (collected > 0) {
       this.runStats.currency += this.loot.collectedGold;
       this.runStats.crystals += this.loot.collectedCrystals;

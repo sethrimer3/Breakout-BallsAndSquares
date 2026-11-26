@@ -289,7 +289,7 @@ export class LateEncounters implements BulletTargets {
   damageEncounter(a: Encounter, damage: number): boolean {
     if (!a.alive) return true;
     const mult = (a.freezeTimer ?? 0) > 0 && a.kind !== "grove" ? FREEZE.enemyDamageMult : 1;
-    a.hp -= damage * mult;
+    a.hp -= damage * mult * this.world.auraDamageMultiplier(a.x, a.y);
     if (a.hp <= 0) {
       this.kill(a);
       return true;

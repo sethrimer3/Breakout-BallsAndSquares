@@ -1,3 +1,4 @@
+import { latentTree, type LatentLevels } from "./LatentAbilities";
 import { accessId, WEAPON_MARKETS } from "./BlackMarket";
 import { RENDER_QUALITIES, type RenderQuality } from "../rendering/RenderScale";
 import type { SpeedrunData } from "../core/SpeedrunTimer";
@@ -50,6 +51,7 @@ export interface SoldierLoadout {
   equipment: (string | null)[];
   /** Levels bought on this soldier's own upgrade tree. */
   upgrades?: SoldierUpgradeLevels;
+  latent?: LatentLevels;
 }
 
 export const VALID_SECONDARY_WEAPONS: readonly SecondaryWeaponType[] = ["grenade", "turret"];
@@ -114,6 +116,8 @@ export interface SaveData {
   /** Blight Essence, dropped by Blight Cores. */
   essence: number;
   exoticMatter: number;
+  /** Unpaid hundredths of a pickup bonus, one per currency kind. */
+  resourceBonusCarry: number[];
   biomass: number;
   lifetimePixels: number;
   upgrades: Record<UpgradeId, number>;
@@ -207,6 +211,7 @@ export function defaultSaveData(): SaveData {
     greenCrystals: 0,
     essence: 0,
     exoticMatter: 0,
+    resourceBonusCarry: [0, 0, 0, 0, 0],
     biomass: 0,
     lifetimePixels: 0,
     upgrades,
@@ -362,6 +367,8 @@ export function sanitizeSaveData(raw: unknown): SaveData {
   def.crystals = Math.floor(finiteNonNeg(obj.crystals, 0));
   def.greenCrystals = Math.floor(finiteNonNeg(obj.greenCrystals, 0));
   def.exoticMatter = Math.floor(finiteNonNeg(obj.exoticMatter, 0));
+  const carry = obj.resourceBonusCarry;
+  if (Array.isArray(carry)) def.resourceBonusCarry = def.resourceBonusCarry.map((_, i) => Math.floor(finiteNonNeg(carry[i], 0, 99)));
   def.essence = Math.floor(finiteNonNeg(obj.essence, 0));
   def.biomass = Math.floor(finiteNonNeg(obj.biomass, 0));
   def.lifetimePixels = Math.floor(finiteNonNeg(obj.lifetimePixels, 0));
@@ -435,6 +442,15 @@ export function sanitizeSaveData(raw: unknown): SaveData {
           def.loadouts[i].secondary = s as SecondaryWeaponType;
         } else {
           def.loadouts[i].secondary = null;
+        }
+        const latent = item.latent as Record<string, unknown> | undefined;
+        if (latent && typeof latent === "object" && finiteNonNeg(latent.latent_unlock, 0) >= 1) {
+          const clean: LatentLevels = {};
+          for (const node of latentTree(i)) {
+            const level = Math.floor(finiteNonNeg(latent[node.id], 0, node.maxLevel));
+            if (level > 0) clean[node.id] = level;
+          }
+          def.loadouts[i].latent = clean;
         }
         const levels = item.upgrades;
         if (levels && typeof levels === "object") {

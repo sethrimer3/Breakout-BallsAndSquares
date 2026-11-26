@@ -1,3 +1,4 @@
+import { LATENT_DEFS, LATENT_BY_ID, latentTree, type LatentUpgradeId } from "../progression/LatentAbilities";
 import { exoticMatterIcon } from "./exoticMatterIcon";
 import { marketFor, marketNode, WEAPON_MARKETS } from "../progression/BlackMarket";
 import { marketLayout } from "./marketLayout";
@@ -138,12 +139,12 @@ export const CATEGORIES: readonly CategoryInfo[] = [
   },
 ];
 
-type TreeDef = UpgradeDef | SoldierUpgradeDef;
+type TreeDef = UpgradeDef | SoldierUpgradeDef | (typeof LATENT_DEFS)[number];
 
-const TREE_DEFS: readonly TreeDef[] = [...UPGRADE_DEFS, ...SOLDIER_UPGRADE_DEFS];
+const TREE_DEFS: readonly TreeDef[] = [...UPGRADE_DEFS, ...SOLDIER_UPGRADE_DEFS, ...LATENT_DEFS];
 
 function treeDef(id: string): TreeDef {
-  return (UPGRADE_BY_ID as Record<string, TreeDef>)[id] ?? SOLDIER_UPGRADE_BY_ID[id as SoldierUpgradeId];
+  return (UPGRADE_BY_ID as Record<string, TreeDef>)[id] ?? SOLDIER_UPGRADE_BY_ID[id as SoldierUpgradeId] ?? LATENT_BY_ID.get(id as LatentUpgradeId)!;
 }
 
 const branchOf = (def: TreeDef): UpgradeBranch => ("branch" in def ? def.branch : "soldier");
@@ -248,6 +249,7 @@ export class UpgradeTree {
   private activeTab: UpgradeBranch = "core";
   /** Whose tree the Soldiers tab shows. */
   private soldierSlot = 0;
+  private latentView = false;
   private expandedCategory: UpgradeCategory = "systems";
   private inLoadoutScreen = false;
   private bodies = new Map<string, ElasticBody>();
@@ -409,7 +411,9 @@ export class UpgradeTree {
     this.slotTabsEl = this.root.querySelector(".soldier-slot-tabs") as HTMLDivElement;
     this.slotTabsEl.addEventListener("click", (e) => {
       const btn = (e.target as HTMLElement).closest("[data-soldier-slot]") as HTMLElement | null;
-      if (btn) this.openSoldierTree(Number(btn.dataset.soldierSlot));
+      const mode = (e.target as HTMLElement).closest<HTMLElement>("[data-soldier-mode]")?.dataset.soldierMode;
+      if (btn) this.openSoldierTree(Number(btn.dataset.soldierSlot), this.latentView);
+      if (mode) this.openSoldierTree(this.soldierSlot, mode === "latent");
     });
     this.lifeValEl = this.root.querySelector(".life-num") as HTMLSpanElement;
     this.titleEl = this.root.querySelector(".tree-title") as HTMLDivElement;
@@ -470,7 +474,7 @@ export class UpgradeTree {
       const active = this.game.upgrades.activeMarketPath(market.weapon)?.root ?? null;
       return [...marketLayout(market, active).keys()].map((id) => UPGRADE_BY_ID[id]);
     }
-    return this.activeTab === "soldier" ? SOLDIER_UPGRADE_DEFS : UPGRADE_DEFS.filter((d) => d.branch === this.activeTab && !marketNode(d.id));
+    return this.activeTab === "soldier" ? (this.latentView ? latentTree(this.soldierSlot) : SOLDIER_UPGRADE_DEFS) : UPGRADE_DEFS.filter((d) => d.branch === this.activeTab && !marketNode(d.id));
   }
 
   private get source(): TreeSource {
@@ -487,6 +491,16 @@ export class UpgradeTree {
       };
     }
     const slot = this.soldierSlot;
+    if (this.latentView) {
+      return {
+        levelOf: (id) => u.latentLevelOf(slot, id as LatentUpgradeId),
+        isUnlocked: (id) => u.latentIsUnlocked(slot, id as LatentUpgradeId),
+        isMaxed: (id) => u.latentIsMaxed(slot, id as LatentUpgradeId),
+        canBuy: (id) => u.latentCanBuy(slot, id as LatentUpgradeId),
+        pricesOf: (id) => u.latentPricesOf(slot, id as LatentUpgradeId),
+        buy: (id) => u.latentBuy(slot, id as LatentUpgradeId),
+      };
+    }
     return {
       levelOf: (id) => u.soldierLevelOf(slot, id as SoldierUpgradeId),
       isUnlocked: (id) => u.soldierIsUnlocked(slot, id as SoldierUpgradeId),
@@ -498,8 +512,9 @@ export class UpgradeTree {
   }
 
   /** Show one soldier's own upgrade tree. */
-  openSoldierTree(slot: number): void {
+  openSoldierTree(slot: number, latent = false): void {
     this.soldierSlot = slot;
+    this.latentView = latent && latentTree(slot).length > 0;
     this.switchTab("soldier");
   }
 
@@ -551,6 +566,8 @@ export class UpgradeTree {
       u.levelOf("behavior_sentry") > 0;
     return (
       st.maxSoldiers > 1 ||
+      this.game.save.data.exoticMatter > 0 ||
+      u.latentLevelOf(0, "latent_unlock") > 0 ||
       st.shotgunUnlocked ||
       st.gooUnlocked ||
       st.arUnlocked ||
@@ -589,6 +606,7 @@ export class UpgradeTree {
     if (!this.game.upgrades.isBranchUnlocked(tab)) return;
     this.inLoadoutScreen = false;
     this.activeTab = tab;
+    if (tab !== "soldier") this.latentView = false;
     this.marketView = blackMarket && !!marketFor(tab);
     this.expandedCategory = categoryForBranch(tab);
     this.hideTooltip();
@@ -604,7 +622,11 @@ export class UpgradeTree {
       this.subEl.textContent = "EQUIP PRIMARY WEAPONS & GEAR FOR EACH SOLDIER BEFORE DEPLOYING";
     } else {
       this.titleEl.textContent = "UPGRADE MATRIX";
-      if (tab === "soldier") {
+      if (tab === "soldier" && this.latentView) {
+        const shape = SOLDIER_SHAPES[soldierShapeIndex(this.soldierSlot)];
+        this.titleEl.textContent = `${shape.name.toUpperCase()} LATENT TREE`;
+        this.subEl.textContent = "AWAKEN WITH EXOTIC MATTER DNA · IMPROVE WITH BLIGHT ESSENCE";
+      } else if (tab === "soldier") {
         this.titleEl.textContent = `SOLDIER #${this.soldierSlot + 1} TREE`;
         this.subEl.textContent = "THIS SOLDIER ONLY — GOLD, THEN ORANGE, THEN GREEN CRYSTALS, ALL WITH BLIGHT ESSENCE";
       } else if (tab === "core") {
@@ -1200,7 +1222,7 @@ export class UpgradeTree {
     return prices
       .map((p) => {
         const short = u.balanceOf(p.currency) < p.amount ? " short" : "";
-        return `<span class="tt-price${short}" title="${p.currency === "exoticMatter" ? "Exotic Matter" : p.currency}">${currencyIcon(p.currency)} ${p.amount.toLocaleString()}</span>`;
+        return `<span class="tt-price${short}" title="${p.currency === "exoticMatter" ? "Exotic Matter" : p.currency === "essence" ? "Blight Essence" : p.currency}">${currencyIcon(p.currency)} ${p.amount.toLocaleString()}</span>`;
       })
       .join("");
   }
@@ -1468,13 +1490,14 @@ export class UpgradeTree {
         .join("");
 
       const shape = SOLDIER_SHAPES[soldierShapeIndex(i)];
+      const supportsLatent = latentTree(i).length > 0;
+      const awakened = this.game.upgrades.latentLevelOf(i, "latent_unlock") > 0;
       cardsHtml += `
         <div class="loadout-card">
           <div class="lc-header">
             <div class="lc-avatar">${sprite("soldier", { color: UI_COLORS.soldier })}</div>
             <div class="lc-meta">
-              <div class="lc-name">SOLDIER #${i + 1}${shape.trait ? ` · ${shape.name.toUpperCase()}` : ""}</div>
-              ${shape.trait ? `<div class="lc-compat">${shape.trait}</div>` : ""}
+              <div class="lc-name">SOLDIER #${i + 1} · ${shape.name.toUpperCase()}</div>
               <div class="lc-stats">${wSummary}</div>
             </div>
           </div>
@@ -1486,6 +1509,7 @@ export class UpgradeTree {
           <div class="lc-section-lbl">BEHAVIOR PROTOCOL</div>
           <div class="lc-behaviors">${bBtnsHtml}</div>
           <button class="btn lc-tree-btn" data-soldier-tree="${i}">UPGRADE TREE · LV ${this.game.upgrades.soldierTreeLevel(i)}</button>
+          ${supportsLatent ? `<button class="btn lc-tree-btn" data-latent-tree="${i}">${exoticMatterIcon()} LATENT TREE · ${awakened ? "AWAKENED" : "DORMANT"}</button>` : ""}
         </div>
       `;
     }
@@ -1512,9 +1536,13 @@ export class UpgradeTree {
       }
     });
 
-    this.loadoutWrap.querySelectorAll(".lc-tree-btn").forEach((btn) => {
+    this.loadoutWrap.querySelectorAll("[data-soldier-tree]").forEach((btn) => {
       btn.addEventListener("click", () => this.openSoldierTree(Number((btn as HTMLElement).dataset.soldierTree)));
     });
+
+    for (const btn of this.loadoutWrap.querySelectorAll<HTMLElement>("[data-latent-tree]")) {
+      btn.addEventListener("click", () => this.openSoldierTree(Number(btn.dataset.latentTree), true));
+    }
 
     this.loadoutWrap.querySelectorAll(".lc-wbtn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1602,6 +1630,10 @@ export class UpgradeTree {
       const active = this.activeTab === "soldier" && i === this.soldierSlot ? " active" : "";
       slotTabs += `<button class="tree-tab${active}" data-soldier-slot="${i}">${sprite("soldier", { color: UI_COLORS.soldier, scale: 1 })} #${i + 1}</button>`;
     }
+    if (this.activeTab === "soldier" && latentTree(this.soldierSlot).length) {
+      slotTabs += `<button class="tree-tab${this.latentView ? "" : " active"}" data-soldier-mode="standard">STANDARD</button>`
+        + `<button class="tree-tab${this.latentView ? " active" : ""}" data-soldier-mode="latent">${exoticMatterIcon()} LATENT</button>`;
+    }
     this.slotTabsEl.innerHTML = slotTabs;
     this.lifeValEl.textContent = this.game.lifetimePixels.toLocaleString();
 
@@ -1665,7 +1697,7 @@ export class UpgradeTree {
     // Center hub ball is shown on Core, Resources, Blight & Pistol (where 0,0 has no upgrade node),
     // and hidden on weapon trees where their unlock node sits at (0,0).
     const hasCenterUnlockNode =
-      !this.marketView && (this.activeTab === "shotgun" ||
+      !this.marketView && ((this.activeTab === "soldier" && this.latentView) || this.activeTab === "shotgun" ||
       this.activeTab === "squelch" ||
       this.activeTab === "assault_rifle" ||
       this.activeTab === "rocket_launcher" ||

@@ -963,6 +963,18 @@ export class Renderer {
       if (!s.alive) continue;
       const sx = cam.worldToScreenX(s.x);
       const sy = cam.worldToScreenY(s.y);
+      const aura = s.auraRadiusCells * game.world.cellSize * cam.zoom;
+      if (aura > 0 && sx + aura >= 0 && sy + aura >= 0 && sx - aura <= vw && sy - aura <= vh) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(sx, sy, aura, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(255, 125, 185, 0.055)";
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 165, 211, 0.42)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+      }
       if (sx + pad < 0 || sy + pad < 0 || sx - pad > vw || sy - pad > vh) continue;
       // The ring marks the soldier the camera is following (auto or Tab-selected).
       const selected = cam.following && cam.targetId === s.id;

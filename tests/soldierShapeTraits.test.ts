@@ -19,6 +19,7 @@ describe("soldier shape traits", () => {
     const { stats, combat, onShot } = fixture();
     stats.globalFireRateMult = 1.2;
     const triangle = new Soldier(100, 100, 1, 0, 0, "pistol", "free", 1);
+    triangle.applyLatentAbilities({ latent_unlock: 1, latent_cadence: 9 });
     triangle.mods.fireRateMult = 1.1;
     const rate = stats.fireRate * 1.2 * 1.1 * 1.5;
     expect(combat.effectiveFireRate(triangle)).toBeCloseTo(rate);
@@ -32,6 +33,7 @@ describe("soldier shape traits", () => {
     const { world, stats, combat, onShot, bullets } = fixture();
     stats.damage = 1;
     const diamond = new Soldier(100, 100, 1, 0, 0, "pistol", "free", 6);
+    diamond.applyLatentAbilities({ latent_unlock: 1 });
     combat.fire(diamond, 1, 0);
     expect(onShot).toHaveBeenCalledTimes(2);
     expect(bullets()).toHaveLength(2);
@@ -60,6 +62,7 @@ describe("soldier shape traits", () => {
   it("doubles hexagon rockets, cluster charges, and grenade blast radii", () => {
     const { world, stats, combat, onExplosion, bullets } = fixture();
     const hexagon = new Soldier(100, 100, 1, 0, 0, "rocket_launcher", "free", 4);
+    hexagon.applyLatentAbilities({ latent_unlock: 1, latent_size: 9 });
     stats.rocketClusterCount = 1;
     combat.fire(hexagon, 1, 0);
     const rocket = bullets()[0];
@@ -80,6 +83,7 @@ describe("soldier shape traits", () => {
     const { world, combat, bullets } = fixture();
     const diamond = new Soldier(100, 100, 1, 0, 0, "pistol", "free", 6);
     for (let cx = 10; cx < 15; cx++) world.setCell(cx, 11, 100);
+    diamond.applyLatentAbilities({ latent_unlock: 1 });
     combat.fire(diamond, 1, 0);
     expect(bullets()).toHaveLength(2);
     expect(bullets()[0].y).toBeGreaterThanOrEqual(12 * world.cellSize);

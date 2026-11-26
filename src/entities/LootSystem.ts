@@ -38,6 +38,8 @@ export class LootSystem {
   readonly value: Uint16Array;
   readonly isFeedback: Uint8Array;
 
+  private readonly bonusCarry = [0, 0, 0, 0, 0];
+
   /** Per-step collection counters populated by `update()`. */
   collectedGold = 0;
   collectedCrystals = 0;
@@ -123,6 +125,7 @@ export class LootSystem {
     soldiers: readonly Soldier[],
     magnetRange: number,
     onCollect?: (x: number, y: number, kind: LootKind) => void,
+    bonusCarry = this.bonusCarry,
   ): number {
     this.collectedGold = 0;
     this.collectedCrystals = 0;
@@ -157,7 +160,8 @@ export class LootSystem {
       let bestRange = magnetRange;
       let bestDx = 0;
       let bestDy = 0;
-      let pickedUp = false;
+      let collector: Soldier | undefined;
+      let pickupDist2 = Infinity;
 
       for (let sIdx = 0; sIdx < nSoldiers; sIdx++) {
         const s = soldiers[sIdx];
@@ -165,11 +169,12 @@ export class LootSystem {
         const dx = s.x - px;
         const dy = s.y - py;
         const d2 = dx * dx + dy * dy;
-        if (d2 <= pickR2) {
-          pickedUp = true;
-          break;
+        if (d2 <= pickR2 && d2 < pickupDist2) {
+          collector = s;
+          pickupDist2 = d2;
         }
-        const reach = s.mods.magnetMult;
+        if (collector) continue;
+        const reach = s.mods.magnetMult * s.pickupRangeScale;
         if (d2 < bestDist2 && d2 < magR2 * reach * reach) {
           bestDist2 = d2;
           bestRange = magnetRange * reach;
@@ -178,10 +183,10 @@ export class LootSystem {
         }
       }
 
-      if (pickedUp) {
+      if (collector) {
         collected++;
         if (!this.isFeedback[i]) {
-          this.tally(k, this.value[i]);
+          this.tally(k, this.value[i], collector.resourceBonusPct, bonusCarry);
         }
         onCollect?.(px, py, k);
         this.removeAt(i);
@@ -212,16 +217,17 @@ export class LootSystem {
         if (!s.alive) continue;
         const dx = s.x - px;
         const dy = s.y - py;
-        if (dx * dx + dy * dy <= pickR2) {
-          pickedUp = true;
-          break;
+        const d2 = dx * dx + dy * dy;
+        if (d2 <= pickR2 && d2 < pickupDist2) {
+          collector = s;
+          pickupDist2 = d2;
         }
       }
 
-      if (pickedUp) {
+      if (collector) {
         collected++;
         if (!this.isFeedback[i]) {
-          this.tally(k, this.value[i]);
+          this.tally(k, this.value[i], collector.resourceBonusPct, bonusCarry);
         }
         onCollect?.(px, py, k);
         this.removeAt(i);
@@ -237,7 +243,12 @@ export class LootSystem {
     return collected;
   }
 
-  private tally(kind: LootKind, value: number): void {
+  private tally(kind: LootKind, value: number, bonusPct: number, carry: number[]): void {
+    if (bonusPct > 0) {
+      const hundredths = carry[kind] + value * bonusPct;
+      value += Math.floor(hundredths / 100);
+      carry[kind] = hundredths % 100;
+    }
     if (kind === LootKind.Crystal) this.collectedCrystals += value;
     else if (kind === LootKind.GreenCrystal) this.collectedGreenCrystals += value;
     else if (kind === LootKind.Essence) this.collectedEssence += value;

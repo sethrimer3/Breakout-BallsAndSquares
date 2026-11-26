@@ -715,7 +715,7 @@ export class CreatureSystem {
   /** Damage a specific creature, applying 2x frozen damage multiplier if frozen. Returns true if killed. */
   damageCreature(c: Creature, damage: number, x: number, y: number): boolean {
     const mult = (c.freezeTimer ?? 0) > 0 ? FREEZE.enemyDamageMult : 1;
-    c.hp -= damage * mult;
+    c.hp -= damage * mult * this.world.auraDamageMultiplier(x, y);
     if (c.kind !== "flower") c.hurt = 0.12;
     if (c.hp > 0) return false;
     this.kill(c, x, y);

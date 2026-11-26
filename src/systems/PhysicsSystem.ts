@@ -351,7 +351,19 @@ export class PhysicsSystem {
     onWallBounce?: (s: Soldier, nx: number, ny: number) => void,
     onCrush?: (s: Soldier, sx: number, sy: number) => void,
   ): number {
+    const previousBoost = 1 + s.reboundSpeedBonus * s.reboundLeft;
+    const wasDashing = s.dashLeft > 0;
     advanceMomentum(s, dt);
+    if (s.reboundLeft > 0) {
+      s.reboundLeft = Math.max(0, s.reboundLeft - dt);
+      if (!s.isManual && !s.isInFormation) {
+        // Momentum computes its velocity from base speed. Otherwise remove the old
+        // rebound multiplier before applying the next value.
+        const boost = (1 + s.reboundSpeedBonus * s.reboundLeft) / (wasDashing ? 1 : previousBoost);
+        s.vx *= boost;
+        s.vy *= boost;
+      }
+    }
     this.dashStats = stats ?? null;
     this.onDash = onDash;
     this.onWallBounce = onWallBounce;
@@ -394,7 +406,7 @@ export class PhysicsSystem {
   resolve(s: Soldier): boolean {
     this.crushHalfBlocks(s);
     const r = s.radius;
-    const moveSpeed = s.dashLeft > 0 ? Math.hypot(s.vx, s.vy) || s.speed : s.speed;
+    const moveSpeed = s.dashLeft > 0 ? Math.hypot(s.vx, s.vy) || s.speed : s.speed * (1 + s.reboundSpeedBonus * s.reboundLeft);
     let firstNx = 0;
     let firstNy = 0;
     let touched = false;
@@ -503,7 +515,15 @@ export class PhysicsSystem {
       s.facingAngle = Math.atan2(s.vy, s.vx);
     }
     if (!recovered) {
-      if (this.dashStats && triggerMomentum(s, this.dashStats)) this.onDash?.(s, nx, ny);
+      const dashed = !!this.dashStats && triggerMomentum(s, this.dashStats);
+      if (dashed) this.onDash?.(s, nx, ny);
+      if (s.reboundSpeedBonus > 0) {
+        const previous = dashed ? 1 : 1 + s.reboundSpeedBonus * s.reboundLeft;
+        s.reboundLeft = 1;
+        const boost = (1 + s.reboundSpeedBonus) / previous;
+        s.vx *= boost;
+        s.vy *= boost;
+      }
       this.onWallBounce?.(s, nx, ny);
     }
     return true;
