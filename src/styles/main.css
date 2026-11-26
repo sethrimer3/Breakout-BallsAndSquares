@@ -2426,17 +2426,10 @@ button {
   .profile-last-played { font-size: 10px; }
 }
 
-/* Each primary weapon keeps a standard tree and a separate Black Market half. */
-.tree-weapon-tab { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:0; min-width:0; }
-.tree-overlay .tree-weapon-tab .tree-tab { padding:2px 5px; font-size:var(--f8); white-space:normal; }
-.tree-market-tab { min-width:0; min-height:56px; padding:5px 3px; border:2px solid #3b263b; border-left:0; background:#130d17; color:#dd79ad; display:flex; align-items:center; justify-content:center; gap:5px; font-family:var(--font-small); font-size:var(--f8); }
-.tree-market-tab span { white-space:normal; }
-.tree-market-tab.active { background:#421b38; border-color:#ff4b8b; color:#ffc6dc; }
-.tree-market-tab:disabled { opacity:.45; cursor:not-allowed; }
-@media(max-width:700px) {
-  .tree-overlay .tree-weapon-tab .tree-tab, .tree-market-tab { min-height:48px; font-size:var(--f8); }
-}
-
+/* New research expands the existing tree in place. */
+.tree-node.folding { pointer-events: none; }
+.soldier-portrait { display: block; width: 32px; height: 32px; image-rendering: pixelated; }
+.tree-core .soldier-portrait { position: relative; width: 48px; height: 48px; }
 /* Black Market trees: the camera glides to the new shape when a path folds away. */
 .tree-view.view-glide { transition: transform 0.42s cubic-bezier(0.3, 0, 0.2, 1); }
 @media (prefers-reduced-motion: reduce) { .tree-view.view-glide { transition: none; } }
@@ -2559,29 +2552,6 @@ button {
   height: var(--exotic-px);
 }
 .exotic-wrap, .hud-exotic .hud-value { color: #ff9dce; }
-.tree-weapon-tab {
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-  gap: 3px;
-  padding: 3px;
-  background: #101723;
-  border: 1px solid #25364a;
-}
-.tree-overlay .tree-weapon-tab .tree-tab {
-  min-height: 44px;
-  padding: 6px;
-  text-align: left;
-}
-.tree-market-tab {
-  min-height: 44px;
-  border: 1px solid #5f3154;
-  border-left: 2px solid #a94b81;
-  background: #211326;
-  color: #f5a9d1;
-  cursor: pointer;
-}
-.tree-market-tab.active { background: #4a2241; border-color: #ff81ba; color: #ffe6f3; }
-.tree-market-tab:not(:disabled):hover { color: #fff1fa; border-color: #ff81ba; }
-.tree-market-tab:disabled { opacity: 0.62; }
 .deploy-cleared-chip { width: 8px; height: 8px; background: #79dfd2; }
 .labmap-tile[data-deployment="available"]:not(.conquered) .labmap-deploy-overlay {
   box-shadow: inset 0 -1px 0 rgba(121, 223, 210, 0.42);

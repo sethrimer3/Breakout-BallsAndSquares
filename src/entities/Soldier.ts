@@ -26,7 +26,7 @@ import {
   RAIL,
   NAPALM,
 } from "../config";
-import { latentValue, type LatentLevels, type LatentUpgradeId } from "../progression/LatentAbilities";
+import { latentValue, symbioteStage, type LatentLevels, type LatentUpgradeId } from "../progression/LatentAbilities";
 import { SOLDIER_SHAPES, soldierShapeIndex } from "./soldierShapes";
 import type { SoldierBehavior } from "../progression/SaveManager";
 import { baseSoldierMods, type SoldierMods } from "../progression/SoldierUpgrades";
@@ -412,6 +412,7 @@ export class Soldier {
   }
 
   applyLatentAbilities(levels?: LatentLevels): void {
+    this.symbioteStage = symbioteStage(this.slotIndex, levels);
     const value = (id: LatentUpgradeId) => latentValue(this.slotIndex, levels, id);
     this.fireRateScale = 1 + value("latent_cadence") / 100;
     this.projectileScale = 1 + value("latent_size") / 100;
@@ -445,6 +446,7 @@ export class Soldier {
   reboundLeft = 0;
   wingmanTracking = 18;
   wingmanSpacing = 1;
+  symbioteStage = 0;
   fireRateScale = 1;
   projectileScale = 1;
   damageScale = 1;

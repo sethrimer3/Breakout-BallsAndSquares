@@ -1,33 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { WEAPON_MARKETS } from "../src/progression/BlackMarket";
-import { MARKET_HUB, marketLayout } from "../src/ui/marketLayout";
+import { accessId, marketNode, WEAPON_MARKETS } from "../src/progression/BlackMarket";
+import { UPGRADE_DEFS } from "../src/progression/UpgradeDefinitions";
+import { graftGate, latentLayout, marketLayout } from "../src/ui/marketLayout";
 
-describe("Black Market tree layout", () => {
-  it("shows only path roots around the hub until a path is active", () => {
+describe("grafted research layout", () => {
+  it("grafts all mutation choices and only the active research onto each weapon", () => {
     for (const market of WEAPON_MARKETS) {
-      const cells = marketLayout(market, null);
-      expect([...cells.keys()]).toEqual(market.paths.map((p) => p.root));
-      for (const cell of cells.values()) {
-        expect(cell.parent).toBe(MARKET_HUB);
-        expect(Math.abs(cell.col) + Math.abs(cell.row)).toBe(1);
+      const gateId = accessId(market.weapon);
+      const base = UPGRADE_DEFS.filter((def) =>
+        def.branch === market.weapon && def.id !== gateId && !marketNode(def.id)).map((def) => def.grid);
+      for (const direction of ["right", "down"] as const) {
+        const gate = graftGate(base, direction);
+        for (const path of [null, ...market.paths]) {
+          const cells = marketLayout(market, path?.root ?? null, gateId, gate, direction);
+          expect([...cells.keys()].sort()).toEqual([...new Set([...market.paths.map((entry) => entry.root), ...(path?.nodes ?? [])])].sort());
+          for (const [id, cell] of cells) {
+            if (market.paths.some((entry) => entry.root === id)) expect(cell.parent).toBe(gateId);
+            else expect(path?.nodes).toContain(cell.parent);
+          }
+          const placed = [...base, gate, ...cells.values()];
+          for (let i = base.length; i < placed.length; i++) {
+            for (let j = 0; j < i; j++) {
+              expect(Math.hypot(placed[i].col - placed[j].col, placed[i].row - placed[j].row)).toBeGreaterThanOrEqual(0.84);
+            }
+          }
+        }
       }
     }
   });
 
-  it("grows only the active path's research, on distinct cells hanging off that path", () => {
-    for (const market of WEAPON_MARKETS) {
-      for (const path of market.paths) {
-        const cells = marketLayout(market, path.root);
-        const shown = [...cells.keys()];
-        expect(shown.sort()).toEqual([...new Set([...market.paths.map((p) => p.root), ...path.nodes])].sort());
-        const spots = [...cells.values()].map((c) => `${c.col},${c.row}`);
-        expect(new Set(spots).size).toBe(spots.length);
-        expect(spots).not.toContain("0,0");
-        for (const id of path.nodes) {
-          if (id === path.root) continue;
-          expect(path.nodes).toContain(cells.get(id)!.parent);
-        }
-      }
-    }
+  it("makes room for latent nodes under their awakening gate", () => {
+    const gate = graftGate([{ col: 0, row: 0 }, { col: 0, row: 1 }], "down");
+    const cells = latentLayout(["rebound", "blast", "range"], "latent_unlock", gate);
+    expect(cells.get("blast")!.col).toBe(gate.col);
+    expect([...cells.values()].every((cell) => cell.row > gate.row && cell.parent === "latent_unlock")).toBe(true);
+    expect(new Set([...cells.values()].map((cell) => cell.col)).size).toBe(3);
   });
 });

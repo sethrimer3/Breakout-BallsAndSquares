@@ -23,7 +23,7 @@ fs.mkdirSync(artifacts, { recursive: true });
    // Weapon research requires finding its gold block before buying the node.
    // This all-weapons fixture represents a profile that has found every block.
    for(const spot of Object.keys(SPECIAL_UNLOCKS))g.save.data.lab.worlds[specialWorld(spot)].specials.push(spot);
-   g.save.data.essence=1000000;g.save.data.bank=g.save.data.crystals=g.save.data.greenCrystals=1000000;g.save.data.lifetimePixels=10000;g.openUpgrades();
+   g.save.data.essence=1000000;g.save.data.exoticMatter=30;g.save.data.bank=g.save.data.crystals=g.save.data.greenCrystals=1000000;g.save.data.lifetimePixels=10000;g.openUpgrades();
    for(const id of [
      'shotgun_unlock','homing_shotgun_unlock','goo_unlock','goo_radius','goo_residue','vacuum_unlock',
      'ar_unlock','ar_stabilizer','overcharge_unlock','overcharge_accuracy','circuit_unlock',
@@ -41,7 +41,7 @@ fs.mkdirSync(artifacts, { recursive: true });
     const g=window.__game,node=marketNode(id);
     if(!node){g.upgradeTree.switchTab(g.upgrades.defs.find(d=>d.id===id).branch);return false;}
     if(!g.upgrades.marketOpen(node.market.weapon))assertPurchase(g.upgrades.buy(accessId(node.market.weapon)));
-    g.applyUpgrades();g.upgradeTree.switchTab(node.market.weapon,true);return true;
+    g.applyUpgrades();g.upgradeTree.switchTab(node.market.weapon);return true;
     function assertPurchase(ok){if(!ok)throw Error('Could not open Black Market');}
    },id);
    const node=page.locator(market?`.tree-node[data-id="${id}"]:not(.hidden)`:`[data-smoke="${id}"]`);
@@ -230,7 +230,7 @@ fs.mkdirSync(artifacts, { recursive: true });
    if(mobile){
     const cdp=await profile.newCDPSession(p);await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
     await p.evaluate(async()=>{const{UPGRADE_DEFS}=await import('/src/progression/UpgradeDefinitions.ts');const g=window.__game;for(const d of UPGRADE_DEFS)g.save.data.upgrades[d.id]=d.maxLevel;g.save.data.lifetimePixels=10000;g.save.data.blackMarketPaths.sniper_rifle='prism_unlock';g.applyUpgrades();g.openUpgrades();});
-    await p.locator('.tree-cat-btn[data-cat="primary"]').tap();await p.locator('[data-market="sniper_rifle"]').tap();
+    await p.locator('.tree-cat-btn[data-cat="primary"]').tap();await p.locator('[data-tab="sniper_rifle"]').tap();
     await p.locator('.tree-node[data-id="prism_spectrum"]:not(.hidden)').tap();
     await p.locator('.tree-tooltip:not(.hidden)').filter({hasText:'Spectrum Ascension'}).waitFor({state:'visible'});
     await p.screenshot({path:path.join(artifacts,'mobile-prism-upgrades.png')});

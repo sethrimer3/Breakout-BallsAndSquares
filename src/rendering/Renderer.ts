@@ -299,7 +299,8 @@ export class Renderer {
     drawWeaponExpansion(ctx, game, still);
     // The deployment portal sits under the operators stepping out of it.
     if (game.portal) drawSpawnPortal(ctx, cam, game.portal, still ? 0 : wallClockMs / 1000);
-    this.drawSoldiers();
+    const symbioteFrame = still || game.lighting.quality === "low" ? 0 : Math.floor(wallClockMs / 180);
+    this.drawSoldiers(symbioteFrame);
     this.drawGrenades();
     drawGoo(ctx, cam, game.combat.goo, still, game.lighting.quality === "low");
     this.drawTurrets();
@@ -308,7 +309,7 @@ export class Renderer {
     this.drawAimIndicator();
     this.drawGateNotice();
     drawSpecialNotice(ctx, cam, game.specialNotice, game.runStats.time);
-    this.offscreenSoldiers.draw(ctx, game);
+    this.offscreenSoldiers.draw(ctx, game, symbioteFrame);
     if (metrics) {
       metrics.actorsAndUiMs = performance.now() - passStart;
       metrics.candidateRoomLights = visibleRoomLightIndices(game.world, cam).length;
@@ -952,7 +953,7 @@ export class Renderer {
     this.ctx.drawImage(sprite, Math.round(sx - half), Math.round(sy - half), size, size);
   }
 
-  private drawSoldiers(): void {
+  private drawSoldiers(symbioteFrame = 0): void {
     const { ctx, game } = this;
     const cam = game.camera;
     const commander = game.getCommander();
@@ -981,12 +982,12 @@ export class Renderer {
       // Each loadout slot has its own body shape, rotated to face where it aims.
       const shape = soldierShapeIndex(s.slotIndex);
       if (s.wingmen.length) {
-        const sprite = soldierShapeSprite(shape, s.facingAngle, false);
+        const sprite = soldierShapeSprite(shape, s.facingAngle, false, s.symbioteStage, symbioteFrame);
         for (const wing of s.wingmen) {
           this.drawSoldierSprite(sprite, cam.worldToScreenX(wing.x), cam.worldToScreenY(wing.y), 0.48);
         }
       }
-      this.drawSoldierSprite(soldierShapeSprite(shape, s.facingAngle, selected), sx, sy);
+      this.drawSoldierSprite(soldierShapeSprite(shape, s.facingAngle, selected, s.symbioteStage, symbioteFrame), sx, sy);
       if (s.secondary) {
         this.drawSoldierEnergyOutline(s, sx, sy);
       }

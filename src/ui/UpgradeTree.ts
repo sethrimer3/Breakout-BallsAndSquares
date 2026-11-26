@@ -1,7 +1,8 @@
-import { LATENT_DEFS, LATENT_BY_ID, latentTree, type LatentUpgradeId } from "../progression/LatentAbilities";
+import { LATENT_DEFS, LATENT_BY_ID, latentTree, symbioteStage, type LatentUpgradeId } from "../progression/LatentAbilities";
+import { soldierShapeSprite } from "../rendering/sprites";
 import { exoticMatterIcon } from "./exoticMatterIcon";
-import { marketFor, marketNode, WEAPON_MARKETS } from "../progression/BlackMarket";
-import { marketLayout } from "./marketLayout";
+import { accessId, marketFor, marketNode, WEAPON_MARKETS } from "../progression/BlackMarket";
+import { graftGate, latentLayout, marketLayout, type GraftDirection } from "./marketLayout";
 import { damageRange, TERRAIN } from "../config";
 import { SOLDIER_SHAPES, soldierShapeIndex } from "../entities/soldierShapes";
 import { mutationCompatibility, resolvePrimaryMutation, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
@@ -66,8 +67,6 @@ const DRAG_THRESHOLD = 5;
 const BUY_KICK = 420;
 /** How long (ms) a Symbiosis path takes to fold back into its root. */
 const COLLAPSE_MS = 420;
-/** Hub color on Symbiosis trees. */
-const MARKET_COLOR = "#ff4b8b";
 
 /** A research node folding back into its path's root after a switch. */
 interface Collapse {
@@ -213,6 +212,17 @@ function reducedMotion(): boolean {
   return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
+const portraitUrls = new WeakMap<HTMLCanvasElement, string>();
+function soldierPortrait(slot: number, stage: number): string {
+  const canvas = soldierShapeSprite(soldierShapeIndex(slot), -Math.PI / 8, false, stage);
+  let url = portraitUrls.get(canvas);
+  if (!url) {
+    url = canvas.toDataURL();
+    portraitUrls.set(canvas, url);
+  }
+  return `<img class="soldier-portrait" alt="" src="${url}">`;
+}
+
 function tabHtml(tab: UpgradeBranch, label: string, locked = false): string {
   const { icon, color } = TAB_ICONS[tab];
   return `${sprite(icon, { color: locked ? "#6d8197" : color, scale: 1 })} ${label}${locked ? ` ${lockIcon()}` : ""}`;
@@ -221,8 +231,9 @@ function tabHtml(tab: UpgradeBranch, label: string, locked = false): string {
 export class UpgradeTree {
   readonly root: HTMLDivElement;
   private stageEl: HTMLDivElement;
-  private marketView = false;
-  /** The active path root the Symbiosis tree was laid out for. */
+  private graftKey = "";
+  private glideTimer = 0;
+  /** The active path root on the selected weapon. */
   private marketRoot: UpgradeId | null = null;
   private collapsing: Collapse[] = [];
   private loadoutWrap: HTMLDivElement;
@@ -249,7 +260,6 @@ export class UpgradeTree {
   private activeTab: UpgradeBranch = "core";
   /** Whose tree the Soldiers tab shows. */
   private soldierSlot = 0;
-  private latentView = false;
   private expandedCategory: UpgradeCategory = "systems";
   private inLoadoutScreen = false;
   private bodies = new Map<string, ElasticBody>();
@@ -328,10 +338,7 @@ export class UpgradeTree {
                 <button class="tree-tab" data-tab="arsenal">${tabHtml("arsenal", "CALIBRATION")}</button>
               </div>
               <div class="tree-cat-panel hidden" data-cat="primary">
-                ${WEAPON_MARKETS.map(m => `<div class="tree-weapon-tab">
-                  <button class="tree-tab" data-tab="${m.weapon}">${tabHtml(m.weapon,m.label.toUpperCase())}</button>
-                  <button class="tree-market-tab" data-market="${m.weapon}" title="Symbiosis">${exoticMatterIcon()}<span>SYMBIOSIS</span></button>
-                </div>${m.weapon === "shotgun" ? `<button class="tree-tab" data-tab="squelch">${tabHtml("squelch","SQUELCH")}</button>` : ""}`).join("")}
+                ${WEAPON_MARKETS.map(m => `<button class="tree-tab" data-tab="${m.weapon}">${tabHtml(m.weapon, m.label.toUpperCase())}</button>${m.weapon === "shotgun" ? `<button class="tree-tab" data-tab="squelch">${tabHtml("squelch", "SQUELCH")}</button>` : ""}`).join("")}
               </div>
               <div class="tree-cat-panel hidden" data-cat="secondary">
                 <button class="tree-tab" data-tab="grenade"></button>
@@ -387,12 +394,6 @@ export class UpgradeTree {
       if (this.visible) this.fitToScreen();
     });
     this.stageEl = this.root.querySelector(".tree-stage") as HTMLDivElement;
-    this.root.querySelectorAll<HTMLButtonElement>("[data-market]").forEach(button => {
-      button.addEventListener("click", () => {
-        const weapon = button.dataset.market as WeaponType;
-        if (game.upgrades.marketOpen(weapon)) this.switchTab(weapon, true);
-      });
-    });
     // The stage takes whatever room the layout grid leaves it.
     new ResizeObserver(() => {
       const w = this.stageEl.clientWidth;
@@ -411,9 +412,7 @@ export class UpgradeTree {
     this.slotTabsEl = this.root.querySelector(".soldier-slot-tabs") as HTMLDivElement;
     this.slotTabsEl.addEventListener("click", (e) => {
       const btn = (e.target as HTMLElement).closest("[data-soldier-slot]") as HTMLElement | null;
-      const mode = (e.target as HTMLElement).closest<HTMLElement>("[data-soldier-mode]")?.dataset.soldierMode;
-      if (btn) this.openSoldierTree(Number(btn.dataset.soldierSlot), this.latentView);
-      if (mode) this.openSoldierTree(this.soldierSlot, mode === "latent");
+      if (btn) this.openSoldierTree(Number(btn.dataset.soldierSlot));
     });
     this.lifeValEl = this.root.querySelector(".life-num") as HTMLSpanElement;
     this.titleEl = this.root.querySelector(".tree-title") as HTMLDivElement;
@@ -467,14 +466,21 @@ export class UpgradeTree {
     parent.append(this.root);
   }
 
-  /** The nodes on the active tab. */
-  private activeDefs(): readonly TreeDef[] {
-    if (this.marketView) {
-      const market = marketFor(this.activeTab)!;
-      const active = this.game.upgrades.activeMarketPath(market.weapon)?.root ?? null;
-      return [...marketLayout(market, active).keys()].map((id) => UPGRADE_BY_ID[id]);
-    }
-    return this.activeTab === "soldier" ? (this.latentView ? latentTree(this.soldierSlot) : SOLDIER_UPGRADE_DEFS) : UPGRADE_DEFS.filter((d) => d.branch === this.activeTab && !marketNode(d.id));
+  private standardDefs(): readonly TreeDef[] {
+    return this.activeTab === "soldier" ? SOLDIER_UPGRADE_DEFS :
+      UPGRADE_DEFS.filter((def) => def.branch === this.activeTab && !marketNode(def.id));
+  }
+
+  private graftDirection(): GraftDirection {
+    return this.activeTab === "soldier" || this.stageW < this.stageH * 1.15 ? "down" : "right";
+  }
+
+  private graftStateKey(): string {
+    const u = this.game.upgrades;
+    if (this.activeTab === "soldier") return `soldier:${this.soldierSlot}:${u.latentLevelOf(this.soldierSlot, "latent_unlock")}`;
+    const market = marketFor(this.activeTab);
+    if (!market) return this.activeTab;
+    return `${this.activeTab}:${u.marketOpen(market.weapon)}:${u.activeMarketPath(market.weapon)?.root ?? ""}:${this.graftDirection()}`;
   }
 
   private get source(): TreeSource {
@@ -491,30 +497,19 @@ export class UpgradeTree {
       };
     }
     const slot = this.soldierSlot;
-    if (this.latentView) {
-      return {
-        levelOf: (id) => u.latentLevelOf(slot, id as LatentUpgradeId),
-        isUnlocked: (id) => u.latentIsUnlocked(slot, id as LatentUpgradeId),
-        isMaxed: (id) => u.latentIsMaxed(slot, id as LatentUpgradeId),
-        canBuy: (id) => u.latentCanBuy(slot, id as LatentUpgradeId),
-        pricesOf: (id) => u.latentPricesOf(slot, id as LatentUpgradeId),
-        buy: (id) => u.latentBuy(slot, id as LatentUpgradeId),
-      };
-    }
+    const latent = (id: string) => id.startsWith("latent_");
     return {
-      levelOf: (id) => u.soldierLevelOf(slot, id as SoldierUpgradeId),
-      isUnlocked: (id) => u.soldierIsUnlocked(slot, id as SoldierUpgradeId),
-      isMaxed: (id) => u.soldierIsMaxed(slot, id as SoldierUpgradeId),
-      canBuy: (id) => u.soldierCanBuy(slot, id as SoldierUpgradeId),
-      pricesOf: (id) => u.soldierPricesOf(slot, id as SoldierUpgradeId),
-      buy: (id) => u.soldierBuy(slot, id as SoldierUpgradeId),
+      levelOf: (id) => latent(id) ? u.latentLevelOf(slot, id as LatentUpgradeId) : u.soldierLevelOf(slot, id as SoldierUpgradeId),
+      isUnlocked: (id) => latent(id) ? u.latentIsUnlocked(slot, id as LatentUpgradeId) : u.soldierIsUnlocked(slot, id as SoldierUpgradeId),
+      isMaxed: (id) => latent(id) ? u.latentIsMaxed(slot, id as LatentUpgradeId) : u.soldierIsMaxed(slot, id as SoldierUpgradeId),
+      canBuy: (id) => latent(id) ? u.latentCanBuy(slot, id as LatentUpgradeId) : u.soldierCanBuy(slot, id as SoldierUpgradeId),
+      pricesOf: (id) => latent(id) ? u.latentPricesOf(slot, id as LatentUpgradeId) : u.soldierPricesOf(slot, id as SoldierUpgradeId),
+      buy: (id) => latent(id) ? u.latentBuy(slot, id as LatentUpgradeId) : u.soldierBuy(slot, id as SoldierUpgradeId),
     };
   }
 
-  /** Show one soldier's own upgrade tree. */
-  openSoldierTree(slot: number, latent = false): void {
-    this.soldierSlot = slot;
-    this.latentView = latent && latentTree(slot).length > 0;
+  openSoldierTree(slot: number): void {
+    this.soldierSlot = Math.max(0, Math.min(slot, this.game.stats.maxSoldiers - 1));
     this.switchTab("soldier");
   }
 
@@ -551,7 +546,7 @@ export class UpgradeTree {
     });
 
     this.root.querySelectorAll(".tree-tab").forEach((btn) => {
-      btn.classList.toggle("active", !this.marketView && (btn as HTMLElement).dataset.tab === this.activeTab);
+      btn.classList.toggle("active", (btn as HTMLElement).dataset.tab === this.activeTab);
     });
   }
 
@@ -602,12 +597,10 @@ export class UpgradeTree {
     this.refresh();
   }
 
-  switchTab(tab: UpgradeBranch, blackMarket = false): void {
+  switchTab(tab: UpgradeBranch): void {
     if (!this.game.upgrades.isBranchUnlocked(tab)) return;
     this.inLoadoutScreen = false;
     this.activeTab = tab;
-    if (tab !== "soldier") this.latentView = false;
-    this.marketView = blackMarket && !!marketFor(tab);
     this.expandedCategory = categoryForBranch(tab);
     this.hideTooltip();
     this.activateBranch(true);
@@ -622,13 +615,12 @@ export class UpgradeTree {
       this.subEl.textContent = "EQUIP PRIMARY WEAPONS & GEAR FOR EACH SOLDIER BEFORE DEPLOYING";
     } else {
       this.titleEl.textContent = "UPGRADE MATRIX";
-      if (tab === "soldier" && this.latentView) {
+      if (tab === "soldier") {
         const shape = SOLDIER_SHAPES[soldierShapeIndex(this.soldierSlot)];
-        this.titleEl.textContent = `${shape.name.toUpperCase()} LATENT TREE`;
-        this.subEl.textContent = "AWAKEN WITH EXOTIC MATTER DNA · IMPROVE WITH BLIGHT ESSENCE";
-      } else if (tab === "soldier") {
-        this.titleEl.textContent = `SOLDIER #${this.soldierSlot + 1} TREE`;
-        this.subEl.textContent = "THIS SOLDIER ONLY — GOLD, THEN ORANGE, THEN GREEN CRYSTALS, ALL WITH BLIGHT ESSENCE";
+        this.titleEl.textContent = `SOLDIER #${this.soldierSlot + 1} · ${shape.name.toUpperCase()}`;
+        this.subEl.textContent = latentTree(this.soldierSlot).length
+          ? "SOLDIER UPGRADES · AWAKEN LATENT ABILITIES WITH EXOTIC MATTER DNA"
+          : "SOLDIER UPGRADES";
       } else if (tab === "core") {
         this.subEl.textContent = "CORE PROGRESSION — FOLLOW THE PATH TO UNLOCK NEW SYSTEMS";
       } else if (tab === "formations") {
@@ -667,6 +659,10 @@ export class UpgradeTree {
     const discovery =
       market?.unlock ?? (tab === "grenade" ? "grenade_unlock" : tab === "turret" ? "turret_unlock" : null);
     if (!this.inLoadoutScreen && discovery && this.game.upgrades.needsFinding(discovery)) this.subEl.textContent = "??? — FIND UPGRADE IN THE LAB";
+    else if (!this.inLoadoutScreen && market && this.game.upgrades.marketOpen(market.weapon)) {
+      this.titleEl.textContent = market.label.toUpperCase();
+      this.subEl.textContent = "SYMBIOSIS · RE-BUY A PATH TO SWITCH · PRIOR RESEARCH IS KEPT";
+    }
     this.tabsEl.classList.toggle("hidden", this.inLoadoutScreen);
     // Keeps its height on other tabs so the panel doesn't jump when switching.
     this.legendEl.classList.toggle("hidden", this.inLoadoutScreen);
@@ -689,7 +685,7 @@ export class UpgradeTree {
       const btn = document.createElement("button");
       // The weapon-unlock node at the center of a tree gets a round frame.
       const round =
-        (branchOf(def) !== "core" && def.grid.col === 0 && def.grid.row === 0) || marketNode(def.id)?.path.root === def.id;
+        (branchOf(def) !== "core" && def.grid.col === 0 && def.grid.row === 0) || marketNode(def.id)?.path.root === def.id || def.id === "latent_unlock";
       btn.className = round ? "tree-node round" : "tree-node";
       btn.dataset.id = def.id;
       btn.style.setProperty("--node-color", def.color);
@@ -727,7 +723,7 @@ export class UpgradeTree {
       this.nodeEls.set(def.id, btn);
       this.bodies.set(def.id, {
         id: def.id,
-        parent: def.parent ?? (round ? null : HUB_ID),
+        parent: def.parent ?? (def.grid.col === 0 && def.grid.row === 0 && round ? null : HUB_ID),
         hx: to.x,
         hy: to.y,
         x: to.x,
@@ -917,7 +913,8 @@ export class UpgradeTree {
     this.stageW = w;
     this.stageH = h;
     this.hideTooltip();
-    this.setView(this.fittedView(), false);
+    if (this.graftKey !== this.graftStateKey()) this.refresh();
+    else this.setView(this.fittedView(), false);
   }
 
   /** `steered`: the player moved the view away from the fit, so offer FIT. */
@@ -932,16 +929,11 @@ export class UpgradeTree {
     this.drag = null;
     this.cycles.reset();
     this.endCollapse();
+    this.endGlide();
+    this.layoutBranch();
     const core = this.activeTab === "core";
-    const hub = this.bodies.get(HUB_ID)!;
-    const home = core ? nodePos(CORE_HUB_GRID.col, CORE_HUB_GRID.row) : nodePos(0, 0);
-    hub.hx = hub.x = home.x;
-    hub.hy = hub.y = home.y;
-    hub.vx = hub.vy = 0;
     this.coreHubEl.style.pointerEvents = core ? "none" : "";
     this.coreHubEl.setAttribute("aria-hidden", String(core));
-    if (this.marketView) this.layoutMarket();
-    this.collectBodies();
 
     // Every tree opens fitted to the stage (see the rules in treeView.ts).
     if (this.activeBodies.length > 0) {
@@ -961,79 +953,108 @@ export class UpgradeTree {
     this.placeNodes();
   }
 
-  /** The active tab's bodies (plus the hub where (0,0) has no node) and their circuit. */
-  private collectBodies(): void {
-    const defs = this.activeDefs();
-    const ids = defs.map((d) => d.id as string);
+  /** Lay out the standard nodes and attach any unlocked research to its gate. */
+  private layoutBranch(): void {
+    this.graftKey = this.graftStateKey();
+    const u = this.game.upgrades;
+    const standard = this.standardDefs();
+    const market = marketFor(this.activeTab);
+    const latent = this.activeTab === "soldier" ? latentTree(this.soldierSlot) : [];
+    const gateId = market ? accessId(market.weapon) : latent[0]?.id;
+    const open = market ? u.marketOpen(market.weapon) : latent.length > 0 && u.latentLevelOf(this.soldierSlot, "latent_unlock") > 0;
+    this.marketRoot = market && open ? u.activeMarketPath(market.weapon)?.root ?? null : null;
+    const direction = this.graftDirection();
+    const spacing = open ? 0.8 : this.activeTab === "soldier" ? 0.84 : 1;
+    const standardCell = (def: TreeDef) => ({ col: def.grid.col * spacing, row: def.grid.row * spacing });
+    const gate = graftGate(standard.filter((def) => def.id !== gateId).map(standardCell), direction);
+    const shift = open ? -0.3 : 0;
+    const dx = direction === "right" ? shift : 0;
+    const dy = direction === "down" ? shift : 0;
     const core = this.activeTab === "core";
-    if (core || (defs.length > 0 && !defs.some((d) => !this.marketView && d.grid.col === 0 && d.grid.row === 0))) ids.push(HUB_ID);
-    this.activeBodies = ids.map((id) => this.bodies.get(id)!);
-    const neighbors = new Map<string, string[]>(ids.map((id) => [id, []]));
-    for (const b of this.activeBodies) {
-      if (!b.parent) continue;
-      neighbors.get(b.id)!.push(b.parent);
-      neighbors.get(b.parent)!.push(b.id);
+    const hasHub = core || !standard.some((def) => def.grid.col === 0 && def.grid.row === 0);
+    const bodies: ElasticBody[] = [];
+    const place = (id: string, col: number, row: number, parent: string | null): void => {
+      const body = this.bodies.get(id)!;
+      const home = nodePos(col + dx, row + dy);
+      body.hx = home.x;
+      body.hy = home.y;
+      body.parent = parent;
+      bodies.push(body);
+    };
+    if (hasHub) {
+      const pos = core ? CORE_HUB_GRID : { col: 0, row: 0 };
+      place(HUB_ID, pos.col, pos.row, null);
+    }
+    for (const def of standard) {
+      const center = def.grid.col === 0 && def.grid.row === 0;
+      const grid = open && def.id === gateId ? gate : standardCell(def);
+      place(def.id, grid.col, grid.row, def.parent ?? (center && !hasHub ? null : HUB_ID));
+    }
+    if (latent.length) {
+      const grid = open ? gate : standardCell(latent[0]);
+      place(latent[0].id, grid.col, grid.row, HUB_ID);
+    }
+    if (open && gateId) {
+      const graft = market
+        ? marketLayout(market, this.marketRoot, gateId, gate, direction)
+        : latentLayout(latent.slice(1).map((def) => def.id), gateId, gate);
+      for (const [id, cell] of graft) place(id, cell.col, cell.row, cell.parent);
+    }
+    this.activeBodies = bodies;
+    const neighbors = new Map<string, string[]>(bodies.map((body) => [body.id, []]));
+    for (const body of bodies) {
+      if (!body.parent) continue;
+      neighbors.get(body.id)!.push(body.parent);
+      neighbors.get(body.parent)!.push(body.id);
     }
     this.circuit = { nodes: new Map(), neighbors };
   }
 
-  /**
-   * Symbiosis trees keep their own shape (see marketLayout.ts): path roots
-   * around the weapon hub, research fanning out of the active root only.
-   */
-  private layoutMarket(): void {
-    const market = marketFor(this.activeTab)!;
-    this.marketRoot = this.game.upgrades.activeMarketPath(market.weapon)?.root ?? null;
-    for (const [id, cell] of marketLayout(market, this.marketRoot)) {
-      const b = this.bodies.get(id)!;
-      const home = nodePos(cell.col, cell.row);
-      b.hx = home.x;
-      b.hy = home.y;
-      b.parent = cell.parent;
-    }
-  }
-
-  /**
-   * A different Symbiosis path was bought: the old path's research shrinks
-   * back into its root while the new path grows out of its own.
-   */
-  private switchMarketPath(): void {
+  /** Carry existing nodes into the expanded layout and grow or fold the graft. */
+  private transformTree(): void {
     const oldRoot = this.marketRoot;
-    const leaving = this.activeBodies.filter((b) => b.id !== HUB_ID && b.parent !== HUB_ID);
-    const before = new Set(this.activeBodies.map((b) => b.id));
+    const before = new Map(this.activeBodies.map((body) => [body.id, body]));
     this.drag = null;
     this.cycles.reset();
     this.endCollapse();
-    this.layoutMarket();
-    this.collectBodies();
+    this.layoutBranch();
+    const shown = new Set(this.activeBodies.map((body) => body.id));
     const animate = !reducedMotion();
     const now = performance.now();
-    for (const b of leaving) {
-      if (animate && oldRoot) {
-        this.collapsing.push({ id: b.id, root: oldRoot, parent: b.parent!, x: b.x, y: b.y, start: now });
-      } else {
-        this.nodeEls.get(b.id)!.classList.add("hidden");
+    for (const body of before.values()) {
+      if (shown.has(body.id) || body.id === HUB_ID) continue;
+      if (animate && oldRoot && body.parent) {
+        this.collapsing.push({ id: body.id, root: oldRoot, parent: body.parent, x: body.x, y: body.y, start: now });
+        this.nodeEls.get(body.id)!.classList.add("folding");
       }
     }
-    const newRoot = this.marketRoot ? this.bodies.get(this.marketRoot)! : null;
-    for (const b of this.activeBodies) {
-      if (before.has(b.id)) continue;
-      b.x = animate && newRoot ? newRoot.x : b.hx;
-      b.y = animate && newRoot ? newRoot.y : b.hy;
-      b.vx = 0;
-      b.vy = 0;
-    }
-    // Re-fit to the new shape, gliding the camera there instead of jumping.
-    const seen = [...this.activeBodies, ...leaving].map((b) => ({ x: b.hx, y: b.hy }));
-    this.bounds = treeBounds(seen);
+    const fitted = treeBounds(this.activeBodies.map((body) => ({ x: body.hx, y: body.hy })));
+    this.bounds = animate
+      ? treeBounds([...this.activeBodies.map((body) => ({ x: body.hx, y: body.hy })), ...[...before.values()].map((body) => ({ x: body.x, y: body.y }))])
+      : fitted;
     this.sizeLinkCanvas();
-    this.bounds = treeBounds(this.activeBodies.map((b) => ({ x: b.hx, y: b.hy })));
+    this.bounds = fitted;
+    for (const body of this.activeBodies) {
+      if (animate && before.has(body.id)) continue;
+      let parent = body.parent;
+      while (parent && !before.has(parent)) parent = this.bodies.get(parent)!.parent;
+      const origin = parent ? before.get(parent) : undefined;
+      body.x = animate && origin ? origin.x : body.hx;
+      body.y = animate && origin ? origin.y : body.hy;
+      body.vx = body.vy = 0;
+    }
+    this.endGlide();
     if (animate) {
       this.viewEl.classList.add("view-glide");
-      window.setTimeout(() => this.viewEl.classList.remove("view-glide"), COLLAPSE_MS + 80);
+      this.glideTimer = window.setTimeout(() => this.endGlide(), COLLAPSE_MS + 80);
     }
     this.setView(this.fittedView(), false);
     this.placeNodes();
+  }
+
+  private endGlide(): void {
+    window.clearTimeout(this.glideTimer);
+    this.viewEl.classList.remove("view-glide");
   }
 
   /** Shrink each folding node toward its root; hide it once it has arrived. */
@@ -1059,6 +1080,7 @@ export class UpgradeTree {
     for (const c of done) {
       const el = this.nodeEls.get(c.id)!;
       el.classList.add("hidden");
+      el.classList.remove("folding");
       el.style.scale = "";
       // The root takes in the last of its branch with a flash.
       if (!this.collapsing.some((o) => o.root === c.root)) this.flashNode(c.root);
@@ -1070,6 +1092,7 @@ export class UpgradeTree {
     for (const c of this.collapsing) {
       const el = this.nodeEls.get(c.id)!;
       el.classList.add("hidden");
+      el.classList.remove("folding");
       el.style.scale = "";
     }
     this.collapsing = [];
@@ -1112,7 +1135,7 @@ export class UpgradeTree {
     const u = this.source;
     for (const b of this.activeBodies) {
       const def = b.id === HUB_ID ? null : treeDef(b.id);
-      const hubColor = this.marketView ? MARKET_COLOR : TAB_ICONS[this.activeTab].color;
+      const hubColor = TAB_ICONS[this.activeTab].color;
       const node: CircuitNode = {
         id: b.id,
         x: toArt(b.x),
@@ -1193,6 +1216,7 @@ export class UpgradeTree {
   }
 
   private onNodeClick(def: TreeDef): void {
+    if (!this.activeBodies.some((body) => body.id === def.id)) return;
     if (this.source.buy(def.id)) {
       this.game.applyUpgrades();
       this.game.onUpgradePurchased?.();
@@ -1490,12 +1514,11 @@ export class UpgradeTree {
         .join("");
 
       const shape = SOLDIER_SHAPES[soldierShapeIndex(i)];
-      const supportsLatent = latentTree(i).length > 0;
-      const awakened = this.game.upgrades.latentLevelOf(i, "latent_unlock") > 0;
+      const coating = symbioteStage(i, loadouts[i]?.latent);
       cardsHtml += `
         <div class="loadout-card">
           <div class="lc-header">
-            <div class="lc-avatar">${sprite("soldier", { color: UI_COLORS.soldier })}</div>
+            <div class="lc-avatar">${soldierPortrait(i, coating)}</div>
             <div class="lc-meta">
               <div class="lc-name">SOLDIER #${i + 1} · ${shape.name.toUpperCase()}</div>
               <div class="lc-stats">${wSummary}</div>
@@ -1508,8 +1531,7 @@ export class UpgradeTree {
           <div class="lc-secondaries">${sBtnsHtml}</div>
           <div class="lc-section-lbl">BEHAVIOR PROTOCOL</div>
           <div class="lc-behaviors">${bBtnsHtml}</div>
-          <button class="btn lc-tree-btn" data-soldier-tree="${i}">UPGRADE TREE · LV ${this.game.upgrades.soldierTreeLevel(i)}</button>
-          ${supportsLatent ? `<button class="btn lc-tree-btn" data-latent-tree="${i}">${exoticMatterIcon()} LATENT TREE · ${awakened ? "AWAKENED" : "DORMANT"}</button>` : ""}
+          <button class="btn lc-tree-btn" data-soldier-tree="${i}">${coating ? exoticMatterIcon() : ""} UPGRADE TREE · LV ${this.game.upgrades.soldierTreeLevel(i)}</button>
         </div>
       `;
     }
@@ -1539,10 +1561,6 @@ export class UpgradeTree {
     this.loadoutWrap.querySelectorAll("[data-soldier-tree]").forEach((btn) => {
       btn.addEventListener("click", () => this.openSoldierTree(Number((btn as HTMLElement).dataset.soldierTree)));
     });
-
-    for (const btn of this.loadoutWrap.querySelectorAll<HTMLElement>("[data-latent-tree]")) {
-      btn.addEventListener("click", () => this.openSoldierTree(Number(btn.dataset.latentTree), true));
-    }
 
     this.loadoutWrap.querySelectorAll(".lc-wbtn").forEach((btn) => {
       btn.addEventListener("click", () => {
@@ -1613,7 +1631,9 @@ export class UpgradeTree {
     this.root.querySelector(".exotic-num")!.textContent = exotic.toLocaleString();
     this.essenceValEl.textContent = this.game.essence.toLocaleString();
     // A currency shows once it's owned, reachable, or priced on this tree.
-    const defs = this.activeDefs();
+    this.soldierSlot = Math.min(this.soldierSlot, st.maxSoldiers - 1);
+    if (!this.inLoadoutScreen && this.graftKey !== this.graftStateKey()) this.transformTree();
+    const defs = this.activeBodies.filter((b) => b.id !== HUB_ID).map((b) => treeDef(b.id));
     const priced = (c: Currency): boolean => defs.some((d) => d.currency === c || (c === "essence" && d.essenceCost));
     const showIf = (selector: string, show: boolean): void => {
       (this.root.querySelector(selector) as HTMLElement).classList.toggle("hidden", !show);
@@ -1621,18 +1641,13 @@ export class UpgradeTree {
     const depth = this.game.bests.depth;
     showIf(".crys-wrap", this.game.crystals > 0 || depth >= TERRAIN.zone2Depth || priced("crystals"));
     showIf(".green-wrap", this.game.greenCrystals > 0 || depth >= TERRAIN.zone3Depth || priced("greenCrystals"));
-    showIf(".exotic-wrap", exotic > 0 || this.marketView || priced("exoticMatter"));
+    showIf(".exotic-wrap", exotic > 0 || priced("exoticMatter"));
     showIf(".essence-wrap", this.game.essence > 0 || priced("essence"));
 
-    this.soldierSlot = Math.min(this.soldierSlot, st.maxSoldiers - 1);
     let slotTabs = "";
     for (let i = 0; i < st.maxSoldiers; i++) {
       const active = this.activeTab === "soldier" && i === this.soldierSlot ? " active" : "";
       slotTabs += `<button class="tree-tab${active}" data-soldier-slot="${i}">${sprite("soldier", { color: UI_COLORS.soldier, scale: 1 })} #${i + 1}</button>`;
-    }
-    if (this.activeTab === "soldier" && latentTree(this.soldierSlot).length) {
-      slotTabs += `<button class="tree-tab${this.latentView ? "" : " active"}" data-soldier-mode="standard">STANDARD</button>`
-        + `<button class="tree-tab${this.latentView ? " active" : ""}" data-soldier-mode="latent">${exoticMatterIcon()} LATENT</button>`;
     }
     this.slotTabsEl.innerHTML = slotTabs;
     this.lifeValEl.textContent = this.game.lifetimePixels.toLocaleString();
@@ -1663,15 +1678,6 @@ export class UpgradeTree {
       button.title = button.disabled ? "Locked — unlock on the Core path" : "";
       button.setAttribute("aria-label", button.disabled || unknown ? "???" : weapon?.[1] ?? label);
     }
-    for (const button of this.root.querySelectorAll<HTMLButtonElement>("[data-market]")) {
-      const weapon = button.dataset.market as WeaponType, market = marketFor(weapon)!;
-      const unknown = !!market.unlock && this.game.upgrades.needsFinding(market.unlock);
-      button.disabled = !this.game.upgrades.isBranchUnlocked(weapon) || !this.game.upgrades.marketOpen(weapon);
-      button.classList.toggle("active", this.marketView && this.activeTab === weapon);
-      button.innerHTML = unknown ? `${lockIcon()} <span>???</span>` : `${exoticMatterIcon()}<span>SYMBIOSIS</span>`;
-      button.title = unknown ? "???" : button.disabled ? "Purchase Symbiosis access on the standard tree" : `${market.label} Symbiosis`;
-      button.setAttribute("aria-label", unknown ? "???" : `${market.label} Symbiosis`);
-    }
     for (const button of this.root.querySelectorAll<HTMLButtonElement>(".tree-cat-btn")) {
       const category = CATEGORIES.find((c) => c.id === button.dataset.cat)!;
       button.disabled = !category.branches.some((b) => this.game.upgrades.isBranchUnlocked(b));
@@ -1682,41 +1688,20 @@ export class UpgradeTree {
       button.setAttribute("aria-label", button.disabled ? "Locked category" : category.name);
     }
     this.updateHeaderAndScreen();
-    if (this.marketView && !this.inLoadoutScreen) {
-      this.titleEl.textContent = "SYMBIOSIS";
-      this.subEl.textContent = "ONE ACTIVE PATH — RE-BUY ANOTHER PATH TO SWITCH; RESEARCH IS KEPT";
-      const active = this.game.upgrades.activeMarketPath(this.activeTab as WeaponType)?.root ?? null;
-      if (active !== this.marketRoot) this.switchMarketPath();
-    }
-
     if (this.inLoadoutScreen) {
       this.renderLoadout();
       return;
     }
 
-    // Center hub ball is shown on Core, Resources, Blight & Pistol (where 0,0 has no upgrade node),
-    // and hidden on weapon trees where their unlock node sits at (0,0).
-    const hasCenterUnlockNode =
-      !this.marketView && ((this.activeTab === "soldier" && this.latentView) || this.activeTab === "shotgun" ||
-      this.activeTab === "squelch" ||
-      this.activeTab === "assault_rifle" ||
-      this.activeTab === "rocket_launcher" ||
-      this.activeTab === "sniper_rifle" ||
-      this.activeTab === "katana" ||
-      this.activeTab === "flamethrower" ||
-      this.activeTab === "grenade" ||
-      this.activeTab === "turret");
-    this.coreHubEl.classList.toggle("hidden", hasCenterUnlockNode);
-    if (this.marketView) {
-      // The weapon itself sits at the heart of its Symbiosis tree.
-      this.coreHubEl.innerHTML =
-        sprite("ring", { color: MARKET_COLOR, scale: 3, cls: "node-ring" }) +
-        sprite(TAB_ICONS[this.activeTab].icon, { color: MARKET_COLOR, scale: 3 });
-    } else if (!hasCenterUnlockNode) {
-      const hubSpec = TAB_ICONS[this.activeTab];
-      this.coreHubEl.innerHTML =
-        sprite("ring", { color: hubSpec.color, scale: 3, cls: "node-ring" }) +
-        sprite("soldier", { color: hubSpec.color, scale: 3 });
+    const hubSpec = TAB_ICONS[this.activeTab];
+    const hasHub = this.activeBodies.some((body) => body.id === HUB_ID);
+    this.coreHubEl.classList.toggle("hidden", !hasHub);
+    if (hasHub) {
+      const coating = this.activeTab === "soldier"
+        ? symbioteStage(this.soldierSlot, this.game.save.data.loadouts[this.soldierSlot]?.latent) : 0;
+      const centerColor = coating ? "#ff77ad" : hubSpec.color;
+      this.coreHubEl.innerHTML = sprite("ring", { color: centerColor, scale: 3, cls: "node-ring" })
+        + (this.activeTab === "soldier" ? soldierPortrait(this.soldierSlot, coating) : sprite("soldier", { color: centerColor, scale: 3 }));
     }
     this.drawCircuit(0);
 
@@ -1730,6 +1715,9 @@ export class UpgradeTree {
       if (!inBranch) continue;
 
       const lvl = u.levelOf(def.id);
+      if (def.id === "latent_unlock" || def.id.startsWith("black_market_")) {
+        btn.setAttribute("aria-expanded", String(this.activeBodies.some((body) => body.parent === def.id)));
+      }
       const unlocked = u.isUnlocked(def.id);
       const maxed = u.isMaxed(def.id);
       const canBuy = u.canBuy(def.id);

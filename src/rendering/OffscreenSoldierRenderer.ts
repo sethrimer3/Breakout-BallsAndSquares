@@ -13,7 +13,7 @@ export class OffscreenSoldierRenderer {
   private readonly active: Marker[]=[];
   private readonly arrows: HTMLCanvasElement[]=[];
 
-  draw(ctx: CanvasRenderingContext2D, game: Game): void {
+  draw(ctx: CanvasRenderingContext2D, game: Game, symbioteFrame = 0): void {
     if(game.soldiers.length===0){
       if(this.active.length){this.active.length=0;for(const marker of this.pool){marker.soldier=null;marker.sprite=null;}}
       return;
@@ -27,7 +27,7 @@ export class OffscreenSoldierRenderer {
     for(const s of game.soldiers){
       if(!s.alive)continue;
       const selected=cam.following&&cam.targetId===s.id;
-      const sprite=soldierShapeSprite(soldierShapeIndex(s.slotIndex),s.facingAngle,selected);
+      const sprite=soldierShapeSprite(soldierShapeIndex(s.slotIndex),s.facingAngle,selected,s.symbioteStage,symbioteFrame);
       const i=this.active.length;
       const marker=this.pool[i]??(this.pool[i]={x:0,y:0,edge:0,ideal:0,targetX:0,targetY:0,soldier:null,sprite:null});
       const sx=cam.worldToScreenX(s.x),sy=cam.worldToScreenY(s.y),size=Math.max(1,Math.round(sprite.width*ART_PIXEL*cam.zoom));

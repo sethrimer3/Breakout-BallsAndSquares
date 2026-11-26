@@ -9,9 +9,9 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
    const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
    await page.goto(process.env.BREACH_BASE_URL||'http://127.0.0.1:5173');await page.locator('[data-act="play"]').click();
    await page.evaluate(()=>{
-    const g=window.__game;g.save.data.upgrades.unlock_primary=1;g.save.data.upgrades.extra_soldier=1;
+    const g=window.__game;g.save.data.upgrades.unlock_primary=1;g.save.data.upgrades.extra_soldier_1=1;
     g.save.data.settings.devMode=true;g.save.data.settings.devFindUpgrades=true;
-    g.save.data.bank=10000;g.save.data.essence=1000;g.save.data.lifetimePixels=10000;g.applyUpgrades();g.openUpgrades();g.upgradeTree.switchTab('squelch');
+    g.save.data.exoticMatter=5;g.save.data.bank=10000;g.save.data.essence=1000;g.save.data.lifetimePixels=10000;g.applyUpgrades();g.openUpgrades();g.upgradeTree.switchTab('squelch');
    });
    await page.locator('.tree-node[aria-label="Unlock SQUELCH"]:visible').click();
    assert.equal(await page.evaluate(()=>window.__game.save.data.essence),1000);
@@ -20,8 +20,8 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
    assert(research.includes('goo_unlock')&&research.includes('goo_mass')&&research.every(id=>id.startsWith('goo_')));
    await page.evaluate(()=>window.__game.upgradeTree.switchTab('shotgun'));
    await page.locator('.tree-node[aria-label="Unlock Shotgun"]:visible').click();
-   await page.locator('.tree-node[aria-label="Black Market"]:visible').click();
-   if(width<700)await page.locator('[data-market="shotgun"]').tap();else await page.locator('[data-market="shotgun"]').click();
+   await page.locator('.tree-node[data-id="black_market_shotgun"]:visible').click();
+   assert(await page.locator('.tree-node[data-id="shotgun_damage"]:visible').isVisible());
    assert.equal(await page.locator('.tree-node[data-id="goo_unlock"]:not(.hidden)').count(),0);
    if(width<700){await page.locator('.tree-node[data-id="homing_shotgun_unlock"]:not(.hidden)').tap();await page.locator('.tree-node[data-id="homing_shotgun_unlock"]:not(.hidden)').tap();}else await page.locator('.tree-node[data-id="homing_shotgun_unlock"]:not(.hidden)').click();
    await page.evaluate(()=>window.__game.upgradeTree.openLoadoutScreen());

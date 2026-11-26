@@ -11,7 +11,7 @@ const color = "#ff77ad";
 const percent = (value: number) => `+${Math.round(value)}%`;
 const unlock: LatentDef = {
   id: "latent_unlock", name: "AWAKEN", shortDesc: "Use one Exotic Matter DNA to activate this soldier's latent ability.",
-  grid: { col: 0, row: 0 }, parent: null, maxLevel: 1, icon: "soldier",
+  grid: { col: 0, row: 2 }, parent: null, maxLevel: 1, icon: "soldier",
   color, currency: "exoticMatter", baseCost: 1, costMultiplier: 1,
   valueAt: (rank) => rank, formatValue: (value) => value ? "Awakened" : "Dormant", formatDelta: () => "Activate ability",
 };
@@ -69,4 +69,14 @@ export function latentValue(slot: number, levels: LatentLevels | undefined, id: 
   if (!levels?.latent_unlock) return 0;
   const def = latentTree(slot).find((node) => node.id === id);
   return def?.valueAt(levels[id] ?? 0) ?? 0;
+}
+
+/** Awake, developed, or mature. The skin advances with completed research ranks. */
+export function symbioteStage(slot: number, levels: LatentLevels | undefined): number {
+  if (!levels?.latent_unlock) return 0;
+  const nodes = latentTree(slot).slice(1);
+  if (!nodes.length) return 0;
+  const max = nodes.reduce((sum, node) => sum + node.maxLevel, 0);
+  const trained = nodes.reduce((sum, node) => sum + (levels[node.id] ?? 0), 0);
+  return Math.min(3, 1 + Math.floor(3 * trained / max));
 }

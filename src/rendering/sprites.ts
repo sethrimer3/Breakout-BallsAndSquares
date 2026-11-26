@@ -1,3 +1,4 @@
+import { SYMBIOTE_FRAMES, SYMBIOTE_PALETTE, symbioteGrid } from "./symbioteSprite";
 import { ART_PIXEL, SOLDIER, SOLDIER_AMBIENT_STOPS } from "../config";
 import { SOLDIER_SHAPES, shapeSdf, type SoldierShape } from "../entities/soldierShapes";
 
@@ -124,13 +125,13 @@ export function soldierShapeGrid(
   return rows;
 }
 
-function gridToCanvas(grid: string[]): HTMLCanvasElement {
+function gridToCanvas(grid: string[], palette: Readonly<Record<string, string>> = SOLDIER_PALETTE): HTMLCanvasElement {
   const [c, g] = makeCanvas(grid.length);
   for (let y = 0; y < grid.length; y++) {
     for (let x = 0; x < grid.length; x++) {
-      const ch = grid[y][x] as keyof typeof SOLDIER_PALETTE | ".";
+      const ch = grid[y][x];
       if (ch === ".") continue;
-      g.fillStyle = SOLDIER_PALETTE[ch];
+      g.fillStyle = palette[ch];
       g.fillRect(x, y, 1, 1);
     }
   }
@@ -140,6 +141,7 @@ function gridToCanvas(grid: string[]): HTMLCanvasElement {
 /** Rotation steps cached per shape (11.25 degrees each). */
 export const SOLDIER_ANGLE_STEPS = 32;
 const shapeSpriteCache = new Map<string, HTMLCanvasElement>();
+const shapeGrids = new Map<string, string[]>();
 const shapeSpriteBounds = new WeakMap<HTMLCanvasElement, {left:number;top:number;right:number;bottom:number}>();
 const FULL_SPRITE_BOUNDS = {left:0,top:0,right:1,bottom:1};
 /** Opaque bounds are recorded while baking, without any canvas pixel readback. */
@@ -152,23 +154,30 @@ export function soldierSpriteBounds(sprite: HTMLCanvasElement) {
  * Cached pixel-art sprite for a soldier shape facing `angle`. The sphere ignores
  * the angle. Drawn at one canvas pixel per art pixel, like `soldierSprite`.
  */
-export function soldierShapeSprite(shapeIndex: number, angle: number, withRing: boolean): HTMLCanvasElement {
+export function soldierShapeSprite(shapeIndex: number, angle: number, withRing: boolean, stage = 0, frame = 0): HTMLCanvasElement {
   const shape = SOLDIER_SHAPES[shapeIndex] ?? SOLDIER_SHAPES[0];
-  const steps = SOLDIER_ANGLE_STEPS;
+  const steps = stage ? SOLDIER_ANGLE_STEPS / 2 : SOLDIER_ANGLE_STEPS;
   const step = shape.verts
     ? ((Math.round((angle / (Math.PI * 2)) * steps) % steps) + steps) % steps
     : 0;
-  const key = `${shapeIndex}:${step}:${withRing ? 1 : 0}`;
+  const gridKey = `${shapeIndex}:${step * (stage ? 2 : 1)}:${withRing ? 1 : 0}`;
+  const phase = stage ? frame % SYMBIOTE_FRAMES : 0;
+  const key = `${gridKey}:${stage}:${phase}`;
   let c = shapeSpriteCache.get(key);
   if (!c) {
-    const grid = soldierShapeGrid(
-      shape,
-      (step / steps) * Math.PI * 2,
-      SOLDIER.renderRadius / ART_PIXEL,
-      SOLDIER.ringRadius / ART_PIXEL,
-      withRing,
-    );
-    c = gridToCanvas(grid);
+    let base = shapeGrids.get(gridKey);
+    if (!base) {
+      base = soldierShapeGrid(
+        shape,
+        (step / steps) * Math.PI * 2,
+        SOLDIER.renderRadius / ART_PIXEL,
+        SOLDIER.ringRadius / ART_PIXEL,
+        withRing,
+      );
+      shapeGrids.set(gridKey, base);
+    }
+    const grid = stage ? symbioteGrid(base, stage, phase) : base;
+    c = gridToCanvas(grid, stage ? SYMBIOTE_PALETTE : SOLDIER_PALETTE);
     let left=grid.length,top=grid.length,right=0,bottom=0;
     for(let y=0;y<grid.length;y++)for(let x=0;x<grid[y].length;x++)if(grid[y][x]!=="."){
       left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x+1);bottom=Math.max(bottom,y+1);

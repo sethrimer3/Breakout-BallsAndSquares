@@ -1,4 +1,4 @@
-/* Run against Vite. Exercise real settings, split navigation, purchases and persistence. */
+/* Run against Vite. Exercise real settings, grafted trees, purchases and persistence. */
 const assert=require('node:assert/strict');
 let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/node_modules/playwright')}
 (async()=>{
@@ -32,14 +32,13 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
    assert(initial.hidden.includes('???'));assert(!initial.hidden.includes('SHOTGUN'));
    assert.equal(initial.ids.filter(id=>id.startsWith('black_market_')).length,1);
    assert(!initial.ids.some(id=>['reverse_unlock','orbit_unlock','drone_unlock'].includes(id)));
-   assert(await page.locator('[data-market="pistol"]').isDisabled());
-   await page.locator('.tree-node[aria-label="Symbiosis"]:visible').click();
-   assert(!(await page.locator('[data-market="pistol"]').isDisabled()));
-   const after=await page.evaluate(()=>[...window.__game.upgradeTree.nodeEls].filter(([,el])=>!el.classList.contains('hidden')).map(([id])=>id));
-   assert.deepEqual(after,initial.ids); // access never sprouts mutation nodes onto the ordinary tree
-   if(width<700)await page.locator('[data-market="pistol"]').tap();else await page.locator('[data-market="pistol"]').click();
-   // The Black Market draws on the ordinary tree stage: hub plus the three path roots.
-   assert.deepEqual((await shown()).sort(),['drone_unlock','orbit_unlock','reverse_unlock']);
+   assert.equal(await page.locator('[data-market="pistol"]').count(),0);
+   const home=()=>page.evaluate(()=>{const {hx,hy}=window.__game.upgradeTree.bodies.get('fire_rate');return [hx,hy]});
+   const originalHome=await home();
+   await buy('black_market_pistol');
+   const after=await shown();
+   for(const id of [...initial.ids,'drone_unlock','orbit_unlock','reverse_unlock']) assert(after.includes(id),id);
+   assert.notDeepEqual(await home(),originalHome);
    assert(await page.locator('.tree-core:not(.hidden)').isVisible());
    await buy('reverse_unlock');
    await buy('orbit_unlock');
@@ -62,6 +61,7 @@ let pw;try{pw=require('playwright')}catch{pw=require('/opt/codex/cua_node/lib/no
    await page.screenshot({path:`/tmp/black-market-fold-${width}.png`});
    await page.waitForTimeout(500);
    assert(!(await shown()).includes('drone_damage'));
+   assert((await shown()).includes('fire_rate'));
    await buy('drone_unlock');
    assert.equal(await page.evaluate(()=>window.__game.stats.droneDamage),ownedDamage);
    const state=await page.evaluate(()=>{
