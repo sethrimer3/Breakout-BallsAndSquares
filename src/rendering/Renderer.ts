@@ -945,8 +945,8 @@ export class Renderer {
   }
 
   /** Draw a pixel-art soldier sprite centred on a screen point (nearest-neighbour, pixel-snapped). */
-  private drawSoldierSprite(sprite: HTMLCanvasElement, sx: number, sy: number): void {
-    const size = Math.max(1, Math.round(sprite.width * ART_PIXEL * this.game.camera.zoom));
+  private drawSoldierSprite(sprite: HTMLCanvasElement, sx: number, sy: number, scale = 1): void {
+    const size = Math.max(1, Math.round(sprite.width * ART_PIXEL * this.game.camera.zoom * scale));
     const half = size / 2;
     this.ctx.imageSmoothingEnabled = false;
     this.ctx.drawImage(sprite, Math.round(sx - half), Math.round(sy - half), size, size);
@@ -967,7 +967,14 @@ export class Renderer {
       // The ring marks the soldier the camera is following (auto or Tab-selected).
       const selected = cam.following && cam.targetId === s.id;
       // Each loadout slot has its own body shape, rotated to face where it aims.
-      this.drawSoldierSprite(soldierShapeSprite(soldierShapeIndex(s.slotIndex), s.facingAngle, selected), sx, sy);
+      const shape = soldierShapeIndex(s.slotIndex);
+      if (s.wingmen.length) {
+        const sprite = soldierShapeSprite(shape, s.facingAngle, false);
+        for (const wing of s.wingmen) {
+          this.drawSoldierSprite(sprite, cam.worldToScreenX(wing.x), cam.worldToScreenY(wing.y), 0.48);
+        }
+      }
+      this.drawSoldierSprite(soldierShapeSprite(shape, s.facingAngle, selected), sx, sy);
       if (s.secondary) {
         this.drawSoldierEnergyOutline(s, sx, sy);
       }
@@ -1185,10 +1192,10 @@ export class Renderer {
         continue;
       }
       const maxTracer = isSniper ? BULLET.tracerLength * 2.4 : isRocket ? BULLET.tracerLength * 2 : BULLET.tracerLength;
-      const tLen = Math.min(maxTracer, b.traveled);
+      const tLen = Math.min(maxTracer * b.sizeScale, b.traveled);
       const tailX = cam.worldToScreenX(b.x - b.dx * tLen);
       const tailY = cam.worldToScreenY(b.y - b.dy * tLen);
-      const pad = 3 * ART_PIXEL * cam.zoom + 2;
+      const pad = 3 * ART_PIXEL * cam.zoom * b.sizeScale + 2;
       if (Math.max(sx, tailX) < -pad || Math.min(sx, tailX) > cam.viewW + pad ||
           Math.max(sy, tailY) < -pad || Math.min(sy, tailY) > cam.viewH + pad) continue;
 
@@ -1200,22 +1207,22 @@ export class Renderer {
       const steps = Math.max(Math.abs(hx - tx), Math.abs(hy - ty));
 
       if (isRocket) {
-        this.drawRocket(hx, hy, tx, ty, steps);
+        this.drawRocket(hx, hy, tx, ty, steps, b.sizeScale);
         continue;
       }
 
       ctx.fillStyle = isSniper ? "#d7fcff" : "#fff2c3";
       // Skip redundant sub-pixel overdraw when zoomed out below 1x.
-      const stride = cam.zoom < 1 ? Math.ceil(1 / cam.zoom) : 1;
+      const stride = Math.max(b.sizeScale, Math.ceil(1 / cam.zoom));
       // Trail: tail (k = 0) is faint, the pixel just behind the head is brightest.
       for (let k = 0; k < steps; k += stride) {
         const t = k / steps;
         ctx.globalAlpha = 0.12 + 0.6 * t;
-        this.fillArtPixel(Math.round(tx + (hx - tx) * t), Math.round(ty + (hy - ty) * t), 1);
+        this.fillArtPixel(Math.round(tx + (hx - tx) * t), Math.round(ty + (hy - ty) * t), b.sizeScale);
       }
       ctx.globalAlpha = 1;
       ctx.fillStyle = "#ffffff";
-      this.fillArtPixel(hx, hy, 1);
+      this.fillArtPixel(hx, hy, b.sizeScale);
     }
     ctx.globalAlpha = 1;
   }
@@ -1393,7 +1400,7 @@ export class Renderer {
    * behind the head to 1 pixel at the tail, cooling from white-yellow through
    * orange to deep red, with a little per-frame flicker.
    */
-  private drawRocket(hx: number, hy: number, tx: number, ty: number, steps: number): void {
+  private drawRocket(hx: number, hy: number, tx: number, ty: number, steps: number, scale: number): void {
     const ctx = this.ctx;
     // Normal blending: the 3-wide trail squares overlap, and additive blending
     // would wash them out to white.
@@ -1403,7 +1410,7 @@ export class Renderer {
       const t = k / steps; // 0 = tail, 1 = just behind the head
       // Ragged, flickering tail end.
       if (t < 0.35 && Math.random() < 0.35) continue;
-      const w = t > 0.7 ? 3 : t > 0.35 ? 2 : 1;
+      const w = (t > 0.7 ? 3 : t > 0.35 ? 2 : 1) * scale;
       const jitter = t < 0.5 && Math.random() < 0.3 ? (Math.random() < 0.5 ? -1 : 1) : 0;
       const cx = Math.round(tx + (hx - tx) * t) + (Math.abs(hx - tx) >= Math.abs(hy - ty) ? 0 : jitter);
       const cy = Math.round(ty + (hy - ty) * t) + (Math.abs(hx - tx) >= Math.abs(hy - ty) ? jitter : 0);
@@ -1414,9 +1421,9 @@ export class Renderer {
     }
     ctx.globalAlpha = 1;
     ctx.fillStyle = "#ffc23a";
-    this.fillArtPixel(hx - 1, hy - 1, 3);
+    this.fillArtPixel(hx - scale, hy - scale, 3 * scale);
     ctx.fillStyle = "#fffbe0";
-    this.fillArtPixel(hx, hy, 1);
+    this.fillArtPixel(hx, hy, scale);
     ctx.restore();
   }
 
@@ -1583,6 +1590,7 @@ export class Renderer {
 
       ctx.save();
       ctx.translate(sx, sy);
+      ctx.scale(g.sizeScale, g.sizeScale);
 
       if (!g.stuck) {
         // Rotating grenade in flight

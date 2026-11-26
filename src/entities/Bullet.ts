@@ -1,5 +1,5 @@
 import type { ReverseShot } from "../systems/ReverseRevolver";
-import type { Soldier } from "./Soldier";
+import type { Soldier, Wingman } from "./Soldier";
 
 export class Bullet {
   homing = false;
@@ -22,6 +22,8 @@ export class Bullet {
   dx = 0;
   dy = 0;
   speed = 0;
+  sizeScale = 1;
+  halfDamage = false;
   terrainDamageBonus = 0;
   damage = 1;
   life = 0;
@@ -52,6 +54,7 @@ export class Bullet {
   slashCircular = false;
   /** Owner soldier reference used to keep stationary slashes anchored in front of the player. */
   ownerSoldier: Soldier | null = null;
+  ownerWingman: Wingman | null = null;
   /** Initial max lifetime for alpha/animation scaling. */
   maxLife = 0;
   /** Distance since launch or last reflection, used to clamp the straight tracer. */
@@ -135,6 +138,8 @@ export function resetBulletFields(b: Bullet): void {
   b.dx = 0;
   b.dy = 0;
   b.speed = 0;
+  b.sizeScale = 1;
+  b.halfDamage = false;
   b.terrainDamageBonus = 0;
   b.damage = 1;
   b.life = 0;
@@ -152,6 +157,7 @@ export function resetBulletFields(b: Bullet): void {
   b.slashHitDone = false;
   b.slashCircular = false;
   b.ownerSoldier = null;
+  b.ownerWingman = null;
   b.maxLife = 0;
   b.traveled = 0;
   b.totalTraveled = 0;

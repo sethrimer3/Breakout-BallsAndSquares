@@ -10,7 +10,7 @@ export function drawGoo(ctx: CanvasRenderingContext2D, cam: CameraSystem, goo: G
     if (!orb.active) continue;
     const x = cam.worldToScreenX(orb.x);
     const y = cam.worldToScreenY(orb.y);
-    const radius = Math.max(1.5, 3.5 * Math.sqrt(orb.mass) * cam.zoom);
+    const radius = Math.max(1.5, 3.5 * Math.sqrt(orb.mass) * cam.zoom) * orb.sizeScale;
     // Spring points are bounded by [-1.7, 2.5] × [-1.7, 1.7]. Their
     // rotated convex hull, not the collision center, determines visibility.
     const pad = radius * 3.1 + Math.max(1, cam.zoom) + 1;
@@ -50,7 +50,7 @@ export function drawGoo(ctx: CanvasRenderingContext2D, cam: CameraSystem, goo: G
     if (!mine.active) continue;
     const x = cam.worldToScreenX(mine.x);
     const y = cam.worldToScreenY(mine.y);
-    const radius = Math.max(1.5, 2 * Math.sqrt(mine.mass / GOO.massPerMine) * cam.zoom);
+    const radius = Math.max(1.5, 2 * Math.sqrt(mine.mass / GOO.massPerMine) * cam.zoom) * mine.sizeScale;
     const pad = Math.max(radius * 2.5, radius + 3) + Math.max(1, cam.zoom) + 1;
     if (x < -pad || y < -pad || x > cam.viewW + pad || y > cam.viewH + pad) continue;
     const charge = 1 - Math.max(0, Math.min(1, mine.fuse / mine.maxFuse));

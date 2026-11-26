@@ -11,6 +11,8 @@ export class ReverseShot {
   /** Seconds this shot hangs before rewinding (Black Market research shortens it). */
   rewindPause: number = REVERSE.pause;
   ownerId = 0; speed = 0; damage = 0; terrainDamageBonus = 0; blightMultiplier = 1;
+  sizeScale = 1;
+  halfDamage = false;
   hits = 0; coreDamageBonus = 0;
 }
 
@@ -26,6 +28,8 @@ export class ReverseRevolver {
     if (!shot) { this.dropped++; return null; }
     shot.phase="recording";shot.count=1;shot.cursor=0;shot.points[0]=shot.x=x;shot.points[1]=shot.y=y;
     shot.rewindPause=pause;shot.speed=speed;shot.damage=damage;shot.terrainDamageBonus=bonus;shot.blightMultiplier=multiplier;shot.ownerId=ownerId;
+    shot.sizeScale = 1;
+    shot.halfDamage = false;
     shot.age=shot.pause=shot.hits=shot.coreDamageBonus=0;shot.cells.clear();shot.targets.clear();
     return shot;
   }

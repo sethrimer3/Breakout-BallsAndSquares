@@ -11,6 +11,8 @@ export interface GooLaunch {
   dy: number;
   ownerId: number;
   mass: number;
+  sizeScale?: number;
+  halfDamage?: boolean;
   distance: number;
   speed: number;
   damage: number;
@@ -66,6 +68,8 @@ export class GooOrbSystem {
     orb.normalX = 0;
     orb.normalY = 0;
     orb.distanceRemaining = shot.distance;
+    orb.sizeScale = shot.sizeScale ?? 1;
+    orb.halfDamage = shot.halfDamage ?? false;
     orb.startingMass = shot.mass;
     orb.mass = shot.mass;
     orb.age = 0;
@@ -158,6 +162,8 @@ export class GooOrbSystem {
           mine.fuse = GOO.mineFuse + dt - remaining;
           mine.mass = shed;
           mine.radiusCells = orb.mineRadius;
+          mine.sizeScale = orb.sizeScale;
+          mine.halfDamage = orb.halfDamage;
           mine.residue = orb.residue;
           mine.damage = orb.damage * (shed / GOO.massPerMine);
           mine.terrainDamageBonus = orb.terrainDamageBonus * (shed / GOO.massPerMine);

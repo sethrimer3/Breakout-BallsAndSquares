@@ -83,7 +83,7 @@ describe("Vacuum Pulse (Shotgun branch 2)", () => {
     stats.shotgunDamage = 2;
     const combat = new CombatSystem(world, new Rng(3), stats);
 
-    const baseShotgun = new Soldier(128, 128, 1, 0, 60, "shotgun", "free", 1, null, null);
+    const baseShotgun = new Soldier(128, 128, 1, 0, 60, "shotgun", "free", 2, null, null);
     const vacuum = new Soldier(128, 128, 1, 0, 60, "shotgun", "free", 2, null, "vacuum_pulse");
     expect(combat.effectiveFireRate(vacuum)).toBeCloseTo(combat.effectiveFireRate(baseShotgun) * 0.5);
 

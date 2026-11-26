@@ -20,6 +20,8 @@ export class StickyGrenade {
   shrapnelCount = 0;
   blightMultiplier = 2.0;
   ownerId = 0;
+  sizeScale = 1;
+  halfDamage = false;
   age = 0;
   beepTimer = 0;
   rotation = 0;

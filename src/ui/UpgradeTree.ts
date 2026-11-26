@@ -2,6 +2,7 @@ import { exoticMatterIcon } from "./exoticMatterIcon";
 import { marketFor, marketNode, WEAPON_MARKETS } from "../progression/BlackMarket";
 import { marketLayout } from "./marketLayout";
 import { damageRange, TERRAIN } from "../config";
+import { SOLDIER_SHAPES, soldierShapeIndex } from "../entities/soldierShapes";
 import { mutationCompatibility, resolvePrimaryMutation, type PrimaryMutation, type SecondaryWeaponType, type WeaponType } from "../entities/Soldier";
 import type { Game } from "../Game";
 import type { SoldierBehavior } from "../progression/SaveManager";
@@ -1466,12 +1467,14 @@ export class UpgradeTree {
         })
         .join("");
 
+      const shape = SOLDIER_SHAPES[soldierShapeIndex(i)];
       cardsHtml += `
         <div class="loadout-card">
           <div class="lc-header">
             <div class="lc-avatar">${sprite("soldier", { color: UI_COLORS.soldier })}</div>
             <div class="lc-meta">
-              <div class="lc-name">SOLDIER #${i + 1}</div>
+              <div class="lc-name">SOLDIER #${i + 1}${shape.trait ? ` · ${shape.name.toUpperCase()}` : ""}</div>
+              ${shape.trait ? `<div class="lc-compat">${shape.trait}</div>` : ""}
               <div class="lc-stats">${wSummary}</div>
             </div>
           </div>

@@ -51,6 +51,7 @@ export class FireSystem {
   readonly maxLife = new Float32Array(this.cap);
   /** 0..1 starting temperature: hotter flames start whiter and burn longer. */
   readonly heat = new Float32Array(this.cap);
+  readonly sizeScale = new Uint8Array(this.cap);
   readonly kind = new Uint8Array(this.cap);
   /** Per-particle phase for the turbulence field. */
   readonly seed = new Float32Array(this.cap);
@@ -134,7 +135,7 @@ export class FireSystem {
   }
 
   /** A flame jet splashing on a surface: flames fan out along it. */
-  splash(x: number, y: number, nx: number, ny: number): void {
+  splash(x: number, y: number, nx: number, ny: number, sizeScale = 1): void {
     const n = 3;
     for (let i = 0; i < n; i++) {
       const side = this.rng.range(-1, 1);
@@ -142,11 +143,11 @@ export class FireSystem {
       // Along the surface (perpendicular to the normal), pushed slightly off it.
       const vx = -ny * side * sp + nx * this.rng.range(4, 14);
       const vy = nx * side * sp + ny * this.rng.range(4, 14);
-      this.spawn(FKind.Flame, x + nx * 0.6, y + ny * 0.6, vx, vy, this.rng.range(0.22, 0.48), this.rng.range(0.6, 0.95));
+      this.spawn(FKind.Flame, x + nx * 0.6, y + ny * 0.6, vx, vy, this.rng.range(0.22, 0.48), this.rng.range(0.6, 0.95), sizeScale);
     }
   }
 
-  spawn(kind: number, x: number, y: number, vx: number, vy: number, life: number, heat: number): void {
+  spawn(kind: number, x: number, y: number, vx: number, vy: number, life: number, heat: number, sizeScale = 1): void {
     let i: number;
     if (this.count < this.cap) i = this.count++;
     else i = this.rng.int(this.cap);
@@ -158,6 +159,7 @@ export class FireSystem {
     this.maxLife[i] = life;
     this.heat[i] = heat;
     this.kind[i] = kind;
+    this.sizeScale[i] = sizeScale;
     this.seed[i] = this.rng.range(0, 100);
   }
 
@@ -181,7 +183,7 @@ export class FireSystem {
       const n = Math.max(1, Math.round(dt * 220));
       for (let k = 0; k < n; k++) {
         const back = this.rng.range(0, b.speed * dt);
-        const spread = 10 + age * 26;
+        const spread = (10 + age * 26) * b.sizeScale;
         const a = this.rng.range(-1, 1);
         const sp = b.speed * this.rng.range(0.35, 0.7);
         this.spawn(
@@ -192,6 +194,7 @@ export class FireSystem {
           b.dy * sp + b.dx * a * spread,
           this.rng.range(0.16, 0.34) + age * 0.16,
           0.92 - age * 0.5,
+          b.sizeScale,
         );
       }
     }
@@ -352,6 +355,7 @@ export class FireSystem {
     this.maxLife[i] = this.maxLife[j];
     this.heat[i] = this.heat[j];
     this.kind[i] = this.kind[j];
+    this.sizeScale[i] = this.sizeScale[j];
     this.seed[i] = this.seed[j];
   }
 

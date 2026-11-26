@@ -264,6 +264,22 @@ export class PixelWorld implements SolidQuery {
   /** Fine-gridSolidQuery view for `gridRaycast` at `subCellSize` resolution. */
   readonly subSolidQuery: SolidQuery;
 
+  // Keep half-point hits without widening the dense terrain health arrays.
+  private readonly fractionalDamage = new Map<number, number>();
+
+  clearFractionalDamage(): void {
+    this.fractionalDamage.clear();
+  }
+
+  private damageWithRemainder(key: number, amount: number): number {
+    const total = amount + (this.fractionalDamage.get(key) ?? 0);
+    const whole = Math.floor(total + 1e-8);
+    const fraction = total - whole;
+    if (fraction > 1e-8) this.fractionalDamage.set(key, fraction);
+    else this.fractionalDamage.delete(key);
+    return whole;
+  }
+
   private listeners: CellListener[] = [];
   private destroyListeners: DestroyListener[] = [];
   private damageListeners: ((x: number, y: number, amount: number, sub: boolean, dx: number, dy: number) => void)[] = [];
@@ -538,6 +554,7 @@ export class PixelWorld implements SolidQuery {
     if (!this.inBounds(cx, cy)) return;
     const idx = cy * this.width + cx;
     if (this.boundary[idx]) return;
+    this.fractionalDamage.delete(idx);
     this.health[idx] = hp;
     if (hp === 0 || kind === "grown") this.glassCracked[idx] = 0;
     if (kind === "grown") {
@@ -553,6 +570,12 @@ export class PixelWorld implements SolidQuery {
     const sw = this.subWidth;
     const row0 = sy0 * sw + sx0;
     const row1 = row0 + sw;
+    if (this.fractionalDamage.size > 0) {
+      this.fractionalDamage.delete(~row0);
+      this.fractionalDamage.delete(~(row0 + 1));
+      this.fractionalDamage.delete(~row1);
+      this.fractionalDamage.delete(~(row1 + 1));
+    }
     this.subHealth[row0] = 0;
     this.subHealth[row0 + 1] = 0;
     this.subHealth[row1] = 0;
@@ -571,6 +594,7 @@ export class PixelWorld implements SolidQuery {
     if (!this.subInBounds(sx, sy)) return;
     if (this.boundary[(sy >> 1) * this.width + (sx >> 1)]) return;
     const si = sy * this.subWidth + sx;
+    this.fractionalDamage.delete(~si);
     this.subHealth[si] = hp;
     if (kind === "grown") this.subKind[si] = SUB.blight;
     if (!silent) this.emit(sx >> 1, sy >> 1, kind, sx, sy);
@@ -628,13 +652,13 @@ export class PixelWorld implements SolidQuery {
    * `byPlayer` marks a hit the squad dealt itself (see `damageSub`).
    */
   /** Squad damage after Arsenal Calibration; armored cells and non-squad damage are unscaled. */
-  private scaled(i: number, amount: number, byPlayer: boolean): number {
+  private scaled(i: number, amount: number, byPlayer: boolean, preserveFraction = false): number {
     if (!byPlayer || (i >= 0 && this.armored[i])) return amount;
     let mult = this.playerDamageMult;
     if (this.damageRollMax > this.damageRollMin) mult *= this.damageRollMin + (this.damageRollMax - this.damageRollMin) * this.nextRoll();
     else mult *= this.damageRollMin;
     if (mult === 1) return amount;
-    return Math.max(1, Math.round(amount * mult));
+    return preserveFraction ? amount * mult : Math.max(1, Math.round(amount * mult));
   }
 
   /**
@@ -667,7 +691,7 @@ export class PixelWorld implements SolidQuery {
     return this.breachBonus(sx >> 1, sy >> 1, bonus);
   }
 
-  damage(cx: number, cy: number, amount: number, byPlayer = false, attackDx = 0, attackDy = -1): 0 | 1 | 2 {
+  damage(cx: number, cy: number, amount: number, byPlayer = false, attackDx = 0, attackDy = -1, preserveFraction = false): 0 | 1 | 2 {
     if (!this.inBounds(cx, cy)) return 0;
     const i = cy * this.width + cx;
     if (this.boundary[i]) return 0;
@@ -679,7 +703,7 @@ export class PixelWorld implements SolidQuery {
       let bestRes: 0 | 1 | 2 = 0;
       for (let dy = 0; dy < 2; dy++) {
         for (let dx = 0; dx < 2; dx++) {
-          const r = this.damageSub(sx0 + dx, sy0 + dy, amount, byPlayer, attackDx, attackDy);
+          const r = this.damageSub(sx0 + dx, sy0 + dy, amount, byPlayer, attackDx, attackDy, preserveFraction);
           if (r > bestRes) bestRes = r;
         }
       }
@@ -693,9 +717,12 @@ export class PixelWorld implements SolidQuery {
         return 1;
       }
     }
-    const next = Math.max(0, hp - this.scaled(i, amount, byPlayer));
+    const damage = this.scaled(i, amount, byPlayer, preserveFraction);
+    const next = Math.max(0, hp - (preserveFraction ? this.damageWithRemainder(i, damage) : damage));
+    if (preserveFraction && next === hp) return 1;
     this.health[i] = next;
     if (next === 0) {
+      this.fractionalDamage.delete(i);
       this.blight[i] = 0;
       this.emit(cx, cy, "destroyed");
       this.emitDestroy(cx, cy, false, cx * 2, cy * 2);
@@ -714,20 +741,23 @@ export class PixelWorld implements SolidQuery {
    * Otherwise damages the 50% subcell at `(sx, sy)`.
    * Destroyed non-Blight subcells trigger `onSubBreakPush` to push nearby 0.5 pixels away.
    */
-  damageSub(sx: number, sy: number, amount: number, byPlayer = false, attackDx = 0, attackDy = -1): 0 | 1 | 2 {
+  damageSub(sx: number, sy: number, amount: number, byPlayer = false, attackDx = 0, attackDy = -1, preserveFraction = false): 0 | 1 | 2 {
     if (!this.subInBounds(sx, sy)) return 0;
     const cx = sx >> 1;
     const cy = sy >> 1;
     const i = cy * this.width + cx;
     if (this.health[i] > 0) {
-      return this.damage(cx, cy, amount, byPlayer, attackDx, attackDy);
+      return this.damage(cx, cy, amount, byPlayer, attackDx, attackDy, preserveFraction);
     }
     const si = sy * this.subWidth + sx;
     const hp = this.subHealth[si];
     if (hp === 0) return 0;
-    const next = Math.max(0, hp - this.scaled(i, amount, byPlayer));
+    const damage = this.scaled(i, amount, byPlayer, preserveFraction);
+    const next = Math.max(0, hp - (preserveFraction ? this.damageWithRemainder(~si, damage) : damage));
+    if (preserveFraction && next === hp) return 1;
     this.subHealth[si] = next;
     if (next === 0) {
+      this.fractionalDamage.delete(~si);
       const pushes = this.subKind[si] !== SUB.blight;
       this.emit(cx, cy, "destroyed", sx, sy);
       this.emitDestroy(cx, cy, true, sx, sy);
@@ -749,6 +779,7 @@ export class PixelWorld implements SolidQuery {
     if (!this.subInBounds(sx, sy)) return;
     const si = sy * this.subWidth + sx;
     if (this.subHealth[si] === 0) return;
+    this.fractionalDamage.delete(~si);
     this.subHealth[si] = 0;
     this.emit(sx >> 1, sy >> 1, "set", sx, sy);
   }
@@ -764,6 +795,7 @@ export class PixelWorld implements SolidQuery {
     if (this.subHealth[si] > 0) return false;
     this.subKind[si] = kind;
     this.subTint[si] = tint;
+    this.fractionalDamage.delete(~si);
     this.subHealth[si] = hp;
     this.emit(cx, cy, "set", sx, sy);
     return true;

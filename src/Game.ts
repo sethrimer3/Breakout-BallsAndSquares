@@ -249,7 +249,7 @@ export class Game {
 
     this.physics = new PhysicsSystem(this.world, this.rng);
     this.combat = new CombatSystem(this.world, this.rng, this.stats, {
-      onShot: (s, dx, dy, mx, my) => this.onShot(s, dx, dy, mx, my),
+      onShot: (s, dx, dy, mx, my, side) => this.onShot(s, dx, dy, mx, my, side),
       onImpact: (x, y, nx, ny, cx, cy, result, sub, ownerId) =>
         this.onImpact(x, y, nx, ny, cx, cy, result, sub, ownerId),
       onExplosion: (x, y, rad, damage, visualOnly) => this.onExplosion(x, y, rad, damage, visualOnly),
@@ -282,8 +282,8 @@ export class Game {
         this.audio.playRicochet(x, y);
         this.particles.spawn(PKind.Spark, x, y, nx * 55, ny * 55, 0.06, 1.5, 0x8eeaff, 8);
       },
-      onFlameHit: (sx, sy, x, y, nx, ny) => {
-        this.fire.splash(x, y, nx, ny);
+      onFlameHit: (sx, sy, x, y, nx, ny, sizeScale) => {
+        this.fire.splash(x, y, nx, ny, sizeScale);
         return this.fire.ignite(sx, sy) || this.fire.isBurning(sy * this.world.subWidth + sx);
       },
     });
@@ -1177,6 +1177,7 @@ export class Game {
     s.mutation = resolvePrimaryMutation(weapon,this.save.data.loadouts[slotIdx]?.mutation,this.stats);
     s.maxHealth = this.stats.soldierHealth + mods.healthBonus;
     s.health = s.maxHealth;
+    this.combat.updateWingmen(s, 0);
     this.soldiers.push(s);
     this.reserves--;
     this.runStats.soldiersDeployed++;
@@ -1328,7 +1329,7 @@ export class Game {
       const cdx = Math.cos(commander.facingAngle);
       const cdy = Math.sin(commander.facingAngle);
       this.combat.fire(commander, cdx, cdy);
-      this.onShot(commander, cdx, cdy, commander.x, commander.y);
+      if (commander.wingmen.length === 0) this.onShot(commander, cdx, cdy, commander.x, commander.y);
       const rate = this.combat.effectiveFireRate(commander);
       commander.fireCooldown = 1 / Math.max(0.1, rate);
     }
@@ -1350,7 +1351,7 @@ export class Game {
     return sx + pad >= 0 && sy + pad >= 0 && sx - pad <= cam.viewW && sy - pad <= cam.viewH;
   }
 
-  private onShot(s: Soldier, dx: number, dy: number, mx: number, my: number): void {
+  private onShot(s: Soldier, dx: number, dy: number, mx: number, my: number, side = 0): void {
     this.runStats.shotsFired++;
     if (s.weapon === "sniper_rifle" && s.mutation === "chromatic_prism") { this.audio.playPrism(mx, my); return; }
     if (s.weapon === "pistol" && s.mutation === "drone_shepherd") return;
@@ -1362,7 +1363,7 @@ export class Game {
       if (s.mutation === "cryospray" || s.mutation === "napalm_garden") return;
       // No white muzzle flash: the stream lights its surroundings with warm firelight.
       this.audio.playFlame(mx, my);
-      this.fire.nozzle(s.id, mx + dx * 10, my + dy * 10);
+      this.fire.nozzle(s.id * 3 + side, mx + dx * 10, my + dy * 10);
       return;
     }
     if (s.weapon === "katana") {
@@ -2069,7 +2070,7 @@ export class Game {
         if (shouldShoot) {
           const cdx = Math.cos(commander.facingAngle);
           const cdy = Math.sin(commander.facingAngle);
-          if (this.combat.advanceRailCharge(commander, dt, cdx, cdy)) {
+          if (this.combat.advanceRailCharge(commander, dt, cdx, cdy) && commander.wingmen.length === 0) {
             this.onShot(commander, commander.railLockDx, commander.railLockDy, commander.x, commander.y);
           }
         } else {

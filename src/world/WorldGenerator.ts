@@ -116,6 +116,7 @@ interface ZoneBand {
  */
 export function generateWorld(world: PixelWorld, seed: number, options: GenerateOptions = {}): void {
   const { width, height, health, tint, wall } = world;
+  world.clearFractionalDamage();
   world.startingTube = null;
   world.glassCracked.fill(0);
   wall.fill(0);

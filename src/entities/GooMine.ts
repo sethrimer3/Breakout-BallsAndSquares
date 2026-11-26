@@ -14,4 +14,6 @@ export class GooMine {
   terrainDamageBonus = 0;
   blightMultiplier = 1;
   ownerId = 0;
+  sizeScale = 1;
+  halfDamage = false;
 }

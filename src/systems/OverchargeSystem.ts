@@ -27,6 +27,8 @@ export interface OverchargeEntry {
   quietLeft: number;
   ownerId: number;
   power: number;
+  sizeScale: number;
+  halfDamage: boolean;
   terrainDamageBonus: number;
   blightMultiplier: number;
 }
@@ -55,9 +57,9 @@ export interface OverchargeBlastVisual {
 export interface OverchargeDischargeContext {
   creatures: CreatureSystem | null;
   late: LateEncounters | null;
-  onBlast: (x: number, y: number, radius: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number) => void;
-  onChainCell: (cx: number, cy: number, x: number, y: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number, dx: number, dy: number) => void;
-  onChainSub: (sx: number, sy: number, x: number, y: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number, dx: number, dy: number) => void;
+  onBlast: (x: number, y: number, radius: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number, halfDamage: boolean) => void;
+  onChainCell: (cx: number, cy: number, x: number, y: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number, dx: number, dy: number, halfDamage: boolean) => void;
+  onChainSub: (sx: number, sy: number, x: number, y: number, damage: number, terrainDamageBonus: number, ownerId: number, blightMultiplier: number, dx: number, dy: number, halfDamage: boolean) => void;
   onChainCreature: (c: Creature, x: number, y: number, damage: number, ownerId: number) => void;
   onChainEncounter: (enc: Encounter, x: number, y: number, damage: number, ownerId: number) => void;
 }
@@ -131,6 +133,8 @@ export class OverchargeSystem {
         quietLeft: 0,
         ownerId: 0,
         power: 1,
+        sizeScale: 1,
+        halfDamage: false,
         terrainDamageBonus: 0,
         blightMultiplier: 1,
       });
@@ -291,6 +295,8 @@ export class OverchargeSystem {
       slot.blightMultiplier = Math.max(1, blightMultiplier);
     }
 
+    slot.sizeScale = 1;
+    slot.halfDamage = false;
     this.totalCharges++;
     return slot;
   }
@@ -416,7 +422,7 @@ export class OverchargeSystem {
         continue;
       }
 
-      this.discharge(originKey, origin, ox, oy, stacks, ownerId, power, terrainBonus, blightMult, ctx);
+      this.discharge(originKey, origin, ox, oy, stacks, ownerId, power, terrainBonus, blightMult, e.sizeScale, e.halfDamage, ctx);
     }
   }
 
@@ -667,6 +673,8 @@ export class OverchargeSystem {
     power: number,
     terrainDamageBonus: number,
     blightMultiplier: number,
+    sizeScale: number,
+    halfDamage: boolean,
     ctx: OverchargeDischargeContext,
   ): void {
     this.totalDischarges++;
@@ -674,15 +682,15 @@ export class OverchargeSystem {
     const blastRadius = Math.min(
       OVERCHARGE.maxBlastRadius,
       OVERCHARGE.baseBlastRadius + extra * OVERCHARGE.blastRadiusPerStack,
-    );
+    ) * sizeScale;
     const blastDmg = Math.max(
       1,
       Math.round(power * (OVERCHARGE.baseBlastDamageMult + extra * OVERCHARGE.blastDamagePerStack)),
-    );
+    ) * (halfDamage ? 0.5 : 1);
     const chainDmg = Math.max(
       1,
       Math.round(power * (OVERCHARGE.baseChainDamageMult + extra * OVERCHARGE.chainDamagePerStack)),
-    );
+    ) * (halfDamage ? 0.5 : 1);
     const chainReach = Math.min(
       OVERCHARGE.maxChainReach,
       OVERCHARGE.baseChainReach + extra * OVERCHARGE.chainReachPerStack,
@@ -696,7 +704,7 @@ export class OverchargeSystem {
       OVERCHARGE.baseArcDuration + extra * OVERCHARGE.arcDurationPerStack,
     );
 
-    ctx.onBlast(ox, oy, blastRadius, blastDmg, terrainDamageBonus, ownerId, blightMultiplier);
+    ctx.onBlast(ox, oy, blastRadius, blastDmg, terrainDamageBonus, ownerId, blightMultiplier, halfDamage);
     this.spawnBlastVisual(ox, oy, blastRadius, Math.min(0.32, arcDuration), stacks);
 
     const visited = new Set<string>([originKey]);
@@ -717,9 +725,9 @@ export class OverchargeSystem {
       } else if (next.kind === "encounter" && next.encounter) {
         ctx.onChainEncounter(next.encounter, next.x, next.y, chainDmg, ownerId);
       } else if (next.kind === "cell") {
-        ctx.onChainCell(next.cx, next.cy, next.x, next.y, chainDmg, terrainDamageBonus, ownerId, blightMultiplier, next.x - curX, next.y - curY);
+        ctx.onChainCell(next.cx, next.cy, next.x, next.y, chainDmg, terrainDamageBonus, ownerId, blightMultiplier, next.x - curX, next.y - curY, halfDamage);
       } else if (next.kind === "subcell") {
-        ctx.onChainSub(next.sx, next.sy, next.x, next.y, chainDmg, terrainDamageBonus, ownerId, blightMultiplier, next.x - curX, next.y - curY);
+        ctx.onChainSub(next.sx, next.sy, next.x, next.y, chainDmg, terrainDamageBonus, ownerId, blightMultiplier, next.x - curX, next.y - curY, halfDamage);
       }
 
       this.spawnArc(curX, curY, next.x, next.y, arcDuration, stacks);

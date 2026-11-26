@@ -22,7 +22,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     if (!drone.active) continue;
     const x=cam.worldToScreenX(drone.x);const y=cam.worldToScreenY(drone.y);
     if (x < -24 || y < -24 || x > cam.viewW+24 || y > cam.viewH+24) continue;
-    const z=Math.max(0.75,cam.zoom);
+    const z=Math.max(0.75,cam.zoom) * drone.sizeScale;
     ctx.fillStyle="#213541";ctx.fillRect(x-3*z,y-2*z,6*z,4*z);
     ctx.fillStyle="#7ce4df";ctx.fillRect(x-z,y-z,2*z,2*z);
     const rotor=reduced?1:0.5+0.5*Math.abs(Math.sin(drone.phase*5));
@@ -34,14 +34,14 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     const x1=cam.worldToScreenX(segment.x1);const y1=cam.worldToScreenY(segment.y1);
     const x2=cam.worldToScreenX(segment.x2);const y2=cam.worldToScreenY(segment.y2);
     // Preserve crossing beams and the reflection marker beyond the endpoint.
-    const pad = 5 + Math.max(1.5, cam.zoom * (0.8 + segment.band * 0.13));
+    const pad = (5 + Math.max(1.5, cam.zoom * (0.8 + segment.band * 0.13))) * segment.sizeScale;
     if (Math.max(x1, x2) < -pad || Math.min(x1, x2) > cam.viewW + pad ||
         Math.max(y1, y2) < -pad || Math.min(y1, y2) > cam.viewH + pad) continue;
     ctx.globalAlpha=reduced?0.85:Math.min(1,segment.life/PRISM.visualLife);
     ctx.strokeStyle=PRISM.colors[segment.band];
-    ctx.lineWidth=Math.max(1.5,cam.zoom*(0.8+segment.band*0.13));
+    ctx.lineWidth=Math.max(1.5,cam.zoom*(0.8+segment.band*0.13)) * segment.sizeScale;
     ctx.setLineDash([]);ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
-    ctx.strokeStyle="#ffffff";ctx.lineWidth=Math.max(0.6,cam.zoom*0.25);
+    ctx.strokeStyle="#ffffff";ctx.lineWidth=Math.max(0.6,cam.zoom*0.25) * segment.sizeScale;
     if (game.save.data.settings.prismPatterns) ctx.setLineDash([2+segment.band,3]);
     ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();ctx.setLineDash([]);
     if(segment.reflected){ctx.beginPath();ctx.moveTo(x2-3,y2);ctx.lineTo(x2+3,y2);ctx.moveTo(x2,y2-3);ctx.lineTo(x2,y2+3);ctx.stroke();}
@@ -50,9 +50,9 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     if(!shot.active || shot.phase==="recording")continue;
     const x=cam.worldToScreenX(shot.x);const y=cam.worldToScreenY(shot.y);
     if(x < -24 || y < -24 || x > cam.viewW+24 || y > cam.viewH+24)continue;
-    ctx.globalAlpha=0.75;ctx.strokeStyle="#d7a5ff";ctx.lineWidth=Math.max(1,cam.zoom);
+    ctx.globalAlpha=0.75;ctx.strokeStyle="#d7a5ff";ctx.lineWidth=Math.max(1,cam.zoom) * shot.sizeScale;
     if(shot.phase==="waiting"){
-      ctx.beginPath();ctx.arc(x,y,Math.max(2,cam.zoom*2),0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.arc(x,y,Math.max(2,cam.zoom*2) * shot.sizeScale,0,Math.PI*2);ctx.stroke();
     }else{
       const from=(shot.cursor+1)*2;const dx=shot.points[from]-shot.x;const dy=shot.points[from+1]-shot.y;
       const length=Math.hypot(dx,dy);const tail=Math.min(12,length)*cam.zoom;
@@ -92,7 +92,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     const x = cam.worldToScreenX(r.x);
     const y = cam.worldToScreenY(r.y);
     if (x < -16 || y < -16 || x > cam.viewW + 16 || y > cam.viewH + 16) continue;
-    const sz = Math.max(2, cam.zoom * 1.6);
+    const sz = Math.max(2, cam.zoom * 1.6) * (r.owner?.projectileScale ?? 1);
     ctx.fillStyle = "#ffe89e";
     ctx.fillRect(x - sz * 0.5, y - sz * 0.5, sz, sz);
   }
@@ -129,7 +129,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     const x = cam.worldToScreenX(p.x);
     const y = cam.worldToScreenY(p.y);
     if (x < -32 || y < -32 || x > cam.viewW + 32 || y > cam.viewH + 32) continue;
-    const rad = Math.max(2.5, NAPALM.patchRadius * 0.55 * cam.zoom);
+    const rad = Math.max(2.5, NAPALM.patchRadius * 0.55 * cam.zoom) * p.sizeScale;
     if (p.lit) {
       ctx.globalAlpha = 0.82;
       ctx.fillStyle = "#ff6a1a";
@@ -182,19 +182,19 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     const y2 = cam.worldToScreenY(b.y2);
     // Reject the whole segment bounds, retaining beams crossing the viewport
     // even when both endpoints are outside. Include stroke and antialias padding.
-    const pad = Math.max(1.5, cam.zoom * 1.6) + 1;
+    const pad = Math.max(1.5, cam.zoom * 1.6) * b.sizeScale + 1;
     // Later frost tint inherits this alpha, even when the last beam is culled.
     ctx.globalAlpha = reduced ? 0.85 : Math.max(0, b.life / b.maxLife);
     if (Math.max(x1, x2) < -pad || Math.min(x1, x2) > cam.viewW + pad ||
         Math.max(y1, y2) < -pad || Math.min(y1, y2) > cam.viewH + pad) continue;
     ctx.strokeStyle = b.crit ? "#ffd25a" : "#7eeaff";
-    ctx.lineWidth = Math.max(1.5, cam.zoom * 1.6);
+    ctx.lineWidth = Math.max(1.5, cam.zoom * 1.6) * b.sizeScale;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
     ctx.stroke();
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = Math.max(0.6, cam.zoom * 0.5);
+    ctx.lineWidth = Math.max(0.6, cam.zoom * 0.5) * b.sizeScale;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -210,7 +210,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
     ctx.globalAlpha = 0.78;
     ctx.fillStyle = b.freezeRocket ? "#7ce8ff" : "#b8f4ff";
     ctx.beginPath();
-    ctx.arc(x, y, Math.max(1.5, cam.zoom * (b.freezeRocket ? 2.2 : 1.4)), 0, Math.PI * 2);
+    ctx.arc(x, y, Math.max(1.5, cam.zoom * (b.freezeRocket ? 2.2 : 1.4)) * b.sizeScale, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -279,7 +279,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
 
     ctx.globalAlpha = alpha;
     ctx.strokeStyle = circuitColorAt(midProg);
-    ctx.lineWidth = Math.max(1.5, cam.zoom * 1.9);
+    ctx.lineWidth = Math.max(1.5, cam.zoom * 1.9) * seg.sizeScale;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);
@@ -287,7 +287,7 @@ export function drawWeaponExpansion(ctx: CanvasRenderingContext2D, game: Game, r
 
     ctx.globalAlpha = alpha * 0.72;
     ctx.strokeStyle = "#ffffff";
-    ctx.lineWidth = Math.max(0.7, cam.zoom * 0.65);
+    ctx.lineWidth = Math.max(0.7, cam.zoom * 0.65) * seg.sizeScale;
     ctx.beginPath();
     ctx.moveTo(x1, y1);
     ctx.lineTo(x2, y2);

@@ -13,25 +13,27 @@ export class DroneSystem {
   constructor(private world: PixelWorld, private fire: (shot: DroneShot) => void,
     private onLaunch: (x: number, y: number) => void = () => {}) {}
 
-  release(owner: Soldier, stats: SoldierStats): Drone | null {
+  release(owner: Soldier, stats: SoldierStats, x = owner.x, y = owner.y): Drone | null {
     if (!owner.alive || owner.weapon !== "pistol" || owner.mutation !== "drone_shepherd") return null;
     let count = 0;
     for (const drone of this.pool.items) if (drone.active && drone.ownerId === owner.id) count++;
     if (count >= Math.min(7, stats.droneCapacity)) return null;
     const drone = this.pool.acquire();
     if (!drone) { this.dropped++; return null; }
-    // Spawn inside the owner's already validated circle, never across a wall.
+    // The launch point is validated by the caller when firing from a wingman.
     drone.owner = owner; drone.ownerId = owner.id;
-    drone.x = owner.x; drone.y = owner.y;
+    drone.x = x; drone.y = y;
+    drone.sizeScale = owner.projectileScale;
+    drone.damageScale = owner.damageScale;
     drone.phase = count * Math.PI * 0.8 + owner.id;
     drone.dx = Math.cos(owner.facingAngle); drone.dy = Math.sin(owner.facingAngle);
     drone.aimX = drone.dx; drone.aimY = drone.dy;
     drone.life = DRONE.life; drone.hp = stats.droneHealth;
     drone.fireCooldown = 0.3; drone.retarget = 0;
     drone.damage = stats.droneDamage + owner.mods.damageBonus;
-    drone.terrainDamageBonus = owner.mods.terrainDamageBonus;
+    drone.terrainDamageBonus = owner.mods.terrainDamageBonus * owner.damageScale;
     drone.blightMultiplier = owner.mods.blightMult; drone.pierce = owner.mods.pierce;
-    drone.speed = stats.droneSpeed; drone.fireRate = stats.droneFireRate * owner.mods.fireRateMult;
+    drone.speed = stats.droneSpeed; drone.fireRate = stats.droneFireRate * owner.mods.fireRateMult * owner.fireRateScale;
     drone.aimDegrees = stats.droneAim; drone.recall = stats.droneRecall;
     this.launched++; this.onLaunch(drone.x, drone.y);
     return drone;
@@ -88,7 +90,7 @@ export class DroneSystem {
     const dot = drone.dx * drone.aimX + drone.dy * drone.aimY;
     const corrected = drone.aimDegrees > 0 && dot >= Math.cos(drone.aimDegrees * Math.PI / 180);
     this.fire({ x: drone.x, y: drone.y, dx: corrected ? drone.aimX : drone.dx, dy: corrected ? drone.aimY : drone.dy,
-      ownerId: drone.ownerId, damage: drone.damage, terrainDamageBonus: drone.terrainDamageBonus,
+      ownerId: drone.ownerId, sizeScale: drone.sizeScale, damageScale: drone.damageScale, damage: drone.damage, terrainDamageBonus: drone.terrainDamageBonus,
       blightMultiplier: drone.blightMultiplier, pierce: drone.pierce });
     this.shots++;
   }

@@ -19,6 +19,8 @@ export class GooOrb {
   age = 0;
   contacts = 0;
   ownerId = 0;
+  sizeScale = 1;
+  halfDamage = false;
   damage = 0;
   dwell = 0.18;
   mineRadius = 1.8;

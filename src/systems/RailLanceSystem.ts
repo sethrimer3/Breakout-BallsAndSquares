@@ -14,6 +14,7 @@ export interface RailBeam {
   life: number;
   maxLife: number;
   crit: boolean;
+  sizeScale: number;
 }
 
 const rayHit = makeRayHit();
@@ -33,6 +34,7 @@ export class RailLanceSystem {
     life: 0,
     maxLife: RAIL.beamFadeTime,
     crit: false,
+    sizeScale: 1,
   }));
 
   totalStrikes = 0;
@@ -141,10 +143,10 @@ export class RailLanceSystem {
           const isPink = isSub
             ? this.world.isPinkSub(sy * this.world.subWidth + sx)
             : this.world.blight[ci] > 0;
-          const totalDmg = (damage + this.world.breachBonus(cx, cy, owner.mods.terrainDamageBonus)) * (isPink ? owner.mods.blightMult : 1);
+          const totalDmg = (damage + this.world.breachBonus(cx, cy, owner.mods.terrainDamageBonus) * owner.damageScale) * (isPink ? owner.mods.blightMult : 1);
           const res = isSub
-            ? this.world.damageSub(sx, sy, totalDmg, true, dx, dy)
-            : this.world.damage(cx, cy, totalDmg, true, dx, dy);
+            ? this.world.damageSub(sx, sy, totalDmg, true, dx, dy, owner.damageScale < 1)
+            : this.world.damage(cx, cy, totalDmg, true, dx, dy, owner.damageScale < 1);
           onTerrainHit(cx, cy, res, isSub, hx, hy, rayHit.nx, rayHit.ny, owner.id);
           remainingHits--;
           hits++;
@@ -178,6 +180,7 @@ export class RailLanceSystem {
 
     const beam = this.beams.acquire();
     if (beam) {
+      beam.sizeScale = owner.projectileScale;
       beam.x1 = ox;
       beam.y1 = oy;
       beam.x2 = curX;

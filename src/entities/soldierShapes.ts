@@ -8,6 +8,7 @@
  */
 export interface SoldierShape {
   name: string;
+  trait?: string;
   /** Outline vertices (counter-clockwise or clockwise), or null for the circle. */
   verts: readonly (readonly [number, number])[] | null;
   /** Corner rounding in body units (the outline grows by this much). */
@@ -25,10 +26,10 @@ function regular(n: number, r: number, startDeg = 0): [number, number][] {
 
 export const SOLDIER_SHAPES: readonly SoldierShape[] = [
   { name: "sphere", verts: null, round: 0 },
-  { name: "triangle", verts: regular(3, 1.12), round: 0.22 },
+  { name: "triangle", trait: "+50% fire rate", verts: regular(3, 1.12), round: 0.22 },
   { name: "square", verts: regular(4, 1.0, 45), round: 0.14 },
   { name: "pentagon", verts: regular(5, 1.0), round: 0.1 },
-  { name: "hexagon", verts: regular(6, 1.0), round: 0.08 },
+  { name: "hexagon", trait: "2× projectile and blast size", verts: regular(6, 1.0), round: 0.08 },
   {
     name: "chevron",
     verts: [
@@ -41,6 +42,7 @@ export const SOLDIER_SHAPES: readonly SoldierShape[] = [
   },
   {
     name: "rhombus",
+    trait: "Two wingmen · 50% damage per shot",
     verts: [
       [1.15, 0],
       [0, 0.66],

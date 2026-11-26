@@ -26,6 +26,7 @@ import {
   RAIL,
   NAPALM,
 } from "../config";
+import { SOLDIER_SHAPES, soldierShapeIndex } from "./soldierShapes";
 import type { SoldierBehavior } from "../progression/SaveManager";
 import { baseSoldierMods, type SoldierMods } from "../progression/SoldierUpgrades";
 
@@ -377,6 +378,12 @@ export function baseSoldierStats(): SoldierStats {
 
 let nextId = 1;
 
+export interface Wingman {
+  readonly side: -1 | 1;
+  x: number;
+  y: number;
+}
+
 export class Soldier {
   readonly id = nextId++;
   x: number;
@@ -395,7 +402,25 @@ export class Soldier {
     this.secondaryEnergy = val;
   }
   behavior: SoldierBehavior;
-  slotIndex: number;
+  private shapeSlot = 0;
+  get slotIndex(): number { return this.shapeSlot; }
+  set slotIndex(index: number) {
+    const shape = SOLDIER_SHAPES[soldierShapeIndex(index)].name;
+    this.shapeSlot = index;
+    this.fireRateScale = shape === "triangle" ? 1.5 : 1;
+    this.projectileScale = shape === "hexagon" ? 2 : 1;
+    this.damageScale = shape === "rhombus" ? 0.5 : 1;
+    if (shape === "rhombus" && this.wingmen.length === 0) {
+      this.wingmen = [{ side: -1, x: this.x, y: this.y }, { side: 1, x: this.x, y: this.y }];
+      this.wingmenPositioned = false;
+    } else if (shape !== "rhombus" && this.wingmen.length) {
+      this.wingmen = [];
+    }
+  }
+  fireRateScale = 1;
+  projectileScale = 1;
+  damageScale = 1;
+  wingmen: readonly Wingman[] = [];
   /** This soldier's own upgrade tree, on top of the squad's shared stats. */
   mods: SoldierMods = baseSoldierMods();
   radius = SOLDIER.collisionRadius;
@@ -429,6 +454,7 @@ export class Soldier {
   railLockDy = 0;
   /** Orbit Cylinder release cooldown (prevents double-release in same step). */
   orbitReleaseCd = 0;
+  wingmenPositioned = false;
   /** Tracks previous manual shooting state for release-on-let-go. */
   wasManualShooting = false;
 
@@ -453,6 +479,7 @@ export class Soldier {
     this.secondary = secondary;
     this.behavior = behavior;
     this.slotIndex = slotIndex;
+
     this.fireCooldown = 0.15;
     this.ejectSide = Math.random() < 0.5 ? 1 : -1;
 

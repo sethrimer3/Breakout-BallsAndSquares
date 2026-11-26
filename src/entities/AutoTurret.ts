@@ -14,6 +14,8 @@ export class AutoTurret {
   fireRate = 3.5;
   turnSpeed = Math.PI * 1.5;
   ownerId = 0;
+  sizeScale = 1;
+  damageScale = 1;
   active = false;
   targetCx = -1;
   targetCy = -1;
@@ -42,6 +44,7 @@ export class AutoTurret {
     this.fireRate = fireRate;
     this.turnSpeed = turnSpeed;
     this.ownerId = ownerId;
+    this.sizeScale = this.damageScale = 1;
     this.active = true;
     this.targetCx = -1;
     this.targetCy = -1;
@@ -98,7 +101,7 @@ export class AutoTurret {
         const muzzleDist = 6;
         const mx = this.x + dirX * muzzleDist;
         const my = this.y + dirY * muzzleDist;
-        combat.fireTurretShot(this.ownerId, mx, my, dirX, dirY, this.damage);
+        combat.fireTurretShot(this.ownerId, mx, my, dirX, dirY, this.damage, this.sizeScale, this.damageScale);
       }
     }
   }

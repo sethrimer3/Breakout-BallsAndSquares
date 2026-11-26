@@ -4,6 +4,8 @@ export class Drone {
   active = false;
   owner: Soldier | null = null;
   ownerId = 0;
+  sizeScale = 1;
+  damageScale = 1;
   x = 0; y = 0; dx = 1; dy = 0;
   life = 0; hp = 1; phase = 0;
   fireCooldown = 0; retarget = 0;
@@ -14,5 +16,7 @@ export class Drone {
 }
 export interface DroneShot {
   x: number; y: number; dx: number; dy: number; ownerId: number;
+  sizeScale?: number;
+  damageScale?: number;
   damage: number; terrainDamageBonus: number; blightMultiplier: number; pierce: number;
 }

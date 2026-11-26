@@ -1,10 +1,11 @@
 import { BULLET, ORBIT } from "../config";
-import type { Soldier } from "../entities/Soldier";
+import type { Soldier, Wingman } from "../entities/Soldier";
 
 export interface OrbitRound {
   active: boolean;
   ownerId: number;
   owner: Soldier | null;
+  wing?: Wingman;
   angle: number;
   x: number;
   y: number;
@@ -67,6 +68,7 @@ export class OrbitCylinderSystem {
       r.active = false;
       r.ownerId = 0;
       r.owner = null;
+      r.wing = undefined;
     }
   }
 
@@ -85,6 +87,7 @@ export class OrbitCylinderSystem {
       if (r.active && r.ownerId === ownerId) {
         r.active = false;
         r.owner = null;
+        r.wing = undefined;
       }
     }
   }
@@ -97,6 +100,7 @@ export class OrbitCylinderSystem {
     terrainDamageBonus: number,
     blightMultiplier: number,
     pierce: number,
+    wing?: Wingman,
   ): boolean {
     const count = this.countFor(owner.id);
     if (count >= this.maxRounds) return false;
@@ -113,9 +117,10 @@ export class OrbitCylinderSystem {
     slot.active = true;
     slot.ownerId = owner.id;
     slot.owner = owner;
+    slot.wing = wing;
     slot.angle = angle;
-    slot.x = owner.x + Math.cos(angle) * ORBIT.radius;
-    slot.y = owner.y + Math.sin(angle) * ORBIT.radius;
+    slot.x = (wing?.x ?? owner.x) + Math.cos(angle) * ORBIT.radius;
+    slot.y = (wing?.y ?? owner.y) + Math.sin(angle) * ORBIT.radius;
     slot.damage = damage;
     slot.speed = speed;
     slot.bounces = bounces;
@@ -139,11 +144,12 @@ export class OrbitCylinderSystem {
       if (!r.owner || !r.owner.alive || !aliveIds.has(r.ownerId)) {
         r.active = false;
         r.owner = null;
+        r.wing = undefined;
         continue;
       }
       r.angle += ORBIT.angularSpeed * dt;
-      r.x = r.owner.x + Math.cos(r.angle) * ORBIT.radius;
-      r.y = r.owner.y + Math.sin(r.angle) * ORBIT.radius;
+      r.x = (r.wing?.x ?? r.owner.x) + Math.cos(r.angle) * ORBIT.radius;
+      r.y = (r.wing?.y ?? r.owner.y) + Math.sin(r.angle) * ORBIT.radius;
     }
   }
 
@@ -173,13 +179,14 @@ export class OrbitCylinderSystem {
       const len = Math.hypot(dx, dy) || 1;
       dx /= len;
       dy /= len;
-      const sx = owner.x + dx * (owner.radius + BULLET.muzzleGap);
-      const sy = owner.y + dy * (owner.radius + BULLET.muzzleGap);
+      const sx = r.wing?.x ?? owner.x + dx * (owner.radius + BULLET.muzzleGap);
+      const sy = r.wing?.y ?? owner.y + dy * (owner.radius + BULLET.muzzleGap);
       if (spawn(sx, sy, dx, dy, r.speed, r.damage, BULLET.lifetime, owner.id, r.bounces, r.terrainDamageBonus, r.blightMultiplier, r.pierce)) {
         released++;
       }
       r.active = false;
       r.owner = null;
+        r.wing = undefined;
     }
     if (released > 0) {
       owner.orbitReleaseCd = ORBIT.releaseCooldown;
@@ -196,13 +203,14 @@ export class OrbitCylinderSystem {
       if (!r.active || r.ownerId !== owner.id) continue;
       const dx = Math.cos(r.angle);
       const dy = Math.sin(r.angle);
-      const sx = owner.x + dx * (owner.radius + BULLET.muzzleGap);
-      const sy = owner.y + dy * (owner.radius + BULLET.muzzleGap);
+      const sx = r.wing?.x ?? owner.x + dx * (owner.radius + BULLET.muzzleGap);
+      const sy = r.wing?.y ?? owner.y + dy * (owner.radius + BULLET.muzzleGap);
       if (spawn(sx, sy, dx, dy, r.speed, r.damage, BULLET.lifetime, owner.id, r.bounces, r.terrainDamageBonus, r.blightMultiplier, r.pierce)) {
         released++;
       }
       r.active = false;
       r.owner = null;
+        r.wing = undefined;
     }
     if (released > 0) {
       this.totalReleased += released;

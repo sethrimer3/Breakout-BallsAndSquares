@@ -1,6 +1,6 @@
 import { steerHomingBullet } from "./HomingSystem";
 import {
-  DRONE, GOO, GALE, REVERSE, VACUUM, BURROWER, RAIL, NAPALM, CRYO, CIRCUIT,
+  SOLDIER, DRONE, GOO, GALE, REVERSE, VACUUM, BURROWER, RAIL, NAPALM, CRYO, CIRCUIT,
   ASSAULT_RIFLE, BULLET, FLAMETHROWER, GRENADE, KATANA, ROCKET_LAUNCHER, SNIPER_RIFLE, TURRET,
 } from "../config";
 import { ReverseRevolver, type ReverseShot } from "./ReverseRevolver";
@@ -12,6 +12,7 @@ import { RailLanceSystem } from "./RailLanceSystem";
 import { NapalmSystem } from "./NapalmSystem";
 import { OverchargeSystem } from "./OverchargeSystem";
 import { CircuitRunnerSystem, chooseOutgoingCardinal } from "./CircuitRunnerSystem";
+import { circleIsClear } from "./PhysicsSystem";
 import { slashMomentum } from "./Momentum";
 import { DEG } from "../core/math";
 import { gridRaycast, makeRayHit } from "../core/gridRaycast";
@@ -19,7 +20,7 @@ import type { Rng } from "../core/Rng";
 import { BulletPool, resetBulletFields, type Bullet } from "../entities/Bullet";
 import type { Creature, CreatureSystem } from "../entities/Creatures";
 import type { Encounter, LateEncounters } from "./LateEncounters";
-import type { Soldier, SoldierStats } from "../entities/Soldier";
+import type { Soldier, SoldierStats, Wingman } from "../entities/Soldier";
 import { StickyGrenadePool, type StickyGrenade } from "../entities/StickyGrenade";
 import { AutoTurretPool, type AutoTurret } from "../entities/AutoTurret";
 import { DroneSystem } from "./DroneSystem";
@@ -30,7 +31,7 @@ import { MAT, type PixelWorld } from "../world/PixelWorld";
 
 export interface CombatEvents {
   /** A soldier fired (once per trigger pull). */
-  onShot?(s: Soldier, dirX: number, dirY: number, muzzleX: number, muzzleY: number): void;
+  onShot?(s: Soldier, dirX: number, dirY: number, muzzleX: number, muzzleY: number, side?: number): void;
   /** A bullet or explosion damaged/destroyed terrain. result: 1 damaged, 2 destroyed, 0 border. `sub`: hit a 50% pink sub-pixel in cell (cx, cy). */
   onImpact?(
     x: number,
@@ -69,7 +70,7 @@ export interface CombatEvents {
    * A flame jet licked terrain at subcell (sx, sy). Returns true if rubble there
    * is burning, in which case the jet does no damage (see FireSystem).
    */
-  onFlameHit?(sx: number, sy: number, x: number, y: number, nx: number, ny: number): boolean;
+  onFlameHit?(sx: number, sy: number, x: number, y: number, nx: number, ny: number, sizeScale: number): boolean;
 }
 
 const hit = makeRayHit();
@@ -180,7 +181,7 @@ export class CombatSystem {
       onRelease: (orb) => this.events.onGooRelease?.(orb.x, orb.y),
       onResidueLost: (orb) => this.events.onGooResidueLost?.(orb.x, orb.y),
       onMineBurst: (mine) => {
-        this.damageBlast(mine, mine.x, mine.y, mine.normalX, mine.normalY, mine.radiusCells);
+        this.damageBlast(mine, mine.x, mine.y, mine.normalX, mine.normalY, mine.radiusCells, mine.halfDamage);
         this.napalm.igniteAt(mine.x, mine.y, mine.radiusCells * this.world.cellSize, mine.ownerId);
         this.events.onGooMineBurst?.(mine.x, mine.y, mine.radiusCells * this.world.cellSize, mine.damage);
       },
@@ -272,12 +273,47 @@ export class CombatSystem {
         rate = this.stats.flameFireRate;
         break;
     }
-    return rate * this.stats.globalFireRateMult * s.mods.fireRateMult;
+    return rate * this.stats.globalFireRateMult * s.mods.fireRateMult * s.fireRateScale;
+  }
+
+  private readonly wingmanHit = makeRayHit();
+
+  /** Follow the flanks with a short lag, pulling inward when there is cover between them. */
+  updateWingmen(s: Soldier, dt: number): void {
+    if (s.wingmen.length === 0) return;
+    const dx = Math.cos(s.facingAngle);
+    const dy = Math.sin(s.facingAngle);
+    const blend = s.wingmenPositioned ? 1 - Math.exp(-18 * dt) : 1;
+    const rear = SOLDIER.renderRadius * 1.4;
+    const flank = SOLDIER.renderRadius * 2.35;
+    const maxDistance = Math.hypot(rear, flank) * 1.2;
+    for (const wing of s.wingmen) {
+      const targetX = s.x - dx * rear - dy * flank * wing.side;
+      const targetY = s.y - dy * rear + dx * flank * wing.side;
+      const ox = wing.x + (targetX - wing.x) * blend - s.x;
+      const oy = wing.y + (targetY - wing.y) * blend - s.y;
+      const distance = Math.hypot(ox, oy);
+      const nx = distance > 0 ? ox / distance : dx;
+      const ny = distance > 0 ? oy / distance : dy;
+      let reach = Math.min(maxDistance, distance);
+      if (gridRaycast(this.world.subSolidQuery, this.world.subCellSize, s.x, s.y, nx, ny, reach, this.wingmanHit)) {
+        reach = Math.max(0, this.wingmanHit.t - 1.8);
+      }
+      while (reach > 0 && !circleIsClear(this.world, s.x + nx * reach, s.y + ny * reach, 1.8)) {
+        reach = Math.max(0, reach - 1.8);
+      }
+      wing.x = s.x + nx * reach;
+      wing.y = s.y + ny * reach;
+    }
+    s.wingmenPositioned = true;
   }
 
   /** Tick a soldier's weapon according to its equipped weapon type. */
   updateSoldier(s: Soldier, dt: number): void {
-    if (s.isManual) return; // Driven by player control in Game.step
+    if (s.isManual) {
+      this.updateWingmen(s, dt);
+      return; // Driven by player control in Game.step
+    }
 
     if (s.behavior === "sentry_slow") {
       s.facingAngle += (Math.PI / 3) * dt;
@@ -285,6 +321,8 @@ export class CombatSystem {
       s.facingAngle += (4 * Math.PI / 3) * dt;
     }
 
+    if (s.wingmen.length && Math.hypot(s.vx, s.vy) > 1e-6) s.facingAngle = Math.atan2(s.vy, s.vx);
+    this.updateWingmen(s, dt);
     const rate = this.effectiveFireRate(s);
     const interval = 1 / Math.max(0.05, rate);
 
@@ -333,14 +371,23 @@ export class CombatSystem {
     }
     if (dx === 0 && dy === 0) return;
     s.facingAngle = Math.atan2(dy, dx);
+    if (s.wingmen.length) {
+      this.updateWingmen(s, 0);
+      for (const wing of s.wingmen) this.fireFrom(s, dx, dy, wing.x, wing.y, s.radius * 0.5, wing);
+    } else {
+      this.fireFrom(s, dx, dy, s.x, s.y, s.radius);
+    }
+  }
+
+  private fireFrom(s: Soldier, dx: number, dy: number, x: number, y: number, radius: number, wing?: Wingman): void {
     this.shooter = s;
 
     if (s.weapon === "pistol" && s.mutation === "drone_shepherd") {
-      this.drones.release(s, this.stats);
+      this.drones.release(s, this.stats, x, y);
       this.shooter = null;
       return;
     } else if (s.weapon === "sniper_rifle" && s.mutation === "chromatic_prism") {
-      this.laser.traceShot(s, dx, dy, this.stats);
+      this.laser.traceShot(s, dx, dy, this.stats, x, y);
     } else if (s.weapon === "sniper_rifle" && s.mutation === "rail_lance") {
       if (!s.railCharging) {
         s.railCharging = true;
@@ -354,21 +401,23 @@ export class CombatSystem {
     } else if (s.weapon === "squelch") {
       const orb = this.goo.launch({
         // Cast from the center so a muzzle beside a thin wall cannot skip it.
-        x: s.x, y: s.y, dx, dy, ownerId: s.id,
+        x: x, y: y, dx, dy, ownerId: s.id,
         mass: this.stats.gooMass, distance: this.stats.gooDistance,
         speed: GOO.speed * this.stats.globalBulletSpeedMult * s.mods.bulletSpeedMult,
-        damage: this.stats.gooDamage + this.stats.globalDamageBonus + s.mods.damageBonus,
-        dwell: this.stats.gooDwell, radius: this.stats.gooRadius, residue: this.stats.gooResidue,
-        terrainDamageBonus: s.mods.terrainDamageBonus,
+        damage: (this.stats.gooDamage + this.stats.globalDamageBonus + s.mods.damageBonus) * s.damageScale,
+        sizeScale: s.projectileScale,
+        halfDamage: s.damageScale < 1,
+        dwell: this.stats.gooDwell, radius: this.stats.gooRadius * s.projectileScale, residue: this.stats.gooResidue,
+        terrainDamageBonus: s.mods.terrainDamageBonus * s.damageScale,
         blightMultiplier: s.mods.blightMult,
       });
       if (!orb) {
         this.shooter = null;
-        this.events.onGooLaunchBlocked?.(s.x, s.y);
+        this.events.onGooLaunchBlocked?.(x, y);
         return;
       }
     } else if (s.weapon === "shotgun" && s.mutation === "vacuum_pulse") {
-      this.debris.reserveInRange(s.id, s.x, s.y, this.stats.vacuumRange);
+      this.debris.reserveInRange(s.id, x, y, this.stats.vacuumRange);
       const consumed = this.debris.consumeFor(s.id);
       const minBasePellets = Math.max(2, Math.floor(this.stats.shotgunPellets * 0.5));
       const rawPellets = (consumed.mass > 0 ? this.stats.shotgunPellets : minBasePellets) + Math.floor(consumed.mass * VACUUM.pelletsPerMass);
@@ -384,8 +433,8 @@ export class CombatSystem {
         const sn = Math.sin(a);
         const spd = this.stats.shotgunBulletSpeed * this.rng.range(0.92, 1.08);
         const b = this.spawnBullet(
-          s.x, s.y, dx * c - dy * sn, dx * sn + dy * c,
-          spd, dmg, this.stats.shotgunLifetime, s.radius + BULLET.muzzleGap,
+          x, y, dx * c - dy * sn, dx * sn + dy * c,
+          spd, dmg, this.stats.shotgunLifetime, radius + BULLET.muzzleGap,
           s.id, 0, 0, 0, 0,
         );
         if (b) {
@@ -404,14 +453,14 @@ export class CombatSystem {
         const sn = Math.sin(a);
         const spd = this.stats.shotgunBulletSpeed * this.rng.range(0.92, 1.08);
         this.spawnBullet(
-          s.x,
-          s.y,
+          x,
+          y,
           dx * c - dy * sn,
           dx * sn + dy * c,
           spd,
           this.stats.shotgunDamage,
           this.stats.shotgunLifetime,
-          s.radius + BULLET.muzzleGap,
+          radius + BULLET.muzzleGap,
           s.id,
           0,
           0,
@@ -427,14 +476,14 @@ export class CombatSystem {
       const c = Math.cos(a);
       const sn = Math.sin(a);
       const b = this.spawnBullet(
-        s.x,
-        s.y,
+        x,
+        y,
         dx * c - dy * sn,
         dx * sn + dy * c,
         isCircuit ? Math.max(CIRCUIT.headSpeed, this.stats.arBulletSpeed) : this.stats.arBulletSpeed,
         isOvercharge ? 0 : this.stats.arDamage,
         isCircuit ? Math.max(ASSAULT_RIFLE.lifetime, this.stats.circuitRange / Math.max(1, CIRCUIT.headSpeed) + 0.5) : ASSAULT_RIFLE.lifetime,
-        s.radius + BULLET.muzzleGap,
+        radius + BULLET.muzzleGap,
         s.id,
         isCircuit ? this.stats.circuitPierce + this.stats.arPierce : this.stats.arPierce,
         0,
@@ -446,7 +495,7 @@ export class CombatSystem {
         b.damage = 0;
         b.terrainDamageBonus = 0;
         b.overchargePower = Math.max(1, (this.stats.arDamage + this.stats.globalDamageBonus + (s.mods?.damageBonus ?? 0)) * this.stats.overchargePowerMult);
-        b.overchargeTerrainBonus = s.mods?.terrainDamageBonus ?? 0;
+        b.overchargeTerrainBonus = s.mods.terrainDamageBonus * s.damageScale;
       } else if (b && isCircuit) {
         b.circuit = true;
         b.circuitMaxRange = this.stats.circuitRange;
@@ -459,14 +508,14 @@ export class CombatSystem {
       const isBurrower = s.mutation === "burrower";
       const isFreeze = s.mutation === "freeze_rockets";
       const b = this.spawnBullet(
-        s.x,
-        s.y,
+        x,
+        y,
         dx,
         dy,
         this.stats.rocketBulletSpeed,
         isFreeze ? 0 : this.stats.rocketDamage,
         ROCKET_LAUNCHER.lifetime,
-        s.radius + BULLET.muzzleGap,
+        radius + BULLET.muzzleGap,
         s.id,
         0,
         this.stats.rocketBlastRadius,
@@ -486,14 +535,14 @@ export class CombatSystem {
       const isCrit = this.stats.sniperCritChance > 0 && this.rng.next() < this.stats.sniperCritChance;
       const dmg = isCrit ? this.stats.sniperDamage * 2 : this.stats.sniperDamage;
       this.spawnBullet(
-        s.x,
-        s.y,
+        x,
+        y,
         dx,
         dy,
         this.stats.sniperBulletSpeed,
         dmg,
         SNIPER_RIFLE.lifetime,
-        s.radius + BULLET.muzzleGap,
+        radius + BULLET.muzzleGap,
         s.id,
         this.stats.sniperPierce,
         0,
@@ -507,37 +556,39 @@ export class CombatSystem {
       const tilt = (s.slashIndex === 0 ? -1 : 1) * 0.38;
 
       this.spawnSlash(
-        s.x,
-        s.y,
+        x,
+        y,
         dx,
         dy,
         this.stats.katanaBulletSpeed,
         this.stats.katanaDamage,
         gale ? this.stats.galeDistance / (this.stats.katanaBulletSpeed * this.stats.globalBulletSpeedMult * s.mods.bulletSpeedMult) + 0.1 : KATANA.lifetime,
-        s.radius + BULLET.muzzleGap,
+        radius + BULLET.muzzleGap,
         s.id,
         gale ? this.stats.galePierce + this.stats.katanaPierce - KATANA.pierce : this.stats.katanaPierce,
         this.stats.katanaBlightMultiplier,
         gale ? Math.max(GALE.width,this.stats.katanaSlashWidth) + this.stats.galeWidth - GALE.width : this.stats.katanaSlashWidth,
         tilt,
+        wing,
       );
 
       // Multishot: fire a cross-slash in the opposite direction!
       if (this.stats.multishotChance > 0 && this.rng.next() < this.stats.multishotChance) {
         this.spawnSlash(
-          s.x,
-          s.y,
+          x,
+          y,
           dx,
           dy,
           this.stats.katanaBulletSpeed,
           this.stats.katanaDamage,
           gale ? this.stats.galeDistance / (this.stats.katanaBulletSpeed * this.stats.globalBulletSpeedMult * s.mods.bulletSpeedMult) + 0.1 : KATANA.lifetime,
-          s.radius + BULLET.muzzleGap,
+          radius + BULLET.muzzleGap,
           s.id,
           gale ? this.stats.galePierce + this.stats.katanaPierce - KATANA.pierce : this.stats.katanaPierce,
           this.stats.katanaBlightMultiplier,
           gale ? Math.max(GALE.width,this.stats.katanaSlashWidth) + this.stats.galeWidth - GALE.width : this.stats.katanaSlashWidth,
           -tilt,
+          wing,
         );
       }
     } else if (s.weapon === "flamethrower") {
@@ -551,14 +602,14 @@ export class CombatSystem {
       const spd = (isCryo ? CRYO.speed : isNapalm ? NAPALM.spraySpeed : FLAMETHROWER.bulletSpeed) * this.rng.range(0.85, 1.15);
       const life = (isCryo ? CRYO.lifetime * this.stats.cryoReachMult : isNapalm ? NAPALM.sprayLifetime : this.stats.flameLifetime) * this.rng.range(0.85, 1.1);
       const b = this.spawnBullet(
-        s.x,
-        s.y,
+        x,
+        y,
         dx * c - dy * sn,
         dx * sn + dy * c,
         spd,
         isCryo ? 0 : this.stats.flameDamage,
         life,
-        s.radius + BULLET.muzzleGap,
+        radius + BULLET.muzzleGap,
         s.id,
         0,
         0,
@@ -574,25 +625,25 @@ export class CombatSystem {
         }
       }
     } else if (s.weapon === "pistol" && s.mutation === "orbit_cylinder") {
-      const dmg = Math.round((this.stats.damage + this.stats.globalDamageBonus + s.mods.damageBonus) * this.stats.orbitDamageMult);
+      const dmg = Math.round((this.stats.damage + this.stats.globalDamageBonus + s.mods.damageBonus) * this.stats.orbitDamageMult) * s.damageScale;
       const spd = this.stats.bulletSpeed * this.stats.globalBulletSpeedMult * s.mods.bulletSpeedMult;
       const bounces = s.mods.pierce > 0 ? 0 : this.stats.pistolBounces;
       this.orbit.maxRounds = this.stats.orbitMaxRounds;
-      this.orbit.loadRound(s, dmg, spd, bounces, s.mods.terrainDamageBonus, s.mods.blightMult, s.mods.pierce);
+      this.orbit.loadRound(s, dmg, spd, bounces, s.mods.terrainDamageBonus * s.damageScale, s.mods.blightMult, s.mods.pierce, wing);
       if (this.stats.multishotChance > 0 && this.rng.next() < this.stats.multishotChance) {
-        this.orbit.loadRound(s, dmg, spd, bounces, s.mods.terrainDamageBonus, s.mods.blightMult, s.mods.pierce);
+        this.orbit.loadRound(s, dmg, spd, bounces, s.mods.terrainDamageBonus * s.damageScale, s.mods.blightMult, s.mods.pierce, wing);
       }
     } else {
       // Pistol
       this.spawnBullet(
-        s.x,
-        s.y,
+        x,
+        y,
         dx,
         dy,
         this.stats.bulletSpeed,
         this.stats.damage,
         BULLET.lifetime,
-        s.radius + BULLET.muzzleGap,
+        radius + BULLET.muzzleGap,
         s.id,
         0,
         0,
@@ -607,14 +658,14 @@ export class CombatSystem {
             const c = Math.cos(a * sign);
             const sn = Math.sin(a * sign);
             this.spawnBullet(
-              s.x,
-              s.y,
+              x,
+              y,
               dx * c - dy * sn,
               dx * sn + dy * c,
               this.stats.bulletSpeed,
               this.stats.damage,
               BULLET.lifetime,
-              s.radius + BULLET.muzzleGap,
+              radius + BULLET.muzzleGap,
               s.id,
               0,
               0,
@@ -626,8 +677,8 @@ export class CombatSystem {
       }
     }
     this.shooter = null;
-    const off = s.radius + BULLET.muzzleGap;
-    this.events.onShot?.(s, dx, dy, s.x + dx * off, s.y + dy * off);
+    const off = radius + BULLET.muzzleGap;
+    this.events.onShot?.(s, dx, dy, x + dx * off, y + dy * off, wing?.side);
   }
 
   private spawnBullet(
@@ -644,6 +695,8 @@ export class CombatSystem {
     explosionRadius: number,
     clusterCount: number,
     style: 0 | 1 | 2 | 3 | 4,
+    sizeScale = this.shooter?.projectileScale ?? 1,
+    damageScale = this.shooter?.damageScale ?? 1,
   ): Bullet | null {
     const b = this.bullets.acquire();
     if (!b) return null;
@@ -654,8 +707,10 @@ export class CombatSystem {
     b.dy = dy;
     const mods = this.shooter?.mods;
     b.speed = speed * this.stats.globalBulletSpeedMult * (mods?.bulletSpeedMult ?? 1);
-    b.terrainDamageBonus = mods?.terrainDamageBonus ?? 0;
-    b.damage = damage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0);
+    b.halfDamage = damageScale < 1;
+    b.sizeScale = sizeScale;
+    b.terrainDamageBonus = (mods?.terrainDamageBonus ?? 0) * damageScale;
+    b.damage = (damage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0)) * damageScale;
     b.life = life;
     b.maxLife = life;
     b.traveled = 0;
@@ -671,7 +726,7 @@ export class CombatSystem {
       ? weapon === "pistol" ? this.stats.pistolBounces : weapon === "shotgun" ? this.stats.shotgunBounces : 0
       : 0;
     b.bounceRetention = weapon === "shotgun" ? 0.7 : 1;
-    b.explosionRadius = explosionRadius;
+    b.explosionRadius = explosionRadius * sizeScale;
     b.clusterCount = clusterCount;
     b.style = style;
     b.blightMultiplier = mods?.blightMult ?? 1;
@@ -693,9 +748,11 @@ export class CombatSystem {
     b.napalmSpray = false;
     b.cryoSpray = false;
     if (weapon === "pistol" && this.shooter?.mutation === "reverse_revolver") {
-      b.replay=this.revolver.begin(x,y,b.speed,Math.round(b.damage*this.stats.reverseDamageMult),b.terrainDamageBonus,b.blightMultiplier,ownerId,this.stats.reversePause);
+      b.replay=this.revolver.begin(x,y,b.speed,Math.round(b.damage * this.stats.reverseDamageMult / damageScale) * damageScale,b.terrainDamageBonus,b.blightMultiplier,ownerId,this.stats.reversePause);
       if(!b.replay){this.bullets.release(b);return null;}
-      b.replay.coreDamageBonus=this.stats.coreDamageBonus;
+      b.replay.coreDamageBonus = this.stats.coreDamageBonus * damageScale;
+      b.replay.sizeScale = sizeScale;
+      b.replay.halfDamage = b.halfDamage;
     }
     if (style === 0) this.telemetry.bulletBounceHistogram[0]++;
     return b;
@@ -715,6 +772,7 @@ export class CombatSystem {
     blightMultiplier: number,
     slashWidth: number,
     slashAngle: number,
+    wing?: Wingman,
   ): void {
     if(this.shooter?.mutation === "gale_edge" && this.bullets.items.filter(b=>b.active&&b.gale).length>=GALE.poolCap)return;
     const b = this.bullets.acquire();
@@ -726,8 +784,11 @@ export class CombatSystem {
     b.dy = dy;
     const mods = this.shooter?.mods;
     b.speed = speed * this.stats.globalBulletSpeedMult * (mods?.bulletSpeedMult ?? 1);
-    b.terrainDamageBonus = mods?.terrainDamageBonus ?? 0;
-    b.damage = damage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0);
+    const damageScale = this.shooter?.damageScale ?? 1;
+    b.halfDamage = damageScale < 1;
+    b.sizeScale = this.shooter?.projectileScale ?? 1;
+    b.terrainDamageBonus = (mods?.terrainDamageBonus ?? 0) * damageScale;
+    b.damage = (damage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0)) * damageScale;
     b.life = life;
     b.maxLife = life;
     b.traveled = 0;
@@ -742,8 +803,8 @@ export class CombatSystem {
     b.style = 3;
     b.blightMultiplier = blightMultiplier * (mods?.blightMult ?? 1);
     const boost = this.shooter ? slashMomentum(this.shooter, this.stats) : { damage: 1, width: 1 };
-    b.damage = Math.max(1, Math.round(b.damage * boost.damage));
-    b.slashWidth = slashWidth * boost.width;
+    b.damage = Math.max(damageScale, Math.round(b.damage * boost.damage / damageScale) * damageScale);
+    b.slashWidth = slashWidth * boost.width * b.sizeScale;
     b.fromDrone = false;
     b.bounces = 0;
     b.momentumBoosted = boost.damage > 1;
@@ -752,11 +813,12 @@ export class CombatSystem {
     b.slashAngle = slashAngle;
     b.replay=null; b.gale=this.shooter?.mutation === "gale_edge";
     b.galeCells.clear();
-    b.distanceLeft=b.gale?this.stats.galeDistance:Infinity;
+    b.distanceLeft = b.gale ? this.stats.galeDistance : Infinity;
+    b.ownerWingman = wing ?? null;
     b.ownerSoldier = this.shooter;
     b.slashCircular = false;
     b.slashHitDone = false;
-    b.slashRange = b.gale ? 0 : this.stats.katanaSlashRange;
+    b.slashRange = b.gale ? 0 : this.stats.katanaSlashRange * b.sizeScale;
     if (!b.gale) {
       // Stationary melee slash: does not move forward; sits right in front of the player.
       b.speed = 0;
@@ -779,19 +841,20 @@ export class CombatSystem {
     b.y = s.y;
     const mods = s.mods;
     b.speed = 0;
-    b.terrainDamageBonus = mods?.terrainDamageBonus ?? 0;
+    b.terrainDamageBonus = (mods?.terrainDamageBonus ?? 0) * s.damageScale;
     const baseDmg = this.stats.katanaDamage + this.stats.globalDamageBonus + (mods?.damageBonus ?? 0);
     const boost = slashMomentum(s, this.stats);
-    b.damage = Math.max(1, Math.round(baseDmg * boost.damage));
+    b.damage = Math.max(1, Math.round(baseDmg * boost.damage)) * s.damageScale;
     b.life = KATANA.lifetime;
     b.maxLife = KATANA.lifetime;
     b.ownerId = s.id;
     b.ownerSoldier = s;
     b.pierceLeft = this.stats.katanaPierce + (mods?.pierce ?? 0);
     b.style = 3;
+    b.halfDamage = s.damageScale < 1;
     b.blightMultiplier = this.stats.katanaBlightMultiplier * (mods?.blightMult ?? 1);
-    b.slashWidth = this.stats.katanaSlashWidth * boost.width;
-    b.slashRange = this.stats.katanaSlashRange;
+    b.slashWidth = this.stats.katanaSlashWidth * boost.width * s.projectileScale;
+    b.slashRange = this.stats.katanaSlashRange * s.projectileScale;
     b.slashOffset = 0;
     b.slashAngle = 0;
     b.slashCircular = true;
@@ -854,17 +917,29 @@ export class CombatSystem {
   }
 
   private fireRailLance(s: Soldier, dx: number, dy: number): void {
+    if (s.wingmen.length) {
+      this.updateWingmen(s, 0);
+      for (const wing of s.wingmen) {
+        this.fireRailFrom(s, dx, dy, wing.x, wing.y);
+        this.events.onShot?.(s, dx, dy, wing.x, wing.y, wing.side);
+      }
+    } else {
+      this.fireRailFrom(s, dx, dy, s.x, s.y);
+    }
+  }
+
+  private fireRailFrom(s: Soldier, dx: number, dy: number, x: number, y: number): void {
     const isCrit = this.stats.sniperCritChance > 0 && this.rng.next() < this.stats.sniperCritChance;
     const baseDmg = Math.round((this.stats.sniperDamage + this.stats.globalDamageBonus + s.mods.damageBonus) * this.stats.railDamageMult);
-    const dmg = isCrit ? baseDmg * 2 : baseDmg;
+    const dmg = baseDmg * (isCrit ? 2 : 1) * s.damageScale;
     const pierce = this.stats.sniperPierce + this.stats.railPierce + s.mods.pierce;
     const prevOwner = this.currentOwnerId;
     this.currentOwnerId = s.id;
     try {
       this.rail.fireStrike(
         s,
-        s.x,
-        s.y,
+        x,
+        y,
         dx,
         dy,
         dmg,
@@ -897,6 +972,8 @@ export class CombatSystem {
         if (!b) return false;
         resetBulletFields(b);
         b.x = x; b.y = y; b.dx = dx; b.dy = dy;
+        b.sizeScale = s.projectileScale;
+        b.halfDamage = s.damageScale < 1;
         b.speed = speed; b.damage = damage; b.life = life; b.maxLife = life;
         b.traveled = 0; b.totalTraveled = 0; b.pendingAdvance = 0;
         b.ownerId = ownerId; b.pierceLeft = pierce;
@@ -923,6 +1000,8 @@ export class CombatSystem {
       if (!b) return false;
       resetBulletFields(b);
       b.x = x; b.y = y; b.dx = dx; b.dy = dy;
+      b.sizeScale = s.projectileScale;
+      b.halfDamage = s.damageScale < 1;
       b.speed = speed; b.damage = damage; b.life = life; b.maxLife = life;
       b.traveled = 0; b.totalTraveled = 0; b.pendingAdvance = 0;
       b.ownerId = ownerId; b.pierceLeft = pierce;
@@ -951,7 +1030,7 @@ export class CombatSystem {
     this.overcharge.update(dt, {
       creatures: this.creatures,
       late: this.late,
-      onBlast: (x, y, radius, damage, terrainBonus, ownerId, blightMultiplier) => {
+      onBlast: (x, y, radius, damage, terrainBonus, ownerId, blightMultiplier, halfDamage) => {
         const radCells = radius / this.world.cellSize;
         this.currentOwnerId = ownerId;
         this.damageBlast(
@@ -961,6 +1040,7 @@ export class CombatSystem {
           0,
           0,
           radCells,
+          halfDamage,
         );
         this.currentOwnerId = 0;
         this.creatures?.explode(x, y, radius, damage);
@@ -968,30 +1048,30 @@ export class CombatSystem {
         this.napalm.igniteAt(x, y, radius, ownerId);
         this.events.onExplosion?.(x, y, radius, damage, true);
       },
-      onChainCell: (cx, cy, x, y, damage, terrainBonus, ownerId, blightMultiplier, dx, dy) => {
+      onChainCell: (cx, cy, x, y, damage, terrainBonus, ownerId, blightMultiplier, dx, dy, halfDamage) => {
         const w = this.world;
         if (!w.inBounds(cx, cy)) return;
         const ci = cy * w.width + cx;
         const isCore = w.coreId[ci] > 0;
         const isBlight = w.isBlightAt(cx, cy);
-        let dmg = damage + w.breachBonus(cx, cy, terrainBonus) + (isCore ? this.stats.coreDamageBonus : 0);
-        if (isBlight && blightMultiplier > 1) dmg = Math.round(dmg * blightMultiplier);
+        let dmg = damage + w.breachBonus(cx, cy, terrainBonus) + (isCore ? this.stats.coreDamageBonus * (halfDamage ? 0.5 : 1) : 0);
+        if (isBlight && blightMultiplier > 1) dmg = halfDamage ? dmg * blightMultiplier : Math.round(dmg * blightMultiplier);
         this.currentOwnerId = ownerId;
-        const res = w.damage(cx, cy, dmg, true, dx, dy);
+        const res = w.damage(cx, cy, dmg, true, dx, dy, halfDamage);
         this.currentOwnerId = 0;
         if (res > 0) {
           this.napalm.igniteAt(x, y, 4, ownerId);
           this.events.onImpact?.(x, y, 0, 0, cx, cy, res, false, ownerId);
         }
       },
-      onChainSub: (sx, sy, x, y, damage, terrainBonus, ownerId, blightMultiplier, dx, dy) => {
+      onChainSub: (sx, sy, x, y, damage, terrainBonus, ownerId, blightMultiplier, dx, dy, halfDamage) => {
         const w = this.world;
         if (!w.subInBounds(sx, sy)) return;
         const isBlight = w.isBlightSubAt(sx, sy);
         let dmg = damage + w.breachBonusSub(sx, sy, terrainBonus);
-        if (isBlight && blightMultiplier > 1) dmg = Math.round(dmg * blightMultiplier);
+        if (isBlight && blightMultiplier > 1) dmg = halfDamage ? dmg * blightMultiplier : Math.round(dmg * blightMultiplier);
         this.currentOwnerId = ownerId;
-        const res = w.damageSub(sx, sy, dmg, true, dx, dy);
+        const res = w.damageSub(sx, sy, dmg, true, dx, dy, halfDamage);
         this.currentOwnerId = 0;
         if (res > 0) {
           this.napalm.igniteAt(x, y, 4, ownerId);
@@ -1044,7 +1124,7 @@ export class CombatSystem {
     b.life -= dt;
     if (b.life <= 0) {
       if (b.napalmSpray) {
-        this.napalm.placeGroundPatch(b.ownerId, b.x, b.y, b.damage, b.terrainDamageBonus, b.blightMultiplier);
+        this.napalm.placeGroundPatch(b.ownerId, b.x, b.y, b.damage, b.terrainDamageBonus, b.blightMultiplier, b.sizeScale, b.halfDamage);
       } else if (b.explosionRadius > 0) {
         this.detonateRocket(b, b.x, b.y, -b.dx, -b.dy, Math.floor(b.x / this.world.cellSize), Math.floor(b.y / this.world.cellSize));
       }
@@ -1224,9 +1304,9 @@ export class CombatSystem {
             const k = this.targets.targetKey ?? null;
             const enc = this.isEncounterKey(k) ? k : null;
             const cr = !enc ? (this.isCreatureKey(k) ? k : this.findCreatureNear(ix, iy, 16)) : null;
-            if (enc) this.napalm.placeEncounterPatch(b.ownerId, enc, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier);
-            else if (cr) this.napalm.placeCreaturePatch(b.ownerId, cr, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier);
-            else this.napalm.placeGroundPatch(b.ownerId, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier);
+            if (enc) this.napalm.placeEncounterPatch(b.ownerId, enc, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier, b.sizeScale, b.halfDamage);
+            else if (cr) this.napalm.placeCreaturePatch(b.ownerId, cr, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier, b.sizeScale, b.halfDamage);
+            else this.napalm.placeGroundPatch(b.ownerId, ix, iy, b.damage, b.terrainDamageBonus, b.blightMultiplier, b.sizeScale, b.halfDamage);
           } else if (b.cryoSpray) {
             const k = this.targets.targetKey ?? null;
             const enc = this.isEncounterKey(k) ? k : null;
@@ -1237,8 +1317,12 @@ export class CombatSystem {
             const k = this.targets.targetKey ?? null;
             const enc = this.isEncounterKey(k) ? k : null;
             const cr = !enc ? (this.isCreatureKey(k) ? k : this.findCreatureNear(ix, iy, 16)) : null;
-            if (enc) this.overcharge.chargeEncounter(enc, b.ownerId, b.overchargePower);
-            else if (cr) this.overcharge.chargeCreature(cr, b.ownerId, b.overchargePower);
+            const charge = enc ? this.overcharge.chargeEncounter(enc, b.ownerId, b.overchargePower)
+              : cr ? this.overcharge.chargeCreature(cr, b.ownerId, b.overchargePower) : null;
+            if (charge) {
+              charge.sizeScale = b.sizeScale;
+              charge.halfDamage = b.halfDamage;
+            }
           } else if (b.explosionRadius > 0) {
             this.detonateRocket(b, ix, iy, -b.dx, -b.dy, Math.floor(ix / cs), Math.floor(iy / cs));
           } else {
@@ -1276,8 +1360,8 @@ export class CombatSystem {
         if (b.napalmSpray) {
           if (w.inBounds(hcx, hcy)) {
             const isSub = w.health[hcy * w.width + hcx] === 0;
-            if (isSub) this.napalm.placeSubPatch(b.ownerId, hit.cx, hit.cy, hit.x, hit.y, b.damage, b.terrainDamageBonus, b.blightMultiplier);
-            else this.napalm.placeCellPatch(b.ownerId, hcx, hcy, hit.x, hit.y, b.damage, b.terrainDamageBonus, b.blightMultiplier);
+            if (isSub) this.napalm.placeSubPatch(b.ownerId, hit.cx, hit.cy, hit.x, hit.y, b.damage, b.terrainDamageBonus, b.blightMultiplier, b.sizeScale, b.halfDamage);
+            else this.napalm.placeCellPatch(b.ownerId, hcx, hcy, hit.x, hit.y, b.damage, b.terrainDamageBonus, b.blightMultiplier, b.sizeScale, b.halfDamage);
           }
           this.finishBullet(b);
           return;
@@ -1306,9 +1390,17 @@ export class CombatSystem {
           if (!alreadyCharged) {
             b.overchargeHitCells.add(targetKey);
             if (isSubOc) {
-              this.overcharge.chargeSubCell(hit.cx, hit.cy, b.ownerId, b.overchargePower, b.blightMultiplier, b.overchargeTerrainBonus);
+              const charge = this.overcharge.chargeSubCell(hit.cx, hit.cy, b.ownerId, b.overchargePower, b.blightMultiplier, b.overchargeTerrainBonus);
+              if (charge) {
+                charge.sizeScale = b.sizeScale;
+                charge.halfDamage = b.halfDamage;
+              }
             } else {
-              this.overcharge.chargeCell(hcx, hcy, b.ownerId, b.overchargePower, b.blightMultiplier, b.overchargeTerrainBonus);
+              const charge = this.overcharge.chargeCell(hcx, hcy, b.ownerId, b.overchargePower, b.blightMultiplier, b.overchargeTerrainBonus);
+              if (charge) {
+                charge.sizeScale = b.sizeScale;
+                charge.halfDamage = b.halfDamage;
+              }
             }
           }
           if (w.mat[ci] === MAT.door) {
@@ -1427,10 +1519,10 @@ export class CombatSystem {
           b.circuitHitKeys.add(targetKey);
           const isCoreC = w.coreId[ci] > 0;
           const isBlightC = isSubC ? w.isBlightSubAt(hit.cx, hit.cy) : w.isBlightAt(hcx, hcy);
-          let hitDmgC = b.damage + w.breachBonusSub(hit.cx, hit.cy, b.terrainDamageBonus) + (isCoreC ? this.stats.coreDamageBonus : 0);
-          if (isBlightC && b.blightMultiplier > 1) hitDmgC = Math.round(hitDmgC * b.blightMultiplier);
+          let hitDmgC = b.damage + w.breachBonusSub(hit.cx, hit.cy, b.terrainDamageBonus) + (isCoreC ? this.stats.coreDamageBonus * (b.halfDamage ? 0.5 : 1) : 0);
+          if (isBlightC && b.blightMultiplier > 1) hitDmgC = b.halfDamage ? hitDmgC * b.blightMultiplier : Math.round(hitDmgC * b.blightMultiplier);
           this.currentOwnerId = b.ownerId;
-          const resC = w.damageSub(hit.cx, hit.cy, hitDmgC, true, b.dx, b.dy);
+          const resC = w.damageSub(hit.cx, hit.cy, hitDmgC, true, b.dx, b.dy, b.halfDamage);
           this.currentOwnerId = 0;
           if (resC > 0) this.napalm.igniteAt(hit.x, hit.y, 4, b.ownerId);
           this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, resC, isSubC, b.ownerId);
@@ -1534,32 +1626,32 @@ export class CombatSystem {
         // Flames don't chip fresh or burning rubble: they set it alight and splash
         // out. Burnt-out (charred) rubble takes the hit like any other block.
         const flameOnRubble = b.style === 4 && isSub && w.isRubbleSub(hit.cy * w.subWidth + hit.cx);
-        if (flameOnRubble && this.events.onFlameHit?.(hit.cx, hit.cy, hit.x, hit.y, hit.nx, hit.ny)) {
+        if (flameOnRubble && this.events.onFlameHit?.(hit.cx, hit.cy, hit.x, hit.y, hit.nx, hit.ny, b.sizeScale)) {
           this.finishBullet(b);
           return;
         }
         const isCore = inside && !isSub && w.coreId[cellIdx] > 0;
         const isBlight = isSub ? w.isBlightSubAt(hit.cx, hit.cy) : w.isBlightAt(hcx, hcy);
-        let hitDmg = b.damage + w.breachBonusSub(hit.cx, hit.cy, b.terrainDamageBonus) + (isCore ? this.stats.coreDamageBonus : 0);
+        let hitDmg = b.damage + w.breachBonusSub(hit.cx, hit.cy, b.terrainDamageBonus) + (isCore ? this.stats.coreDamageBonus * (b.halfDamage ? 0.5 : 1) : 0);
         if (isBlight && b.blightMultiplier > 1) {
-          hitDmg = Math.round(hitDmg * b.blightMultiplier);
+          hitDmg = b.halfDamage ? hitDmg * b.blightMultiplier : Math.round(hitDmg * b.blightMultiplier);
         }
         // Terrain stores integer health. Round retained pellet damage explicitly
         // instead of allowing typed-array truncation to round damage upward.
-        if (b.bounceRetention < 1) hitDmg = Math.max(1, Math.round(hitDmg));
+        if (b.bounceRetention < 1 && !b.halfDamage) hitDmg = Math.max(1, Math.round(hitDmg));
         const beforeHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
         const galeKey = isSub ? w.width*w.height+hit.cy*w.subWidth+hit.cx : cellIdx;
         const alreadyHit = b.gale && b.galeCells.has(galeKey);
         if(b.gale)b.galeCells.add(galeKey);
         this.currentOwnerId = b.ownerId;
-        const result = alreadyHit ? 1 : w.damageSub(hit.cx, hit.cy, hitDmg, true, b.dx, b.dy);
+        const result = alreadyHit ? 1 : w.damageSub(hit.cx, hit.cy, hitDmg, true, b.dx, b.dy, b.halfDamage);
         this.currentOwnerId = 0;
         if (result > 0) this.napalm.igniteAt(hit.x, hit.y, 4, b.ownerId);
         const afterHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
         if (b.momentumBoosted) this.telemetry.katanaBoostedDamage += Math.max(0, beforeHp - afterHp);
         if (b.fromDrone && result > 0) this.drones.usefulHits++;
         this.events.onImpact?.(hit.x, hit.y, hit.nx, hit.ny, hcx, hcy, result, isSub, b.ownerId);
-        if (b.style === 4 && !flameOnRubble) this.events.onFlameHit?.(hit.cx, hit.cy, hit.x, hit.y, hit.nx, hit.ny);
+        if (b.style === 4 && !flameOnRubble) this.events.onFlameHit?.(hit.cx, hit.cy, hit.x, hit.y, hit.nx, hit.ny, b.sizeScale);
 
         // Katana slashes cleave adjacent subcells across the slash arc width!
         if (b.style === 3 && b.slashWidth > 0) {
@@ -1658,7 +1750,7 @@ export class CombatSystem {
     const p0 = b.circuitTraveled / maxR;
     b.circuitTraveled += segDist;
     const p1 = b.circuitTraveled / maxR;
-    this.circuit.addSegment(x1, y1, x2, y2, p0, p1);
+    this.circuit.addSegment(x1, y1, x2, y2, p0, p1, CIRCUIT.trailLife, b.sizeScale);
   }
 
   private finishBullet(b: Bullet): void {
@@ -1697,7 +1789,7 @@ export class CombatSystem {
         shot.cells.add(key);shot.hits++;
         let damage=shot.damage+w.breachBonusSub(hit.cx,hit.cy,shot.terrainDamageBonus)+(w.coreId[index]>0?shot.coreDamageBonus:0);
         if(sub?w.isBlightSubAt(hit.cx,hit.cy):w.isBlightAt(cx,cy))damage=Math.round(damage*shot.blightMultiplier);
-        const result=w.damageSub(hit.cx,hit.cy,damage,true,dx,dy);
+        const result=w.damageSub(hit.cx,hit.cy,damage,true,dx,dy,shot.halfDamage);
         if(result>0)this.napalm.igniteAt(hit.x,hit.y,4,shot.ownerId);
         this.events.onImpact?.(hit.x,hit.y,hit.nx,hit.ny,cx,cy,result,sub,shot.ownerId);
       }
@@ -1712,8 +1804,8 @@ export class CombatSystem {
   /** Keep stationary katana slash anchored to the player and apply its melee hit once. */
   private updateStationarySlash(b: Bullet): void {
     if (b.ownerSoldier && b.ownerSoldier.alive) {
-      b.x = b.ownerSoldier.x + b.dx * b.slashOffset;
-      b.y = b.ownerSoldier.y + b.dy * b.slashOffset;
+      b.x = (b.ownerWingman?.x ?? b.ownerSoldier.x) + b.dx * b.slashOffset;
+      b.y = (b.ownerWingman?.y ?? b.ownerSoldier.y) + b.dy * b.slashOffset;
     }
     if (b.slashHitDone) return;
     b.slashHitDone = true;
@@ -1729,9 +1821,9 @@ export class CombatSystem {
     const w = this.world;
     const cs = w.cellSize;
     const ss = w.subCellSize;
-    const originX = b.ownerSoldier ? b.ownerSoldier.x : b.x - b.dx * b.slashOffset;
-    const originY = b.ownerSoldier ? b.ownerSoldier.y : b.y - b.dy * b.slashOffset;
-    const reach = (b.ownerSoldier?.radius ?? 3.2) + BULLET.muzzleGap + b.slashRange;
+    const originX = b.ownerWingman?.x ?? b.ownerSoldier?.x ?? b.x - b.dx * b.slashOffset;
+    const originY = b.ownerWingman?.y ?? b.ownerSoldier?.y ?? b.y - b.dy * b.slashOffset;
+    const reach = (b.ownerSoldier?.radius ?? 3.2) * (b.ownerWingman ? 0.5 : 1) + BULLET.muzzleGap + b.slashRange;
 
     let curX = originX;
     let curY = originY;
@@ -1771,13 +1863,13 @@ export class CombatSystem {
       const isSub = inside && w.health[cellIdx] === 0;
       const isCore = inside && !isSub && w.coreId[cellIdx] > 0;
       const isBlight = isSub ? w.isBlightSubAt(hit.cx, hit.cy) : w.isBlightAt(hcx, hcy);
-      let hitDmg = b.damage + w.breachBonusSub(hit.cx, hit.cy, b.terrainDamageBonus) + (isCore ? this.stats.coreDamageBonus : 0);
+      let hitDmg = b.damage + w.breachBonusSub(hit.cx, hit.cy, b.terrainDamageBonus) + (isCore ? this.stats.coreDamageBonus * (b.halfDamage ? 0.5 : 1) : 0);
       if (isBlight && b.blightMultiplier > 1) {
-        hitDmg = Math.round(hitDmg * b.blightMultiplier);
+        hitDmg = b.halfDamage ? hitDmg * b.blightMultiplier : Math.round(hitDmg * b.blightMultiplier);
       }
       const beforeHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
       this.currentOwnerId = b.ownerId;
-      const result = w.damageSub(hit.cx, hit.cy, hitDmg, true, b.dx, b.dy);
+      const result = w.damageSub(hit.cx, hit.cy, hitDmg, true, b.dx, b.dy, b.halfDamage);
       this.currentOwnerId = 0;
       if (result > 0) this.napalm.igniteAt(hit.x, hit.y, 4, b.ownerId);
       const afterHp = isSub ? w.subHealth[hit.cy * w.subWidth + hit.cx] : inside ? w.health[cellIdx] : 0;
@@ -1870,16 +1962,16 @@ export class CombatSystem {
 
         const isCore = !isSub && w.coreId[cellIdx] > 0;
         const isBlight = isSub ? w.isBlightSubAt(sx, sy) : w.isBlightAt(hcx, hcy);
-        let dmg = b.damage + w.breachBonusSub(sx, sy, b.terrainDamageBonus) + (isCore ? this.stats.coreDamageBonus : 0);
+        let dmg = b.damage + w.breachBonusSub(sx, sy, b.terrainDamageBonus) + (isCore ? this.stats.coreDamageBonus * (b.halfDamage ? 0.5 : 1) : 0);
         if (isBlight && b.blightMultiplier > 1) {
-          dmg = Math.round(dmg * b.blightMultiplier);
+          dmg = b.halfDamage ? dmg * b.blightMultiplier : Math.round(dmg * b.blightMultiplier);
         }
         const dist = Math.hypot(dx, dy) || 1;
         const dirX = dx / dist;
         const dirY = dy / dist;
         const beforeHp = isSub ? w.subHealth[sy * w.subWidth + sx] : w.health[cellIdx];
         this.currentOwnerId = b.ownerId;
-        const res = w.damageSub(sx, sy, dmg, true, dirX, dirY);
+        const res = w.damageSub(sx, sy, dmg, true, dirX, dirY, b.halfDamage);
         this.currentOwnerId = 0;
         if (res > 0) {
           const afterHp = isSub ? w.subHealth[sy * w.subWidth + sx] : w.health[cellIdx];
@@ -1936,11 +2028,11 @@ export class CombatSystem {
         const isCore = !isSub && w.coreId[cellIdx] > 0;
         const isBlight = isSub ? w.isBlightSubAt(sx, sy) : w.isBlightAt(hcx, hcy);
 
-        let dmg = b.damage + w.breachBonusSub(sx, sy, b.terrainDamageBonus) + (isCore ? this.stats.coreDamageBonus : 0);
+        let dmg = b.damage + w.breachBonusSub(sx, sy, b.terrainDamageBonus) + (isCore ? this.stats.coreDamageBonus * (b.halfDamage ? 0.5 : 1) : 0);
         if (isBlight && b.blightMultiplier > 1) {
-          dmg = Math.round(dmg * b.blightMultiplier);
+          dmg = b.halfDamage ? dmg * b.blightMultiplier : Math.round(dmg * b.blightMultiplier);
         }
-        const res = w.damageSub(sx, sy, dmg, true, b.dx, b.dy);
+        const res = w.damageSub(sx, sy, dmg, true, b.dx, b.dy, b.halfDamage);
         if (res > 0) {
           const wx = (sx + 0.5) * ss;
           const wy = (sy + 0.5) * ss;
@@ -1954,7 +2046,7 @@ export class CombatSystem {
   /** Shared terrain damage/owner pipeline for rockets and independent goo mines. */
   private damageBlast(
     source: Pick<Bullet, "damage" | "terrainDamageBonus" | "blightMultiplier" | "ownerId">,
-    ix: number, iy: number, nx: number, ny: number, radCells: number,
+    ix: number, iy: number, nx: number, ny: number, radCells: number, halfDamage = false,
   ): void {
     const w = this.world;
     const cs = w.cellSize;
@@ -1976,9 +2068,14 @@ export class CombatSystem {
         const idx = cy * w.width + cx;
         const wasSub = w.health[idx] === 0;
         const isCore = !wasSub && w.coreId[idx] > 0;
-        let dmg = Math.max(1, Math.round((source.damage + w.breachBonus(cx, cy, source.terrainDamageBonus)) * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
-        if (source.blightMultiplier > 1 && w.isBlightAt(cx, cy)) dmg = Math.round(dmg * source.blightMultiplier);
-        const res = w.damage(cx, cy, dmg, true, (cx + 0.5) * cs - ix, (cy + 0.5) * cs - iy);
+        const amount = (source.damage + w.breachBonus(cx, cy, source.terrainDamageBonus)) * falloff;
+        let dmg = halfDamage ? amount : Math.max(1, Math.round(amount));
+        if (isCore) dmg += this.stats.coreDamageBonus * (halfDamage ? 0.5 : 1);
+        if (source.blightMultiplier > 1 && w.isBlightAt(cx, cy)) {
+          dmg *= source.blightMultiplier;
+          if (!halfDamage) dmg = Math.round(dmg);
+        }
+        const res = w.damage(cx, cy, dmg, true, (cx + 0.5) * cs - ix, (cy + 0.5) * cs - iy, halfDamage);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
           const wy = (cy + 0.5) * cs;
@@ -2029,7 +2126,7 @@ export class CombatSystem {
       for (const ch of charges) {
         const chCx = Math.floor(ch.x / cs);
         const chCy = Math.floor(ch.y / cs);
-        this.damageBlast(ch, (chCx + 0.5) * cs, (chCy + 0.5) * cs, nx, ny, ch.radiusCells);
+        this.damageBlast(ch, (chCx + 0.5) * cs, (chCy + 0.5) * cs, nx, ny, ch.radiusCells, b.halfDamage);
         this.napalm.igniteAt(ch.x, ch.y, ch.radiusCells * cs, ch.ownerId);
         this.events.onExplosion?.(ch.x, ch.y, ch.radiusCells * cs, ch.damage);
       }
@@ -2038,7 +2135,7 @@ export class CombatSystem {
     }
 
     this.currentOwnerId = b.ownerId;
-    this.damageBlast(b, (centerCx + 0.5) * cs, (centerCy + 0.5) * cs, nx, ny, radCells);
+    this.damageBlast(b, (centerCx + 0.5) * cs, (centerCy + 0.5) * cs, nx, ny, radCells, b.halfDamage);
     this.currentOwnerId = 0;
     this.napalm.igniteAt(ix, iy, radCells * cs, b.ownerId);
 
@@ -2056,14 +2153,16 @@ export class CombatSystem {
           Math.cos(a),
           Math.sin(a),
           spd,
-          Math.max(1, Math.ceil(b.damage * 0.5)),
+          Math.max(1, Math.ceil(b.damage * (b.halfDamage ? 1 : 0.5))),
           this.rng.range(0.18, 0.32),
           0,
           b.ownerId,
           0,
-          Math.max(1.4, radCells * 0.55),
+          Math.max(1.4, radCells / b.sizeScale * 0.55),
           0,
           1,
+          b.sizeScale,
+          b.halfDamage ? 0.5 : 1,
         );
       }
     }
@@ -2116,9 +2215,11 @@ export class CombatSystem {
     g.stuckNy = 0;
     g.fuse = GRENADE.fuseSeconds;
     g.maxFuse = GRENADE.fuseSeconds;
-    g.radiusCells = blastRadius;
-    g.terrainDamageBonus = s.mods.terrainDamageBonus;
-    g.damage = damage + this.stats.globalDamageBonus + s.mods.damageBonus;
+    g.sizeScale = s.projectileScale;
+    g.halfDamage = s.damageScale < 1;
+    g.radiusCells = blastRadius * g.sizeScale;
+    g.terrainDamageBonus = s.mods.terrainDamageBonus * s.damageScale;
+    g.damage = (damage + this.stats.globalDamageBonus + s.mods.damageBonus) * s.damageScale;
     g.shrapnelCount = shrapnelCount;
     g.blightMultiplier = blightMult;
     g.ownerId = s.id;
@@ -2207,12 +2308,14 @@ export class CombatSystem {
         const isCore = !wasSub && w.coreId[idx] > 0;
         const isBlight = wasSub ? w.isBlightSubAt(cx * 2, cy * 2) : w.isBlightAt(cx, cy);
 
-        let dmg = Math.max(1, Math.round((g.damage + w.breachBonus(cx, cy, g.terrainDamageBonus)) * falloff)) + (isCore ? this.stats.coreDamageBonus : 0);
+        const amount = (g.damage + w.breachBonus(cx, cy, g.terrainDamageBonus)) * falloff;
+        let dmg = g.halfDamage ? amount : Math.max(1, Math.round(amount));
+        if (isCore) dmg += this.stats.coreDamageBonus * (g.halfDamage ? 0.5 : 1);
         if (isBlight && g.blightMultiplier > 1) {
-          dmg = Math.round(dmg * g.blightMultiplier);
+          dmg = g.halfDamage ? dmg * g.blightMultiplier : Math.round(dmg * g.blightMultiplier);
         }
 
-        const res = w.damage(cx, cy, dmg, true, (cx + 0.5) * cs - g.x, (cy + 0.5) * cs - g.y);
+        const res = w.damage(cx, cy, dmg, true, (cx + 0.5) * cs - g.x, (cy + 0.5) * cs - g.y, g.halfDamage);
         if (res > 0) {
           const wx = (cx + 0.5) * cs;
           const wy = (cy + 0.5) * cs;
@@ -2236,7 +2339,7 @@ export class CombatSystem {
           Math.cos(a),
           Math.sin(a),
           spd,
-          Math.max(1, Math.ceil(g.damage * 0.4)),
+          Math.max(1, Math.ceil(g.damage * (g.halfDamage ? 0.8 : 0.4))),
           this.rng.range(0.25, 0.45),
           0,
           g.ownerId,
@@ -2244,6 +2347,8 @@ export class CombatSystem {
           0,
           0,
           0,
+          g.sizeScale,
+          g.halfDamage ? 0.5 : 1,
         );
       }
     }
@@ -2304,11 +2409,15 @@ export class CombatSystem {
         offsetAngle,
         TURRET.lifetime,
         damage,
-        fireRate,
+        fireRate * s.fireRateScale,
         turnSpeed,
         s.id,
       );
-      if (turret) deployed.push(turret);
+      if (turret) {
+        turret.sizeScale = s.projectileScale;
+        turret.damageScale = s.damageScale;
+        deployed.push(turret);
+      }
     }
     return deployed;
   }
@@ -2316,7 +2425,7 @@ export class CombatSystem {
   /** Narrow actor-shot interface: no fake Soldier and no inherited ricochet policy. */
   fireDroneShot(shot: DroneShot): void {
     const bullet = this.spawnBullet(shot.x, shot.y, shot.dx, shot.dy, DRONE.bulletSpeed,
-      shot.damage, 1.1, 0, shot.ownerId, shot.pierce, 0, 0, 0);
+      shot.damage, 1.1, 0, shot.ownerId, shot.pierce, 0, 0, 0, shot.sizeScale, shot.damageScale);
     if (!bullet) return;
     bullet.terrainDamageBonus = shot.terrainDamageBonus;
     bullet.blightMultiplier = shot.blightMultiplier;
@@ -2332,6 +2441,8 @@ export class CombatSystem {
     dx: number,
     dy: number,
     damage: number,
+    sizeScale = 1,
+    damageScale = 1,
   ): void {
     this.spawnBullet(
       x,
@@ -2347,6 +2458,8 @@ export class CombatSystem {
       0,
       0,
       0,
+      sizeScale,
+      damageScale,
     );
     this.events.onShot?.({ id: ownerId, x, y, ejectSide: 1 } as unknown as Soldier, dx, dy, x, y);
   }

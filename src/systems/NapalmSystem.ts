@@ -22,6 +22,8 @@ export interface NapalmPatch {
   encounterId: string;
   encounter: Encounter | null;
   damage: number;
+  sizeScale: number;
+  halfDamage: boolean;
   terrainDamageBonus: number;
   blightMultiplier: number;
   lit: boolean;
@@ -68,6 +70,8 @@ export class NapalmSystem {
         encounterId: "",
         encounter: null,
         damage: 1,
+        sizeScale: 1,
+        halfDamage: false,
         terrainDamageBonus: 0,
         blightMultiplier: 1,
         lit: false,
@@ -104,6 +108,8 @@ export class NapalmSystem {
     damage: number,
     terrainDamageBonus: number,
     blightMultiplier: number,
+    sizeScale: number,
+    halfDamage: boolean,
   ): NapalmPatch | null {
     // Merge same-owner overlapping deposits to avoid multiplying ticks by spray rate.
     for (const p of this.patches) {
@@ -160,6 +166,8 @@ export class NapalmSystem {
     slot.encounterId = encounterId;
     slot.encounter = encounter;
     slot.damage = damage;
+    slot.sizeScale = sizeScale;
+    slot.halfDamage = halfDamage;
     slot.terrainDamageBonus = terrainDamageBonus;
     slot.blightMultiplier = blightMultiplier;
     slot.lit = false;
@@ -170,28 +178,28 @@ export class NapalmSystem {
     return slot;
   }
 
-  placeGroundPatch(ownerId: number, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number): NapalmPatch | null {
-    return this.acquireOrMerge(ownerId, "ground", x, y, 0, 0, 0, 0, 0, null, "", null, damage, terrainDamageBonus, blightMultiplier);
+  placeGroundPatch(ownerId: number, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number, sizeScale = 1, halfDamage = false): NapalmPatch | null {
+    return this.acquireOrMerge(ownerId, "ground", x, y, 0, 0, 0, 0, 0, null, "", null, damage, terrainDamageBonus, blightMultiplier, sizeScale, halfDamage);
   }
 
-  placeCellPatch(ownerId: number, cx: number, cy: number, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number): NapalmPatch | null {
+  placeCellPatch(ownerId: number, cx: number, cy: number, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number, sizeScale = 1, halfDamage = false): NapalmPatch | null {
     if (!this.world.inBounds(cx, cy) || this.world.health[cy * this.world.width + cx] === 0) return null;
-    return this.acquireOrMerge(ownerId, "cell", x, y, cx, cy, 0, 0, 0, null, "", null, damage, terrainDamageBonus, blightMultiplier);
+    return this.acquireOrMerge(ownerId, "cell", x, y, cx, cy, 0, 0, 0, null, "", null, damage, terrainDamageBonus, blightMultiplier, sizeScale, halfDamage);
   }
 
-  placeSubPatch(ownerId: number, sx: number, sy: number, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number): NapalmPatch | null {
+  placeSubPatch(ownerId: number, sx: number, sy: number, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number, sizeScale = 1, halfDamage = false): NapalmPatch | null {
     if (!this.world.subInBounds(sx, sy) || this.world.subHealth[sy * this.world.subWidth + sx] === 0) return null;
-    return this.acquireOrMerge(ownerId, "subcell", x, y, sx >> 1, sy >> 1, sx, sy, 0, null, "", null, damage, terrainDamageBonus, blightMultiplier);
+    return this.acquireOrMerge(ownerId, "subcell", x, y, sx >> 1, sy >> 1, sx, sy, 0, null, "", null, damage, terrainDamageBonus, blightMultiplier, sizeScale, halfDamage);
   }
 
-  placeCreaturePatch(ownerId: number, creature: Creature, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number): NapalmPatch | null {
+  placeCreaturePatch(ownerId: number, creature: Creature, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number, sizeScale = 1, halfDamage = false): NapalmPatch | null {
     if (creature.hp <= 0) return null;
-    return this.acquireOrMerge(ownerId, "creature", x, y, 0, 0, 0, 0, creature.id, creature, "", null, damage, terrainDamageBonus, blightMultiplier);
+    return this.acquireOrMerge(ownerId, "creature", x, y, 0, 0, 0, 0, creature.id, creature, "", null, damage, terrainDamageBonus, blightMultiplier, sizeScale, halfDamage);
   }
 
-  placeEncounterPatch(ownerId: number, enc: Encounter, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number): NapalmPatch | null {
+  placeEncounterPatch(ownerId: number, enc: Encounter, x: number, y: number, damage: number, terrainDamageBonus: number, blightMultiplier: number, sizeScale = 1, halfDamage = false): NapalmPatch | null {
     if (!enc.alive || enc.hp <= 0 || enc.kind === "grove") return null;
-    return this.acquireOrMerge(ownerId, "encounter", x, y, 0, 0, 0, 0, 0, null, enc.id, enc, damage, terrainDamageBonus, blightMultiplier);
+    return this.acquireOrMerge(ownerId, "encounter", x, y, 0, 0, 0, 0, 0, null, enc.id, enc, damage, terrainDamageBonus, blightMultiplier, sizeScale, halfDamage);
   }
 
   /**
@@ -200,12 +208,11 @@ export class NapalmSystem {
    * Status-only cold hits and Napalm's own burn ticks must NEVER call this.
    */
   igniteAt(x: number, y: number, radius: number, ignitionOwnerId: number): number {
-    const r = radius + this.patchRadius;
-    const r2 = r * r;
     let litCount = 0;
     for (const p of this.patches) {
       if (!p.active || p.worldGen !== this.worldGen || p.lit) continue;
-      if ((p.x - x) ** 2 + (p.y - y) ** 2 <= r2) {
+      const reach = radius + this.patchRadius * p.sizeScale;
+      if ((p.x - x) ** 2 + (p.y - y) ** 2 <= reach * reach) {
         p.lit = true;
         p.ignitionOwnerId = ignitionOwnerId;
         p.burnElapsed = 0;
@@ -298,13 +305,13 @@ export class NapalmSystem {
       const ci = p.cy * this.world.width + p.cx;
       const isBlight = this.world.blight[ci] > 0;
       const dmg = (p.damage + this.world.breachBonus(p.cx, p.cy, p.terrainDamageBonus)) * (isBlight ? p.blightMultiplier : 1);
-      const res = this.world.damage(p.cx, p.cy, dmg, true);
+      const res = this.world.damage(p.cx, p.cy, dmg, true, 0, -1, p.halfDamage);
       if (res > 0) this.onTerrainTick?.(p.cx, p.cy, res, false, p.cx * 2, p.cy * 2, p.ownerId);
     } else if (p.hostKind === "subcell") {
       const si = p.sy * this.world.subWidth + p.sx;
       const isPink = this.world.isPinkSub(si);
       const dmg = (p.damage + this.world.breachBonusSub(p.sx, p.sy, p.terrainDamageBonus)) * (isPink ? p.blightMultiplier : 1);
-      const res = this.world.damageSub(p.sx, p.sy, dmg, true);
+      const res = this.world.damageSub(p.sx, p.sy, dmg, true, 0, -1, p.halfDamage);
       if (res > 0) this.onTerrainTick?.(p.sx >> 1, p.sy >> 1, res, true, p.sx, p.sy, p.ownerId);
     } else if (p.hostKind === "creature" && p.creature && creatures) {
       creatures.damageCreature(p.creature, p.damage, p.x, p.y);
@@ -318,14 +325,14 @@ export class NapalmSystem {
       if (this.world.inBounds(cx, cy)) {
         const ci = cy * this.world.width + cx;
         if (this.world.health[ci] > 0 && this.world.blight[ci] > 0) {
-          const res = this.world.damage(cx, cy, (p.damage + this.world.breachBonus(cx, cy, p.terrainDamageBonus)) * p.blightMultiplier, true);
+          const res = this.world.damage(cx, cy, (p.damage + this.world.breachBonus(cx, cy, p.terrainDamageBonus)) * p.blightMultiplier, true, 0, -1, p.halfDamage);
           if (res > 0) this.onTerrainTick?.(cx, cy, res, false, cx * 2, cy * 2, p.ownerId);
         } else if (this.world.anySolidInCell(cx, cy)) {
           for (let sy = cy * 2; sy <= cy * 2 + 1; sy++) {
             for (let sx = cx * 2; sx <= cx * 2 + 1; sx++) {
               const si = sy * this.world.subWidth + sx;
               if (this.world.subHealth[si] > 0 && this.world.isPinkSub(si)) {
-                const res = this.world.damageSub(sx, sy, (p.damage + this.world.breachBonusSub(sx, sy, p.terrainDamageBonus)) * p.blightMultiplier, true);
+                const res = this.world.damageSub(sx, sy, (p.damage + this.world.breachBonusSub(sx, sy, p.terrainDamageBonus)) * p.blightMultiplier, true, 0, -1, p.halfDamage);
                 if (res > 0) this.onTerrainTick?.(cx, cy, res, true, sx, sy, p.ownerId);
               }
             }
@@ -333,12 +340,12 @@ export class NapalmSystem {
         }
       }
       if (creatures) {
-        creatures.explode(p.x, p.y, this.patchRadius, p.damage);
+        creatures.explode(p.x, p.y, this.patchRadius * p.sizeScale, p.damage);
       }
       if (late) {
         for (const a of late.actors) {
           if (!a.alive || a.kind === "grove") continue;
-          const r = this.patchRadius + this.world.cellSize * (a.kind === "boss" ? 2.8 : a.kind === "brute" ? 1.2 : 0.8);
+          const r = this.patchRadius * p.sizeScale + this.world.cellSize * (a.kind === "boss" ? 2.8 : a.kind === "brute" ? 1.2 : 0.8);
           if (Math.hypot(a.x - p.x, a.y - p.y) < r) {
             late.damageEncounter(a, p.damage);
           }

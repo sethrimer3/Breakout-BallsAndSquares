@@ -11,6 +11,7 @@ export interface CircuitTrailSegment {
   progress1: number;
   life: number;
   maxLife: number;
+  sizeScale: number;
 }
 
 const CARDINAL_DIRS: readonly (readonly [number, number])[] = [
@@ -93,6 +94,7 @@ export class CircuitRunnerSystem {
     progress1: 0,
     life: 0,
     maxLife: CIRCUIT.trailLife,
+    sizeScale: 1,
   }));
 
   private nextSlot = 0;
@@ -105,6 +107,7 @@ export class CircuitRunnerSystem {
     progress0: number,
     progress1: number,
     maxLife = CIRCUIT.trailLife,
+    sizeScale = 1,
   ): void {
     if (Math.hypot(x2 - x1, y2 - y1) < 1e-4) return;
     const seg = this.segments[this.nextSlot];
@@ -117,6 +120,7 @@ export class CircuitRunnerSystem {
     seg.progress0 = Math.max(0, Math.min(1, progress0));
     seg.progress1 = Math.max(0, Math.min(1, progress1));
     seg.maxLife = maxLife;
+    seg.sizeScale = sizeScale;
     seg.life = maxLife;
   }
 

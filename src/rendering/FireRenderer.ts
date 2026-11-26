@@ -51,7 +51,8 @@ export class FireRenderer {
       if (kind === FKind.Smoke) continue;
       const sx = cam.worldToScreenX(fire.x[i]);
       const sy = cam.worldToScreenY(fire.y[i]);
-      if (sx < -8 || sy < -8 || sx > vw + 8 || sy > vh + 8) continue;
+      const pad = Math.max(8, 2 * ART_PIXEL * cam.zoom * fire.sizeScale[i]);
+      if (sx < -pad || sy < -pad || sx > vw + pad || sy > vh + pad) continue;
       const age = 1 - fire.life[i] / fire.maxLife[i];
       const gx = Math.floor(fire.x[i] / ART_PIXEL);
       const gy = Math.floor(fire.y[i] / ART_PIXEL);
@@ -67,7 +68,7 @@ export class FireRenderer {
       ctx.fillStyle = FLAME_RAMP[c];
       ctx.globalAlpha = Math.min(1, (1 - age) * 2.2) * 0.85;
       // Young, hot flames are chunkier; they thin to single pixels as they cool.
-      this.pixel(ctx, cam, gx, gy, temp > 0.55 ? 2 : 1);
+      this.pixel(ctx, cam, gx, gy, (temp > 0.55 ? 2 : 1) * fire.sizeScale[i]);
     }
     ctx.globalAlpha = 1;
   }
