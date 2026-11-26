@@ -551,6 +551,17 @@ export function sanitizeSaveData(raw: unknown): SaveData {
     for (let id = 1; id <= LAB_WORLD_COUNT; id++) def.lab.worlds[id] = sanitizeLabWorld(worlds[id], id);
     // Saves from before zone 2 kept zone 1's progress at the top level.
     if (!lab.worlds && "discovered" in lab) def.lab.worlds[1] = sanitizeLabWorld(lab, 1);
+    // Exotic DNA is now granted the moment a generator dies. Pay out any drop an
+    // older save left lying uncollected, so nobody loses it.
+    for (let id = 1; id <= LAB_WORLD_COUNT; id++) {
+      const destroyed = def.lab.worlds[id].destroyedGenerators;
+      if (!destroyed) continue;
+      for (const key of Object.keys(destroyed)) {
+        if (destroyed[key]) continue;
+        destroyed[key] = true;
+        def.exoticMatter++;
+      }
+    }
     const int = (x: unknown, fallback: number): number => (typeof x === "number" && Number.isInteger(x) ? x : fallback);
     def.lab.unlocked = clamp(int(lab.unlocked, 1), 1, LAB_WORLD_COUNT);
     def.lab.world = clamp(int(lab.world, 1), 1, def.lab.unlocked);

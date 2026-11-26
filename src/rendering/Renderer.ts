@@ -1,4 +1,5 @@
 import { exoticMatterPixels } from "./exoticMatterSprite";
+import { EXOTIC_BURST, EXOTIC_MOTE_COLORS } from "../systems/ExoticBurst";
 import { OffscreenSoldierRenderer } from "./OffscreenSoldierRenderer";
 import { circleIsClear } from "../systems/PhysicsSystem";
 import { DeploymentOverlay } from "./DeploymentOverlay";
@@ -390,26 +391,68 @@ export class Renderer {
     if (lastAlpha !== 1) ctx.globalAlpha = 1;
   }
 
-  /** Blight Essence drops: the living glob, on whole screen pixels so it stays crisp. */
+  /**
+   * The exotic DNA show over a destroyed generator: the strand pops out, hangs,
+   * swells, then bursts into black/orange/pink pixels that fly into the nearest
+   * soldier. Purely cosmetic: the DNA was granted on the kill.
+   */
   private drawExoticMatter(now: number, still: boolean): void {
     const { game, ctx } = this;
-    if (!game.exoticDrops.length) return;
+    const fx = game.exoticBursts;
+    if (!fx.shows.length && !fx.motes.length && !fx.glow.size) return;
     const cam = game.camera;
-    const frame = essenceFrame(now, still);
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    for (const drop of game.exoticDrops) {
-      const x = cam.worldToScreenX(drop.x), y = cam.worldToScreenY(drop.y);
-      if (x < -32 || y < -32 || x > cam.viewW + 32 || y > cam.viewH + 32) continue;
-      if (!game.devMapAccess && game.fog.lightAt(drop.x, drop.y) <= 0) continue;
+    if (fx.shows.length) {
+      const frame = essenceFrame(now, still);
       const canvas = this.exoticCanvas ??= document.createElement("canvas");
       if (frame !== this.exoticFrame) {
         paintPixels(canvas, exoticMatterPixels(frame * 0.09));
         this.exoticFrame = frame;
       }
-      const scale = Math.max(1, Math.min(3, Math.round(cam.zoom)));
-      const bob = still ? 0 : Math.sin(now / 350) * 3;
-      ctx.drawImage(canvas, Math.round(x - canvas.width * scale / 2), Math.round(y - canvas.height * scale / 2 + bob), canvas.width * scale, canvas.height * scale);
+      const base = Math.max(1, Math.min(3, Math.round(cam.zoom)));
+      for (const show of fx.shows) {
+        const x = cam.worldToScreenX(show.x), y = cam.worldToScreenY(show.y);
+        if (x < -40 || y < -40 || x > cam.viewW + 40 || y > cam.viewH + 40) continue;
+        const t = show.age / EXOTIC_BURST.hold;
+        // Pop in with a little overshoot, hang, then swell just before bursting.
+        const pop = t < 0.2 ? Math.sin((t / 0.2) * Math.PI * 0.62) / Math.sin(Math.PI * 0.62) * 1.15 : t > 0.8 ? 1 + (t - 0.8) * 1.6 : 1;
+        const lift = Math.min(1, t / 0.25) * 10 * base;
+        const w = Math.max(1, Math.round(canvas.width * base * pop)), h = Math.max(1, Math.round(canvas.height * base * pop));
+        const shake = t > 0.8 && !still ? Math.round(Math.sin(now / 18) * base) : 0;
+        ctx.drawImage(canvas, Math.round(x - w / 2) + shake, Math.round(y - h / 2 - lift), w, h);
+      }
+    }
+    const px = Math.max(1, Math.round(cam.zoom * 1.5));
+    for (const m of fx.motes) {
+      if (m.age < 0) continue;
+      const x = cam.worldToScreenX(m.x), y = cam.worldToScreenY(m.y);
+      if (x < -20 || y < -20 || x > cam.viewW + 20 || y > cam.viewH + 20) continue;
+      const s = px * m.size;
+      // A trail pixel one step behind, in the same color, half seen.
+      const tx = cam.worldToScreenX(m.x - m.vx * 0.03), ty = cam.worldToScreenY(m.y - m.vy * 0.03);
+      if (m.color === 0) {
+        // Black pixels get a pink rim so they read against the dark lab.
+        ctx.fillStyle = "#7a1f55";
+        ctx.fillRect(Math.round(x - s / 2) - 1, Math.round(y - s / 2) - 1, s + 2, s + 2);
+      }
+      ctx.fillStyle = EXOTIC_MOTE_COLORS[m.color];
+      ctx.globalAlpha = 0.45;
+      ctx.fillRect(Math.round(tx - s / 2), Math.round(ty - s / 2), s, s);
+      ctx.globalAlpha = 1;
+      ctx.fillRect(Math.round(x - s / 2), Math.round(y - s / 2), s, s);
+    }
+    // Absorb shimmer: a few colored pixels twinkling round the soldier.
+    for (const [s, left] of fx.glow) {
+      if (!s.alive) continue;
+      const x = cam.worldToScreenX(s.x), y = cam.worldToScreenY(s.y);
+      const r = (s.radius + 3) * cam.zoom;
+      ctx.globalAlpha = Math.min(1, left * 1.6);
+      for (let i = 0; i < 6; i++) {
+        const a = i * Math.PI / 3 + (still ? 0 : now / 260);
+        ctx.fillStyle = EXOTIC_MOTE_COLORS[1 + (i % 3)];
+        ctx.fillRect(Math.round(x + Math.cos(a) * r - px / 2), Math.round(y + Math.sin(a) * r - px / 2), px, px);
+      }
     }
     ctx.restore();
   }
