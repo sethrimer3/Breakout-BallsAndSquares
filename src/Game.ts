@@ -1,4 +1,4 @@
-import { exoticDrop, generatorKey, type ExoticDrop } from "./world/ExoticMatter";
+import { generatorKey } from "./world/ExoticMatter";
 import { BrowserFrameEvents } from "./core/BrowserFrameEvents";
 import { FrameTimings } from "./core/FrameTimings";
 import { DamageNumbers } from "./entities/DamageNumbers";
@@ -28,6 +28,7 @@ import { CameraSystem } from "./systems/CameraSystem";
 import { CombatSystem } from "./systems/CombatSystem";
 import { CombinedTargets, RoomFixtures } from "./systems/RoomFixtures";
 import { SpecialUpgradeSystem } from "./systems/SpecialUpgrades";
+import { ExoticBurstSystem } from "./systems/ExoticBurst";
 import { BlightWardenSystem, type Warden } from "./systems/BlightWardens";
 import { SpawnPortal } from "./systems/SpawnPortal";
 import { SPECIAL_UNLOCKS } from "./progression/specialUnlocks";
@@ -188,7 +189,8 @@ export class Game {
   private bankedThisRun = false;
   /** Discovered / conquered sectors of the hand-made lab (mirrors `save.data.lab`). */
   labProgress = new LabProgress();
-  exoticDrops: ExoticDrop[] = [];
+  /** Cosmetic DNA strand + pixel burst over destroyed generators (the DNA is granted on the kill). */
+  readonly exoticBursts: ExoticBurstSystem;
   labMap!: LabMap;
   private labCheckT = 0;
   /** The "access needed" notice over a locked world gate (run seconds it started), or null. */
@@ -409,6 +411,14 @@ export class Game {
       },
     }, () => this.rng.next());
     this.specials.isShielded = (id) => this.wardens.isGuarded(id);
+    this.exoticBursts = new ExoticBurstSystem(() => this.soldiers, {
+      onBurst: (x, y) => {
+        this.audio.playGlassShatter(x, y);
+        this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.2, 20, 0xff8a1e, 1);
+        this.particles.spawn(PKind.Burst, x, y, 0, 0, 0.32, 14, 0xff48a4, 1);
+      },
+      onMoteAbsorbed: (s) => this.audio.playPickup(s.x, s.y),
+    }, () => this.rng.next());
     this.combat.targets = new CombinedTargets([this.creatures, this.fixtures, this.late, this.wardens, this.specials]);
     this.combat.late = this.late;
     this.camera = new CameraSystem(this.world);
@@ -713,7 +723,7 @@ export class Game {
     if (!this.canDeployInto(lab.spawn)) lab.spawn = def.start;
     generateWorld(this.world, labWorldSeed(def.id), { conquered: this.labProgress.conquered, destroyedGenerators: lab.destroyedGenerators, labWorld: def, spawn: lab.spawn });
     this.labProgress.attach(this.world);
-    this.exoticDrops = Object.entries(lab.destroyedGenerators ?? {}).flatMap(([id, claimed]) => claimed ? [] : [exoticDrop(id, this.world.cellSize)]);
+    this.exoticBursts.reset();
     this.creatures.flowerMult = def.alien ? FACILITY.alienFlowerMult : 1;
     this.gateNotice = null;
     this.gateHits.length = 0;
@@ -1529,8 +1539,10 @@ export class Game {
     const id = generatorKey(destroyedCore);
     const destroyed = this.labSave.destroyedGenerators ??= {};
     if (id in destroyed) return;
-    destroyed[id] = false;
-    this.exoticDrops.push(exoticDrop(id, this.world.cellSize));
+    // The DNA goes straight into the wallet so it can never be missed; the
+    // strand and pixel burst below are only for show.
+    destroyed[id] = true;
+    this.save.data.exoticMatter++;
     this.labCheckT = 0;
     this.updateLabProgress(0);
     this.save.save();
@@ -1556,6 +1568,7 @@ export class Game {
     for (let i = 0; i < essence; i++) {
       this.loot.spawnOne(coreWx, coreWy, essenceLife, this.rng, LootKind.Essence);
     }
+    this.exoticBursts.spawn(coreWx, coreWy);
     this.particles.spawn(PKind.Burst, coreWx, coreWy, 0, 0, 0.45, 28, 0xff48a4, 1);
     for (let i = 0; i < 36; i++) {
       const a = this.rng.range(0, Math.PI * 2);
@@ -1572,19 +1585,6 @@ export class Game {
         col,
         5,
       );
-    }
-  }
-
-  private collectExoticMatter(): void {
-    const radiusSquared = (2 * this.world.cellSize) ** 2;
-    for (let i = this.exoticDrops.length - 1; i >= 0; i--) {
-      const drop = this.exoticDrops[i];
-      if (!this.soldiers.some(s => s.alive && (s.x - drop.x) ** 2 + (s.y - drop.y) ** 2 <= radiusSquared)) continue;
-      this.labSave.destroyedGenerators![drop.id] = true;
-      this.exoticDrops.splice(i, 1);
-      this.save.data.exoticMatter++;
-      this.audio.playPickup(drop.x, drop.y);
-      this.save.save();
     }
   }
 
@@ -2189,7 +2189,7 @@ export class Game {
     this.subPixels.update(dt, this.soldiers);
     this.lighting.invalidateMovingSubPixels();
     metrics.subPixelSimulationMs += performance.now() - subStart;
-    if (this.exoticDrops.length) this.collectExoticMatter();
+    this.exoticBursts.update(dt);
     const collected = this.loot.update(dt, this.soldiers, this.stats.magnetRange, (x, y) => this.audio.playPickup(x, y));
     if (collected > 0) {
       this.runStats.currency += this.loot.collectedGold;
